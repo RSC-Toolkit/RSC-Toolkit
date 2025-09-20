@@ -23,8 +23,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Upgrade pip & install build backend
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel build
 
-# Install the package (uses pyproject.toml) saves some time at builds
-# By default: minimal install. For extras, use `--extras viz,dev`
 COPY . .
 RUN pip install --no-cache-dir .
 

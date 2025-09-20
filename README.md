@@ -25,7 +25,7 @@ pip install -e .
 You can automatically download and extract the official ICBHI dataset with:
 
 ```bash
-rsc-toolkit dataset download icbhi --outdir ./datasets
+rsc-toolkit datasets download icbhi --datasets_download_path ./datasets
 ```
 This will create ./datasets/ICBHI_final_database/ by default
 ```
