@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "rsc-toolkit"
+version = "0.1.0"
+description = "Respiratory Sound Classification Toolkit"
+readme = "README.md"
+requires-python = ">=3.9"
+license = "MIT"
+license-files = ["LICENSE"]
+
+dependencies = [
+    "pydantic",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "black",
+    "flake8",
+    "isort",
+]
+
+[project.scripts]
+rsc-toolkit = "rsc_toolkit.cli:main"
+
+[tool.setuptools]
+packages = ["rsc_toolkit"]

@@ -1,0 +1,15 @@
+FROM rsc-toolkit:latest
+
+# Set environment variables
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+# re-install as editable
+RUN pip uninstall -y rsc-toolkit && pip install -e .
+# Add dev extras (viz, linting, testing)
+# RUN pip install --no-cache-dir .[viz,dev]
+# Cache hack: copy all project files after install
+COPY . .
+
+# Default command (can be overridden at runtime)
+CMD ["python"]
