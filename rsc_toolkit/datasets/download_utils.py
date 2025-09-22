@@ -3,6 +3,7 @@ import requests
 import tqdm
 import urllib3
 import logging
+import zipfile
 
 
 logger = logging.getLogger(__name__)
@@ -36,3 +37,10 @@ def download_file(url: str, out_path: str, chunk_size: int = 1024):
                     if chunk:
                         f.write(chunk)
                         pbar.update(len(chunk))
+
+
+def extract_zip(zip_path: str, out_dir: str):
+    with zipfile.ZipFile(zip_path, "r") as z:
+        z.extractall(out_dir)
+
+

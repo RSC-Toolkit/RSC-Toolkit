@@ -5,7 +5,7 @@ import functools
 
 from rsc_toolkit.datasets.base import BaseDatasetDownloader, BaseDataset
 from rsc_toolkit.datasets import DatasetFactory
-from rsc_toolkit.datasets.download_utils import download_file
+from rsc_toolkit.datasets.download_utils import download_file, extract_zip
 
 
 logger = logging.getLogger(__name__)
@@ -35,6 +35,7 @@ class ICBHIDatasetDownloader(BaseDatasetDownloader):
         Validate the dataset files.
         """
         if not self.extracted_dir.exists():
+            # this is a really simple check. Maybe better to see that all expected files are downloaded and unpacked.
             return False
         return True
 
@@ -45,7 +46,16 @@ class ICBHIDatasetDownloader(BaseDatasetDownloader):
             "Process:\n" \
             f"\t- Download and unzip single archive from {self.dataset_download_url}\n"
             )
-        download_file(self.dataset_download_url, self.zip_path)
+
+        if self.force or not self.zip_path.exists():
+            download_file(url=self.dataset_download_url, out_path=self.zip_path)
+        else:
+            logger.info(f"Found dataset at {self.zip_path}, skipping download!")
+
+        if self.force or not self.extracted_dir.exists():
+            extract_zip(zip_path=self.zip_path, out_dir=self.extracted_dir)
+        else:
+            logger.info(f"Found extracted files at {self.extracted_dir}, skipping extraction!")
 
 
 @DatasetFactory.register_dataset_class("icbhi")

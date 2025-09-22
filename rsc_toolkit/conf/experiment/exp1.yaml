@@ -1,0 +1,8 @@
+defaults:
+  - dataset: icbhi
+  - model: bts
+
+training:
+  epochs: 50
+model:
+  dropout: 0.5

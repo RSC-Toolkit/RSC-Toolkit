@@ -11,6 +11,8 @@ class BaseDatasetDownloader(ABC, BaseModel):
     Interface for downloading datasets
     """
     name: str
+    outputs_directory: str
+    force: bool
 
     @abstractmethod
     def validate_dataset_files(self) -> bool:
@@ -25,11 +27,12 @@ class BaseDatasetDownloader(ABC, BaseModel):
         """
 
     def download(self):
-        if self.validate_dataset_files():
-            logger.info(f"✅ Found existing dataset {self.name}, skipping download.")
+        if not self.force and self.validate_dataset_files():
+            logger.info(f"✅ Found existing {self.name}, skipping download.")
             return
-        logger.info(f"⬇️ Downloading dataset {self.name}")
+        logger.info(f"⬇️ Downloading {self.name}")
         self.download_dataset()
+        logger.info(f"✅ Completed {self.name} download")
         
 
     
@@ -42,3 +45,7 @@ class BaseDataset(ABC, BaseModel):
 
     def get_downloader(self, **kwargs):
         return self.downloader(**kwargs)
+
+    def download(self, **kwargs):
+        downloader = self.get_downloader(**kwargs)
+        downloader.download()

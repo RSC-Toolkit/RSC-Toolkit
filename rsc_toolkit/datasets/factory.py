@@ -1,4 +1,4 @@
-from typing import ClassVar
+from typing import ClassVar, List
 import importlib
 import pkgutil
 import sys
@@ -30,6 +30,10 @@ class DatasetFactory:
             cls.datasets[dataset_name] = dataset_cls
             return dataset_cls
         return decorator
+
+    @classmethod
+    def get_dataset_names(cls) -> List[str]:
+        return list(cls.datasets.keys())
 
     @classmethod
     def get_dataset_class(cls, dataset_name: str) -> type[BaseDataset]:
