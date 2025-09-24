@@ -3,16 +3,15 @@ import logging
 import functools
 
 
-from rsc_toolkit.datasets.base import BaseDatasetDownloader, BaseDataset
+from rsc_toolkit.datasets.icbhi_dataset import ICBHIDataset
 from rsc_toolkit.datasets import DatasetFactory
-from rsc_toolkit.datasets.download_utils import download_file, extract_zip
 
 
 logger = logging.getLogger(__name__)
 
 
 @DatasetFactory.register_dataset_class("toy")
-class ToyDataset(BaseDataset):
+class ToyDataset(ICBHIDataset):
     """
     Toy Dataset for testing.
 

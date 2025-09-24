@@ -1,7 +1,11 @@
-from typing import Optional
+from typing import ClassVar
 from abc import ABC, abstractmethod
 from pydantic import BaseModel
 import logging
+import functools
+import pathlib
+import hashlib
+import json
 
 
 logger = logging.getLogger(__name__)
@@ -13,7 +17,7 @@ class BaseDatasetDownloader(ABC, BaseModel):
     """
     name: str
     outputs_directory: str
-    force: bool
+    force: bool = False
 
     @abstractmethod
     def validate_dataset_files(self) -> bool:
@@ -36,17 +40,78 @@ class BaseDatasetDownloader(ABC, BaseModel):
         logger.info(f"✅ Completed {self.name} download")
         
 
+
+class BaseDatasetProcessor(ABC, BaseModel):
+    """
+    Interface for processing datasets for training
+    """
+    name: str # TODO better to use this from parent?
+    outputs_directory: str
+    force: bool = False
+
+    @functools.cached_property
+    def cache_dir_path(self):
+
+        def _create_unique_name(**kwargs):
+            # Sort keys for determinism
+            serialized = json.dumps(kwargs, sort_keys=True, default=str)
+            # Hash for compact unique identifier
+            return hashlib.md5(serialized.encode()).hexdigest()
+        
+        # put settings that should distinguish in here
+        key = _create_unique_name(
+
+        )
+
+        # create cache/dataset/DatasetName dir for temp files.
+        cache_path = pathlib.Path(self.outputs_directory, "dataset", self.name, key)
+        cache_path.mkdir(parents=True, exist_ok=True)
+        return cache_path
+
+    @abstractmethod
+    def validate_dataset_files(self) -> bool:
+        """
+        Validate preocessed files files
+        """
+
+    @abstractmethod
+    def process_dataset(self) -> None:
+        """
+        Process the dataset for running
+        """
+
+    def process(self):
+        if not self.force and self.validate_dataset_files():
+            logger.info(f"Found existing {self.name}, skipping download.")
+            return
+        logger.info(f"⬇️ Processing {self.name}")
+        self.process_dataset()
+        logger.info(f"✅ Completed {self.name} processing")
+
     
 class BaseDataset(ABC, BaseModel):
     """
     Interface datasets
     """
 
-    downloader: Optional[type[BaseDatasetDownloader]] = None
+    downloader_class: ClassVar[type[BaseDatasetDownloader]]
+    processor_class: ClassVar[type[BaseDatasetProcessor]]
 
-    def get_downloader(self, **kwargs):
-        return self.downloader(**kwargs)
+    downloader: BaseDatasetDownloader
+    processor: BaseDatasetProcessor
 
-    def download(self, **kwargs):
-        downloader = self.get_downloader(**kwargs)
-        downloader.download()
+    @classmethod
+    def make_downloader(cls, **kwargs) -> BaseDatasetDownloader:
+        return cls.downloader_class(**kwargs)
+
+    @classmethod
+    def make_processor(cls, **kwargs) -> BaseDatasetProcessor:
+        return cls.processor_class(**kwargs)
+
+    def download(self):
+        self.downloader.download()
+
+    def process(self):
+        self.processor.process()
+
+

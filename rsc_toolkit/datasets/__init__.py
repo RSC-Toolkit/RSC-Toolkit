@@ -18,7 +18,16 @@ def build_parser(subparsers):
     return dataset_parser
 
 
-def handle_command(args) -> None:
+def create_dataset(args):
     dataset_class = DatasetFactory.get_dataset_class(dataset_name=args.dataset)
-    dataset = dataset_class()
-    dataset.download(outputs_directory=args.datasets_directory, force=args.force)
+    downloader = dataset_class.make_downloader(outputs_directory=args.datasets_directory, force=args.force)
+    processor = dataset_class.make_processor(outputs_directory=args.datasets_directory, force=args.force)
+    dataset = dataset_class(
+        downloader=downloader,
+        processor=processor,
+    )
+    return dataset
+
+def handle_command(args) -> None:
+    dataset = create_dataset(args)
+    dataset.download()

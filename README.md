@@ -85,3 +85,4 @@ rsc-toolkit train --config configs/sprsound/intra/bts_ce.yaml
 
 ## Development
 
+Install development deps with `pip install -e .[dev]`, then run tests with `pytest`

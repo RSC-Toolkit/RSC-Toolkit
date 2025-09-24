@@ -1,9 +1,10 @@
+from typing import ClassVar
 import pathlib
 import logging
 import functools
 
 
-from rsc_toolkit.datasets.base import BaseDatasetDownloader, BaseDataset
+from rsc_toolkit.datasets.base import BaseDataset, BaseDatasetDownloader, BaseDatasetProcessor
 from rsc_toolkit.datasets import DatasetFactory
 from rsc_toolkit.datasets.download_utils import download_file, extract_zip
 
@@ -13,7 +14,6 @@ logger = logging.getLogger(__name__)
 
 class ICBHIDatasetDownloader(BaseDatasetDownloader):
     name: str = "ICBHI"
-    outputs_directory: str
     dataset_download_url: str = "https://bhichallenge.med.auth.gr/sites/default/files/ICBHI_final_database/ICBHI_final_database.zip"
 
     # Extra links on the page, maybe not needed.
@@ -62,10 +62,46 @@ class ICBHIDatasetDownloader(BaseDatasetDownloader):
             logger.info(f"Found extracted files at {self.extracted_dir}, skipping extraction!")
 
 
+class ICBHIDatasetProcessor(BaseDatasetProcessor):
+    name: str = "ICBHI"
+
+    @property
+    def train_cache_file(self):
+        return self.cache_dir_path / "icbhi_training.pt"
+
+    @property
+    def train_cache_classes_file(self):
+        return self.cache_dir_path / "icbhi_class_nums.pt"
+
+    @property
+    def test_cache_file(self):
+        return self.cache_dir_path / "icbhi_test.pt"
+    
+    def validate_dataset_files(self) -> bool:
+        """
+        Validate preocessed files files
+        """
+        if not self.train_cache_classes_file.exists():
+            return False
+        if not self.train_cache_file.exists():
+            return False
+        if not self.test_cache_file.exists():
+            return False
+        return True
+
+    def process_dataset(self) -> None:
+        """
+        Process the dataset for running
+        """
+        raise NotImplementedError
+
+
 @DatasetFactory.register_dataset_class("icbhi")
 class ICBHIDataset(BaseDataset):
     """
     ICBHI Dataset
     https://bhichallenge.med.auth.gr/ICBHI_2017_Challenge
     """
-    downloader: type[ICBHIDatasetDownloader] = ICBHIDatasetDownloader
+    downloader_class: ClassVar[type[ICBHIDatasetDownloader]] = ICBHIDatasetDownloader
+    processor_class: ClassVar[type[ICBHIDatasetProcessor]] = ICBHIDatasetProcessor
+
