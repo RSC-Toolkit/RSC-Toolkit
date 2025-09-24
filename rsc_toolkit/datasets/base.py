@@ -1,3 +1,4 @@
+from typing import Optional
 from abc import ABC, abstractmethod
 from pydantic import BaseModel
 import logging
@@ -28,7 +29,7 @@ class BaseDatasetDownloader(ABC, BaseModel):
 
     def download(self):
         if not self.force and self.validate_dataset_files():
-            logger.info(f"✅ Found existing {self.name}, skipping download.")
+            logger.info(f"Found existing {self.name}, skipping download.")
             return
         logger.info(f"⬇️ Downloading {self.name}")
         self.download_dataset()
@@ -41,7 +42,7 @@ class BaseDataset(ABC, BaseModel):
     Interface datasets
     """
 
-    downloader: type[BaseDatasetDownloader]
+    downloader: Optional[type[BaseDatasetDownloader]] = None
 
     def get_downloader(self, **kwargs):
         return self.downloader(**kwargs)

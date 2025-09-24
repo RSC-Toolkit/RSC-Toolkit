@@ -16,6 +16,10 @@ class ICBHIDatasetDownloader(BaseDatasetDownloader):
     outputs_directory: str
     dataset_download_url: str = "https://bhichallenge.med.auth.gr/sites/default/files/ICBHI_final_database/ICBHI_final_database.zip"
 
+    # Extra links on the page, maybe not needed.
+    metadata_download_url: str = "https://bhichallenge.med.auth.gr/sites/default/files/ICBHI_final_database/ICBHI_Challenge_demographic_information.txt"
+    events_download_url: str = "https://bhichallenge.med.auth.gr/sites/default/files/ICBHI_final_database/events.zip"
+
     @functools.cached_property
     def outputs_path(self) -> pathlib.Path:
         path = pathlib.Path(self.outputs_directory).expanduser().resolve()
@@ -65,43 +69,3 @@ class ICBHIDataset(BaseDataset):
     https://bhichallenge.med.auth.gr/ICBHI_2017_Challenge
     """
     downloader: type[ICBHIDatasetDownloader] = ICBHIDatasetDownloader
-
-
-
-
-
-
-
-
-
-# def extract_zip(zip_path: str, out_dir: str):
-#     with zipfile.ZipFile(zip_path, "r") as z:
-#         z.extractall(out_dir)
-
-
-# @register_dataset("icbhi")
-# def download_icbhi(args):
-
-#     out_dir = args.outdir
-#     link_to = "data/icbhi_dataset/audio_test_data" # TODO This is temporarily needed.. 
-
-#     """Download and extract the ICBHI dataset."""
-#     url = "https://bhichallenge.med.auth.gr/sites/default/files/ICBHI_final_database/ICBHI_final_database.zip"
-#     out_dir = pathlib.Path(out_dir).expanduser().resolve()
-#     out_dir.mkdir(parents=True, exist_ok=True)
-
-#     zip_path = out_dir / "ICBHI_final_database.zip"
-#     extracted_dir = out_dir / "ICBHI_final_database"
-
-#     print(
-#         "Preparing to download ICBHI Dataset.\n" \
-#         "Process:\n" \
-#         f"\t- Download and unzip single archive from {url}\n" \
-#         f"\t- Create symlink to expected data dir: {str(link_to)}"
-#         )
-
-#     if not zip_path.exists():
-#         print(f"⬇️ Downloading ICBHI dataset to {zip_path}")
-#         download_file(url, zip_path)
-#     else:
-#         print(f"✅ Found existing file at {zip_path}, skipping download.")
