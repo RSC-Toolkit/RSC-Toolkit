@@ -8,13 +8,13 @@ import pathlib
 
 
 from rsc_toolkit.datasets.base import (
-    BaseDatasetDownloader,
-    BaseDatasetProcessor,
-    BaseDataset,
+    BaseRSCDatasetDownloader,
+    BaseRSCDatasetProcessor,
+    BaseRSCDataset,
 )
 
 
-class DummyDownloader(BaseDatasetDownloader):
+class DummyDownloader(BaseRSCDatasetDownloader):
     _valid: bool = PrivateAttr(default=False)
 
     def validate_dataset_files(self) -> bool:
@@ -24,7 +24,7 @@ class DummyDownloader(BaseDatasetDownloader):
         self._valid = True
 
 
-class DummyProcessor(BaseDatasetProcessor):
+class DummyProcessor(BaseRSCDatasetProcessor):
     _valid: bool = PrivateAttr(default=False)
 
     def validate_dataset_files(self) -> bool:
@@ -34,7 +34,7 @@ class DummyProcessor(BaseDatasetProcessor):
         (self.cache_dir_path / "dummy.txt").write_text("ok")
         self._valid = True
 
-class DummyDataset(BaseDataset):
+class DummyDataset(BaseRSCDataset):
     downloader_class = DummyDownloader
     processor_class = DummyProcessor
 
@@ -62,7 +62,7 @@ def test_dataset_integration(tmp_path):
         processor=DummyProcessor(name="dummy", outputs_directory=str(tmp_path)),
     )
 
-    # Use BaseDataset convenience methods
+    # Use BaseRSCDataset convenience methods
     dataset.download()
     dataset.process()
 

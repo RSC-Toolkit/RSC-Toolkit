@@ -11,7 +11,7 @@ import json
 logger = logging.getLogger(__name__)
 
 
-class BaseDatasetDownloader(ABC, BaseModel):
+class BaseRSCDatasetDownloader(ABC, BaseModel):
     """
     Interface for downloading datasets
     """
@@ -41,7 +41,7 @@ class BaseDatasetDownloader(ABC, BaseModel):
         
 
 
-class BaseDatasetProcessor(ABC, BaseModel):
+class BaseRSCDatasetProcessor(ABC, BaseModel):
     """
     Interface for processing datasets for training
     """
@@ -89,23 +89,23 @@ class BaseDatasetProcessor(ABC, BaseModel):
         logger.info(f"✅ Completed {self.name} processing")
 
     
-class BaseDataset(ABC, BaseModel):
+class BaseRSCDataset(ABC, BaseModel):
     """
     Interface datasets
     """
 
-    downloader_class: ClassVar[type[BaseDatasetDownloader]]
-    processor_class: ClassVar[type[BaseDatasetProcessor]]
+    downloader_class: ClassVar[type[BaseRSCDatasetDownloader]]
+    processor_class: ClassVar[type[BaseRSCDatasetProcessor]]
 
-    downloader: BaseDatasetDownloader
-    processor: BaseDatasetProcessor
+    downloader: BaseRSCDatasetDownloader
+    processor: BaseRSCDatasetProcessor
 
     @classmethod
-    def make_downloader(cls, **kwargs) -> BaseDatasetDownloader:
+    def make_downloader(cls, **kwargs) -> BaseRSCDatasetDownloader:
         return cls.downloader_class(**kwargs)
 
     @classmethod
-    def make_processor(cls, **kwargs) -> BaseDatasetProcessor:
+    def make_processor(cls, **kwargs) -> BaseRSCDatasetProcessor:
         return cls.processor_class(**kwargs)
 
     def download(self):

@@ -4,11 +4,11 @@ import pkgutil
 import sys
 
 
-from rsc_toolkit.datasets.base import BaseDataset
+from rsc_toolkit.datasets.base import BaseRSCDataset
 
 
 class DatasetFactory:
-    datasets: ClassVar[dict[str, type[BaseDataset]]] = {}
+    datasets: ClassVar[dict[str, type[BaseRSCDataset]]] = {}
 
     @staticmethod
     def register_datasets():
@@ -26,7 +26,7 @@ class DatasetFactory:
     @classmethod
     def register_dataset_class(cls, dataset_name: str):
         """Decorator to register a dataset class."""
-        def decorator(dataset_cls: type[BaseDataset]):
+        def decorator(dataset_cls: type[BaseRSCDataset]):
             cls.datasets[dataset_name] = dataset_cls
             return dataset_cls
         return decorator
@@ -36,5 +36,5 @@ class DatasetFactory:
         return list(cls.datasets.keys())
 
     @classmethod
-    def get_dataset_class(cls, dataset_name: str) -> type[BaseDataset]:
+    def get_dataset_class(cls, dataset_name: str) -> type[BaseRSCDataset]:
         return cls.datasets[dataset_name]
