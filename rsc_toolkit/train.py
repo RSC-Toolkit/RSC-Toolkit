@@ -8,5 +8,6 @@ def hydra_main(overrides=None):
         print(OmegaConf.to_yaml(cfg))
 
     _main(overrides)
+
 if __name__ == "__main__":
     hydra_main()

@@ -1,5 +1,5 @@
 from typing import ClassVar, Dict, Optional, List, Tuple
-from pydantic import BaseModel, field_validator, ConfigDict
+from pydantic import BaseModel, field_validator, ConfigDict, Field
 import pathlib
 import logging
 import functools
@@ -82,6 +82,14 @@ CHEST_LOCATIONS = {
     "Lr": "Lateral right",
 }
 
+LABEL_MAP = { # (Crackle, Wheeze)
+    (0, 0): 0,  # normal
+    (1, 0): 1,  # crackle only
+    (0, 1): 2,  # wheeze only
+    (1, 1): 3,  # both crackle and wheeze
+}
+
+
 class RecordingMetadata(BaseModel):
     # From filename
     patient_id: int
@@ -140,8 +148,38 @@ class Cycle(BaseModel):
     start: float                       # seconds
     end: float                         # seconds
     annotation: pd.Series              # the row from the annotation file
-    label: Optional[int] = None        # processor fills this in
     features: Optional[torch.Tensor] = None  # e.g. spectrogram
+
+    recording: Optional["Recording"] = Field(repr=False)    # reference to recording where this was from
+
+    @property
+    def label(self):
+        """Compute label from annotation if not already assigned."""
+        c = int(self.annotation["Crackle"])
+        w = int(self.annotation["Wheeze"])
+        self.label = {
+            (0, 0): 0,
+            (1, 0): 1,
+            (0, 1): 2,
+            (1, 1): 3,
+        }[(c, w)]
+        return self.label
+
+    def to_dict(self) -> dict:
+        """Prepare for serialization."""
+        return {
+            "audio": self.audio,
+            "start": self.start,
+            "end": self.end,
+            "label": self.label,
+            "annotation": self.annotation.to_dict(),
+            "meta": self.recording.meta,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict):
+        data["annotation"] = pd.Series(data["annotation"])
+        return cls(**data)
 
 
 class Recording(BaseModel):
@@ -293,7 +331,13 @@ class ICBHIDatasetProcessor(BaseRSCDatasetProcessor):
             rec.meta.chest_location_id = row["chest_location"]
 
     def _extract_cycles(self, rec: Recording):
-        print(rec.compute_cycles(sample_rate=self.sample_rate))
+        cycles = rec.compute_cycles(sample_rate=self.sample_rate)
+        for i, cycle in enumerate(cycles):
+            cycle_id = f"{rec.wav_path.stem}_cycle_{i:03d}"
+            store.save_cycle(cycle_id, cycle.model_dump())
+
+        
+        
         # raw_cycles = rec.get_individual_cycles_torchaudio(
         #     annotations,
         #     self.config.audio_processing.sample_rate
@@ -309,11 +353,14 @@ class ICBHIDatasetProcessor(BaseRSCDatasetProcessor):
         """
         Process the dataset for running
         """
+        store = self.build_cycle_store()
         recordings = self._discover_recordings()
         logger.debug(f"Found {len(recordings)} recordings: Example {recordings[0]}")
+        
         df_metadata = self._load_metadata_file()
         self._attach_metadata(recordings=recordings, df=df_metadata)
         logger.debug(f"Attached metadata: Example {recordings[0]}")
+        
         for recording in recordings:
             self._extract_cycles(recording)
             break

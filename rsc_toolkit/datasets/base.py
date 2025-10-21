@@ -114,4 +114,3 @@ class BaseRSCDataset(ABC, BaseModel):
     def process(self):
         self.processor.process()
 
-
