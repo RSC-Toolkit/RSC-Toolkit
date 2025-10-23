@@ -52,5 +52,5 @@ def test_cycle_index(dummy_cycle, tmp_path):
         cycle_id="2",
         cycle=dummy_cycle,
     )
-    print(store.finalize_index())
+    assert len(store.finalize_index()) == 2
     

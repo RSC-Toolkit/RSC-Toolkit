@@ -5,10 +5,12 @@ import logging
 import functools
 import torch
 import pandas as pd
+import tqdm
 
 
 from rsc_toolkit.datasets.base import BaseRSCDataset, BaseRSCDatasetDownloader, BaseRSCDatasetProcessor
 from rsc_toolkit.datasets import DatasetFactory
+from rsc_toolkit.datasets.cycle_store import BaseCycleStore, FileCycleStore
 from rsc_toolkit.datasets.download_utils import download_file, extract_zip
 
 
@@ -141,7 +143,7 @@ class RecordingMetadata(BaseModel):
         )
 
 
-class Cycle(BaseModel):
+class ICBHICycle(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     audio: torch.Tensor                # sliced waveform
@@ -150,20 +152,20 @@ class Cycle(BaseModel):
     annotation: pd.Series              # the row from the annotation file
     features: Optional[torch.Tensor] = None  # e.g. spectrogram
 
-    recording: Optional["Recording"] = Field(repr=False)    # reference to recording where this was from
+    # recording: Optional["Recording"] = Field(repr=False)    # reference to recording where this was from
 
     @property
     def label(self):
         """Compute label from annotation if not already assigned."""
         c = int(self.annotation["Crackle"])
         w = int(self.annotation["Wheeze"])
-        self.label = {
+        label = {
             (0, 0): 0,
             (1, 0): 1,
             (0, 1): 2,
             (1, 1): 3,
         }[(c, w)]
-        return self.label
+        return label
 
     def to_dict(self) -> dict:
         """Prepare for serialization."""
@@ -173,8 +175,13 @@ class Cycle(BaseModel):
             "end": self.end,
             "label": self.label,
             "annotation": self.annotation.to_dict(),
-            "meta": self.recording.meta,
+            # "meta": self.recording.meta,
         }
+
+    def to_index_entry(self) -> dict:
+        _data = self.to_dict()
+        _data.pop("audio")
+        return _data
 
     @classmethod
     def from_dict(cls, data: dict):
@@ -210,7 +217,7 @@ class Recording(BaseModel):
         df.columns = ["Start", "End", "Crackle", "Wheeze"] # TODO verify order
         return df
 
-    def compute_cycles(self, sample_rate: int) -> list[Cycle]:
+    def compute_cycles(self, sample_rate: int) -> list[ICBHICycle]:
         """Slice waveform into Cycle objects according to annotations."""
         data = self._load_and_preprocess_audio(sample_rate)
 
@@ -219,7 +226,7 @@ class Recording(BaseModel):
             start, end = row["Start"], row["End"]
             chunk = self._slice_data(start, end, data, sample_rate)
             cycles.append(
-                Cycle(audio=chunk, start=start, end=end, annotation=row)
+                ICBHICycle(audio=chunk, start=start, end=end, annotation=row)
             )
         return cycles
 
@@ -246,7 +253,7 @@ class ICBHIDatasetProcessor(BaseRSCDatasetProcessor):
     sample_rate: int = 10000 # TODO pass from config
     
     # Raw unpacked data here. Expecting other files in current dir.
-    raw_data_directory: str = "/home/miika/research/RSC-Toolkit/downloaded_datasets/ICBHI_final_database/ICBHI_final_database" # TODO take from config
+    raw_data_directory: str = "/src/downloaded_datasets/ICBHI_final_database/ICBHI_final_database" # TODO take from config
 
     DEVICE_IDS: Dict[str, int] = {'Meditron': 0, 'LittC2SE': 1, 'Litt3200': 2, 'AKGC417L': 3}
 
@@ -330,30 +337,18 @@ class ICBHIDatasetProcessor(BaseRSCDatasetProcessor):
             rec.meta.child_height = row["child_height"]
             rec.meta.chest_location_id = row["chest_location"]
 
-    def _extract_cycles(self, rec: Recording):
+    def _extract_cycles(self, rec: Recording, store: BaseCycleStore):
         cycles = rec.compute_cycles(sample_rate=self.sample_rate)
+        # for i, cycle in enumerate(tqdm.tqdm(cycles, desc="Processing cycles")): # Too much info in terminal
         for i, cycle in enumerate(cycles):
             cycle_id = f"{rec.wav_path.stem}_cycle_{i:03d}"
-            store.save_cycle(cycle_id, cycle.model_dump())
-
+            store.save_cycle(cycle_id, cycle)
         
-        
-        # raw_cycles = rec.get_individual_cycles_torchaudio(
-        #     annotations,
-        #     self.config.audio_processing.sample_rate
-        # )
-
-        # rec.cycles = []
-        # for audio_chunk, row in raw_cycles:
-        #     label = self.map_label(row)   # processor-specific
-        #     audio_chunk = cut_pad_sample_torchaudio(audio_chunk, self.config)
-        #     rec.cycles.append((audio_chunk, label))
-
     def process_dataset(self) -> None:
         """
         Process the dataset for running
         """
-        store = self.build_cycle_store()
+        store = FileCycleStore(root=pathlib.Path(".data"))    # TODO get path from config or env
         recordings = self._discover_recordings()
         logger.debug(f"Found {len(recordings)} recordings: Example {recordings[0]}")
         
@@ -361,9 +356,16 @@ class ICBHIDatasetProcessor(BaseRSCDatasetProcessor):
         self._attach_metadata(recordings=recordings, df=df_metadata)
         logger.debug(f"Attached metadata: Example {recordings[0]}")
         
-        for recording in recordings:
-            self._extract_cycles(recording)
-            break
+        for recording in tqdm.tqdm(recordings, desc="Processing recordings"):
+            self._extract_cycles(recording, store=store)
+
+        store.save_index()
+        
+        # logger.info(
+        #     f"✅ Processed {len(df_index)} cycles "
+        #     f"from {len(recordings)} recordings. "
+        #     f"Index saved to {df_index_path}."
+        # )
 
 
 

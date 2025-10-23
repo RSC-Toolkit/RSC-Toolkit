@@ -20,3 +20,10 @@ def dataset(tmp_path):
 def test_toy_dataset(dataset):
     dataset.download()
     dataset.process()
+
+
+    from rsc_toolkit.datasets.cycle_store import FileCycleStore
+    from rsc_toolkit.datasets.icbhi_dataset.icbhi_dataset import ICBHICycle
+    store = FileCycleStore(root=pathlib.Path(".data"))    # TODO get path from config or env
+    print(store.index)
+    print(store.load_cycle(store.index.iloc[0].cycle_id, cls=ICBHICycle))
