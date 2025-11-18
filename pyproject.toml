@@ -17,6 +17,10 @@ dependencies = [
 
     # Dataset processing
     "librosa",
+
+    # torch
+    # torchaudio
+    # tqdm
 ]
 
 [project.optional-dependencies]

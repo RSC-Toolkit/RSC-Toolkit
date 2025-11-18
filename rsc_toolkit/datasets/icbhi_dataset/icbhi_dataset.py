@@ -1,12 +1,13 @@
 from typing import ClassVar, Dict, Optional, List, Tuple
-from pydantic import BaseModel, field_validator, ConfigDict, Field
-import pathlib
+from pathlib import Path
+from enum import Enum
 import logging
 import functools
+
+from pydantic import BaseModel, field_validator, ConfigDict, Field
 import torch
 import pandas as pd
 import tqdm
-
 
 from rsc_toolkit.datasets.base import BaseRSCDataset, BaseRSCDatasetDownloader, BaseRSCDatasetProcessor
 from rsc_toolkit.datasets import DatasetFactory
@@ -26,8 +27,8 @@ class ICBHIDatasetDownloader(BaseRSCDatasetDownloader):
     events_download_url: str = "https://bhichallenge.med.auth.gr/sites/default/files/ICBHI_final_database/events.zip"
 
     @functools.cached_property
-    def outputs_path(self) -> pathlib.Path:
-        path = pathlib.Path(self.outputs_directory).expanduser().resolve()
+    def outputs_path(self) -> Path:
+        path = Path(self.outputs_directory).expanduser().resolve()
         path.mkdir(parents=True, exist_ok=True)
         return path
 
@@ -84,6 +85,13 @@ CHEST_LOCATIONS = {
     "Lr": "Lateral right",
 }
 
+class RespiratoryLabel(Enum):
+    NORMAL = 0
+    CRACKLE = 1
+    WHEEZE = 2
+    BOTH = 3
+
+
 LABEL_MAP = { # (Crackle, Wheeze)
     (0, 0): 0,  # normal
     (1, 0): 1,  # crackle only
@@ -128,7 +136,7 @@ class RecordingMetadata(BaseModel):
         return DEVICE_IDS[self.device]
 
     @classmethod
-    def from_path(cls, path: pathlib.Path):
+    def from_path(cls, path: Path):
         parts = path.stem.split("_")
         if len(parts) != 5:
             raise ValueError(f"Unexpected filename format: {path.name}")
@@ -149,53 +157,18 @@ class ICBHICycle(BaseModel):
     audio: torch.Tensor                # sliced waveform
     start: float                       # seconds
     end: float                         # seconds
-    annotation: pd.Series              # the row from the annotation file
+    label: RespiratoryLabel
+    meta: RecordingMetadata
     features: Optional[torch.Tensor] = None  # e.g. spectrogram
-
-    # recording: Optional["Recording"] = Field(repr=False)    # reference to recording where this was from
-
-    @property
-    def label(self):
-        """Compute label from annotation if not already assigned."""
-        c = int(self.annotation["Crackle"])
-        w = int(self.annotation["Wheeze"])
-        label = {
-            (0, 0): 0,
-            (1, 0): 1,
-            (0, 1): 2,
-            (1, 1): 3,
-        }[(c, w)]
-        return label
-
-    def to_dict(self) -> dict:
-        """Prepare for serialization."""
-        return {
-            "audio": self.audio,
-            "start": self.start,
-            "end": self.end,
-            "label": self.label,
-            "annotation": self.annotation.to_dict(),
-            # "meta": self.recording.meta,
-        }
-
-    def to_index_entry(self) -> dict:
-        _data = self.to_dict()
-        _data.pop("audio")
-        return _data
-
-    @classmethod
-    def from_dict(cls, data: dict):
-        data["annotation"] = pd.Series(data["annotation"])
-        return cls(**data)
 
 
 class Recording(BaseModel):
     meta: RecordingMetadata
-    wav_path: pathlib.Path
-    txt_path: pathlib.Path
+    wav_path: Path
+    txt_path: Path
 
     @classmethod
-    def from_paths(cls, wav: pathlib.Path, txt: pathlib.Path):
+    def from_paths(cls, wav: Path, txt: Path):
         base = RecordingMetadata.from_path(wav)
         return cls(meta=base, wav_path=wav, txt_path=txt)
 
@@ -224,9 +197,23 @@ class Recording(BaseModel):
         cycles = []
         for _, row in self.cycle_annotations.iterrows():
             start, end = row["Start"], row["End"]
+            c = int(row["Crackle"])
+            w = int(row["Wheeze"])
+            label = {
+                (0, 0): RespiratoryLabel.NORMAL,
+                (1, 0): RespiratoryLabel.CRACKLE,
+                (0, 1): RespiratoryLabel.WHEEZE,
+                (1, 1): RespiratoryLabel.BOTH,
+            }[(c, w)]
             chunk = self._slice_data(start, end, data, sample_rate)
             cycles.append(
-                ICBHICycle(audio=chunk, start=start, end=end, annotation=row)
+                ICBHICycle(
+                    audio=chunk,
+                    start=start,
+                    end=end,
+                    label=label,
+                    meta=self.meta,
+                )
             )
         return cycles
 
@@ -248,13 +235,14 @@ class Recording(BaseModel):
 
 
 
-class ICBHIDatasetProcessor(BaseRSCDatasetProcessor):
+class ICBHIProcessor(BaseRSCDatasetProcessor):
+    
+    # Raw unpacked data here. Expecting other files in current dir.
+    raw_data_directory: Path
+
     name: str = "ICBHI"
     sample_rate: int = 10000 # TODO pass from config
     
-    # Raw unpacked data here. Expecting other files in current dir.
-    raw_data_directory: str = "/src/downloaded_datasets/ICBHI_final_database/ICBHI_final_database" # TODO take from config
-
     DEVICE_IDS: Dict[str, int] = {'Meditron': 0, 'LittC2SE': 1, 'Litt3200': 2, 'AKGC417L': 3}
 
     @property
@@ -283,24 +271,24 @@ class ICBHIDatasetProcessor(BaseRSCDatasetProcessor):
 
     @property
     def data_folder(self):
-        return pathlib.Path(self.raw_data_directory)
+        return Path(self.raw_data_directory)
 
     @property
     def metadata_folder(self):
-        return (pathlib.Path(__file__).parent / "data").resolve()
+        return (Path(__file__).parent / "data").resolve()
 
     @property
     def metadata_file(self):
         return self.metadata_folder / "metadata.txt"
 
     def _discover_recordings(self):
-        files = list(pathlib.Path(self.data_folder).iterdir())
+        files = list(Path(self.data_folder).iterdir())
         stems = {p.stem for p in files if p.suffix in {".wav", ".txt"}}
 
         pairs = []
         for stem in stems:
-            wav = pathlib.Path(self.data_folder, stem + ".wav")
-            txt = pathlib.Path(self.data_folder, stem + ".txt")
+            wav = Path(self.data_folder, stem + ".wav")
+            txt = Path(self.data_folder, stem + ".txt")
             if wav.exists() and txt.exists():
                 pairs.append(Recording.from_paths(wav, txt))
             else:
@@ -342,14 +330,15 @@ class ICBHIDatasetProcessor(BaseRSCDatasetProcessor):
         # for i, cycle in enumerate(tqdm.tqdm(cycles, desc="Processing cycles")): # Too much info in terminal
         for i, cycle in enumerate(cycles):
             cycle_id = f"{rec.wav_path.stem}_cycle_{i:03d}"
-            store.save_cycle(cycle_id, cycle)
+            store.add_cycle(key=cycle_id, cycle=cycle)
         
     def process_dataset(self) -> None:
         """
         Process the dataset for running
         """
-        store = FileCycleStore(root=pathlib.Path(".data"))    # TODO get path from config or env
         recordings = self._discover_recordings()
+        if len(recordings) == 0:
+            raise FileNotFoundError("Could not find any samples.")
         logger.debug(f"Found {len(recordings)} recordings: Example {recordings[0]}")
         
         df_metadata = self._load_metadata_file()
@@ -357,15 +346,8 @@ class ICBHIDatasetProcessor(BaseRSCDatasetProcessor):
         logger.debug(f"Attached metadata: Example {recordings[0]}")
         
         for recording in tqdm.tqdm(recordings, desc="Processing recordings"):
-            self._extract_cycles(recording, store=store)
+            self._extract_cycles(recording, store=self.cycle_store)
 
-        store.save_index()
-        
-        # logger.info(
-        #     f"✅ Processed {len(df_index)} cycles "
-        #     f"from {len(recordings)} recordings. "
-        #     f"Index saved to {df_index_path}."
-        # )
 
 
 
@@ -376,5 +358,5 @@ class ICBHIDataset(BaseRSCDataset):
     https://bhichallenge.med.auth.gr/ICBHI_2017_Challenge
     """
     downloader_class: ClassVar[type[ICBHIDatasetDownloader]] = ICBHIDatasetDownloader
-    processor_class: ClassVar[type[ICBHIDatasetProcessor]] = ICBHIDatasetProcessor
+    processor_class: ClassVar[type[ICBHIProcessor]] = ICBHIProcessor
 

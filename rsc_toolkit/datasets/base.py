@@ -1,11 +1,14 @@
 from typing import ClassVar
 from abc import ABC, abstractmethod
-from pydantic import BaseModel
 import logging
 import functools
-import pathlib
+from pathlib import Path
 import hashlib
 import json
+
+from pydantic import BaseModel, ConfigDict
+
+from rsc_toolkit.datasets.cycle_store import BaseCycleStore
 
 
 logger = logging.getLogger(__name__)
@@ -46,8 +49,12 @@ class BaseRSCDatasetProcessor(ABC, BaseModel):
     Interface for processing datasets for training
     """
     name: str # TODO better to use this from parent?
-    outputs_directory: str
+    outputs_directory: Path
     force: bool = False
+
+    cycle_store: BaseCycleStore
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
     @functools.cached_property
     def cache_dir_path(self):
@@ -64,7 +71,7 @@ class BaseRSCDatasetProcessor(ABC, BaseModel):
         )
 
         # create cache/dataset/DatasetName dir for temp files.
-        cache_path = pathlib.Path(self.outputs_directory, "dataset", self.name, key)
+        cache_path = Path(self.outputs_directory, "dataset", self.name, key)
         cache_path.mkdir(parents=True, exist_ok=True)
         return cache_path
 
