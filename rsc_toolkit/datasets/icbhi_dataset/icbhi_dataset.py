@@ -186,15 +186,9 @@ class Recording(BaseModel):
         return cycles
 
     def _load_and_preprocess_audio(self, sample_rate: int):
-        try:
-            import torchaudio
-            import torchaudio.transforms as T
-            import librosa
-        except ImportError:
-            raise ImportError(
-                "torchaudio and librosa are required for audio processing. "
-                "Install with: pip install torchaudio librosa"
-            )
+        import torchaudio
+        import torchaudio.transforms as T
+        import librosa
         
         sr = librosa.get_samplerate(str(self.wav_path))
         data, _ = torchaudio.load(str(self.wav_path))
@@ -218,6 +212,10 @@ class ICBHIDatasetProcessor(BaseRSCDatasetProcessor):
     
     # Raw unpacked data here. Expecting other files in current dir.
     raw_data_directory: Optional[str] = None  # Configurable, defaults to None
+    
+    # Store processed cycles and recordings for later use
+    _processed_cycles: Optional[List[Cycle]] = None
+    _processed_recordings: Optional[List[Recording]] = None
 
     DEVICE_IDS: Dict[str, int] = {'Meditron': 0, 'LittC2SE': 1, 'Litt3200': 2, 'AKGC417L': 3}
 
@@ -315,17 +313,12 @@ class ICBHIDatasetProcessor(BaseRSCDatasetProcessor):
 
     def _extract_audio(self, sample) -> torch.Tensor:
         """Extract audio tensor from sample (Recording or Cycle)"""
+        import torchaudio
+        
         if isinstance(sample, Cycle):
             return sample.audio
         elif isinstance(sample, Recording):
             # Load full recording audio
-            try:
-                import torchaudio
-            except ImportError:
-                raise ImportError(
-                    "torchaudio is required for audio processing. "
-                    "Install with: pip install torchaudio"
-                )
             data, _ = torchaudio.load(str(sample.wav_path))
             return data
         else:
@@ -383,12 +376,19 @@ class ICBHIDatasetProcessor(BaseRSCDatasetProcessor):
         for recording in recordings:
             try:
                 cycles = recording.compute_cycles(sample_rate=self.sample_rate)
+                # Store reference to recording in each cycle for sample_id generation
+                for cycle in cycles:
+                    cycle._recording = recording
                 all_cycles.extend(cycles)
             except Exception as e:
                 logger.error(f"Error extracting cycles from {recording.wav_path}: {e}")
                 continue
         
         logger.info(f"Extracted {len(all_cycles)} cycles from {len(recordings)} recordings")
+        
+        # Store for later access
+        self._processed_cycles = all_cycles
+        self._processed_recordings = recordings
         
         # Preprocess features if enabled
         if self.preprocess_features and self.feature_processor:
@@ -397,6 +397,18 @@ class ICBHIDatasetProcessor(BaseRSCDatasetProcessor):
             logger.info("✅ Feature preprocessing complete!")
         else:
             logger.info("Feature preprocessing not enabled (preprocess_features=False or no feature_processor)")
+    
+    def get_cycles(self) -> List[Cycle]:
+        """Get all processed cycles"""
+        if self._processed_cycles is None:
+            raise RuntimeError("Dataset not processed yet. Call process() first.")
+        return self._processed_cycles
+    
+    def get_recordings(self) -> List[Recording]:
+        """Get all processed recordings"""
+        if self._processed_recordings is None:
+            raise RuntimeError("Dataset not processed yet. Call process() first.")
+        return self._processed_recordings
 
 
 
