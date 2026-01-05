@@ -15,6 +15,16 @@ def build_parser(subparsers):
     download_parser.add_argument("--datasets_directory", default="downloaded_datasets")
     download_parser.add_argument("--force", action="store_true", help="Despite valid dataset, re-download.")
 
+    preprocess_parser = dataset_subparsers.add_parser(
+        "preprocess", 
+        help="Preprocess dataset features (e.g., CLAP embeddings)"
+    )
+    preprocess_parser.add_argument("dataset", choices=DatasetFactory.datasets.keys())
+    preprocess_parser.add_argument("--datasets_directory", default="downloaded_datasets")
+    preprocess_parser.add_argument("--force", action="store_true", help="Re-preprocess even if cached.")
+    preprocess_parser.add_argument("--workers", type=int, default=4, help="Number of parallel workers")
+    preprocess_parser.add_argument("--batch_size", type=int, default=None, help="Batch size for GPU processing")
+
     return dataset_parser
 
 
@@ -30,4 +40,21 @@ def create_dataset(args):
 
 def handle_command(args) -> None:
     dataset = create_dataset(args)
-    dataset.download()
+    
+    if args.dataset_command == "download":
+        dataset.download()
+    elif args.dataset_command == "preprocess":
+        # For preprocessing, we need to configure the processor
+        # This would typically come from config, but for CLI we'll need
+        # to set it up. For now, just process the dataset which may include
+        # preprocessing if configured.
+        processor = dataset.processor
+        
+        # Update processor settings from CLI args
+        if hasattr(processor, 'num_preprocess_workers'):
+            processor.num_preprocess_workers = args.workers
+        if hasattr(processor, 'preprocess_batch_size') and args.batch_size:
+            processor.preprocess_batch_size = args.batch_size
+        
+        # Process dataset (which may trigger preprocessing)
+        dataset.process()

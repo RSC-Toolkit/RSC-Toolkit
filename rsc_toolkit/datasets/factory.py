@@ -1,4 +1,4 @@
-from typing import ClassVar, List
+from typing import ClassVar, List, Dict, Type
 import importlib
 import pkgutil
 import sys
@@ -8,7 +8,7 @@ from rsc_toolkit.datasets.base import BaseRSCDataset
 
 
 class DatasetFactory:
-    datasets: ClassVar[dict[str, type[BaseRSCDataset]]] = {}
+    datasets: ClassVar[Dict[str, Type[BaseRSCDataset]]] = {}
 
     @staticmethod
     def register_datasets():
@@ -26,7 +26,7 @@ class DatasetFactory:
     @classmethod
     def register_dataset_class(cls, dataset_name: str):
         """Decorator to register a dataset class."""
-        def decorator(dataset_cls: type[BaseRSCDataset]):
+        def decorator(dataset_cls: Type[BaseRSCDataset]):
             cls.datasets[dataset_name] = dataset_cls
             return dataset_cls
         return decorator
@@ -36,5 +36,5 @@ class DatasetFactory:
         return list(cls.datasets.keys())
 
     @classmethod
-    def get_dataset_class(cls, dataset_name: str) -> type[BaseRSCDataset]:
+    def get_dataset_class(cls, dataset_name: str) -> Type[BaseRSCDataset]:
         return cls.datasets[dataset_name]

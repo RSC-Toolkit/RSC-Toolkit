@@ -1,4 +1,4 @@
-from typing import ClassVar, Dict, Optional, List, Tuple
+from typing import ClassVar, Dict, Optional, List, Tuple, Type
 from pydantic import BaseModel, field_validator, ConfigDict
 import pathlib
 import logging
@@ -172,7 +172,7 @@ class Recording(BaseModel):
         df.columns = ["Start", "End", "Crackle", "Wheeze"] # TODO verify order
         return df
 
-    def compute_cycles(self, sample_rate: int) -> list[Cycle]:
+    def compute_cycles(self, sample_rate: int) -> List[Cycle]:
         """Slice waveform into Cycle objects according to annotations."""
         data = self._load_and_preprocess_audio(sample_rate)
 
@@ -186,7 +186,16 @@ class Recording(BaseModel):
         return cycles
 
     def _load_and_preprocess_audio(self, sample_rate: int):
-        import torchaudio, torchaudio.transforms as T, librosa
+        try:
+            import torchaudio
+            import torchaudio.transforms as T
+            import librosa
+        except ImportError:
+            raise ImportError(
+                "torchaudio and librosa are required for audio processing. "
+                "Install with: pip install torchaudio librosa"
+            )
+        
         sr = librosa.get_samplerate(str(self.wav_path))
         data, _ = torchaudio.load(str(self.wav_path))
         if sr != sample_rate:
@@ -208,7 +217,7 @@ class ICBHIDatasetProcessor(BaseRSCDatasetProcessor):
     sample_rate: int = 10000 # TODO pass from config
     
     # Raw unpacked data here. Expecting other files in current dir.
-    raw_data_directory: str = "/home/miika/research/RSC-Toolkit/downloaded_datasets/ICBHI_final_database/ICBHI_final_database" # TODO take from config
+    raw_data_directory: Optional[str] = None  # Configurable, defaults to None
 
     DEVICE_IDS: Dict[str, int] = {'Meditron': 0, 'LittC2SE': 1, 'Litt3200': 2, 'AKGC417L': 3}
 
@@ -238,7 +247,19 @@ class ICBHIDatasetProcessor(BaseRSCDatasetProcessor):
 
     @property
     def data_folder(self):
-        return pathlib.Path(self.raw_data_directory)
+        if self.raw_data_directory:
+            return pathlib.Path(self.raw_data_directory)
+        # Default fallback (for backward compatibility)
+        default_path = pathlib.Path.home() / "research" / "RSC-Toolkit" / "downloaded_datasets" / "ICBHI_final_database" / "ICBHI_final_database"
+        if default_path.exists():
+            return default_path
+        # If default doesn't exist, try relative to project
+        project_root = pathlib.Path(__file__).parent.parent.parent.parent
+        sample_data_path = project_root / "sample_data" / "toy_dataset" / "files"
+        if sample_data_path.exists():
+            logger.warning(f"Using toy dataset at {sample_data_path}")
+            return sample_data_path
+        raise ValueError(f"raw_data_directory not set and no default found. Please set raw_data_directory.")
 
     @property
     def metadata_folder(self):
@@ -271,14 +292,14 @@ class ICBHIDatasetProcessor(BaseRSCDatasetProcessor):
             delimiter="\t",
             index_col=0  # patient_id is the index
         )
-        # Normalize fields (safe for pandas 3.0+)
-        df.replace({
+        # Normalize fields - use replace without inplace to avoid deprecation warning
+        df = df.replace({
             "sex": {"M": 0, "F": 1},
             "chest_location": {"Tc": 0, "Al": 1, "Ar": 2, "Pl": 3, "Pr": 4, "Ll": 5, "Lr": 6}
-        }, inplace=True)
+        })
         return df
 
-    def _attach_metadata(self, recordings: list[Recording], df: pd.DataFrame):
+    def _attach_metadata(self, recordings: List[Recording], df: pd.DataFrame):
         for rec in recordings:
             if rec.meta.patient_id not in df.index:
                 logger.warning(f"No metadata found for patient {rec.meta.patient_id}")
@@ -291,6 +312,37 @@ class ICBHIDatasetProcessor(BaseRSCDatasetProcessor):
             rec.meta.child_weight = row["child_weight"]
             rec.meta.child_height = row["child_height"]
             rec.meta.chest_location_id = row["chest_location"]
+
+    def _extract_audio(self, sample) -> torch.Tensor:
+        """Extract audio tensor from sample (Recording or Cycle)"""
+        if isinstance(sample, Cycle):
+            return sample.audio
+        elif isinstance(sample, Recording):
+            # Load full recording audio
+            try:
+                import torchaudio
+            except ImportError:
+                raise ImportError(
+                    "torchaudio is required for audio processing. "
+                    "Install with: pip install torchaudio"
+                )
+            data, _ = torchaudio.load(str(sample.wav_path))
+            return data
+        else:
+            raise NotImplementedError(f"Cannot extract audio from {type(sample)}")
+    
+    def _get_sample_id(self, sample) -> str:
+        """Get unique ID for sample (for caching)"""
+        if isinstance(sample, Cycle):
+            # Use recording path + cycle index
+            rec = getattr(sample, '_recording', None)
+            if rec:
+                return f"{rec.wav_path.stem}_cycle_{sample.start:.3f}_{sample.end:.3f}"
+            return f"cycle_{sample.start:.3f}_{sample.end:.3f}"
+        elif isinstance(sample, Recording):
+            return str(sample.wav_path.stem)
+        else:
+            return str(hash(str(sample)))
 
     def _extract_cycles(self, rec: Recording):
         print(rec.compute_cycles(sample_rate=self.sample_rate))
@@ -310,13 +362,41 @@ class ICBHIDatasetProcessor(BaseRSCDatasetProcessor):
         Process the dataset for running
         """
         recordings = self._discover_recordings()
-        logger.debug(f"Found {len(recordings)} recordings: Example {recordings[0]}")
-        df_metadata = self._load_metadata_file()
-        self._attach_metadata(recordings=recordings, df=df_metadata)
-        logger.debug(f"Attached metadata: Example {recordings[0]}")
+        logger.info(f"Found {len(recordings)} recordings")
+        
+        if len(recordings) == 0:
+            logger.warning("No recordings found!")
+            return
+        
+        # Load metadata if available
+        try:
+            df_metadata = self._load_metadata_file()
+            self._attach_metadata(recordings=recordings, df=df_metadata)
+            logger.debug(f"Attached metadata to {len(recordings)} recordings")
+        except FileNotFoundError:
+            logger.warning("Metadata file not found, skipping metadata attachment")
+        except Exception as e:
+            logger.warning(f"Error loading metadata: {e}, continuing without metadata")
+        
+        # Extract cycles from all recordings
+        all_cycles = []
         for recording in recordings:
-            self._extract_cycles(recording)
-            break
+            try:
+                cycles = recording.compute_cycles(sample_rate=self.sample_rate)
+                all_cycles.extend(cycles)
+            except Exception as e:
+                logger.error(f"Error extracting cycles from {recording.wav_path}: {e}")
+                continue
+        
+        logger.info(f"Extracted {len(all_cycles)} cycles from {len(recordings)} recordings")
+        
+        # Preprocess features if enabled
+        if self.preprocess_features and self.feature_processor:
+            logger.info(f"Preprocessing features with {self.feature_processor.__class__.__name__}")
+            self.preprocess_all_features(all_cycles)
+            logger.info("✅ Feature preprocessing complete!")
+        else:
+            logger.info("Feature preprocessing not enabled (preprocess_features=False or no feature_processor)")
 
 
 
@@ -326,6 +406,6 @@ class ICBHIDataset(BaseRSCDataset):
     ICBHI Dataset
     https://bhichallenge.med.auth.gr/ICBHI_2017_Challenge
     """
-    downloader_class: ClassVar[type[ICBHIDatasetDownloader]] = ICBHIDatasetDownloader
-    processor_class: ClassVar[type[ICBHIDatasetProcessor]] = ICBHIDatasetProcessor
+    downloader_class: ClassVar[Type[ICBHIDatasetDownloader]] = ICBHIDatasetDownloader
+    processor_class: ClassVar[Type[ICBHIDatasetProcessor]] = ICBHIDatasetProcessor
 
