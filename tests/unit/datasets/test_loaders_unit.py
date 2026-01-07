@@ -1,6 +1,6 @@
 """
 Unit tests for PyTorch Dataset loaders with mocks.
-These tests don't require actual audio files or expensive processing.
+These tests don't require actual audio files or slow processing.
 """
 import pytest
 import torch
@@ -112,7 +112,7 @@ def test_base_dataset_cycle_level():
 def test_base_dataset_clip_level():
     """Test BaseRSCPyTorchDataset with clip-level samples"""
     # For unit tests, we'll skip clip-level with file loading
-    # That's tested in expensive integration tests
+    # That's tested in slow integration tests
     # Here we just verify the filtering works
     recordings = [
         MockRecording(wav_path=Mock(stem="rec1")),
@@ -130,7 +130,7 @@ def test_base_dataset_clip_level():
     
     assert len(dataset) == 2
     assert dataset.sample_level == "clip"
-    # Note: Actually loading from wav_path is tested in expensive tests
+    # Note: Actually loading from wav_path is tested in slow tests
 
 
 def test_dataset_filters_by_sample_level():
@@ -159,7 +159,7 @@ def test_dataset_filters_by_sample_level():
         feature_processor=processor
     )
     assert len(clip_dataset) == 1
-    # Note: Actually loading from files is tested in expensive tests
+    # Note: Actually loading from files is tested in slow tests
 
 
 def test_dataset_label_extraction():

@@ -4,24 +4,24 @@ This directory contains tests for the preprocessing and caching system.
 
 ## Running Tests
 
-### Run all tests (excluding expensive ones):
+### Run all tests (excluding slow ones):
 ```bash
-pytest tests/datasets/ -m "not expensive"
+pytest tests/datasets/ -m "not slow"
 ```
 
-### Run only expensive preprocessing tests:
+### Run only slow preprocessing tests:
 ```bash
-pytest tests/datasets/test_toy_preprocessing.py -m expensive -v
+pytest tests/datasets/test_toy_preprocessing.py -m slow -v
 ```
 
-### Run a specific expensive test:
+### Run a specific slow test:
 ```bash
-pytest tests/datasets/test_toy_preprocessing.py::test_toy_dataset_preprocessing -m expensive -v
+pytest tests/datasets/test_toy_preprocessing.py::test_toy_dataset_preprocessing -m slow -v
 ```
 
 ## Test Files
 
-- `test_toy_preprocessing.py` - Expensive tests that actually process audio files and cache features
+- `test_toy_preprocessing.py` - Slow tests that actually process audio files and cache features
   - Requires the toy dataset at `sample_data/toy_dataset/files/`
   - Tests feature caching, cache reuse, and cache isolation
 

@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 class CLAPProcessor(BaseAudioProcessor):
     """
     CLAP (Contrastive Language-Audio Pre-training) feature extractor.
-    This is expensive, so caching is highly recommended.
+    This is slow, so caching is highly recommended.
     
     Requires: laion_clap package
     Install with: pip install laion-clap
@@ -66,7 +66,7 @@ class CLAPProcessor(BaseAudioProcessor):
         # Move to device
         audio = audio.to(self.device)
         
-        # Extract features (this is the expensive operation)
+        # Extract features (this is the slow operation)
         with torch.no_grad():
             features = model.get_audio_embedding_from_data(
                 audio, use_tensor=True

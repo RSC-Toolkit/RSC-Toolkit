@@ -102,6 +102,15 @@ class BaseRSCPyTorchDataset(Dataset, ABC):
         else:
             # No processor - return raw audio
             features = audio
+
+        # For per-sample embeddings, many processors return (1, D). Prefer (D,).
+        if (
+            self.feature_processor
+            and isinstance(features, torch.Tensor)
+            and features.dim() == 2
+            and features.shape[0] == 1
+        ):
+            features = features.squeeze(0)
         
         return features
     
@@ -179,4 +188,3 @@ def create_dataloader(
         pin_memory=pin_memory,
         **kwargs
     )
-

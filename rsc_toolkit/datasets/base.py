@@ -8,6 +8,8 @@ import hashlib
 import json
 import torch
 
+import torchaudio
+
 
 logger = logging.getLogger(__name__)
 
@@ -21,9 +23,9 @@ class BaseRSCDatasetDownloader(ABC, BaseModel):
     force: bool = False
 
     @abstractmethod
-    def validate_dataset_files(self) -> bool:
+    def validate_downloaded_files(self) -> bool:
         """
-        Validate the dataset files.
+        Validate the downloaded files.
         """
 
     @abstractmethod
@@ -33,13 +35,12 @@ class BaseRSCDatasetDownloader(ABC, BaseModel):
         """
 
     def download(self):
-        if not self.force and self.validate_dataset_files():
+        if not self.force and self.validate_downloaded_files():
             logger.info(f"Found existing {self.name}, skipping download.")
             return
         logger.info(f"⬇️ Downloading {self.name}")
         self.download_dataset()
         logger.info(f"✅ Completed {self.name} download")
-        
 
 
 class BaseRSCDatasetProcessor(ABC, BaseModel):
@@ -85,21 +86,25 @@ class BaseRSCDatasetProcessor(ABC, BaseModel):
         cache_path.mkdir(parents=True, exist_ok=True)
         return cache_path
 
+    @functools.cached_property
+    def index_dir_path(self):
+        path = pathlib.Path(self.outputs_directory, "dataset", self.name, "index")
+        path.mkdir(parents=True, exist_ok=True)
+        return path
+
     @abstractmethod
-    def validate_dataset_files(self) -> bool:
-        """
-        Validate preocessed files files
-        """
+    def validate_processed_files(self) -> bool:
+        ...
 
     @abstractmethod
     def process_dataset(self) -> None:
         """
         Process the dataset for running
         """
-    
+
     def preprocess_all_features(self, samples: List[Any]) -> None:
         """
-        Preprocess all samples with expensive feature extractor.
+        Preprocess all samples with slow feature extractor.
         This runs in parallel and caches results.
         """
         if not self.feature_processor or not self.preprocess_features:
@@ -159,9 +164,11 @@ class BaseRSCDatasetProcessor(ABC, BaseModel):
         if hasattr(sample, 'audio'):
             return sample.audio
         elif hasattr(sample, 'wav_path'):
-            # Load from file
-            import torchaudio
             data, _ = torchaudio.load(str(sample.wav_path))
+            # To get rid of deprecation warning:
+            # from torchcodec.decoders import AudioDecoder
+            # decoder = AudioDecoder(str(sample.wav_path))
+            # data = decoder.get_all_samples()  # shape: (channels, samples)
             return data
         else:
             raise NotImplementedError(f"Cannot extract audio from {type(sample)}")
@@ -179,7 +186,7 @@ class BaseRSCDatasetProcessor(ABC, BaseModel):
             return str(hash(str(sample)))
 
     def process(self):
-        if not self.force and self.validate_dataset_files():
+        if not self.force and self.validate_processed_files():
             logger.info(f"Found existing {self.name}, skipping processing.")
             return
         logger.info(f"⬇️ Processing {self.name}")
@@ -211,5 +218,3 @@ class BaseRSCDataset(ABC, BaseModel):
 
     def process(self):
         self.processor.process()
-
-

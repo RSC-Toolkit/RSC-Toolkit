@@ -74,7 +74,7 @@ def processed_toy_dataset(tmp_path, toy_dataset_path):
     }
 
 
-@pytest.mark.expensive
+@pytest.mark.slow
 def test_pytorch_dataset_cycle_level(processed_toy_dataset):
     """Test PyTorch Dataset with cycle-level samples"""
     cycles = processed_toy_dataset['cycles']
@@ -103,7 +103,7 @@ def test_pytorch_dataset_cycle_level(processed_toy_dataset):
     assert processor.feature_processor._feature_cache.is_cached(sample_id)
 
 
-@pytest.mark.expensive
+@pytest.mark.slow
 def test_pytorch_dataset_clip_level(processed_toy_dataset):
     """Test PyTorch Dataset with clip-level (recording) samples"""
     recordings = processed_toy_dataset['recordings']
@@ -127,7 +127,7 @@ def test_pytorch_dataset_clip_level(processed_toy_dataset):
     assert isinstance(label, (int, torch.Tensor))
 
 
-@pytest.mark.expensive
+@pytest.mark.slow
 def test_dataloader_basic(processed_toy_dataset):
     """Test creating and using a DataLoader"""
     cycles = processed_toy_dataset['cycles']
@@ -158,7 +158,7 @@ def test_dataloader_basic(processed_toy_dataset):
     assert batch_features.shape[1] == 128  # feature_dim
 
 
-@pytest.mark.expensive
+@pytest.mark.slow
 def test_dataloader_multiple_batches(processed_toy_dataset):
     """Test iterating through multiple batches"""
     cycles = processed_toy_dataset['cycles']
@@ -190,7 +190,7 @@ def test_dataloader_multiple_batches(processed_toy_dataset):
     assert batch_count > 0
 
 
-@pytest.mark.expensive
+@pytest.mark.slow
 def test_dataloader_with_transform(processed_toy_dataset):
     """Test DataLoader with transforms"""
     cycles = processed_toy_dataset['cycles']
@@ -215,7 +215,7 @@ def test_dataloader_with_transform(processed_toy_dataset):
     assert batch_features.max() <= 1.0 + 1e-6  # Allow small floating point errors
 
 
-@pytest.mark.expensive
+@pytest.mark.slow
 def test_dataloader_label_extraction(processed_toy_dataset):
     """Test that labels are correctly extracted from cycles"""
     cycles = processed_toy_dataset['cycles']

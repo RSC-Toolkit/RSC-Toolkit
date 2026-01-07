@@ -34,6 +34,9 @@ class MockDatasetProcessor(BaseRSCDatasetProcessor):
     
     def validate_dataset_files(self) -> bool:
         return False  # Always need processing
+
+    def validate_processed_files(self):
+        return False  # Always need processing
     
     def process_dataset(self) -> None:
         # Create some mock samples

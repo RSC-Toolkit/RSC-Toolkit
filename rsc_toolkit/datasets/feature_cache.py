@@ -3,6 +3,7 @@ import hashlib
 import json
 import logging
 from typing import Optional, Any, Dict
+import threading
 import torch
 
 logger = logging.getLogger(__name__)
@@ -10,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 class FeatureCache:
     """
-    Manages caching of expensive preprocessed features.
+    Manages caching of slow preprocessed features.
     Uses content-based hashing to invalidate cache when inputs change.
     """
     
@@ -20,6 +21,7 @@ class FeatureCache:
         processor_config: Dict[str, Any],
         processor_name: str
     ):
+        self._lock = threading.Lock()
         self.cache_dir = pathlib.Path(cache_dir)
         self.cache_dir.mkdir(parents=True, exist_ok=True)
         
@@ -63,8 +65,9 @@ class FeatureCache:
     
     def get(self, sample_id: str) -> Optional[torch.Tensor]:
         """Retrieve cached features for a sample"""
-        if sample_id not in self.metadata:
-            return None
+        with self._lock:
+            if sample_id not in self.metadata:
+                return None
         
         cache_path = self._get_cache_path(sample_id)
         if not cache_path.exists():
@@ -82,26 +85,30 @@ class FeatureCache:
         cache_path = self._get_cache_path(sample_id)
         try:
             torch.save(features, cache_path)
-            self.metadata[sample_id] = {
-                "cached": True,
-                "shape": list(features.shape),
-                "dtype": str(features.dtype)
-            }
-            self._save_metadata()
+            with self._lock:
+                self.metadata[sample_id] = {
+                    "cached": True,
+                    "shape": list(features.shape),
+                    "dtype": str(features.dtype),
+                }
+                self._save_metadata()
         except Exception as e:
             logger.error(f"Error caching {sample_id}: {e}")
     
     def is_cached(self, sample_id: str) -> bool:
         """Check if sample is cached"""
-        return sample_id in self.metadata and self._get_cache_path(sample_id).exists()
+        with self._lock:
+            known = sample_id in self.metadata
+        return known and self._get_cache_path(sample_id).exists()
     
     def get_cache_stats(self) -> Dict:
         """Get statistics about cache"""
-        total = len(self.metadata)
-        existing = sum(1 for sid in self.metadata if self._get_cache_path(sid).exists())
+        with self._lock:
+            keys = list(self.metadata.keys())
+        total = len(keys)
+        existing = sum(1 for sid in keys if self._get_cache_path(sid).exists())
         return {
             "total_entries": total,
             "existing_files": existing,
             "cache_dir": str(self.features_dir)
         }
-

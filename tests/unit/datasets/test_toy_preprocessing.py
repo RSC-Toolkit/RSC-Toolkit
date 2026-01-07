@@ -1,9 +1,9 @@
 """
-Expensive test for toy dataset preprocessing with feature caching.
+Slow test for toy dataset preprocessing with feature caching.
 This test actually processes audio files and caches features.
 
-Run with: pytest tests/datasets/test_toy_preprocessing.py -m expensive
-Or skip with: pytest -m "not expensive"
+Run with: pytest tests/datasets/test_toy_preprocessing.py -m slow
+Or skip with: pytest -m "not slow"
 """
 import pytest
 import pathlib
@@ -54,7 +54,7 @@ def toy_dataset_path():
     return toy_path
 
 
-@pytest.mark.expensive
+@pytest.mark.slow
 def test_toy_dataset_preprocessing(tmp_path, toy_dataset_path):
     """Test preprocessing toy dataset with feature caching"""
     cache_dir = str(tmp_path / "cache")
@@ -100,7 +100,7 @@ def test_toy_dataset_preprocessing(tmp_path, toy_dataset_path):
     assert (cache_features_dir / "cache_metadata.json").exists()
 
 
-@pytest.mark.expensive
+@pytest.mark.slow
 def test_toy_dataset_preprocessing_cache_reuse(tmp_path, toy_dataset_path):
     """Test that cached features are reused on second run"""
     cache_dir = str(tmp_path / "cache")
@@ -155,7 +155,7 @@ def test_toy_dataset_preprocessing_cache_reuse(tmp_path, toy_dataset_path):
     assert second_run_stats["existing_files"] == first_run_count
 
 
-@pytest.mark.expensive
+@pytest.mark.slow
 def test_toy_dataset_different_processors_isolated_cache(tmp_path, toy_dataset_path):
     """Test that different processors use isolated caches"""
     cache_dir = str(tmp_path / "cache")
