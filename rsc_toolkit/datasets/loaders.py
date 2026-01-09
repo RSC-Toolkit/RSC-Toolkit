@@ -70,11 +70,25 @@ class BaseRSCPyTorchDataset(Dataset, ABC):
         elif hasattr(sample, 'annotation'):
             # Extract label from annotation (e.g., ICBHI: Crackle + Wheeze)
             ann = sample.annotation
-            if hasattr(ann, 'Crackle') and hasattr(ann, 'Wheeze'):
-                crackle = int(ann['Crackle']) if 'Crackle' in ann else 0
-                wheeze = int(ann['Wheeze']) if 'Wheeze' in ann else 0
-                # Combine: 0=Normal, 1=Crackle, 2=Wheeze, 3=Both
-                return crackle + 2 * wheeze
+            # Support pandas Series, dict-like, or objects with attributes
+            crackle = 0
+            wheeze = 0
+            if isinstance(ann, dict):
+                crackle = int(ann.get('Crackle', 0))
+                wheeze = int(ann.get('Wheeze', 0))
+            else:
+                if hasattr(ann, 'Crackle'):
+                    crackle = int(getattr(ann, 'Crackle'))
+                if hasattr(ann, 'Wheeze'):
+                    wheeze = int(getattr(ann, 'Wheeze'))
+                # Fallback for Series / mapping-like with key access
+                try:
+                    crackle = int(ann['Crackle']) if 'Crackle' in ann else crackle
+                    wheeze = int(ann['Wheeze']) if 'Wheeze' in ann else wheeze
+                except Exception:
+                    pass
+            # Combine: 0=Normal, 1=Crackle, 2=Wheeze, 3=Both
+            return crackle + 2 * wheeze
         return 0  # Default to class 0
     
     def _load_features(self, sample: Any, sample_id: str) -> torch.Tensor:

@@ -4,11 +4,13 @@ import pkgutil
 import sys
 
 
-from rsc_toolkit.models.base import BaseModel
+from rsc_toolkit.models.base import BaseRSCModel
 
+
+MODELS = {}
 
 class ModelFactory:
-    models: ClassVar[dict[str, type[BaseModel]]] = {}
+    
 
     @staticmethod
     def register_models():
@@ -26,15 +28,15 @@ class ModelFactory:
     @classmethod
     def register_model_class(cls, model_name: str):
         """Decorator to register a model class."""
-        def decorator(model_cls: type[BaseModel]):
-            cls.models[model_name] = model_cls
+        def decorator(model_cls: BaseRSCModel):
+            MODELS[model_name] = model_cls
             return model_cls
         return decorator
 
     @classmethod
     def get_model_names(cls) -> List[str]:
-        return list(cls.models.keys())
+        return list(MODELS.keys())
 
     @classmethod
-    def get_model_class(cls, model_name: str) -> type[BaseModel]:
-        return cls.models[model_name]
+    def get_model_class(cls, model_name: str) -> BaseRSCModel:
+        return MODELS[model_name]

@@ -265,16 +265,18 @@ def test_dataset_cached_features():
     processor._feature_cache = cache
     
     # Pre-cache a feature
-    sample_id = "test_cycle_0.000_1.000"
-    cached_feature = torch.ones(128) * 42.0  # Distinct value
-    cache.put(sample_id, cached_feature)
-    
-    dataset = BaseRSCPyTorchDataset(
+    # Use dataset's sample_id convention to ensure cache hit
+    temp_dataset = BaseRSCPyTorchDataset(
         samples=cycles,
         sample_level="cycle",
         feature_processor=processor,
         use_cached_features=True
     )
+    sample_id = temp_dataset._get_sample_id(cycles[0])
+    cached_feature = torch.ones(128) * 42.0  # Distinct value
+    cache.put(sample_id, cached_feature)
+    
+    dataset = temp_dataset
     
     features, _ = dataset[0]
     # Should use cached feature
@@ -361,4 +363,3 @@ def test_icbhi_dataset_class():
     
     assert isinstance(dataset, BaseRSCPyTorchDataset)
     assert len(dataset) == 1
-

@@ -1,14 +1,17 @@
 # rsc_toolkit/datasets/icbhi/dataset.py
 from __future__ import annotations
 
-from typing import Any, Dict, Optional, Literal, Union
+from typing import Any, Dict, Optional, Literal, Union, Mapping
 import pathlib
+import logging
 
 import pandas as pd
 import torch
 from torch.utils.data import Dataset
 
 from .processing import load_audio, slice_audio
+
+logger = logging.getLogger(__name__)
 
 
 class ICBHIIndexDataset(Dataset):
@@ -32,8 +35,10 @@ class ICBHIIndexDataset(Dataset):
         self,
         index_csv: Union[str, pathlib.Path],
         data_root: Optional[Union[str, pathlib.Path]] = None,
-        sample_rate: int = 10000,
+        sampling_rate: int = 10000,
         sample_level: Optional[Literal["cycle", "clip"]] = None,
+        split: Optional[str] = None,
+        split_file: Optional[Union[str, pathlib.Path]] = None,
         return_meta: bool = True,
         fade: bool = True,
     ):
@@ -46,7 +51,7 @@ class ICBHIIndexDataset(Dataset):
         # If your SampleIndex.to_csv includes data_root somewhere else, you can load it.
         # Here we accept data_root explicitly, otherwise infer from index location or recording paths.
         self.data_root = pathlib.Path(data_root).expanduser().resolve() if data_root else None
-        self.sample_rate = int(sample_rate)
+        self.sampling_rate = int(sampling_rate)
         self.return_meta = bool(return_meta)
         self.fade = bool(fade)
 
@@ -59,13 +64,18 @@ class ICBHIIndexDataset(Dataset):
         if sample_level not in ("cycle", "clip"):
             raise ValueError(f"Invalid sample_level: {sample_level}")
 
-        self.sample_level: Literal["cycle", "clip"] = sample_level  # type: ignore[assignment]
+        self.sample_level: Literal["cycle", "clip"] = sample_level  # type: ignore[assignment] # TODO use enum instead
+        self.split: str = split
 
         # Basic schema expectations
         required = {"sample_id", "recording_path", "sample_level", "t0", "t1", "label", "meta"}
         missing = required - set(self.df.columns)
         if missing:
             raise ValueError(f"Index CSV missing columns: {sorted(missing)}")
+
+        if split is not None:
+            split_map = self._load_official_split_map(split_file)
+            self._filter_df_by_split(split_map, split)
 
     def __len__(self) -> int:
         return int(len(self.df))
@@ -79,6 +89,52 @@ class ICBHIIndexDataset(Dataset):
             return (self.index_csv.parent / p).resolve()
         return (self.data_root / p).resolve()
 
+    @staticmethod
+    def _default_split_file() -> pathlib.Path:
+        return (pathlib.Path(__file__).parent / "data" / "official_split.txt").resolve()
+
+    def _load_official_split_map(
+        self, split_file: Optional[Union[str, pathlib.Path]]
+    ) -> Mapping[str, str]:
+        """
+        Returns mapping: recording_id -> split ("train" or "test").
+        """
+        path = pathlib.Path(split_file).expanduser().resolve() if split_file else self._default_split_file()
+        if not path.exists():
+            raise FileNotFoundError(f"Split file not found: {path}")
+
+        mapping: Dict[str, str] = {}
+        for raw_line in path.read_text().splitlines():
+            line = raw_line.strip()
+            if not line or line.startswith("#"):
+                continue
+            parts = line.split()
+            if len(parts) < 2:
+                continue
+            recording_id, split = parts[0], parts[1].lower()
+            mapping[recording_id] = split
+        return mapping
+
+    def _filter_df_by_split(self, split_map: Mapping[str, str], split: str) -> None:
+        def get_recording_id(recording_path: str) -> str:
+            return pathlib.Path(str(recording_path)).stem
+
+        before = int(len(self.df))
+        recording_ids = self.df["recording_path"].map(get_recording_id)
+        unassigned = int((~recording_ids.isin(list(split_map.keys()))).sum())
+        mask = recording_ids.map(lambda rid: split_map.get(rid) == split)
+        self.df = self.df.loc[mask].reset_index(drop=True)
+        after = int(len(self.df))
+        logger.info(
+            "ICBHIIndexDataset split=%s filtered %d -> %d samples (unassigned recordings=%d)",
+            split,
+            before,
+            after,
+            unassigned,
+        )
+        if len(self.df) == 0:
+            raise ValueError(f"No data found for split {split}")
+
     def __getitem__(self, idx: int) -> Dict[str, Any]:
         row = self.df.iloc[int(idx)]
 
@@ -86,14 +142,14 @@ class ICBHIIndexDataset(Dataset):
         recording_path = str(row["recording_path"])
         wav_path = self._resolve_recording_path(recording_path)
 
-        # Load audio (resample + optional fade)
-        wav = load_audio(wav_path, target_sample_rate=self.sample_rate, fade=self.fade)
+        # Load audio. Resample + Fade here. Previously it was done to each cycle, why?
+        wav = load_audio(wav_path, target_sampling_rate=self.sampling_rate, fade=self.fade)
 
         level = str(row["sample_level"])
         if level == "cycle":
             t0 = float(row["t0"])
             t1 = float(row["t1"])
-            audio = slice_audio(wav, t0=t0, t1=t1, sample_rate=self.sample_rate)
+            audio = slice_audio(wav, t0=t0, t1=t1, sampling_rate=self.sampling_rate)
         elif level == "clip":
             audio = wav
             t0 = None

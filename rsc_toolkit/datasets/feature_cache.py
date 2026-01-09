@@ -18,22 +18,18 @@ class FeatureCache:
     def __init__(
         self,
         cache_dir: pathlib.Path,
-        processor_config: Dict[str, Any],
-        processor_name: str
     ):
         self._lock = threading.Lock()
         self.cache_dir = pathlib.Path(cache_dir)
         self.cache_dir.mkdir(parents=True, exist_ok=True)
-        
-        # Create unique cache key from processor config
+
+    def configure(self, processor_config, processor_name):
         self.cache_key = self._create_cache_key(processor_config, processor_name)
         self.features_dir = self.cache_dir / "features" / self.cache_key
         self.features_dir.mkdir(parents=True, exist_ok=True)
-        
-        # Metadata file to track what's cached
         self.metadata_file = self.features_dir / "cache_metadata.json"
         self.metadata = self._load_metadata()
-    
+
     def _create_cache_key(self, config: Dict, name: str) -> str:
         """Create deterministic cache key from config"""
         # Sort for determinism

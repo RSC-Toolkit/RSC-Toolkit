@@ -110,7 +110,7 @@ def test_melbank_processor(tmp_path):
     """Test MelBankAudioProcessor"""
     processor = MelBankAudioProcessor(
         n_mels=64,
-        sample_rate=16000,
+        sampling_rate=16000,
         cache_features=True,
         cache_dir=str(tmp_path)
     )

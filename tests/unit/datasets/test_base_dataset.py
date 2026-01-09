@@ -3,8 +3,6 @@ This test module checks the common behaviours of datasets
 """
 
 from pydantic import PrivateAttr
-import pytest
-import pathlib
 
 
 from rsc_toolkit.datasets.base import (
@@ -17,7 +15,7 @@ from rsc_toolkit.datasets.base import (
 class DummyDownloader(BaseRSCDatasetDownloader):
     _valid: bool = PrivateAttr(default=False)
 
-    def validate_dataset_files(self) -> bool:
+    def validate_downloaded_files(self) -> bool:
         return self._valid
 
     def download_dataset(self) -> None:
@@ -30,22 +28,26 @@ class DummyProcessor(BaseRSCDatasetProcessor):
     def validate_dataset_files(self) -> bool:
         return self._valid
 
+    def validate_processed_files(self) -> bool:
+        return self._valid
+
     def process_dataset(self) -> None:
         (self.cache_dir_path / "dummy.txt").write_text("ok")
         self._valid = True
+
 
 class DummyDataset(BaseRSCDataset):
     downloader_class = DummyDownloader
     processor_class = DummyProcessor
 
 
-def test_downloader_runs(tmp_path, caplog):
+def test_downloader_runs(tmp_path):
     dl = DummyDownloader(name="dummy", outputs_directory=str(tmp_path))
     dl.download()
     assert dl._valid is True
 
 
-def test_processor_runs(tmp_path, caplog):
+def test_processor_runs(tmp_path):
     proc = DummyProcessor(name="dummy", outputs_directory=str(tmp_path))
 
     # process should call process_dataset

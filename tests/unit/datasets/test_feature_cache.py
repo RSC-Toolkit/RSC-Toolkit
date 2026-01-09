@@ -157,7 +157,7 @@ def test_feature_cache_isolation(tmp_path):
     # MelBank processor cache
     mel_cache = FeatureCache(
         cache_dir=cache_dir,
-        processor_config={"n_mels": 128, "sample_rate": 16000},
+        processor_config={"n_mels": 128, "sampling_rate": 16000},
         processor_name="MelBankProcessor"
     )
     

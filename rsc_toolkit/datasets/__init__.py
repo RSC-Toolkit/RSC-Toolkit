@@ -28,6 +28,8 @@ def build_parser(subparsers):
     preprocess_parser.add_argument("--workers", type=int, default=4, help="Number of parallel workers")
     preprocess_parser.add_argument("--batch_size", type=int, default=None, help="Batch size for GPU processing")
     preprocess_parser.add_argument("--raw_data_directory", default=None)
+    preprocess_parser.add_argument("--sample_level", choices=["cycle", "clip"], default="cycle")
+    preprocess_parser.add_argument("--cache_dir", default=None, help="Override feature cache directory")
 
     index_parser = dataset_subparsers.add_parser(
         "build-index",
@@ -67,24 +69,27 @@ def handle_command(args) -> None:
     if args.dataset_command == "download":
         dataset.download()
         return
-    # elif args.dataset_command == "preprocess":
-    #     # For preprocessing, we need to configure the processor
-    #     # This would typically come from config, but for CLI we'll need
-    #     # to set it up. For now, just process the dataset which may include
-    #     # preprocessing if configured.
-    #     processor = dataset.processor
+    elif args.dataset_command == "preprocess":
+        processor = dataset.processor
 
-    #     if getattr(args, "raw_data_directory", None) and hasattr(processor, "raw_data_directory"):
-    #         processor.raw_data_directory = args.raw_data_directory
-        
-    #     # Update processor settings from CLI args
-    #     if hasattr(processor, 'num_preprocess_workers'):
-    #         processor.num_preprocess_workers = args.workers
-    #     if hasattr(processor, 'preprocess_batch_size') and args.batch_size:
-    #         processor.preprocess_batch_size = args.batch_size
-        
-    #     # Process dataset (which may trigger preprocessing)
-    #     dataset.process()
+        if getattr(args, "raw_data_directory", None) and hasattr(processor, "raw_data_directory"):
+            processor.raw_data_directory = args.raw_data_directory
+
+        if not getattr(processor, "feature_processor", None):
+            raise RuntimeError("preprocess requires a feature_processor to be configured")
+
+        # Ensure index exists; build if missing
+        index_path = processor.index_dir_path / f"index_{args.sample_level}.csv"
+        if not index_path.exists() or args.force:
+            processor.build_index(sample_level=args.sample_level)
+        processor.preprocess_features_from_index(
+            index_csv=index_path,
+            sample_level=args.sample_level,
+            batch_size=args.batch_size or 1,
+            num_workers=args.workers,
+            cache_dir=args.cache_dir,
+        )
+        return
     elif args.dataset_command == "build-index":
         processor = dataset.processor
 

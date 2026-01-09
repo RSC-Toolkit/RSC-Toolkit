@@ -10,7 +10,7 @@ from torch.utils.data import DataLoader
 from rsc_toolkit.datasets.base import BaseRSCDatasetProcessor
 from rsc_toolkit.datasets.sample_index import SampleIndex, SampleRecord
 
-from .dataset import ICBHIIndexDataset
+from .index_dataset import ICBHIIndexDataset
 from .models import RecordingRef
 from .processing import (
     discover_recordings,
@@ -35,7 +35,7 @@ class ICBHIDatasetProcessor(BaseRSCDatasetProcessor):
     """
 
     name: str = "ICBHI"
-    sample_rate: int = 10000
+    sampling_rate: int = 10000
 
     # Raw unpacked data directory (folder containing .wav + .txt pairs)
     raw_data_directory: Optional[str] = None
@@ -166,8 +166,8 @@ class ICBHIDatasetProcessor(BaseRSCDatasetProcessor):
         sample_level: str = "cycle",
         batch_size: int = 1,
         num_workers: int = 0,
-        overwrite: bool = False,
         fade: bool = True,
+        cache_dir: str | pathlib.Path | None = None,
     ):
         if not self.feature_processor:
             raise RuntimeError("preprocess_features=True but feature_processor is None")
@@ -177,7 +177,7 @@ class ICBHIDatasetProcessor(BaseRSCDatasetProcessor):
         ds = ICBHIIndexDataset(
             index_csv=index_csv,
             data_root=self.data_folder,
-            sample_rate=self.sample_rate,
+            sampling_rate=self.sampling_rate,
             sample_level=sample_level,
             return_meta=True,
             fade=fade,
@@ -192,35 +192,38 @@ class ICBHIDatasetProcessor(BaseRSCDatasetProcessor):
             persistent_workers=False,
         )
 
-        out_dir = pathlib.Path(self.outputs_directory, "features", sample_level)
-        out_dir.mkdir(parents=True, exist_ok=True)
+        # Ensure processor cache is set up
+        if cache_dir is None:
+            cache_dir = pathlib.Path(self.outputs_directory) / "features"
+        cache_dir = pathlib.Path(cache_dir)
+        if not self.feature_processor.cache_features or self.feature_processor.cache_dir != str(cache_dir):
+            self.feature_processor.cache_features = True
+            self.feature_processor.cache_dir = str(cache_dir)
+            # re-init cache with new dir/config
+            self.feature_processor._init_cache()
+
+        fp = self.feature_processor
 
         for batch in loader:
             # batch is a dict of tensors/lists
             audio = batch["audio"]            # shape: [B, C, T]
             sample_ids = batch["sample_id"]   # list[str] or tuple[str]
-            labels = batch["label"]           # Optional
-            metas = batch.get("meta")
-
-            for i in range(audio.shape[0]):
-                sid = sample_ids[i]
-                feat_path = out_dir / f"{sid}.pt"
-                if feat_path.exists() and not overwrite:
-                    continue
-
-                x = audio[i]  # [C, T]
-
-                # ---- compute features ----
-                feats = self.feature_processor(x, sample_rate=self.sample_rate)
-
-                payload = {
-                    "sample_id": sid,
-                    "features": feats.detach().cpu(),
-                    "label": labels[i] if labels is not None else None,
-                    "meta": metas[i] if metas is not None else None,
-                    "sample_rate": self.sample_rate,
-                }
-                torch.save(payload, feat_path)
+            # Compute + cache features per sample_id
+            if hasattr(fp, "make_features_batch"):
+                # Optional batch path if processor supports it (not cache-aware internally)
+                feats_list = fp.make_features_batch(audio, sample_ids=sample_ids)  # type: ignore[arg-type]
+                cache = getattr(fp, "_feature_cache", None)
+                for sid, feats in zip(sample_ids, feats_list):
+                    if cache:
+                        cache.put(sid, feats)
+                    else:
+                        # fallback: cache disabled, no-op aside from compute
+                        pass
+            else:
+                for i in range(audio.shape[0]):
+                    sid = sample_ids[i]
+                    x = audio[i]  # [C, T]
+                    fp.make_features_cached(x, sample_id=sid)
 
             # Explicit cleanup (optional but fine)
             del batch

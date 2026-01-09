@@ -164,7 +164,7 @@ def try_relpath(path: pathlib.Path, root: pathlib.Path) -> str:
 
 def load_audio(
     wav_path: pathlib.Path,
-    target_sample_rate: int,
+    target_sampling_rate: int,
     fade: bool = True,
     fade_fraction: float = 1 / 16,
 ) -> torch.Tensor:
@@ -173,11 +173,11 @@ def load_audio(
     and optionally apply a small fade in/out to reduce boundary clicks.
     """
     data, sr = torchaudio.load(str(wav_path))
-    if sr != target_sample_rate:
-        data = T.Resample(sr, target_sample_rate)(data)
+    if sr != target_sampling_rate:
+        data = T.Resample(sr, target_sampling_rate)(data)
 
     if fade:
-        fade_samples = int(target_sample_rate * fade_fraction)
+        fade_samples = int(target_sampling_rate * fade_fraction)
         if fade_samples > 0:
             data = T.Fade(
                 fade_in_len=fade_samples,
@@ -192,7 +192,7 @@ def slice_audio(
     data: torch.Tensor,
     t0: float,
     t1: float,
-    sample_rate: int,
+    sampling_rate: int,
 ) -> torch.Tensor:
     """
     Slice waveform by time. Clamps to valid range.
@@ -201,8 +201,8 @@ def slice_audio(
         raise ValueError(f"Invalid segment: t1({t1}) < t0({t0})")
 
     max_ind = int(data.shape[1])
-    start_ind = max(0, min(int(t0 * sample_rate), max_ind))
-    end_ind = max(0, min(int(t1 * sample_rate), max_ind))
+    start_ind = max(0, min(int(t0 * sampling_rate), max_ind))
+    end_ind = max(0, min(int(t1 * sampling_rate), max_ind))
 
     if end_ind < start_ind:
         end_ind = start_ind
@@ -231,7 +231,7 @@ class CycleAudio:
 def extract_cycles_audio_for_recording(
     rec: RecordingRef,
     data_root: pathlib.Path,
-    sample_rate: int,
+    sampling_rate: int,
 ) -> List[CycleAudio]:
     """
     Convenience helper for eager extraction (debugging/feature preprocessing).
@@ -239,12 +239,12 @@ def extract_cycles_audio_for_recording(
     you load slices in the Dataset __getitem__.
     """
     ann = parse_cycle_annotations(rec.txt_path)
-    wav = load_audio(rec.wav_path, target_sample_rate=sample_rate)
+    wav = load_audio(rec.wav_path, target_sampling_rate=sampling_rate)
 
     out: List[CycleAudio] = []
     for row in ann:
         sid = make_cycle_sample_id(rec.recording_id, row.start, row.end)
-        audio = slice_audio(wav, row.start, row.end, sample_rate)
+        audio = slice_audio(wav, row.start, row.end, sampling_rate)
         out.append(
             CycleAudio(
                 sample_id=sid,
