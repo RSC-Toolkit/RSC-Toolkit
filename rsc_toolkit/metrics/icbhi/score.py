@@ -73,7 +73,7 @@ class ICBHIScore(Metric):
             self.counts[cls] += mask.sum()
             self.hits[cls] += (correct & mask).sum()
 
-    def compute(self) -> Dict[str, float]:
+    def compute(self) -> Dict[str, torch.Tensor]:
         counts = self.counts.float()
         hits = self.hits.float()
 
