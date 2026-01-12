@@ -1,0 +1,5 @@
+params:
+  max_epochs: 5
+  accelerator: auto
+  devices: 1
+  log_every_n_steps: 10

@@ -1,0 +1,10 @@
+defaults:
+  - model: audioclap
+  - data: toy
+  - loss: cross_entropy
+  - metrics: icbhi_metrics
+  - optimizer: adam
+  - trainer: default
+  - _self_
+
+seed: 123

@@ -20,6 +20,9 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+trainer = [
+    "hydra-core",
+]
 dev = [
     "pytest",
     "black",
@@ -28,7 +31,7 @@ dev = [
 ]
 
 [project.scripts]
-rsc-toolkit-train = "rsc_toolkit.train:hydra_main"
+rsc-toolkit-train = "rsc_toolkit.train:main"
 rsctk = "rsc_toolkit.cli:main"
 
 [tool.setuptools]
