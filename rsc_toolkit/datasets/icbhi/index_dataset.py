@@ -184,3 +184,19 @@ class ICBHIIndexDataset(Dataset):
             out["meta"] = meta_val
 
         return out
+
+
+class IndexFeatureDataset(Dataset):
+
+    def __init__(self, index_ds, feature_processor):
+        self.index_ds = index_ds
+        self.fp = feature_processor
+
+    def __len__(self):
+        return len(self.index_ds)
+
+    def __getitem__(self, i):
+        item = self.index_ds[i]
+        audio = item["audio"].squeeze()
+        feats = self.fp.make_features_cached(audio, sample_id=item["sample_id"])
+        return feats, item["label"], item["sample_id"]

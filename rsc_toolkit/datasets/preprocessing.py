@@ -1,16 +1,13 @@
-import multiprocessing as mp
-from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
-from typing import List, Callable, Optional, Any
 import logging
+import multiprocessing as mp
+from typing import List, Callable, Optional, Any
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
+
+from tqdm import tqdm
+
 
 logger = logging.getLogger(__name__)
 
-try:
-    from tqdm import tqdm
-    HAS_TQDM = True
-except ImportError:
-    HAS_TQDM = False
-    logger.warning("tqdm not available, progress bars will be disabled")
 
 
 class ParallelPreprocessor:
