@@ -8,7 +8,7 @@ import lightning as L
 import torch
 from torch.utils.data import DataLoader
 
-from rsc_toolkit.datasets.toy_dataset import ToyDataset
+from rsc_toolkit.datasets.toy_dataset import ICBHIDataset
 from rsc_toolkit.datasets.icbhi.index_dataset import ICBHIIndexDataset, IndexFeatureDataset
 
 from rsc_toolkit.datasets.feature_cache import FeatureCache
@@ -107,62 +107,6 @@ class ICBHIIndexDataModule(L.LightningDataModule):
         self.val_ds = None
         self.test_ds = None
 
-    def prepare_data(self) -> None:
-        """
-        Do disk-writing, one-time stuff here:
-        - download raw data
-        - build index csv
-        - (optional) precompute cached features
-        """
-        out_dir = self.outputs_directory
-        out_dir.mkdir(parents=True, exist_ok=True)
-
-        # Build processor + dataset and download/build index
-        self.processor = ToyDataset.make_processor(
-            outputs_directory=str(out_dir),
-            raw_data_directory=str(self.raw_data_directory),
-            force=self.force_rebuild,
-            sampling_rate=self.sampling_rate,
-        )
-
-        toy = ToyDataset(
-            downloader=ToyDataset.make_downloader(outputs_directory=str(out_dir)),
-            processor=self.processor,
-        )
-
-        toy.download()
-        self.processor.build_index(sample_level=self.sample_level)
-
-        # Decide index csv path
-        if self.index_filename is not None:
-            self.index_csv = self.processor.index_dir_path / self.index_filename
-        else:
-            self.index_csv = self.processor.index_dir_path / f"index_{self.sample_level}.csv"
-
-        if not self.index_csv.exists():
-            raise FileNotFoundError(f"Index CSV not found: {self.index_csv}")
-
-        # Optional: precompute features into cache
-        if self.features_cfg.enabled and self.feature_precompute:
-            cache_dir = Path(self.features_cfg.cache_dir) if self.features_cfg.cache_dir else (out_dir / "features_cache")
-            cache_dir.mkdir(parents=True, exist_ok=True)
-            feature_cache = FeatureCache(cache_dir=cache_dir)
-
-            fp = self._build_feature_processor(feature_cache)
-            feature_cache.configure(fp.get_processor_config(), processor_name=fp.__class__.__name__)
-
-            # Your comment hinted this exists:
-            # processor.preprocess_features_from_index(...)
-            # If it exists on self.processor, call it. Otherwise you can omit precompute entirely.
-            if hasattr(self.processor, "preprocess_features_from_index"):
-                self.processor.preprocess_features_from_index(
-                    index_csv=self.index_csv,
-                    sample_level=self.sample_level,
-                    batch_size=self.feature_precompute_batch_size,
-                    num_workers=self.feature_precompute_num_workers,
-                    cache_dir=cache_dir,
-                )
-
     def setup(self, stage: Optional[str] = None) -> None:
         """
         Build datasets in-memory here. Called on every process in DDP.
@@ -172,7 +116,7 @@ class ICBHIIndexDataModule(L.LightningDataModule):
             # In case someone calls setup without prepare_data (rare), rebuild minimal paths
             out_dir = self.outputs_directory
             out_dir.mkdir(parents=True, exist_ok=True)
-            self.index_csv = out_dir / "dataset" / "toy" / "index" / f"index_{self.sample_level}.csv"
+            self.index_csv = out_dir / "dataset" / "ICBHI" / "index" / f"index_{self.sample_level}.csv"
 
         base_kwargs = dict(
             index_csv=self.index_csv,
