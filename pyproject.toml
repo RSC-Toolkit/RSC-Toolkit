@@ -14,7 +14,7 @@ license-files = ["LICENSE"]
 dependencies = [
     "pydantic",
     "torch",
-    "torchaudio",
+    "torchaudio==2.7.0", # before torchcodec change
     "librosa",
     "tqdm",
 ]
@@ -32,6 +32,7 @@ dev = [
 
 [project.scripts]
 rsc-toolkit-train = "rsc_toolkit.train:main"
+rsc-toolkit = "rsc_toolkit.cli:main"
 rsctk = "rsc_toolkit.cli:main"
 
 [tool.setuptools]

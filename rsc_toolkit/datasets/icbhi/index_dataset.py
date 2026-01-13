@@ -90,7 +90,7 @@ class ICBHIIndexDataset(Dataset):
         return (self.data_root / p).resolve()
 
     @staticmethod
-    def _default_split_file() -> pathlib.Path:
+    def _default_split_file() -> pathlib.Path: # TODO not good to provide default
         return (pathlib.Path(__file__).parent / "data" / "official_split.txt").resolve()
 
     def _load_official_split_map(
@@ -100,7 +100,7 @@ class ICBHIIndexDataset(Dataset):
         Returns mapping: recording_id -> split ("train" or "test").
         """
         path = pathlib.Path(split_file).expanduser().resolve() if split_file else self._default_split_file()
-        if not path.exists():
+        if not path.exists():   
             raise FileNotFoundError(f"Split file not found: {path}")
 
         mapping: Dict[str, str] = {}

@@ -59,6 +59,9 @@ class PLAdapter(L.LightningModule):
         for metric in self.val_metrics:
             metric.update(logits, labels)
 
+    def on_train_start(self):
+        self.rsc_model.train()
+
     def on_train_epoch_end(self):
         for metric in self.train_metrics:
             self.log_dict(metric.compute(), prog_bar=True)
