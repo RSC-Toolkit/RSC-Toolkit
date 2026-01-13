@@ -1,7 +1,7 @@
 name: icbhi_index
 params:
   project_root: .
-  raw_data_directory: downloaded_datasets/ICBHI_final_database/ICBHI_final_database
+  raw_data_directory: downloaded_datasets/ICBHI_final_database
   outputs_directory: downloaded_datasets
   split_file: datasets/icbhi/data/official_split.txt
 
