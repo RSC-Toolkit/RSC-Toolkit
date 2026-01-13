@@ -22,6 +22,7 @@ dependencies = [
 [project.optional-dependencies]
 trainer = [
     "hydra-core",
+    "lightning",
 ]
 dev = [
     "pytest",
