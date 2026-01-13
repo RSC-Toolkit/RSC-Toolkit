@@ -1,0 +1,21 @@
+name: icbhi_index
+params:
+  project_root: .
+  raw_data_directory: downloaded_datasets/ICBHI_final_database/ICBHI_final_database
+  outputs_directory: downloaded_datasets
+  split_file: datasets/icbhi/data/official_split.txt
+
+  sampling_rate: 16000
+  sample_level: cycle
+  force_rebuild: true
+
+  batch_size: 32
+  num_workers: 4
+  shuffle_train: true
+
+  # optional feature caching (if your DataModule supports it)
+  features:
+    enabled: true
+    kind: clap
+    cache_dir: downloaded_datasets/features_cache
+    clap_model_name: laion/clap-htsat-unfused

@@ -13,10 +13,14 @@ license-files = ["LICENSE"]
 
 dependencies = [
     "pydantic",
-    "torch",
-    "torchaudio==2.7.0", # before torchcodec change
     "librosa",
     "tqdm",
+
+    # Below versions must be compatible with eachother
+    "torch==2.7.0",
+    "torchaudio==2.7.0", # before torchcodec change
+    "torchvision==0.22.0",
+    "torchcodec",
 ]
 
 [project.optional-dependencies]
