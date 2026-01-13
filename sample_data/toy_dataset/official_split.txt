@@ -1,11 +1,11 @@
 
-107_3p2_Al_mc_AKGC417L	val
-107_3p2_Ar_mc_AKGC417L	val
-107_3p2_Ll_mc_AKGC417L	val
-107_3p2_Lr_mc_AKGC417L	val
-107_3p2_Pl_mc_AKGC417L	val
-107_3p2_Pr_mc_AKGC417L	val
-107_3p2_Tc_mc_AKGC417L	val
+107_3p2_Al_mc_AKGC417L	test
+107_3p2_Ar_mc_AKGC417L	test
+107_3p2_Ll_mc_AKGC417L	test
+107_3p2_Lr_mc_AKGC417L	test
+107_3p2_Pl_mc_AKGC417L	test
+107_3p2_Pr_mc_AKGC417L	test
+107_3p2_Tc_mc_AKGC417L	test
 107_2b3_Al_mc_AKGC417L	train
 107_2b3_Ar_mc_AKGC417L	train
 107_2b3_Ll_mc_AKGC417L	train

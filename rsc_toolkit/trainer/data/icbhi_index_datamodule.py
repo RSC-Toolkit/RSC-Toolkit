@@ -185,16 +185,17 @@ class ICBHIIndexDataModule(L.LightningDataModule):
         # Build base audio datasets
         if stage in (None, "fit"):
             self.train_ds = ICBHIIndexDataset(**base_kwargs, split="train")
-            self.val_ds = ICBHIIndexDataset(**base_kwargs, split="val")
+            self.val_ds = ICBHIIndexDataset(**base_kwargs, split="test")
 
             if self.features_cfg.enabled:
                 self.train_ds = self._wrap_with_features(self.train_ds)
                 self.val_ds = self._wrap_with_features(self.val_ds)
 
-        if stage in (None, "test"):
-            self.test_ds = ICBHIIndexDataset(**base_kwargs, split="test")
-            if self.features_cfg.enabled:
-                self.test_ds = self._wrap_with_features(self.test_ds)
+        # TODO need to sort out the val==test case
+        # if stage in (None, "test"):
+        #     self.test_ds = ICBHIIndexDataset(**base_kwargs, split="test")
+        #     if self.features_cfg.enabled:
+        #         self.test_ds = self._wrap_with_features(self.test_ds)
 
     def _build_feature_processor(self, feature_cache: FeatureCache):
         if self.features_cfg.kind == "clap":
