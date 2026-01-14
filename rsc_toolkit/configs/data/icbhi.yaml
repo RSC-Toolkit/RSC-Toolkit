@@ -1,5 +1,7 @@
 name: index
 params:
+  datamodule_name: index
+  
   dataset_name: ICBHI
   index_dataset_cls: rsc_toolkit.datasets.index_dataset.IndexDataset
   project_root: .
