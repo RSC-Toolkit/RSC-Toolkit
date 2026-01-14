@@ -263,7 +263,7 @@ class IndexDataModule(L.LightningDataModule):
         )
 
         with torch.inference_mode():
-            for batch in tqdm(warmup_loader):
+            for batch in tqdm.tqdm(warmup_loader):
                 computed += sum(1 for sid in batch if sid is not None)
                 if computed > 0 and computed % log_every == 0:
                     elapsed = time.time() - start
