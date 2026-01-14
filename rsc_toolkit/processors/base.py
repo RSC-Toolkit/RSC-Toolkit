@@ -42,7 +42,10 @@ class BaseAudioProcessor(ABC):
         """Make features with caching support"""
         if self.feature_cache and self.feature_cache.is_cached(sample_id):
             logger.debug(f"Cache hit for {sample_id}")
-            return self.feature_cache.get(sample_id)
+            cached_features = self.feature_cache.get(sample_id)
+            if cached_features is not None:
+                return cached_features
+            logger.warning(f"Got cached features {cached_features}, recomputing.")
         
         # Compute features
         features = self.make_features(audio, sample_id=sample_id)

@@ -1,4 +1,4 @@
-# rsc_toolkit/datasets/icbhi/dataset.py
+# rsc_toolkit/datasets//dataset.py
 from __future__ import annotations
 
 from typing import Any, Dict, Optional, Literal, Union, Mapping
@@ -9,12 +9,12 @@ import pandas as pd
 import torch
 from torch.utils.data import Dataset
 
-from .processing import load_audio, slice_audio
+from .icbhi.processing import load_audio, slice_audio
 
 logger = logging.getLogger(__name__)
 
 
-class ICBHIIndexDataset(Dataset):
+class IndexDataset(Dataset):
     """
     Torch-style dataset that consumes an index CSV produced by the processor.
 
@@ -126,7 +126,7 @@ class ICBHIIndexDataset(Dataset):
         self.df = self.df.loc[mask].reset_index(drop=True)
         after = int(len(self.df))
         logger.info(
-            "ICBHIIndexDataset split=%s filtered %d -> %d samples (unassigned recordings=%d)",
+            "IndexDataset split=%s filtered %d -> %d samples (unassigned recordings=%d)",
             split,
             before,
             after,

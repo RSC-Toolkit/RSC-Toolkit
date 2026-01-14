@@ -1,5 +1,9 @@
-name: icbhi_index
+name: toy
 params:
+  datamodule_name: index
+
+  dataset_name: toy
+  index_dataset_cls: rsc_toolkit.datasets.index_dataset.IndexDataset
   project_root: .
   raw_data_directory: sample_data/toy_dataset/files
   outputs_directory: downloaded_datasets
@@ -7,7 +11,6 @@ params:
 
   sampling_rate: 16000
   sample_level: cycle
-  force_rebuild: true
 
   batch_size: 32
   num_workers: 4
@@ -19,3 +22,9 @@ params:
     kind: clap
     cache_dir: downloaded_datasets/features_cache
     clap_model_name: laion/clap-htsat-unfused
+
+  # Optional: warm up feature cache at datamodule setup (rank 0 only).
+  # This ensures training doesn't spend time computing features on-the-fly.
+  feature_precompute: true
+  feature_precompute_batch_size: 8
+  feature_precompute_num_workers: 0

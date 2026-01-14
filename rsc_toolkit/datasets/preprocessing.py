@@ -75,10 +75,7 @@ class ParallelPreprocessor:
             }
             
             # Process with progress bar
-            if HAS_TQDM:
-                iterator = tqdm(as_completed(future_to_id), total=len(future_to_id), desc=desc)
-            else:
-                iterator = as_completed(future_to_id)
+            iterator = tqdm(as_completed(future_to_id), total=len(future_to_id), desc=desc)
             
             for future in iterator:
                 sample_id = future_to_id[future]
@@ -111,10 +108,7 @@ class ParallelPreprocessor:
         results = []
         num_batches = (len(samples) + self.batch_size - 1) // self.batch_size
         
-        if HAS_TQDM:
-            iterator = tqdm(range(0, len(samples), self.batch_size), desc=desc, total=num_batches)
-        else:
-            iterator = range(0, len(samples), self.batch_size)
+        iterator = tqdm(range(0, len(samples), self.batch_size), desc=desc, total=num_batches)
         
         for i in iterator:
             batch = samples[i:i + self.batch_size]

@@ -192,7 +192,6 @@ class BaseRSCDatasetProcessor(ABC, BaseModel):
         logger.info(f"⬇️ Processing {self.name}")
         self.process_dataset()
         logger.info(f"✅ Completed {self.name} processing")
-
     
 class BaseRSCDataset(ABC, BaseModel):
     """

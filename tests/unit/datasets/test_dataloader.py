@@ -7,15 +7,18 @@ import torch
 from typing import Optional, Dict, Any
 
 from rsc_toolkit.datasets.toy_dataset import ToyDataset
-from rsc_toolkit.datasets.icbhi.index_dataset import ICBHIIndexDataset
+from rsc_toolkit.datasets.index_dataset import IndexDataset
 from rsc_toolkit.processors.base import BaseAudioProcessor
 
 
 class SimpleTestProcessor(BaseAudioProcessor):
     """Simple processor for testing"""
-    feature_dim: int = 128
+
+    def __init__(self, feature_dim: int = 128, **kwargs):
+        self.feature_dim = feature_dim
+        super().__init__(**kwargs)
     
-    def _get_processor_config(self) -> Dict[str, Any]:
+    def get_processor_config(self) -> Dict[str, Any]:
         return {"feature_dim": self.feature_dim}
     
     def make_features(self, audio: torch.Tensor, sample_id: Optional[str] = None):

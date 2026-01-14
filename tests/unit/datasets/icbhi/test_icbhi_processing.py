@@ -13,7 +13,7 @@ from rsc_toolkit.datasets.icbhi.processing import (
 def _write_wav(path: pathlib.Path, sr: int = 8000, seconds: float = 0.25):
     n = int(sr * seconds)
     x = torch.zeros(1, n)
-    torchaudio.save(str(path), x, sampling_rate=sr)
+    torchaudio.save(str(path), x, sample_rate=sr)
 
 
 def test_discover_recordings_pairs_only(tmp_path: pathlib.Path):

@@ -13,8 +13,10 @@ def build_datamodule(cfg: Dict[str, Any]) -> L.LightningDataModule:
     name = cfg["name"]
     params = cfg.get("params", {})
 
-    if name not in DATAMODULES:
+    datamodule_name = params.pop('datamodule_name')
+
+    if datamodule_name not in DATAMODULES:
         raise KeyError(f"Unknown datamodule '{name}'. Available: {sorted(DATAMODULES.keys())}")
 
-    cls = DATAMODULES[name]
+    cls = DATAMODULES[datamodule_name]
     return cls(**params)

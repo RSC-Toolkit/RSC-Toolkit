@@ -10,7 +10,6 @@ from torch.utils.data import DataLoader
 from rsc_toolkit.datasets.base import BaseRSCDatasetProcessor
 from rsc_toolkit.datasets.sample_index import SampleIndex, SampleRecord
 
-from .index_dataset import ICBHIIndexDataset
 from .models import RecordingRef
 from .processing import (
     discover_recordings,

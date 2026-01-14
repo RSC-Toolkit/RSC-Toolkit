@@ -10,7 +10,7 @@ from rsc_toolkit.datasets.sample_index import SampleIndex
 def _write_wav(path: pathlib.Path, sr: int = 8000, seconds: float = 1.0):
     n = int(sr * seconds)
     x = torch.zeros(1, n)
-    torchaudio.save(str(path), x, sampling_rate=sr)
+    torchaudio.save(str(path), x, sample_rate=sr)
 
 
 def _write_recording(tmp_path: pathlib.Path, stem: str):

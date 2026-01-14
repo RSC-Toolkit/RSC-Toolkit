@@ -1,19 +1,21 @@
-from __future__ import annotations
-
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional, Dict, Any, List, Tuple
+import logging
 
+from torch.utils.data import DataLoader
 import lightning as L
 import torch
-from torch.utils.data import DataLoader
+import time
 
 from rsc_toolkit.datasets.toy_dataset import ICBHIDataset
-from rsc_toolkit.datasets.icbhi.index_dataset import ICBHIIndexDataset, IndexFeatureDataset
-
+from rsc_toolkit.datasets.index_dataset import IndexDataset, IndexFeatureDataset
 from rsc_toolkit.datasets.feature_cache import FeatureCache
 from rsc_toolkit.processors.clap import CLAPProcessor
 from rsc_toolkit.processors.mel import MelBankAudioProcessor
+
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -107,6 +109,117 @@ class ICBHIIndexDataModule(L.LightningDataModule):
         self.val_ds = None
         self.test_ds = None
 
+    def _is_global_zero(self) -> bool:
+        trainer = getattr(self, "trainer", None)
+        if trainer is not None:
+            try:
+                return bool(trainer.is_global_zero)
+            except Exception:
+                pass
+        if torch.distributed.is_available() and torch.distributed.is_initialized():
+            try:
+                return torch.distributed.get_rank() == 0
+            except Exception:
+                return True
+        return True
+
+    def _warmup_feature_cache(self, ds: IndexFeatureDataset, *, split_name: str) -> None:
+        fp = getattr(ds, "fp", None)
+        cache = getattr(fp, "feature_cache", None)
+        if cache is None:
+            logger.warning("Feature precompute enabled but feature_cache is missing (split=%s)", split_name)
+            return
+
+        index_ds = getattr(ds, "index_ds", None)
+        df = getattr(index_ds, "df", None)
+        if df is None or "sample_id" not in df.columns:
+            logger.warning("Cannot warm cache: missing index_ds.df['sample_id'] (split=%s)", split_name)
+            return
+
+        sample_ids = df["sample_id"].astype(str).tolist()
+        total = len(sample_ids)
+        cached_before = sum(1 for sid in sample_ids if cache.is_cached(sid))
+        missing = total - cached_before
+
+        try:
+            stats = cache.get_cache_stats()
+            cache_dir = stats.get("cache_dir")
+        except Exception:
+            cache_dir = None
+
+        logger.info(
+            "Feature cache warmup split=%s: cached=%d/%d missing=%d cache_dir=%s",
+            split_name,
+            cached_before,
+            total,
+            missing,
+            cache_dir,
+        )
+
+        if missing == 0:
+            return
+
+        start = time.time()
+        computed = 0
+        log_every = max(25, missing // 10)
+
+        class _WarmupDataset(torch.utils.data.Dataset):
+            def __init__(self, inner: ICBHIIndexDataset):
+                self.inner = inner
+
+            def __len__(self) -> int:
+                return len(self.inner)
+
+            def __getitem__(self, i: int) -> Optional[str]:
+                sid = str(self.inner.df.iloc[int(i)]["sample_id"])
+                if cache.is_cached(sid):
+                    return None
+                item = self.inner[int(i)]
+                audio = item["audio"].squeeze()
+                fp.make_features_cached(audio, sample_id=sid)
+                return sid
+
+        if self.feature_precompute_num_workers > 0:
+            logger.info(
+                "Feature cache warmup split=%s using num_workers=%d (may require the feature processor to be picklable)",
+                split_name,
+                self.feature_precompute_num_workers,
+            )
+
+        warmup_loader = DataLoader(
+            _WarmupDataset(index_ds),
+            batch_size=self.feature_precompute_batch_size,
+            shuffle=False,
+            num_workers=self.feature_precompute_num_workers,
+            collate_fn=lambda batch: batch,
+            pin_memory=self.pin_memory,
+            persistent_workers=False,
+        )
+
+        with torch.inference_mode():
+            for batch in warmup_loader:
+                computed += sum(1 for sid in batch if sid is not None)
+                if computed > 0 and computed % log_every == 0:
+                    elapsed = time.time() - start
+                    logger.info(
+                        "Feature cache warmup split=%s: computed=%d/%d (%.1fs)",
+                        split_name,
+                        computed,
+                        missing,
+                        elapsed,
+                    )
+
+        elapsed = time.time() - start
+        cached_after = sum(1 for sid in sample_ids if cache.is_cached(sid))
+        logger.info(
+            "Feature cache warmup done split=%s: computed=%d elapsed=%.1fs now_cached=%d/%d",
+            split_name,
+            computed,
+            elapsed,
+            cached_after,
+            total,
+        )
+
     def setup(self, stage: Optional[str] = None) -> None:
         """
         Build datasets in-memory here. Called on every process in DDP.
@@ -134,6 +247,13 @@ class ICBHIIndexDataModule(L.LightningDataModule):
             if self.features_cfg.enabled:
                 self.train_ds = self._wrap_with_features(self.train_ds)
                 self.val_ds = self._wrap_with_features(self.val_ds)
+
+            if self.features_cfg.enabled and self.feature_precompute:
+                if not self._is_global_zero():
+                    logger.info("Skipping feature cache warmup on non-global-zero rank")
+                else:
+                    self._warmup_feature_cache(self.train_ds, split_name="train")  # type: ignore[arg-type]
+                    self._warmup_feature_cache(self.val_ds, split_name="val")  # type: ignore[arg-type]
 
         # TODO need to sort out the val==test case
         # if stage in (None, "test"):

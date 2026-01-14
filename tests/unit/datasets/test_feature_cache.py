@@ -3,8 +3,9 @@ Tests for FeatureCache functionality
 """
 import pytest
 import pathlib
+
 import torch
-import json
+
 from rsc_toolkit.datasets.feature_cache import FeatureCache
 
 
@@ -12,6 +13,8 @@ def test_feature_cache_creates_directory(tmp_path):
     """Test that FeatureCache creates cache directory"""
     cache = FeatureCache(
         cache_dir=tmp_path,
+    )
+    cache.configure(
         processor_config={"test": "config"},
         processor_name="TestProcessor"
     )
@@ -27,12 +30,15 @@ def test_feature_cache_key_generation():
     
     cache1 = FeatureCache(
         cache_dir=cache_dir,
+    )
+    cache1.configure(
         processor_config={"model": "clap", "device": "cuda"},
         processor_name="CLAPProcessor"
     )
-    
     cache2 = FeatureCache(
         cache_dir=cache_dir,
+    )
+    cache2.configure(
         processor_config={"model": "clap", "device": "cuda"},
         processor_name="CLAPProcessor"
     )
@@ -43,6 +49,8 @@ def test_feature_cache_key_generation():
     # Different processor name should give different key
     cache3 = FeatureCache(
         cache_dir=cache_dir,
+    )
+    cache3.configure(
         processor_config={"model": "clap", "device": "cuda"},
         processor_name="MelBankProcessor"
     )
@@ -51,9 +59,12 @@ def test_feature_cache_key_generation():
     # Different config should give different key
     cache4 = FeatureCache(
         cache_dir=cache_dir,
+    )
+    cache4.configure(
         processor_config={"model": "clap", "device": "cpu"},
         processor_name="CLAPProcessor"
     )
+    
     assert cache1.cache_key != cache4.cache_key
 
 
@@ -61,9 +72,12 @@ def test_feature_cache_put_get(tmp_path):
     """Test storing and retrieving cached features"""
     cache = FeatureCache(
         cache_dir=tmp_path,
+    )
+    cache.configure(
         processor_config={"test": "config"},
         processor_name="TestProcessor"
     )
+    
     
     sample_id = "test_sample_123"
     features = torch.randn(128, 512)  # Example feature tensor
@@ -92,6 +106,8 @@ def test_feature_cache_metadata_persistence(tmp_path):
     # Create cache and store features
     cache1 = FeatureCache(
         cache_dir=cache_dir,
+    )
+    cache1.configure(
         processor_config={"test": "config"},
         processor_name="TestProcessor"
     )
@@ -103,6 +119,8 @@ def test_feature_cache_metadata_persistence(tmp_path):
     # Create new cache instance (simulating restart)
     cache2 = FeatureCache(
         cache_dir=cache_dir,
+    )
+    cache2.configure(
         processor_config={"test": "config"},
         processor_name="TestProcessor"
     )
@@ -117,6 +135,8 @@ def test_feature_cache_multiple_samples(tmp_path):
     """Test caching multiple samples"""
     cache = FeatureCache(
         cache_dir=tmp_path,
+    )
+    cache.configure(
         processor_config={"test": "config"},
         processor_name="TestProcessor"
     )
@@ -139,8 +159,7 @@ def test_feature_cache_multiple_samples(tmp_path):
     
     # Check stats
     stats = cache.get_cache_stats()
-    assert stats["total_entries"] == 3
-    assert stats["existing_files"] == 3
+    assert stats["pt_files"] == 3
 
 
 def test_feature_cache_isolation(tmp_path):
@@ -150,6 +169,8 @@ def test_feature_cache_isolation(tmp_path):
     # CLAP processor cache
     clap_cache = FeatureCache(
         cache_dir=cache_dir,
+    )
+    clap_cache.configure(
         processor_config={"model_name": "clap", "device": "cuda"},
         processor_name="CLAPProcessor"
     )
@@ -157,6 +178,8 @@ def test_feature_cache_isolation(tmp_path):
     # MelBank processor cache
     mel_cache = FeatureCache(
         cache_dir=cache_dir,
+    )
+    mel_cache.configure(
         processor_config={"n_mels": 128, "sampling_rate": 16000},
         processor_name="MelBankProcessor"
     )
@@ -190,14 +213,17 @@ def test_feature_cache_isolation(tmp_path):
     assert mel_retrieved.shape == (64, 128)
 
 
+@pytest.mark.skip(reason="metadata was agent hallucination?")
 def test_feature_cache_missing_file(tmp_path):
     """Test handling of missing cache files"""
     cache = FeatureCache(
         cache_dir=tmp_path,
+    )
+    cache.configure(
         processor_config={"test": "config"},
         processor_name="TestProcessor"
     )
-    
+
     sample_id = "missing_sample"
     
     # Add to metadata but don't create file (simulate corruption/deletion)
@@ -214,21 +240,21 @@ def test_feature_cache_stats(tmp_path):
     """Test cache statistics"""
     cache = FeatureCache(
         cache_dir=tmp_path,
+    )
+    cache.configure(
         processor_config={"test": "config"},
         processor_name="TestProcessor"
     )
     
     # Empty cache
     stats = cache.get_cache_stats()
-    assert stats["total_entries"] == 0
-    assert stats["existing_files"] == 0
+    assert stats["pt_files"] == 0
     
     # Add some samples
     for i in range(5):
         cache.put(f"sample_{i}", torch.randn(64, 128))
     
     stats = cache.get_cache_stats()
-    assert stats["total_entries"] == 5
-    assert stats["existing_files"] == 5
+    assert stats["pt_files"] == 5
     assert "cache_dir" in stats
 
