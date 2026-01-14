@@ -7,9 +7,10 @@ import importlib
 import logging
 import time
 
-import lightning as L
-import torch
 from torch.utils.data import DataLoader
+import torch
+import lightning as L
+import tqdm
 
 from rsc_toolkit.datasets.feature_cache import FeatureCache
 from rsc_toolkit.datasets.index_dataset import IndexFeatureDataset
@@ -262,7 +263,7 @@ class IndexDataModule(L.LightningDataModule):
         )
 
         with torch.inference_mode():
-            for batch in warmup_loader:
+            for batch in tqdm(warmup_loader):
                 computed += sum(1 for sid in batch if sid is not None)
                 if computed > 0 and computed % log_every == 0:
                     elapsed = time.time() - start
