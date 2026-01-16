@@ -41,4 +41,12 @@ rsc-toolkit = "rsc_toolkit.cli:main"
 rsctk = "rsc_toolkit.cli:main"
 
 [tool.setuptools]
-packages = ["rsc_toolkit"]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["rsc_toolkit*"]
+
+[tool.setuptools.package-data]
+rsc_toolkit = ["configs/**/*.yaml", "configs/**/*.yml"]
+"rsc_toolkit.datasets.icbhi" = ["data/*.txt"]
