@@ -4,7 +4,7 @@ params:
 
   dataset_name: toy
   index_dataset_cls: rsc_toolkit.datasets.index_dataset.IndexDataset
-  project_root: .
+  project_root: ${hydra:runtime.cwd}
   raw_data_directory: sample_data/toy_dataset/files
   outputs_directory: downloaded_datasets
   split_file: sample_data/toy_dataset/official_split.txt

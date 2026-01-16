@@ -115,3 +115,45 @@ def test_index_datamodule_supports_split_lists(tmp_path: Path) -> None:
     assert len(dm.train_ds) == 2
     assert len(dm.val_ds) == 2
     assert len(dm.test_ds) == 2
+
+
+def test_index_datamodule_resolves_relative_paths_under_project_root(tmp_path: Path) -> None:
+    project_root = tmp_path / "project"
+    project_root.mkdir(parents=True, exist_ok=True)
+
+    # Create index where IndexDataModule expects it: <outputs>/dataset/<name>/index/index_cycle.csv
+    index_dir = project_root / "outputs" / "dataset" / "DUMMY" / "index"
+    index_dir.mkdir(parents=True, exist_ok=True)
+    df = pd.DataFrame(
+        [
+            {"sample_id": "a", "label": 0, "split": "train"},
+            {"sample_id": "b", "label": 1, "split": "test"},
+        ]
+    )
+    df.to_csv(index_dir / "index_cycle.csv", index=False)
+
+    split_file_rel = Path("splits") / "split.txt"
+    (project_root / split_file_rel).parent.mkdir(parents=True, exist_ok=True)
+    (project_root / split_file_rel).write_text("rec_a train\nrec_b test\n")
+
+    dm = IndexDataModule(
+        dataset_name="DUMMY",
+        index_dataset_cls=DummyIndexDataset,
+        project_root=str(project_root),
+        raw_data_directory="raw",
+        outputs_directory="outputs",
+        split_file=str(split_file_rel),
+        sampling_rate=16_000,
+        sample_level="cycle",
+        features={"enabled": False, "cache_dir": "cache"},
+    )
+
+    assert dm.project_root == project_root.resolve()
+    assert dm.raw_data_directory == (project_root / "raw").resolve()
+    assert dm.outputs_directory == (project_root / "outputs").resolve()
+    assert dm.split_file == (project_root / split_file_rel).resolve()
+    assert dm.features_cfg.cache_dir == str((project_root / "cache").resolve())
+
+    dm.setup("fit")
+    assert dm.train_ds is not None
+    assert dm.val_ds is not None

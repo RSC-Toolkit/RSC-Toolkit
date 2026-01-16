@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional, Dict, Any, List, Tuple, Sequence
+from typing import Optional, Dict, Any, List, Tuple, Sequence, Union
 import importlib
 import logging
 import time
@@ -97,10 +97,10 @@ class IndexDataModule(L.LightningDataModule):
         else:
             self.index_dataset_cls = index_dataset_cls
 
-        self.project_root = Path(project_root)
-        self.raw_data_directory = Path(raw_data_directory)
-        self.outputs_directory = Path(outputs_directory)
-        self.split_file = Path(split_file) if split_file else None
+        self.project_root = Path(project_root).expanduser().resolve()
+        self.raw_data_directory = self._resolve_path(raw_data_directory)
+        self.outputs_directory = self._resolve_path(outputs_directory)
+        self.split_file = self._resolve_path(split_file) if split_file else None
 
         self.sampling_rate = int(sampling_rate)
         self.sample_level = str(sample_level)
@@ -117,6 +117,8 @@ class IndexDataModule(L.LightningDataModule):
         self.persistent_workers = bool(persistent_workers)
 
         self.features_cfg = FeatureConfig(**(features or {}))
+        if self.features_cfg.cache_dir:
+            self.features_cfg.cache_dir = str(self._resolve_path(self.features_cfg.cache_dir))
         self.feature_precompute = bool(feature_precompute)
         self.feature_precompute_batch_size = int(feature_precompute_batch_size)
         self.feature_precompute_num_workers = int(feature_precompute_num_workers)
@@ -126,6 +128,12 @@ class IndexDataModule(L.LightningDataModule):
         self.train_ds = None
         self.val_ds = None
         self.test_ds = None
+
+    def _resolve_path(self, path: Union[str, Path]) -> Path:
+        p = Path(path).expanduser()
+        if not p.is_absolute():
+            p = self.project_root / p
+        return p.resolve()
 
     @staticmethod
     def _normalize_splits(
