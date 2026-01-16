@@ -71,7 +71,7 @@ def test_cycle_level_index_dataloader(processor_with_index, toy_dataset_path):
     processor = processor_with_index["processor"]
     index_path = processor_with_index["cycle_index_path"]
 
-    ds = ICBHIIndexDataset(
+    ds = IndexDataset(
         index_csv=index_path,
         data_root=toy_dataset_path,
         sampling_rate=processor.sampling_rate,
@@ -100,7 +100,7 @@ def test_clip_level_index_dataloader(processor_with_index, toy_dataset_path):
     processor = processor_with_index["processor"]
     index_path = processor_with_index["clip_index_path"]
 
-    ds = ICBHIIndexDataset(
+    ds = IndexDataset(
         index_csv=index_path,
         data_root=toy_dataset_path,
         sampling_rate=processor.sampling_rate,
@@ -121,7 +121,7 @@ def test_dataloader_basic(processor_with_index, toy_dataset_path):
     processor = processor_with_index["processor"]
     index_path = processor_with_index["cycle_index_path"]
 
-    ds = ICBHIIndexDataset(
+    ds = IndexDataset(
         index_csv=index_path,
         data_root=toy_dataset_path,
         sampling_rate=processor.sampling_rate,
@@ -140,7 +140,7 @@ def test_dataloader_multiple_batches(processor_with_index, toy_dataset_path):
     processor = processor_with_index["processor"]
     index_path = processor_with_index["cycle_index_path"]
 
-    ds = ICBHIIndexDataset(
+    ds = IndexDataset(
         index_csv=index_path,
         data_root=toy_dataset_path,
         sampling_rate=processor.sampling_rate,
@@ -161,7 +161,7 @@ def test_dataloader_multiple_batches(processor_with_index, toy_dataset_path):
 #     processor = processor_with_index["processor"]
 #     index_path = processor_with_index["cycle_index_path"]
 
-#     ds = ICBHIIndexDataset(
+#     ds = IndexDataset(
 #         index_csv=index_path,
 #         data_root=toy_dataset_path,
 #         sampling_rate=processor.sampling_rate,
@@ -182,7 +182,7 @@ def test_dataloader_label_extraction(processor_with_index, toy_dataset_path):
     processor = processor_with_index["processor"]
     index_path = processor_with_index["cycle_index_path"]
 
-    ds = ICBHIIndexDataset(
+    ds = IndexDataset(
         index_csv=index_path,
         data_root=toy_dataset_path,
         sampling_rate=processor.sampling_rate,

@@ -2,10 +2,12 @@ from pathlib import Path
 from typing import Any, Dict, Optional
 
 import pandas as pd
+import pytest
 import torch
 from torch.utils.data import Dataset
 
 from rsc_toolkit.trainer.data.index_datamodule import IndexDataModule
+
 
 class DummyIndexDataset(Dataset):
     """
@@ -73,3 +75,43 @@ def test_index_datamodule_builds_splits(tmp_path: Path) -> None:
     assert len(dm.train_ds) == 2
     assert len(dm.val_ds) == 1
 
+
+def test_index_datamodule_supports_split_lists(tmp_path: Path) -> None:
+    out_dir = tmp_path / "outputs"
+    index_dir = out_dir / "dataset" / "DUMMY" / "index"
+    index_dir.mkdir(parents=True, exist_ok=True)
+
+    # Simulate arbitrary split labels (including numbers).
+    df = pd.DataFrame(
+        [
+            {"sample_id": "a", "label": 0, "split": 0},
+            {"sample_id": "b", "label": 1, "split": 1},
+            {"sample_id": "c", "label": 0, "split": 2},
+            {"sample_id": "d", "label": 1, "split": 2},
+        ]
+    )
+    df.to_csv(index_dir / "index_cycle.csv", index=False)
+
+    dm = IndexDataModule(
+        dataset_name="DUMMY",
+        index_dataset_cls=DummyIndexDataset,
+        project_root=".",
+        raw_data_directory=str(tmp_path / "raw"),
+        outputs_directory=str(out_dir),
+        split_file=None,
+        sampling_rate=16_000,
+        sample_level="cycle",
+        train_splits=[0, 1],
+        val_splits=[2],
+        test_splits=[2],
+        features={"enabled": False},
+    )
+    dm.setup("fit")
+    dm.setup("test")
+
+    assert dm.train_ds is not None
+    assert dm.val_ds is not None
+    assert dm.test_ds is not None
+    assert len(dm.train_ds) == 2
+    assert len(dm.val_ds) == 2
+    assert len(dm.test_ds) == 2

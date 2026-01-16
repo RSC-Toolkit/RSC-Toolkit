@@ -2,12 +2,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional, Dict, Any, List, Tuple
+from typing import Optional, Dict, Any, List, Tuple, Sequence
 import importlib
 import logging
 import time
 
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, ConcatDataset
 import torch
 import lightning as L
 import tqdm
@@ -67,7 +67,11 @@ class IndexDataModule(L.LightningDataModule):
         sampling_rate: int = 16_000,
         sample_level: str = "cycle",
         index_filename: Optional[str] = None,
-        # split names
+        # split names (supports arbitrary split labels, including numbers)
+        train_splits: Optional[Sequence[Any]] = None,
+        val_splits: Optional[Sequence[Any]] = None,
+        test_splits: Optional[Sequence[Any]] = None,
+        # legacy single-split args (kept for backwards compatibility)
         train_split: str = "train",
         val_split: str = "test",
         test_split: str = "test",
@@ -102,9 +106,9 @@ class IndexDataModule(L.LightningDataModule):
         self.sample_level = str(sample_level)
         self.index_filename = index_filename
 
-        self.train_split = str(train_split)
-        self.val_split = str(val_split)
-        self.test_split = str(test_split)
+        self.train_splits = self._normalize_splits(train_splits, fallback=train_split, role="train")
+        self.val_splits = self._normalize_splits(val_splits, fallback=val_split, role="val")
+        self.test_splits = self._normalize_splits(test_splits, fallback=test_split, role="test")
 
         self.batch_size = int(batch_size)
         self.num_workers = int(num_workers)
@@ -122,6 +126,39 @@ class IndexDataModule(L.LightningDataModule):
         self.train_ds = None
         self.val_ds = None
         self.test_ds = None
+
+    @staticmethod
+    def _normalize_splits(
+        splits: Optional[Sequence[Any]],
+        *,
+        fallback: Optional[Any],
+        role: str,
+    ) -> List[str]:
+        if splits is None:
+            splits_list: List[Any] = [] if fallback is None else [fallback]
+        else:
+            # yaml might pass a scalar when a list was intended; treat it as a singleton list
+            splits_list = list(splits) if isinstance(splits, (list, tuple, set)) else [splits]
+
+        out: List[str] = []
+        for split in splits_list:
+            s = str(split).strip()
+            if not s:
+                continue
+            out.append(s.lower())
+
+        if not out:
+            raise ValueError(f"{role}_splits is empty; provide at least one split label")
+
+        # preserve order but drop duplicates
+        deduped: List[str] = []
+        seen = set()
+        for s in out:
+            if s in seen:
+                continue
+            seen.add(s)
+            deduped.append(s)
+        return deduped
 
     def _is_global_zero(self) -> bool:
         trainer = getattr(self, "trainer", None)
@@ -141,7 +178,7 @@ class IndexDataModule(L.LightningDataModule):
         filename = self.index_filename or f"index_{self.sample_level}.csv"
         return (self.outputs_directory / "dataset" / self.dataset_name / "index" / filename).resolve()
 
-    def _build_index_dataset(self, *, split: str):
+    def _build_index_dataset_single(self, *, split: str):
         if self.index_csv is None:
             self.index_csv = self._default_index_path()
         if not self.index_csv.exists():
@@ -157,6 +194,13 @@ class IndexDataModule(L.LightningDataModule):
         if self.split_file is not None:
             kwargs["split_file"] = self.split_file
         return self.index_dataset_cls(**kwargs)
+
+    def _build_index_dataset(self, *, splits: Sequence[str]):
+        splits = list(splits)
+        if len(splits) == 1:
+            return self._build_index_dataset_single(split=splits[0])
+        datasets = [self._build_index_dataset_single(split=s) for s in splits]
+        return ConcatDataset(datasets)
 
     def _build_feature_processor(self, feature_cache: FeatureCache):
         if self.features_cfg.kind == "clap":    # TODO no construction here, either DI or factory
@@ -189,6 +233,25 @@ class IndexDataModule(L.LightningDataModule):
 
         return IndexFeatureDataset(base_ds, fp)
 
+    @staticmethod
+    def _collect_sample_ids(index_ds: Any) -> List[str]:
+        if isinstance(index_ds, ConcatDataset):
+            sample_ids: List[str] = []
+            for sub in index_ds.datasets:
+                sample_ids.extend(IndexDataModule._collect_sample_ids(sub))
+            return sample_ids
+
+        df = getattr(index_ds, "df", None)
+        if df is not None and getattr(df, "columns", None) is not None and "sample_id" in df.columns:
+            return df["sample_id"].astype(str).tolist()
+
+        # Fallback: compute by indexing the dataset (may be slow but keeps this generic).
+        out: List[str] = []
+        for i in range(len(index_ds)):
+            item = index_ds[int(i)]
+            out.append(str(item["sample_id"]))
+        return out
+
     def _warmup_feature_cache(self, ds: IndexFeatureDataset, *, split_name: str) -> None:
         fp = getattr(ds, "fp", None)
         cache = getattr(fp, "feature_cache", None)
@@ -197,12 +260,11 @@ class IndexDataModule(L.LightningDataModule):
             return
 
         index_ds = getattr(ds, "index_ds", None)
-        df = getattr(index_ds, "df", None)
-        if df is None or "sample_id" not in df.columns:
-            logger.warning("Cannot warm cache: missing index_ds.df['sample_id'] (split=%s)", split_name)
+        if index_ds is None:
+            logger.warning("Cannot warm cache: missing ds.index_ds (split=%s)", split_name)
             return
 
-        sample_ids = df["sample_id"].astype(str).tolist()
+        sample_ids = self._collect_sample_ids(index_ds)
         total = len(sample_ids)
         cached_before = sum(1 for sid in sample_ids if cache.is_cached(sid))
         missing = total - cached_before
@@ -230,14 +292,15 @@ class IndexDataModule(L.LightningDataModule):
         log_every = max(25, missing // 10)
 
         class _WarmupDataset(torch.utils.data.Dataset):
-            def __init__(self, inner):
+            def __init__(self, inner, sample_ids: Sequence[str]):
                 self.inner = inner
+                self.sample_ids = list(sample_ids)
 
             def __len__(self) -> int:
                 return len(self.inner)
 
             def __getitem__(self, i: int) -> Optional[str]:
-                sid = str(self.inner.df.iloc[int(i)]["sample_id"])
+                sid = str(self.sample_ids[int(i)])
                 if cache.is_cached(sid):
                     return None
                 item = self.inner[int(i)]
@@ -253,7 +316,7 @@ class IndexDataModule(L.LightningDataModule):
             )
 
         warmup_loader = DataLoader(
-            _WarmupDataset(index_ds),
+            _WarmupDataset(index_ds, sample_ids),
             batch_size=self.feature_precompute_batch_size,
             shuffle=False,
             num_workers=self.feature_precompute_num_workers,
@@ -292,8 +355,8 @@ class IndexDataModule(L.LightningDataModule):
             self.index_csv = self._default_index_path()
 
         if stage in (None, "fit"):
-            self.train_ds = self._build_index_dataset(split=self.train_split)
-            self.val_ds = self._build_index_dataset(split=self.val_split)
+            self.train_ds = self._build_index_dataset(splits=self.train_splits)
+            self.val_ds = self._build_index_dataset(splits=self.val_splits)
 
             if self.features_cfg.enabled:
                 self.train_ds = self._wrap_with_features(self.train_ds)
@@ -307,7 +370,7 @@ class IndexDataModule(L.LightningDataModule):
                     self._warmup_feature_cache(self.val_ds, split_name="val")  # type: ignore[arg-type]
 
         if stage in (None, "test"):
-            self.test_ds = self._build_index_dataset(split=self.test_split)
+            self.test_ds = self._build_index_dataset(splits=self.test_splits)
             if self.features_cfg.enabled:
                 self.test_ds = self._wrap_with_features(self.test_ds)
             if self.features_cfg.enabled and self.feature_precompute:

@@ -12,6 +12,11 @@ params:
   sampling_rate: 16000
   sample_level: cycle
 
+  # Split labels from your split file / index. Can be arbitrary strings or numbers.
+  train_splits: [train]
+  val_splits: [test]
+  test_splits: [test]
+
   batch_size: 32
   num_workers: 4
   shuffle_train: true

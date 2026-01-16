@@ -37,7 +37,7 @@ def test_cycle_item_loads_slices_and_decodes_meta(tmp_path: pathlib.Path):
     index_csv = tmp_path / "index_cycle.csv"
     idx.to_csv(index_csv)
 
-    ds = ICBHIIndexDataset(
+    ds = IndexDataset(
         index_csv=index_csv,
         data_root=data_root,
         sampling_rate=8000,
@@ -83,7 +83,7 @@ def test_clip_item_loads_full_recording(tmp_path: pathlib.Path):
     index_csv = tmp_path / "index_clip.csv"
     idx.to_csv(index_csv)
 
-    ds = ICBHIIndexDataset(
+    ds = IndexDataset(
         index_csv=index_csv,
         data_root=data_root,
         sampling_rate=8000,
@@ -117,7 +117,7 @@ def test_resolve_recording_path_defaults_to_index_parent_when_data_root_missing(
     index_csv = tmp_path / "index_clip.csv"
     idx.to_csv(index_csv)
 
-    ds = ICBHIIndexDataset(index_csv=index_csv, data_root=None, sampling_rate=8000, fade=False)
+    ds = IndexDataset(index_csv=index_csv, data_root=None, sampling_rate=8000, fade=False)
     item = ds[0]
     assert item["audio"].shape == (1, 2000)  # 0.25 sec * 8000
 
@@ -135,7 +135,7 @@ def test_return_meta_false_omits_meta_key(tmp_path: pathlib.Path):
     index_csv = tmp_path / "index_clip.csv"
     idx.to_csv(index_csv)
 
-    ds = ICBHIIndexDataset(index_csv=index_csv, data_root=data_root, sampling_rate=8000, return_meta=False, fade=False)
+    ds = IndexDataset(index_csv=index_csv, data_root=data_root, sampling_rate=8000, return_meta=False, fade=False)
     item = ds[0]
     assert "meta" not in item
 
@@ -149,7 +149,7 @@ def test_invalid_sample_level_init_raises(tmp_path: pathlib.Path):
     )
 
     with pytest.raises(ValueError, match="Invalid sample_level"):
-        ICBHIIndexDataset(index_csv=index_csv, sample_level="bad")  # type: ignore[arg-type]
+        IndexDataset(index_csv=index_csv, sample_level="bad")  # type: ignore[arg-type]
 
 
 def test_missing_required_columns_raises(tmp_path: pathlib.Path):
@@ -157,7 +157,7 @@ def test_missing_required_columns_raises(tmp_path: pathlib.Path):
     index_csv.write_text("sample_id,recording_path\nx,y\n")
 
     with pytest.raises(ValueError, match="missing columns"):
-        ICBHIIndexDataset(index_csv=index_csv)
+        IndexDataset(index_csv=index_csv)
 
 
 def test_split_filters_rows_with_custom_split_file(tmp_path: pathlib.Path):
@@ -189,11 +189,11 @@ def test_split_filters_rows_with_custom_split_file(tmp_path: pathlib.Path):
     split_file = tmp_path / "split.txt"
     split_file.write_text("rec_a train\nrec_b test\n")
 
-    ds_train = ICBHIIndexDataset(index_csv=index_csv, split="train", split_file=split_file)
+    ds_train = IndexDataset(index_csv=index_csv, split="train", split_file=split_file)
     assert len(ds_train) == 1
     assert str(ds_train.df.iloc[0]["sample_id"]).startswith("rec_a")
 
-    ds_test = ICBHIIndexDataset(index_csv=index_csv, split="test", split_file=split_file)
+    ds_test = IndexDataset(index_csv=index_csv, split="test", split_file=split_file)
     assert len(ds_test) == 1
     assert str(ds_test.df.iloc[0]["sample_id"]).startswith("rec_b")
 
@@ -221,8 +221,8 @@ def test_split_filters_rows_using_packaged_official_split_file(tmp_path: pathlib
     )
     idx.to_csv(index_csv)
 
-    ds_test = ICBHIIndexDataset(index_csv=index_csv, split="test")
+    ds_test = IndexDataset(index_csv=index_csv, split="test")
     assert len(ds_test) == 1
 
-    ds_train = ICBHIIndexDataset(index_csv=index_csv, split="train")
+    ds_train = IndexDataset(index_csv=index_csv, split="train")
     assert len(ds_train) == 0
