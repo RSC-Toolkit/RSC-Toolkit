@@ -1,10 +1,17 @@
 import logging
 
 from rsc_toolkit.datasets.factory import DatasetFactory
+import pathlib
 
 
 DatasetFactory.register_datasets()
 logger = logging.getLogger(__name__)
+
+def _resolve_under_root(project_root: pathlib.Path, path: str) -> str:
+    p = pathlib.Path(path).expanduser()
+    if not p.is_absolute():
+        p = project_root / p
+    return str(p.resolve())
 
 
 def build_parser(subparsers):
@@ -15,6 +22,7 @@ def build_parser(subparsers):
 
     download_parser = dataset_subparsers.add_parser("download", help="Download datasets")
     download_parser.add_argument("dataset", choices=DatasetFactory.datasets.keys())
+    download_parser.add_argument("--project_root", default=".", help="Base directory for relative paths")
     download_parser.add_argument("--datasets_directory", default="downloaded_datasets")
     download_parser.add_argument("--force", action="store_true", help="Despite valid dataset, re-download.")
 
@@ -23,6 +31,7 @@ def build_parser(subparsers):
         help="Preprocess dataset features (e.g., CLAP embeddings)"
     )
     preprocess_parser.add_argument("dataset", choices=DatasetFactory.datasets.keys())
+    preprocess_parser.add_argument("--project_root", default=".", help="Base directory for relative paths")
     preprocess_parser.add_argument("--datasets_directory", default="downloaded_datasets")
     preprocess_parser.add_argument("--force", action="store_true", help="Re-preprocess even if cached.")
     preprocess_parser.add_argument("--workers", type=int, default=4, help="Number of parallel workers")
@@ -36,6 +45,7 @@ def build_parser(subparsers):
         help="Build dataset sample index",
     )
     index_parser.add_argument("dataset", choices=DatasetFactory.datasets.keys())
+    index_parser.add_argument("--project_root", default=".", help="Base directory for relative paths")
     index_parser.add_argument("--datasets_directory", default="downloaded_datasets")
     index_parser.add_argument("--force", action="store_true", help="Rebuild index even if present.")
     index_parser.add_argument("--sample_level", choices=["cycle", "clip"], default="cycle")
@@ -46,6 +56,7 @@ def build_parser(subparsers):
         help="Validate downloaded and raw dataset files",
     )
     validate_parser.add_argument("dataset", choices=DatasetFactory.datasets.keys())
+    validate_parser.add_argument("--project_root", default=".", help="Base directory for relative paths")
     validate_parser.add_argument("--datasets_directory", default="downloaded_datasets")
     validate_parser.add_argument("--force", action="store_true", help="Dummy..")
     validate_parser.add_argument("--raw_data_directory", default=None)
@@ -54,9 +65,11 @@ def build_parser(subparsers):
 
 
 def create_dataset(args):
+    project_root = pathlib.Path(getattr(args, "project_root", ".")).expanduser().resolve()
+    datasets_directory = _resolve_under_root(project_root, args.datasets_directory)
     dataset_class = DatasetFactory.get_dataset_class(dataset_name=args.dataset)
-    downloader = dataset_class.make_downloader(outputs_directory=args.datasets_directory, force=args.force)
-    processor = dataset_class.make_processor(outputs_directory=args.datasets_directory, force=args.force)
+    downloader = dataset_class.make_downloader(outputs_directory=datasets_directory, force=args.force)
+    processor = dataset_class.make_processor(outputs_directory=datasets_directory, force=args.force)
     dataset = dataset_class(
         downloader=downloader,
         processor=processor,
@@ -64,6 +77,7 @@ def create_dataset(args):
     return dataset
 
 def handle_command(args) -> None:
+    project_root = pathlib.Path(getattr(args, "project_root", ".")).expanduser().resolve()
     dataset = create_dataset(args)
     
     if args.dataset_command == "download":
@@ -73,7 +87,7 @@ def handle_command(args) -> None:
         processor = dataset.processor
 
         if getattr(args, "raw_data_directory", None) and hasattr(processor, "raw_data_directory"):
-            processor.raw_data_directory = args.raw_data_directory
+            processor.raw_data_directory = _resolve_under_root(project_root, args.raw_data_directory)
 
         if not getattr(processor, "feature_processor", None):
             raise RuntimeError("preprocess requires a feature_processor to be configured")
@@ -87,14 +101,14 @@ def handle_command(args) -> None:
             sample_level=args.sample_level,
             batch_size=args.batch_size or 1,
             num_workers=args.workers,
-            cache_dir=args.cache_dir,
+            cache_dir=_resolve_under_root(project_root, args.cache_dir) if args.cache_dir else None,
         )
         return
     elif args.dataset_command == "build-index":
         processor = dataset.processor
 
         if args.raw_data_directory and hasattr(processor, "raw_data_directory"):
-            processor.raw_data_directory = args.raw_data_directory
+            processor.raw_data_directory = _resolve_under_root(project_root, args.raw_data_directory)
 
         if hasattr(processor, "build_index"):
             processor.build_index(sample_level=args.sample_level)
@@ -105,7 +119,7 @@ def handle_command(args) -> None:
         processor = dataset.processor
 
         if args.raw_data_directory and hasattr(processor, "raw_data_directory"):
-            processor.raw_data_directory = args.raw_data_directory
+            processor.raw_data_directory = _resolve_under_root(project_root, args.raw_data_directory)
 
         dataset.downloader.validate_downloaded_files()
         processor.validate_processed_files()
