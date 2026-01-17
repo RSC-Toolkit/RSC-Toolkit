@@ -1,8 +1,11 @@
 import logging
 
 from rsc_toolkit.datasets.factory import DatasetFactory
+import os
 import pathlib
 from typing import Optional
+
+from platformdirs import user_data_dir
 
 
 DatasetFactory.register_datasets()
@@ -33,6 +36,48 @@ def _resolve_under_root(project_root: pathlib.Path, path: str) -> str:
         p = project_root / p
     return str(p.resolve())
 
+def _default_raw_data_directory(*, dataset_name: str) -> str:
+    """
+    Default on-disk location for raw dataset files (stable across runs).
+
+    Override base via env var:
+      - RSC_TOOLKIT_RAW_DIR: base dir under which each dataset gets its own subdir
+    """
+    override = os.getenv("RSC_TOOLKIT_RAW_DIR")
+    if override:
+        base = pathlib.Path(override).expanduser()
+    else:
+        base = pathlib.Path(user_data_dir(appname="rsc_toolkit", appauthor=False))
+    return str((base / "raw" / str(dataset_name)).resolve())
+
+
+def _configure_processor_raw_data_directory(
+    *,
+    processor,
+    dataset_name: str,
+    project_root: pathlib.Path,
+    raw_data_directory_arg: Optional[str],
+) -> None:
+    if not hasattr(processor, "raw_data_directory"):
+        return
+
+    if raw_data_directory_arg:
+        raw_dir = _resolve_under_root(project_root, raw_data_directory_arg)
+    else:
+        # Some processors (e.g., ToyDataset) can infer a reasonable location when
+        # raw_data_directory is unset; preserve that behavior if possible.
+        if getattr(processor, "raw_data_directory", None) in (None, "") and hasattr(processor, "data_folder"):
+            try:
+                _ = processor.data_folder
+                return
+            except Exception:
+                pass
+
+        raw_dir = _default_raw_data_directory(dataset_name=dataset_name)
+        logger.info("Using default raw_data_directory=%s", raw_dir)
+
+    processor.raw_data_directory = raw_dir
+
 
 def build_parser(subparsers):
     """Attach the 'dataset' subcommand and its children."""
@@ -56,7 +101,11 @@ def build_parser(subparsers):
     preprocess_parser.add_argument("--force", action="store_true", help="Re-preprocess even if cached.")
     preprocess_parser.add_argument("--workers", type=int, default=4, help="Number of parallel workers")
     preprocess_parser.add_argument("--batch_size", type=int, default=None, help="Batch size for GPU processing")
-    preprocess_parser.add_argument("--raw_data_directory", default=None)
+    preprocess_parser.add_argument(
+        "--raw_data_directory",
+        default=None,
+        help="Raw dataset root (defaults to OS user data dir; override base via RSC_TOOLKIT_RAW_DIR)",
+    )
     preprocess_parser.add_argument("--sample_level", choices=["cycle", "clip"], default="cycle")
     preprocess_parser.add_argument("--cache_dir", default=None, help="Override feature cache directory")
 
@@ -69,7 +118,11 @@ def build_parser(subparsers):
     index_parser.add_argument("--datasets_directory", default="downloaded_datasets")
     index_parser.add_argument("--force", action="store_true", help="Rebuild index even if present.")
     index_parser.add_argument("--sample_level", choices=["cycle", "clip"], default="cycle")
-    index_parser.add_argument("--raw_data_directory", default=None)
+    index_parser.add_argument(
+        "--raw_data_directory",
+        default=None,
+        help="Raw dataset root (defaults to OS user data dir; override base via RSC_TOOLKIT_RAW_DIR)",
+    )
 
     validate_parser = dataset_subparsers.add_parser(
         "validate",
@@ -79,7 +132,11 @@ def build_parser(subparsers):
     validate_parser.add_argument("--project_root", default=None, help="Base directory for relative paths (defaults to repo root)")
     validate_parser.add_argument("--datasets_directory", default="downloaded_datasets")
     validate_parser.add_argument("--force", action="store_true", help="Dummy..")
-    validate_parser.add_argument("--raw_data_directory", default=None)
+    validate_parser.add_argument(
+        "--raw_data_directory",
+        default=None,
+        help="Raw dataset root (defaults to OS user data dir; override base via RSC_TOOLKIT_RAW_DIR)",
+    )
 
     return dataset_parser
 
@@ -116,8 +173,12 @@ def handle_command(args) -> None:
     elif args.dataset_command == "preprocess":
         processor = dataset.processor
 
-        if getattr(args, "raw_data_directory", None) and hasattr(processor, "raw_data_directory"):
-            processor.raw_data_directory = _resolve_under_root(project_root, args.raw_data_directory)
+        _configure_processor_raw_data_directory(
+            processor=processor,
+            dataset_name=args.dataset,
+            project_root=project_root,
+            raw_data_directory_arg=getattr(args, "raw_data_directory", None),
+        )
 
         if not getattr(processor, "feature_processor", None):
             raise RuntimeError("preprocess requires a feature_processor to be configured")
@@ -137,8 +198,12 @@ def handle_command(args) -> None:
     elif args.dataset_command == "build-index":
         processor = dataset.processor
 
-        if args.raw_data_directory and hasattr(processor, "raw_data_directory"):
-            processor.raw_data_directory = _resolve_under_root(project_root, args.raw_data_directory)
+        _configure_processor_raw_data_directory(
+            processor=processor,
+            dataset_name=args.dataset,
+            project_root=project_root,
+            raw_data_directory_arg=getattr(args, "raw_data_directory", None),
+        )
 
         if hasattr(processor, "build_index"):
             processor.build_index(sample_level=args.sample_level)
@@ -148,8 +213,12 @@ def handle_command(args) -> None:
     elif args.dataset_command == "validate":
         processor = dataset.processor
 
-        if args.raw_data_directory and hasattr(processor, "raw_data_directory"):
-            processor.raw_data_directory = _resolve_under_root(project_root, args.raw_data_directory)
+        _configure_processor_raw_data_directory(
+            processor=processor,
+            dataset_name=args.dataset,
+            project_root=project_root,
+            raw_data_directory_arg=getattr(args, "raw_data_directory", None),
+        )
 
         dataset.downloader.validate_downloaded_files()
         processor.validate_processed_files()

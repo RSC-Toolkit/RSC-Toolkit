@@ -15,6 +15,7 @@ dependencies = [
     "pydantic",
     "librosa",
     "tqdm",
+    "platformdirs",
 
     # Below versions must be compatible with eachother
     "torch==2.7.0",
