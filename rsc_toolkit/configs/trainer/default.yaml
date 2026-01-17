@@ -7,7 +7,7 @@ params:
   # Optional: instantiate Lightning callbacks via Hydra.
   callbacks:
     - _target_: rsc_toolkit.trainer.callbacks.ema.EMACallback
-      beta: 0.999
+      beta: 0.5
       model_attr: rsc_model
       apply_to_validation: true
       apply_to_test: true

@@ -141,6 +141,10 @@ class IndexDataset(Dataset):
         sample_id = str(row["sample_id"])
         recording_path = str(row["recording_path"])
         wav_path = self._resolve_recording_path(recording_path)
+        if not wav_path.exists():
+            raise FileNotFoundError(
+                f"Audio file not found: {wav_path} (from recording_path={recording_path!r}, data_root={self.data_root})"
+            )
 
         # Load audio. Resample + Fade here. Previously it was done to each cycle, why?
         wav = load_audio(wav_path, target_sampling_rate=self.sampling_rate, fade=self.fade)

@@ -155,3 +155,22 @@ def test_index_datamodule_resolves_relative_paths_under_project_root(tmp_path: P
     dm.setup("fit")
     assert dm.train_ds is not None
     assert dm.val_ds is not None
+
+
+def test_index_datamodule_toy_falls_back_to_repo_sample_data(tmp_path: Path) -> None:
+    project_root = Path(__file__).resolve().parents[2]
+    out_dir = tmp_path / "outputs"
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    dm = IndexDataModule(
+        dataset_name="toy",
+        index_dataset_cls=DummyIndexDataset,
+        project_root=str(project_root),
+        data_dir=str(out_dir),
+        split_file=None,
+        sampling_rate=16_000,
+        sample_level="cycle",
+        features={"enabled": False},
+    )
+
+    assert dm.raw_data_directory == (project_root / "sample_data" / "toy_dataset" / "files").resolve()
