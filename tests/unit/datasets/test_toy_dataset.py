@@ -52,3 +52,12 @@ def test_toy_dataset_index_csv_headers(dataset):
 def test_toy_dataset_validate_raw_files(dataset):
     dataset.download()
     assert dataset.downloader.validate_downloaded_files()
+
+
+def test_toy_dataset_falls_back_to_bundled_data_when_raw_dir_missing(tmp_path):
+    processor = ToyDataset.make_processor(outputs_directory=str(tmp_path), force=True)
+    processor.raw_data_directory = str(tmp_path / "does-not-exist")
+
+    data_folder = processor.data_folder
+    assert data_folder.exists()
+    assert data_folder.name == "files"

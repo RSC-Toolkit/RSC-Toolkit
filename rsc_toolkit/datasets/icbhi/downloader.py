@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 
 class ICBHIDatasetDownloader(BaseRSCDatasetDownloader):
-    name: str = "ICBHI"
+    name: str = "icbhi"
     dataset_download_url: str = "https://bhichallenge.med.auth.gr/sites/default/files/ICBHI_final_database/ICBHI_final_database.zip"
 
     @functools.cached_property

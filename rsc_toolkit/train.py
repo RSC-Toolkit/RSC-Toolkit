@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import os
 from typing import Any, Dict
 
@@ -21,6 +22,11 @@ def _to_plain_dict(cfg: DictConfig) -> Dict[str, Any]:
 
 @hydra.main(version_base=None, config_path="configs", config_name="default")
 def main(cfg: DictConfig) -> None:
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    )
+
     # Optional: print fully resolved config for debugging
     print(OmegaConf.to_yaml(cfg, resolve=True))
 
