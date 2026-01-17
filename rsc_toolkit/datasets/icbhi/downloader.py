@@ -38,16 +38,16 @@ class ICBHIDatasetDownloader(BaseRSCDatasetDownloader):
         txt_stems = {p.stem for p in txt_files}
         return len(wav_stems & txt_stems) > 0
 
+    def _nested_extracted_dir(self) -> pathlib.Path:
+        # Some extractions end up as <outputs>/ICBHI_final_database/ICBHI_final_database/*
+        return self.extracted_dir / "ICBHI_final_database"
+
     def validate_downloaded_files(self) -> bool:
         """
         Validate the dataset files.
         """
-        if self._has_paired_files(self.outputs_path):
-            return True
-        # Backwards-compatible: accept previous layout where files lived under ICBHI_final_database/
-        if self.extracted_dir.exists() and self._has_paired_files(self.extracted_dir):
-            return True
-        return False
+        # For the unified layout, consider the dataset valid only when files are at the dataset root.
+        return self._has_paired_files(self.outputs_path)
 
     def _maybe_flatten_extracted_dir(self) -> None:
         """
@@ -58,19 +58,30 @@ class ICBHIDatasetDownloader(BaseRSCDatasetDownloader):
         """
         if self._has_paired_files(self.outputs_path):
             return
-        if not self.extracted_dir.exists():
+
+        candidates = [self.extracted_dir, self._nested_extracted_dir()]
+        src = next((p for p in candidates if p.exists() and self._has_paired_files(p)), None)
+        if src is None:
             return
 
-        for p in self.extracted_dir.iterdir():
+        logger.info("Normalizing ICBHI layout: moving files from %s -> %s", src, self.outputs_path)
+        for p in src.iterdir():
             dst = self.outputs_path / p.name
             if dst.exists():
-                continue
+                if not self.force:
+                    continue
+                if dst.is_dir():
+                    shutil.rmtree(dst)
+                else:
+                    dst.unlink()
             shutil.move(str(p), str(dst))
 
-        try:
-            self.extracted_dir.rmdir()
-        except OSError:
-            pass
+        # Best-effort cleanup of now-empty directories
+        for d in (src, self.extracted_dir, self._nested_extracted_dir()):
+            try:
+                d.rmdir()
+            except OSError:
+                pass
 
     def download_dataset(self) -> None:
         """Download and extract the ICBHI dataset."""
@@ -86,7 +97,8 @@ class ICBHIDatasetDownloader(BaseRSCDatasetDownloader):
             logger.info(f"Found dataset at {self.zip_path}, skipping download!")
 
         if self.force or not self.extracted_dir.exists():
-            extract_zip(zip_path=self.zip_path, out_dir=self.extracted_dir)
+            # Extract to dataset root to avoid nesting `ICBHI_final_database/ICBHI_final_database/*`.
+            extract_zip(zip_path=self.zip_path, out_dir=self.outputs_path)
         else:
             logger.info(f"Found extracted files at {self.extracted_dir}, skipping extraction!")
 
