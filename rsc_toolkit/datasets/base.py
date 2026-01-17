@@ -35,10 +35,13 @@ class BaseRSCDatasetDownloader(ABC, BaseModel):
         """
 
     def download(self):
+        outputs_path = pathlib.Path(self.outputs_directory).expanduser().resolve()
+        logger.info("Dataset '%s' download directory: %s", self.name, outputs_path)
+
         if not self.force and self.validate_downloaded_files():
             logger.info(f"Found existing {self.name}, skipping download.")
             return
-        logger.info(f"⬇️ Downloading {self.name}")
+        logger.info("⬇️ Downloading %s", self.name)
         self.download_dataset()
         logger.info(f"✅ Completed {self.name} download")
 
