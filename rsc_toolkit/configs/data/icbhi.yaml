@@ -5,7 +5,7 @@ params:
   dataset_name: ICBHI
   index_dataset_cls: rsc_toolkit.datasets.index_dataset.IndexDataset
   project_root: ${hydra:runtime.cwd}
-  split_file: rsc_toolkit/datasets/icbhi/data/official_split.txt
+  split_file: rsc_toolkit/datasets/ICBHI/data/official_split.txt
 
   sampling_rate: 16000
   sample_level: cycle
