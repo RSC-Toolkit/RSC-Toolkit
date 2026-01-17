@@ -45,7 +45,7 @@ class DummyIndexDataset(Dataset):
 
 def test_index_datamodule_builds_splits(tmp_path: Path) -> None:
     out_dir = tmp_path / "outputs"
-    index_dir = out_dir / "dataset" / "DUMMY" / "index"
+    index_dir = out_dir / "index"
     index_dir.mkdir(parents=True, exist_ok=True)
 
     df = pd.DataFrame(
@@ -61,8 +61,7 @@ def test_index_datamodule_builds_splits(tmp_path: Path) -> None:
         dataset_name="DUMMY",
         index_dataset_cls=DummyIndexDataset,
         project_root=".",
-        raw_data_directory=str(tmp_path / "raw"),
-        outputs_directory=str(out_dir),
+        data_dir=str(out_dir),
         split_file=None,
         sampling_rate=16_000,
         sample_level="cycle",
@@ -78,7 +77,7 @@ def test_index_datamodule_builds_splits(tmp_path: Path) -> None:
 
 def test_index_datamodule_supports_split_lists(tmp_path: Path) -> None:
     out_dir = tmp_path / "outputs"
-    index_dir = out_dir / "dataset" / "DUMMY" / "index"
+    index_dir = out_dir / "index"
     index_dir.mkdir(parents=True, exist_ok=True)
 
     # Simulate arbitrary split labels (including numbers).
@@ -96,8 +95,7 @@ def test_index_datamodule_supports_split_lists(tmp_path: Path) -> None:
         dataset_name="DUMMY",
         index_dataset_cls=DummyIndexDataset,
         project_root=".",
-        raw_data_directory=str(tmp_path / "raw"),
-        outputs_directory=str(out_dir),
+        data_dir=str(out_dir),
         split_file=None,
         sampling_rate=16_000,
         sample_level="cycle",
@@ -121,8 +119,8 @@ def test_index_datamodule_resolves_relative_paths_under_project_root(tmp_path: P
     project_root = tmp_path / "project"
     project_root.mkdir(parents=True, exist_ok=True)
 
-    # Create index where IndexDataModule expects it: <outputs>/dataset/<name>/index/index_cycle.csv
-    index_dir = project_root / "outputs" / "dataset" / "DUMMY" / "index"
+    # Create index where IndexDataModule expects it: <data_dir>/index/index_cycle.csv
+    index_dir = project_root / "outputs" / "index"
     index_dir.mkdir(parents=True, exist_ok=True)
     df = pd.DataFrame(
         [
@@ -140,8 +138,7 @@ def test_index_datamodule_resolves_relative_paths_under_project_root(tmp_path: P
         dataset_name="DUMMY",
         index_dataset_cls=DummyIndexDataset,
         project_root=str(project_root),
-        raw_data_directory="raw",
-        outputs_directory="outputs",
+        data_dir="outputs",
         split_file=str(split_file_rel),
         sampling_rate=16_000,
         sample_level="cycle",
@@ -149,7 +146,8 @@ def test_index_datamodule_resolves_relative_paths_under_project_root(tmp_path: P
     )
 
     assert dm.project_root == project_root.resolve()
-    assert dm.raw_data_directory == (project_root / "raw").resolve()
+    assert dm.data_dir == (project_root / "outputs").resolve()
+    assert dm.raw_data_directory == (project_root / "outputs").resolve()
     assert dm.outputs_directory == (project_root / "outputs").resolve()
     assert dm.split_file == (project_root / split_file_rel).resolve()
     assert dm.features_cfg.cache_dir == str((project_root / "cache").resolve())

@@ -81,14 +81,13 @@ class BaseRSCDatasetProcessor(ABC, BaseModel):
             **kwargs
         )
 
-        # create cache/dataset/DatasetName dir for temp files.
-        cache_path = pathlib.Path(self.outputs_directory, "dataset", self.name, key)
+        cache_path = pathlib.Path(self.outputs_directory, "cache", key)
         cache_path.mkdir(parents=True, exist_ok=True)
         return cache_path
 
     @functools.cached_property
     def index_dir_path(self):
-        path = pathlib.Path(self.outputs_directory, "dataset", self.name, "index")
+        path = pathlib.Path(self.outputs_directory, "index")
         path.mkdir(parents=True, exist_ok=True)
         return path
 

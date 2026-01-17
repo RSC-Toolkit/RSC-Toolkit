@@ -6,8 +6,7 @@ from pydantic import BaseModel, Field
 
 class DatasetConfig(BaseModel):
     name: str
-    outputs_directory: str = "downloaded_datasets"
-    raw_data_directory: Optional[str] = None
+    data_dir: Optional[str] = None
     force: bool = False
 
 

@@ -1,11 +1,10 @@
 import logging
 
 from rsc_toolkit.datasets.factory import DatasetFactory
-import os
 import pathlib
 from typing import Optional
 
-from platformdirs import user_data_dir
+from rsc_toolkit.datasets.paths import resolve_dataset_dir
 
 
 DatasetFactory.register_datasets()
@@ -36,38 +35,25 @@ def _resolve_under_root(project_root: pathlib.Path, path: str) -> str:
         p = project_root / p
     return str(p.resolve())
 
-def _default_raw_data_directory(*, dataset_name: str) -> str:
-    """
-    Default on-disk location for raw dataset files (stable across runs).
-
-    Override base via env var:
-      - RSC_TOOLKIT_RAW_DIR: base dir under which each dataset gets its own subdir
-    """
-    override = os.getenv("RSC_TOOLKIT_RAW_DIR")
-    if override:
-        base = pathlib.Path(override).expanduser()
-    else:
-        base = pathlib.Path(user_data_dir(appname="rsc_toolkit", appauthor=False))
-    return str((base / "raw" / str(dataset_name)).resolve())
-
-
 def _configure_processor_raw_data_directory(
     *,
     processor,
     dataset_name: str,
-    project_root: pathlib.Path,
-    raw_data_directory_arg: Optional[str],
+    dataset_dir: pathlib.Path,
 ) -> None:
     if not hasattr(processor, "raw_data_directory"):
         return
 
-    if raw_data_directory_arg:
-        raw_dir = _resolve_under_root(project_root, raw_data_directory_arg)
-    else:
-        raw_dir = _default_raw_data_directory(dataset_name=dataset_name)
-        logger.info("Using default raw_data_directory=%s", raw_dir)
+    # Some processors (e.g., ToyDataset) can infer a reasonable location when
+    # raw_data_directory is unset; preserve that behavior if possible.
+    if getattr(processor, "raw_data_directory", None) in (None, "") and hasattr(processor, "data_folder"):
+        try:
+            _ = processor.data_folder
+            return
+        except Exception:
+            pass
 
-    processor.raw_data_directory = raw_dir
+    processor.raw_data_directory = str(dataset_dir.resolve())
 
 
 def build_parser(subparsers):
@@ -79,7 +65,7 @@ def build_parser(subparsers):
     download_parser = dataset_subparsers.add_parser("download", help="Download datasets")
     download_parser.add_argument("dataset", choices=DatasetFactory.datasets.keys())
     download_parser.add_argument("--project_root", default=None, help="Base directory for relative paths (defaults to repo root)")
-    download_parser.add_argument("--datasets_directory", default="downloaded_datasets")
+    download_parser.add_argument("--data_dir", default=None, help="Dataset directory (defaults to OS user data dir)")
     download_parser.add_argument("--force", action="store_true", help="Despite valid dataset, re-download.")
 
     preprocess_parser = dataset_subparsers.add_parser(
@@ -88,14 +74,13 @@ def build_parser(subparsers):
     )
     preprocess_parser.add_argument("dataset", choices=DatasetFactory.datasets.keys())
     preprocess_parser.add_argument("--project_root", default=None, help="Base directory for relative paths (defaults to repo root)")
-    preprocess_parser.add_argument("--datasets_directory", default="downloaded_datasets")
     preprocess_parser.add_argument("--force", action="store_true", help="Re-preprocess even if cached.")
     preprocess_parser.add_argument("--workers", type=int, default=4, help="Number of parallel workers")
     preprocess_parser.add_argument("--batch_size", type=int, default=None, help="Batch size for GPU processing")
     preprocess_parser.add_argument(
-        "--raw_data_directory",
+        "--data_dir",
         default=None,
-        help="Raw dataset root (defaults to OS user data dir; override base via RSC_TOOLKIT_RAW_DIR)",
+        help="Dataset directory (defaults to OS user data dir)",
     )
     preprocess_parser.add_argument("--sample_level", choices=["cycle", "clip"], default="cycle")
     preprocess_parser.add_argument("--cache_dir", default=None, help="Override feature cache directory")
@@ -106,14 +91,9 @@ def build_parser(subparsers):
     )
     index_parser.add_argument("dataset", choices=DatasetFactory.datasets.keys())
     index_parser.add_argument("--project_root", default=None, help="Base directory for relative paths (defaults to repo root)")
-    index_parser.add_argument("--datasets_directory", default="downloaded_datasets")
+    index_parser.add_argument("--data_dir", default=None, help="Dataset directory (defaults to OS user data dir)")
     index_parser.add_argument("--force", action="store_true", help="Rebuild index even if present.")
     index_parser.add_argument("--sample_level", choices=["cycle", "clip"], default="cycle")
-    index_parser.add_argument(
-        "--raw_data_directory",
-        default=None,
-        help="Raw dataset root (defaults to OS user data dir; override base via RSC_TOOLKIT_RAW_DIR)",
-    )
 
     validate_parser = dataset_subparsers.add_parser(
         "validate",
@@ -121,13 +101,8 @@ def build_parser(subparsers):
     )
     validate_parser.add_argument("dataset", choices=DatasetFactory.datasets.keys())
     validate_parser.add_argument("--project_root", default=None, help="Base directory for relative paths (defaults to repo root)")
-    validate_parser.add_argument("--datasets_directory", default="downloaded_datasets")
+    validate_parser.add_argument("--data_dir", default=None, help="Dataset directory (defaults to OS user data dir)")
     validate_parser.add_argument("--force", action="store_true", help="Dummy..")
-    validate_parser.add_argument(
-        "--raw_data_directory",
-        default=None,
-        help="Raw dataset root (defaults to OS user data dir; override base via RSC_TOOLKIT_RAW_DIR)",
-    )
 
     return dataset_parser
 
@@ -139,10 +114,14 @@ def create_dataset(args):
         if project_root_arg
         else _default_project_root()
     )
-    datasets_directory = _resolve_under_root(project_root, args.datasets_directory)
+    dataset_dir = resolve_dataset_dir(
+        args.dataset,
+        dataset_dir=getattr(args, "data_dir", None),
+        project_root=project_root,
+    )
     dataset_class = DatasetFactory.get_dataset_class(dataset_name=args.dataset)
-    downloader = dataset_class.make_downloader(outputs_directory=datasets_directory, force=args.force)
-    processor = dataset_class.make_processor(outputs_directory=datasets_directory, force=args.force)
+    downloader = dataset_class.make_downloader(outputs_directory=str(dataset_dir), force=args.force)
+    processor = dataset_class.make_processor(outputs_directory=str(dataset_dir), force=args.force)
     dataset = dataset_class(
         downloader=downloader,
         processor=processor,
@@ -157,6 +136,11 @@ def handle_command(args) -> None:
         else _default_project_root()
     )
     dataset = create_dataset(args)
+    dataset_dir = resolve_dataset_dir(
+        args.dataset,
+        dataset_dir=getattr(args, "data_dir", None),
+        project_root=project_root,
+    )
     
     if args.dataset_command == "download":
         dataset.download()
@@ -167,8 +151,7 @@ def handle_command(args) -> None:
         _configure_processor_raw_data_directory(
             processor=processor,
             dataset_name=args.dataset,
-            project_root=project_root,
-            raw_data_directory_arg=getattr(args, "raw_data_directory", None),
+            dataset_dir=dataset_dir,
         )
 
         if not getattr(processor, "feature_processor", None):
@@ -192,8 +175,7 @@ def handle_command(args) -> None:
         _configure_processor_raw_data_directory(
             processor=processor,
             dataset_name=args.dataset,
-            project_root=project_root,
-            raw_data_directory_arg=getattr(args, "raw_data_directory", None),
+            dataset_dir=dataset_dir,
         )
 
         if hasattr(processor, "build_index"):
@@ -207,8 +189,7 @@ def handle_command(args) -> None:
         _configure_processor_raw_data_directory(
             processor=processor,
             dataset_name=args.dataset,
-            project_root=project_root,
-            raw_data_directory_arg=getattr(args, "raw_data_directory", None),
+            dataset_dir=dataset_dir,
         )
 
         dataset.downloader.validate_downloaded_files()

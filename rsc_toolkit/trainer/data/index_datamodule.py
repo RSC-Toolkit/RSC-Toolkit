@@ -14,6 +14,7 @@ import tqdm
 
 from rsc_toolkit.datasets.feature_cache import FeatureCache
 from rsc_toolkit.datasets.index_dataset import IndexFeatureDataset
+from rsc_toolkit.datasets.paths import default_dataset_dir
 
 logger = logging.getLogger(__name__)
 
@@ -58,10 +59,9 @@ class IndexDataModule(L.LightningDataModule):
         # dataset identity
         dataset_name: str,
         index_dataset_cls: str, # TODO class or import name
-        # raw/index locations
+        # data location
         project_root: str,
-        raw_data_directory: str,
-        outputs_directory: str,
+        data_dir: Optional[str] = None,
         split_file: Optional[str] = None,
         # sampling/index
         sampling_rate: int = 16_000,
@@ -98,8 +98,13 @@ class IndexDataModule(L.LightningDataModule):
             self.index_dataset_cls = index_dataset_cls
 
         self.project_root = Path(project_root).expanduser().resolve()
-        self.raw_data_directory = self._resolve_path(raw_data_directory)
-        self.outputs_directory = self._resolve_path(outputs_directory)
+        if data_dir is None:
+            self.data_dir = default_dataset_dir(self.dataset_name)
+        else:
+            self.data_dir = self._resolve_path(data_dir)
+
+        self.raw_data_directory = self.data_dir
+        self.outputs_directory = self.data_dir
         self.split_file = self._resolve_path(split_file) if split_file else None
 
         self.sampling_rate = int(sampling_rate)
@@ -184,7 +189,7 @@ class IndexDataModule(L.LightningDataModule):
 
     def _default_index_path(self) -> Path:
         filename = self.index_filename or f"index_{self.sample_level}.csv"
-        return (self.outputs_directory / "dataset" / self.dataset_name / "index" / filename).resolve()
+        return (self.outputs_directory / "index" / filename).resolve()
 
     def _build_index_dataset_single(self, *, split: str):
         if self.index_csv is None:
