@@ -33,7 +33,7 @@ class ICBHIDatasetProcessor(BaseRSCDatasetProcessor):
       - optionally run feature preprocessing (ideally driven by the index)
     """
 
-    name: str = "ICBHI"
+    name: str = "icbhi"
     sampling_rate: int = 10000
 
     # Raw unpacked data directory (folder containing .wav + .txt pairs)
