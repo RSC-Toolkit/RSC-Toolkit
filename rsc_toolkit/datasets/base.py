@@ -167,10 +167,6 @@ class BaseRSCDatasetProcessor(ABC, BaseModel):
             return sample.audio
         elif hasattr(sample, 'wav_path'):
             data, _ = torchaudio.load(str(sample.wav_path))
-            # To get rid of deprecation warning:
-            # from torchcodec.decoders import AudioDecoder
-            # decoder = AudioDecoder(str(sample.wav_path))
-            # data = decoder.get_all_samples()  # shape: (channels, samples)
             return data
         else:
             raise NotImplementedError(f"Cannot extract audio from {type(sample)}")

@@ -68,13 +68,9 @@ class IndexDataModule(L.LightningDataModule):
         sample_level: str = "cycle",
         index_filename: Optional[str] = None,
         # split names (supports arbitrary split labels, including numbers)
-        train_splits: Optional[Sequence[Any]] = None,
-        val_splits: Optional[Sequence[Any]] = None,
-        test_splits: Optional[Sequence[Any]] = None,
-        # legacy single-split args (kept for backwards compatibility)
-        train_split: str = "train",
-        val_split: str = "test",
-        test_split: str = "test",
+        train_splits: Sequence[Any] = ("train",),
+        val_splits: Sequence[Any] = ("test",),
+        test_splits: Sequence[Any] = ("test",),
         # loaders
         batch_size: int = 32,
         num_workers: int = 4,
@@ -111,9 +107,9 @@ class IndexDataModule(L.LightningDataModule):
         self.sample_level = str(sample_level)
         self.index_filename = index_filename
 
-        self.train_splits = self._normalize_splits(train_splits, fallback=train_split, role="train")
-        self.val_splits = self._normalize_splits(val_splits, fallback=val_split, role="val")
-        self.test_splits = self._normalize_splits(test_splits, fallback=test_split, role="test")
+        self.train_splits = self._normalize_splits(train_splits, role="train")
+        self.val_splits = self._normalize_splits(val_splits, role="val")
+        self.test_splits = self._normalize_splits(test_splits, role="test")
 
         self.batch_size = int(batch_size)
         self.num_workers = int(num_workers)
@@ -144,14 +140,18 @@ class IndexDataModule(L.LightningDataModule):
     def _normalize_splits(
         splits: Optional[Sequence[Any]],
         *,
-        fallback: Optional[Any],
         role: str,
     ) -> List[str]:
         if splits is None:
-            splits_list: List[Any] = [] if fallback is None else [fallback]
+            raise ValueError(f"{role}_splits is None; provide at least one split label")
+
+        # yaml might pass a scalar when a list was intended; treat it as a singleton list
+        if isinstance(splits, str):
+            splits_list: List[Any] = [splits]
+        elif isinstance(splits, (list, tuple, set)):
+            splits_list = list(splits)
         else:
-            # yaml might pass a scalar when a list was intended; treat it as a singleton list
-            splits_list = list(splits) if isinstance(splits, (list, tuple, set)) else [splits]
+            splits_list = [splits]
 
         out: List[str] = []
         for split in splits_list:
