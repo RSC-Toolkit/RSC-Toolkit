@@ -64,15 +64,6 @@ def _configure_processor_raw_data_directory(
     if raw_data_directory_arg:
         raw_dir = _resolve_under_root(project_root, raw_data_directory_arg)
     else:
-        # Some processors (e.g., ToyDataset) can infer a reasonable location when
-        # raw_data_directory is unset; preserve that behavior if possible.
-        if getattr(processor, "raw_data_directory", None) in (None, "") and hasattr(processor, "data_folder"):
-            try:
-                _ = processor.data_folder
-                return
-            except Exception:
-                pass
-
         raw_dir = _default_raw_data_directory(dataset_name=dataset_name)
         logger.info("Using default raw_data_directory=%s", raw_dir)
 
