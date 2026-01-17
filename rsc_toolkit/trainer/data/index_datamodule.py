@@ -99,7 +99,7 @@ class IndexDataModule(L.LightningDataModule):
         else:
             self.data_dir = self._resolve_path(data_dir)
 
-        self.raw_data_directory = self.data_dir
+        self.raw_data_directory = self._resolve_raw_data_directory()
         self.outputs_directory = self.data_dir
         self.split_file = self._resolve_path(split_file) if split_file else None
 
@@ -129,6 +129,28 @@ class IndexDataModule(L.LightningDataModule):
         self.train_ds = None
         self.val_ds = None
         self.test_ds = None
+
+    def _resolve_raw_data_directory(self) -> Path:
+        """
+        Resolve where the raw audio files live.
+
+        By default this matches `data_dir`, but for bundled fixture datasets (e.g. `toy`)
+        we fall back to the repository `sample_data` if `data_dir` doesn't contain audio.
+        """
+        data_dir = self.data_dir
+
+        if self.dataset_name.lower() == "toy":
+            try:
+                has_wavs = data_dir.exists() and any(data_dir.glob("*.wav"))
+            except Exception:
+                has_wavs = False
+
+            if not has_wavs:
+                bundled = (self.project_root / "sample_data" / "toy_dataset" / "files").resolve()
+                if bundled.exists():
+                    return bundled
+
+        return data_dir
 
     def _resolve_path(self, path: Union[str, Path]) -> Path:
         p = Path(path).expanduser()

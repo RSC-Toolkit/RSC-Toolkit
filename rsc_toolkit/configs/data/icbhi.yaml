@@ -2,7 +2,7 @@ name: index
 params:
   datamodule_name: index
   
-  dataset_name: ICBHI
+  dataset_name: icbhi
   index_dataset_cls: rsc_toolkit.datasets.index_dataset.IndexDataset
   project_root: ${hydra:runtime.cwd}
   split_file: rsc_toolkit/datasets/icbhi/data/official_split.txt
