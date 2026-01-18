@@ -28,6 +28,11 @@ class FeatureConfig:
     clap_model_name: str = "laion/clap-htsat-unfused"
     # mel params
     n_mels: int = 64
+    target_frames: int = 1024
+    frame_shift: int = 10
+    window_type: str = "hanning"
+    dither: float = 0.0
+    normalize: bool = True
 
 
 def _tuple_collate(batch: List[Dict[str, Any]]) -> Tuple[torch.Tensor, torch.Tensor]:
@@ -245,11 +250,16 @@ class IndexDataModule(L.LightningDataModule):
                 model_name=self.features_cfg.clap_model_name,
                 feature_cache=feature_cache,
             )
-        if self.features_cfg.kind == "mel":
+        if self.features_cfg.kind in {"mel", "fbank"}:
             from rsc_toolkit.processors.mel import MelBankAudioProcessor
             return MelBankAudioProcessor(
                 sampling_rate=self.sampling_rate,
                 n_mels=self.features_cfg.n_mels,
+                target_frames=self.features_cfg.target_frames,
+                frame_shift=self.features_cfg.frame_shift,
+                window_type=self.features_cfg.window_type,
+                dither=self.features_cfg.dither,
+                normalize=self.features_cfg.normalize,
                 feature_cache=feature_cache,
             )
         raise ValueError(f"Unknown features.kind: {self.features_cfg.kind}")

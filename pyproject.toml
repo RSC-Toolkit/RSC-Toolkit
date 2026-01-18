@@ -29,6 +29,9 @@ trainer = [
     "hydra-core",
     "lightning",
 ]
+models = [
+    "timm>=0.4.5",
+]
 dev = [
     "pytest",
     "black",

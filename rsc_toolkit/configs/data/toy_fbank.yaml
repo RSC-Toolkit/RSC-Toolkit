@@ -1,0 +1,35 @@
+name: toy
+params:
+  datamodule_name: index
+
+  dataset_name: toy
+  index_dataset_cls: rsc_toolkit.datasets.index_dataset.IndexDataset
+  project_root: ${hydra:runtime.cwd}
+  data_dir: downloaded_datasets/toy
+  split_file: sample_data/toy_dataset/official_split.txt
+
+  sampling_rate: 16000
+  sample_level: cycle
+
+  train_splits: [train]
+  val_splits: [test]
+  test_splits: [test]
+
+  batch_size: 32
+  num_workers: 4
+  shuffle_train: true
+
+  features:
+    enabled: true
+    kind: fbank
+    cache_dir: downloaded_datasets/features_cache
+    n_mels: 128
+    target_frames: 1024
+    frame_shift: 10
+    window_type: hanning
+    dither: 0.0
+    normalize: true
+
+  feature_precompute: false
+  feature_precompute_batch_size: 8
+  feature_precompute_num_workers: 0

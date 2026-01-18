@@ -37,6 +37,7 @@ class CLAPProcessor(BaseAudioProcessor):
     def get_processor_config(self) -> Dict[str, Any]:
         return {
             "model_name": self.model_name,
+            "sampling_rate": self.sampling_rate,
         }
     
     def make_features(

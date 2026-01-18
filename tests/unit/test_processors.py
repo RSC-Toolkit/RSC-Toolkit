@@ -125,13 +125,17 @@ def test_processor_cache_isolation(tmp_path):
     assert proc2.feature_cache.is_cached(sample_id)
 
 
-@pytest.mark.skip(reason="mel not implemented well yet.")
 def test_melbank_processor(tmp_path, feature_cache):
     """Test MelBankAudioProcessor"""
     processor = MelBankAudioProcessor(
         n_mels=64,
         sampling_rate=16000,
+        target_frames=64,
         feature_cache=feature_cache,
+    )
+    processor.feature_cache.configure(
+        processor_config=processor.get_processor_config(),
+        processor_name=processor.__class__.__name__
     )
     
     # Audio should be 16kHz for fbank
@@ -140,6 +144,7 @@ def test_melbank_processor(tmp_path, feature_cache):
     # Should work without caching
     features = processor.make_features(audio)
     assert features is not None
+    assert features.shape == (64, 64)
     
     # Should work with caching
     sample_id = "mel_sample_1"
@@ -192,4 +197,3 @@ def test_processor_cache_key_changes_with_config(tmp_path):
     )
     # Cache keys should be different
     assert proc1.feature_cache.cache_key != proc2.feature_cache.cache_key
-
