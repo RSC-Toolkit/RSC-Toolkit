@@ -9,6 +9,7 @@ from typing import Optional, Dict, Any
 from rsc_toolkit.datasets.toy_dataset import ToyDataset
 from rsc_toolkit.datasets.index_dataset import IndexDataset
 from rsc_toolkit.processors.base import BaseAudioProcessor
+from rsc_toolkit.processors.audio import AudioPreprocessConfig, AudioPreprocessor
 
 
 class SimpleTestProcessor(BaseAudioProcessor):
@@ -196,3 +197,24 @@ def test_dataloader_label_extraction(processor_with_index, toy_dataset_path):
         assert 0 <= item["label"] <= 3
 
     assert len(set(labels)) > 0
+
+
+@pytest.mark.slow
+def test_cycle_level_index_dataloader_with_audio_preprocessor(processor_with_index, toy_dataset_path):
+    """Audio preprocessor is applied to cycle slices."""
+    processor = processor_with_index["processor"]
+    index_path = processor_with_index["cycle_index_path"]
+
+    cfg = AudioPreprocessConfig(desired_length_sec=1.0, pad_type="repeat")
+    pre = AudioPreprocessor(sampling_rate=processor.sampling_rate, cfg=cfg)
+
+    ds = IndexDataset(
+        index_csv=index_path,
+        data_root=toy_dataset_path,
+        sampling_rate=processor.sampling_rate,
+        sample_level="cycle",
+        audio_preprocessor=pre,
+    )
+    item = ds[0]
+    audio = item["audio"]
+    assert audio.shape[1] == processor.sampling_rate

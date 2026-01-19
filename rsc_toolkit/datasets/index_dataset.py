@@ -36,13 +36,12 @@ class IndexDataset(Dataset):
         index_csv: Union[str, pathlib.Path],
         data_root: Optional[Union[str, pathlib.Path]] = None,
         sampling_rate: int = 10000,
-        desired_length_sec: Optional[float] = None,
-        pad_type: str = "repeat",
         sample_level: Optional[Literal["cycle", "clip"]] = None,
         split: Optional[str] = None,
         split_file: Optional[Union[str, pathlib.Path]] = None,
         return_meta: bool = True,
         fade: bool = True,
+        audio_preprocessor: Optional[Any] = None,
     ):
         self.index_csv = pathlib.Path(index_csv).expanduser().resolve()
         if not self.index_csv.exists():
@@ -54,10 +53,9 @@ class IndexDataset(Dataset):
         # Here we accept data_root explicitly, otherwise infer from index location or recording paths.
         self.data_root = pathlib.Path(data_root).expanduser().resolve() if data_root else None
         self.sampling_rate = int(sampling_rate)
-        self.desired_length_sec = float(desired_length_sec) if desired_length_sec is not None else None
-        self.pad_type = str(pad_type)
         self.return_meta = bool(return_meta)
         self.fade = bool(fade)
+        self.audio_preprocessor = audio_preprocessor
 
         if sample_level is None:
             # infer from first row
@@ -83,30 +81,6 @@ class IndexDataset(Dataset):
 
     def __len__(self) -> int:
         return int(len(self.df))
-
-    def _pad_or_trim(self, audio: torch.Tensor) -> torch.Tensor:
-        if self.desired_length_sec is None:
-            return audio
-
-        target_samples = int(self.desired_length_sec * self.sampling_rate)
-        if target_samples <= 0:
-            return audio
-
-        channels, length = audio.shape
-        if length == target_samples:
-            return audio
-        if length > target_samples:
-            return audio[:, :target_samples]
-
-        pad = target_samples - length
-        if self.pad_type == "zero":
-            return torch.nn.functional.pad(audio, (0, pad))
-        if self.pad_type == "repeat":
-            reps = (target_samples + length - 1) // length
-            expanded = audio.repeat(1, reps)
-            return expanded[:, :target_samples]
-
-        raise ValueError(f"Unknown pad_type: {self.pad_type}")
 
     def _resolve_recording_path(self, recording_path: str) -> pathlib.Path:
         p = pathlib.Path(recording_path)
@@ -182,7 +156,8 @@ class IndexDataset(Dataset):
             t0 = float(row["t0"])
             t1 = float(row["t1"])
             audio = slice_audio(wav, t0=t0, t1=t1, sampling_rate=self.sampling_rate)
-            audio = self._pad_or_trim(audio)
+            if self.audio_preprocessor is not None:
+                audio = self.audio_preprocessor(audio)
         elif level == "clip":
             audio = wav
             t0 = None

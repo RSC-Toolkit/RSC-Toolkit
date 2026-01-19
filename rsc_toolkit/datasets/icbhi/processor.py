@@ -158,73 +158,73 @@ class ICBHIDatasetProcessor(BaseRSCDatasetProcessor):
         logger.info("Wrote index to %s", index_path)
         return index
 
-    def preprocess_features_from_index(
-        self,
-        index_csv: str | pathlib.Path,
-        *,
-        sample_level: str = "cycle",
-        batch_size: int = 1,
-        num_workers: int = 0,
-        fade: bool = True,
-        cache_dir: str | pathlib.Path | None = None,
-    ):
-        if not self.feature_processor:
-            raise RuntimeError("preprocess_features=True but feature_processor is None")
+    # def preprocess_features_from_index(
+    #     self,
+    #     index_csv: str | pathlib.Path,
+    #     *,
+    #     sample_level: str = "cycle",
+    #     batch_size: int = 1,
+    #     num_workers: int = 0,
+    #     fade: bool = True,
+    #     cache_dir: str | pathlib.Path | None = None,
+    # ):
+    #     if not self.feature_processor:
+    #         raise RuntimeError("preprocess_features=True but feature_processor is None")
 
-        index_csv = pathlib.Path(index_csv).expanduser().resolve()
+    #     index_csv = pathlib.Path(index_csv).expanduser().resolve()
 
-        ds = ICBHIIndexDataset(
-            index_csv=index_csv,
-            data_root=self.data_folder,
-            sampling_rate=self.sampling_rate,
-            sample_level=sample_level,
-            return_meta=True,
-            fade=fade,
-        )
+    #     ds = ICBHIIndexDataset(
+    #         index_csv=index_csv,
+    #         data_root=self.data_folder,
+    #         sampling_rate=self.sampling_rate,
+    #         sample_level=sample_level,
+    #         return_meta=True,
+    #         fade=fade,
+    #     )
 
-        loader = DataLoader(
-            ds,
-            batch_size=batch_size,
-            shuffle=False,
-            num_workers=num_workers,
-            pin_memory=False,
-            persistent_workers=False,
-        )
+    #     loader = DataLoader(
+    #         ds,
+    #         batch_size=batch_size,
+    #         shuffle=False,
+    #         num_workers=num_workers,
+    #         pin_memory=False,
+    #         persistent_workers=False,
+    #     )
 
-        # Ensure processor cache is set up
-        if cache_dir is None:
-            cache_dir = pathlib.Path(self.outputs_directory) / "features"
-        cache_dir = pathlib.Path(cache_dir)
-        if not self.feature_processor.cache_features or self.feature_processor.cache_dir != str(cache_dir):
-            self.feature_processor.cache_features = True
-            self.feature_processor.cache_dir = str(cache_dir)
-            # re-init cache with new dir/config
-            self.feature_processor._init_cache()
+    #     # Ensure processor cache is set up
+    #     if cache_dir is None:
+    #         cache_dir = pathlib.Path(self.outputs_directory) / "features"
+    #     cache_dir = pathlib.Path(cache_dir)
+    #     if not self.feature_processor.cache_features or self.feature_processor.cache_dir != str(cache_dir):
+    #         self.feature_processor.cache_features = True
+    #         self.feature_processor.cache_dir = str(cache_dir)
+    #         # re-init cache with new dir/config
+    #         self.feature_processor._init_cache()
 
-        fp = self.feature_processor
+    #     fp = self.feature_processor
 
-        for batch in loader:
-            # batch is a dict of tensors/lists
-            audio = batch["audio"]            # shape: [B, C, T]
-            sample_ids = batch["sample_id"]   # list[str] or tuple[str]
-            # Compute + cache features per sample_id
-            if hasattr(fp, "make_features_batch"):
-                # Optional batch path if processor supports it (not cache-aware internally)
-                feats_list = fp.make_features_batch(audio, sample_ids=sample_ids)  # type: ignore[arg-type]
-                cache = getattr(fp, "_feature_cache", None)
-                for sid, feats in zip(sample_ids, feats_list):
-                    if cache:
-                        cache.put(sid, feats)
-                    else:
-                        # fallback: cache disabled, no-op aside from compute
-                        pass
-            else:
-                for i in range(audio.shape[0]):
-                    sid = sample_ids[i]
-                    x = audio[i]  # [C, T]
-                    fp.make_features_cached(x, sample_id=sid)
+    #     for batch in loader:
+    #         # batch is a dict of tensors/lists
+    #         audio = batch["audio"]            # shape: [B, C, T]
+    #         sample_ids = batch["sample_id"]   # list[str] or tuple[str]
+    #         # Compute + cache features per sample_id
+    #         if hasattr(fp, "make_features_batch"):
+    #             # Optional batch path if processor supports it (not cache-aware internally)
+    #             feats_list = fp.make_features_batch(audio, sample_ids=sample_ids)  # type: ignore[arg-type]
+    #             cache = getattr(fp, "_feature_cache", None)
+    #             for sid, feats in zip(sample_ids, feats_list):
+    #                 if cache:
+    #                     cache.put(sid, feats)
+    #                 else:
+    #                     # fallback: cache disabled, no-op aside from compute
+    #                     pass
+    #         else:
+    #             for i in range(audio.shape[0]):
+    #                 sid = sample_ids[i]
+    #                 x = audio[i]  # [C, T]
+    #                 fp.make_features_cached(x, sample_id=sid)
 
-            # Explicit cleanup (optional but fine)
-            del batch
-            if torch.cuda.is_available():
-                torch.cuda.empty_cache()
+    #         # Explicit cleanup (optional but fine)
+    #         del batch
+    #         if torch.cuda.is_available():
+    #             torch.cuda.empty_cache()

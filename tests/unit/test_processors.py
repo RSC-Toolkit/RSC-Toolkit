@@ -5,6 +5,7 @@ import pytest
 import torch
 
 from rsc_toolkit.datasets.feature_cache import FeatureCache
+from rsc_toolkit.processors.audio import AudioPreprocessConfig, AudioPreprocessor
 from rsc_toolkit.processors.base import BaseAudioProcessor
 from rsc_toolkit.processors.mel import MelBankAudioProcessor
 
@@ -197,3 +198,30 @@ def test_processor_cache_key_changes_with_config(tmp_path):
     )
     # Cache keys should be different
     assert proc1.feature_cache.cache_key != proc2.feature_cache.cache_key
+
+
+def test_audio_preprocessor_repeat_pad():
+    cfg = AudioPreprocessConfig(desired_length_sec=1.0, pad_type="repeat")
+    pre = AudioPreprocessor(sampling_rate=8, cfg=cfg)
+    audio = torch.tensor([[0.0, 1.0, 2.0]])
+    out = pre(audio)
+    assert out.shape == (1, 8)
+    assert torch.allclose(out, torch.tensor([[0.0, 1.0, 2.0, 0.0, 1.0, 2.0, 0.0, 1.0]]))
+
+
+def test_audio_preprocessor_zero_pad():
+    cfg = AudioPreprocessConfig(desired_length_sec=1.0, pad_type="zero")
+    pre = AudioPreprocessor(sampling_rate=5, cfg=cfg)
+    audio = torch.tensor([[1.0, 2.0]])
+    out = pre(audio)
+    assert out.shape == (1, 5)
+    assert torch.allclose(out, torch.tensor([[1.0, 2.0, 0.0, 0.0, 0.0]]))
+
+
+def test_audio_preprocessor_trim():
+    cfg = AudioPreprocessConfig(desired_length_sec=1.0, pad_type="repeat")
+    pre = AudioPreprocessor(sampling_rate=3, cfg=cfg)
+    audio = torch.tensor([[1.0, 2.0, 3.0, 4.0]])
+    out = pre(audio)
+    assert out.shape == (1, 3)
+    assert torch.allclose(out, torch.tensor([[1.0, 2.0, 3.0]]))

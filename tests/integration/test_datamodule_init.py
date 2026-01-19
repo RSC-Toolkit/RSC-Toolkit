@@ -25,8 +25,9 @@ class DummyIndexDataset(Dataset):
         sample_level: str,
         split: str,
         split_file: Optional[Path] = None,
+        audio_preprocessor: Optional[Any] = None,
     ):
-        _ = (data_root, sampling_rate, sample_level, split_file)
+        _ = (data_root, sampling_rate, sample_level, split_file, audio_preprocessor)
         self.df = pd.read_csv(Path(index_csv))
         self.df = self.df.loc[self.df["split"].astype(str) == str(split)].reset_index(drop=True)
 

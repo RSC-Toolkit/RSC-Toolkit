@@ -15,6 +15,7 @@ import tqdm
 from rsc_toolkit.datasets.feature_cache import FeatureCache
 from rsc_toolkit.datasets.index_dataset import IndexFeatureDataset
 from rsc_toolkit.datasets.paths import default_dataset_dir
+from rsc_toolkit.processors.audio import AudioPreprocessConfig, AudioPreprocessor
 
 logger = logging.getLogger(__name__)
 
@@ -115,6 +116,11 @@ class IndexDataModule(L.LightningDataModule):
         self.index_filename = index_filename
         self.desired_length_sec = float(desired_length_sec) if desired_length_sec is not None else None
         self.pad_type = str(pad_type)
+        self.audio_preprocess_cfg = AudioPreprocessConfig(
+            desired_length_sec=self.desired_length_sec,
+            pad_type=self.pad_type,
+        )
+        self.audio_preprocessor = AudioPreprocessor(self.sampling_rate, self.audio_preprocess_cfg)
 
         self.train_splits = self._normalize_splits(train_splits, role="train")
         self.val_splits = self._normalize_splits(val_splits, role="val")
@@ -234,8 +240,7 @@ class IndexDataModule(L.LightningDataModule):
             sampling_rate=self.sampling_rate,
             sample_level=self.sample_level,
             split=split,
-            desired_length_sec=self.desired_length_sec,
-            pad_type=self.pad_type,
+            audio_preprocessor=self.audio_preprocessor,
         )
         if self.split_file is not None:
             kwargs["split_file"] = self.split_file
