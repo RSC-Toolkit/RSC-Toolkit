@@ -72,6 +72,8 @@ class IndexDataModule(L.LightningDataModule):
         sampling_rate: int = 16_000,
         sample_level: str = "cycle",
         index_filename: Optional[str] = None,
+        desired_length_sec: Optional[float] = None,
+        pad_type: str = "repeat",
         # split names (supports arbitrary split labels, including numbers)
         train_splits: Sequence[Any] = ("train",),
         val_splits: Sequence[Any] = ("test",),
@@ -111,6 +113,8 @@ class IndexDataModule(L.LightningDataModule):
         self.sampling_rate = int(sampling_rate)
         self.sample_level = str(sample_level)
         self.index_filename = index_filename
+        self.desired_length_sec = float(desired_length_sec) if desired_length_sec is not None else None
+        self.pad_type = str(pad_type)
 
         self.train_splits = self._normalize_splits(train_splits, role="train")
         self.val_splits = self._normalize_splits(val_splits, role="val")
@@ -230,6 +234,8 @@ class IndexDataModule(L.LightningDataModule):
             sampling_rate=self.sampling_rate,
             sample_level=self.sample_level,
             split=split,
+            desired_length_sec=self.desired_length_sec,
+            pad_type=self.pad_type,
         )
         if self.split_file is not None:
             kwargs["split_file"] = self.split_file

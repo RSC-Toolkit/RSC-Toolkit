@@ -9,6 +9,8 @@ params:
 
   sampling_rate: 48000
   sample_level: cycle
+  desired_length_sec: 8.0
+  pad_type: repeat
 
   # Split labels from your split file / index. Can be arbitrary strings or numbers.
   train_splits: [train]

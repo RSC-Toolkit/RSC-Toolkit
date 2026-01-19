@@ -1,5 +1,6 @@
 defaults:
   - model: audioclap
+  - data_defaults@data: base
   - data: toy
   - loss: cross_entropy
   - metrics: icbhi_metrics
