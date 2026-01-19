@@ -196,9 +196,10 @@ class IndexDataset(Dataset):
 
 class IndexFeatureDataset(Dataset):
 
-    def __init__(self, index_ds, feature_processor):
+    def __init__(self, index_ds, feature_processor, feature_transform: Optional[Any] = None):
         self.index_ds = index_ds
         self.fp = feature_processor
+        self.feature_transform = feature_transform
 
     def __len__(self):
         return len(self.index_ds)
@@ -207,4 +208,6 @@ class IndexFeatureDataset(Dataset):
         item = self.index_ds[i]
         audio = item["audio"].squeeze()
         feats = self.fp.make_features_cached(audio, sample_id=item["sample_id"])
+        if self.feature_transform is not None:
+            feats = self.feature_transform(feats)
         return feats, item["label"], item["sample_id"]

@@ -9,3 +9,8 @@ defaults:
   - _self_
 
 seed: 123
+
+run:
+  name: ${data.name}-${model.name}
+  group: null
+  tags: []

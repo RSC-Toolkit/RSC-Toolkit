@@ -1,0 +1,16 @@
+defaults:
+  - model: ast
+  - data_defaults@data: base
+  - data: toy_fbank
+  - loss: cross_entropy
+  - metrics: icbhi_metrics
+  - optimizer: adam
+  - trainer: default
+  - _self_
+
+seed: 123
+
+run:
+  name: ${data.name}-${model.name}
+  group: null
+  tags: []

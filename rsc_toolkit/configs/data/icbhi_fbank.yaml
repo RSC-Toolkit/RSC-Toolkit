@@ -32,3 +32,8 @@ params:
   feature_precompute: true
   feature_precompute_batch_size: 8
   feature_precompute_num_workers: 0
+
+  specaugment:
+    enabled: true
+    policy: icbhi_ast_sup
+    mask: mean

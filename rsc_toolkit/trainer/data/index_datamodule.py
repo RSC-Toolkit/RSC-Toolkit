@@ -16,6 +16,7 @@ from rsc_toolkit.datasets.feature_cache import FeatureCache
 from rsc_toolkit.datasets.index_dataset import IndexFeatureDataset
 from rsc_toolkit.datasets.paths import default_dataset_dir
 from rsc_toolkit.processors.audio import AudioPreprocessConfig, AudioPreprocessor
+from rsc_toolkit.augmentations.specaugment import SpecAugment
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +35,13 @@ class FeatureConfig:
     window_type: str = "hanning"
     dither: float = 0.0
     normalize: bool = True
+
+
+@dataclass
+class SpecAugmentOptions:
+    enabled: bool = False
+    policy: str = "icbhi_ast_sup"
+    mask: str = "mean"
 
 
 def _tuple_collate(batch: List[Dict[str, Any]]) -> Tuple[torch.Tensor, torch.Tensor]:
@@ -90,6 +98,7 @@ class IndexDataModule(L.LightningDataModule):
         feature_precompute: bool = False,
         feature_precompute_batch_size: int = 8,
         feature_precompute_num_workers: int = 0,
+        specaugment: Optional[dict] = None,
     ):
         super().__init__()
 
@@ -138,6 +147,7 @@ class IndexDataModule(L.LightningDataModule):
         self.feature_precompute = bool(feature_precompute)
         self.feature_precompute_batch_size = int(feature_precompute_batch_size)
         self.feature_precompute_num_workers = int(feature_precompute_num_workers)
+        self.specaugment_cfg = SpecAugmentOptions(**(specaugment or {}))
 
         # set later
         self.index_csv: Optional[Path] = None
@@ -275,7 +285,7 @@ class IndexDataModule(L.LightningDataModule):
             )
         raise ValueError(f"Unknown features.kind: {self.features_cfg.kind}")
 
-    def _wrap_with_features(self, base_ds):
+    def _wrap_with_features(self, base_ds, *, feature_transform=None):
         cache_dir = (
             Path(self.features_cfg.cache_dir)
             if self.features_cfg.cache_dir
@@ -287,7 +297,16 @@ class IndexDataModule(L.LightningDataModule):
         fp = self._build_feature_processor(feature_cache)
         feature_cache.configure(fp.get_processor_config(), processor_name=fp.__class__.__name__)
 
-        return IndexFeatureDataset(base_ds, fp)
+        return IndexFeatureDataset(base_ds, fp, feature_transform=feature_transform)
+
+    def _build_feature_transform(self, *, training: bool):
+        if not training:
+            return None
+        if not self.specaugment_cfg.enabled:
+            return None
+        if self.features_cfg.kind not in {"mel", "fbank"}:
+            return None
+        return SpecAugment(policy=self.specaugment_cfg.policy, mask=self.specaugment_cfg.mask)
 
     @staticmethod
     def _collect_sample_ids(index_ds: Any) -> List[str]:
@@ -415,8 +434,9 @@ class IndexDataModule(L.LightningDataModule):
             self.val_ds = self._build_index_dataset(splits=self.val_splits)
 
             if self.features_cfg.enabled:
-                self.train_ds = self._wrap_with_features(self.train_ds)
-                self.val_ds = self._wrap_with_features(self.val_ds)
+                train_transform = self._build_feature_transform(training=True)
+                self.train_ds = self._wrap_with_features(self.train_ds, feature_transform=train_transform)
+                self.val_ds = self._wrap_with_features(self.val_ds, feature_transform=None)
 
             if self.features_cfg.enabled and self.feature_precompute:
                 if not self._is_global_zero():
