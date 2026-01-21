@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Tuple
 import logging
+import os
 
 import torch
 import torch.nn as nn
@@ -47,7 +48,8 @@ class ASTBackbone(nn.Module):
         tstride: int = 10,
         input_fdim: int = 128,
         input_tdim: int = 1024,
-        imagenet_pretrain: bool = True,
+        pretrained: str = "imagenet",
+        pretrained_path: str | None = None,
         model_size: str = "base384",
         verbose: bool = True,
     ):
@@ -58,22 +60,26 @@ class ASTBackbone(nn.Module):
                 "ASTBackbone requires timm. Install with `pip install timm`."
             ) from _timm_import_error
 
+        pretrain_source = self._resolve_pretrain_source(pretrained)
+        if pretrain_source == "audioset" and model_size != "base384":
+            raise ValueError("audioset pretrained weights are only available for model_size=base384")
+
         if verbose:
             logger.info(
-                "AST init: imagenet_pretrain=%s model_size=%s",
-                imagenet_pretrain,
+                "AST init: pretrained=%s model_size=%s",
+                pretrain_source,
                 model_size,
             )
 
         timm.models.vision_transformer.PatchEmbed = PatchEmbed
         if model_size == "tiny224":
-            self.v = timm.create_model("vit_deit_tiny_distilled_patch16_224", pretrained=imagenet_pretrain)
+            self.v = timm.create_model("vit_deit_tiny_distilled_patch16_224", pretrained=pretrain_source == "imagenet")
         elif model_size == "small224":
-            self.v = timm.create_model("vit_deit_small_distilled_patch16_224", pretrained=imagenet_pretrain)
+            self.v = timm.create_model("vit_deit_small_distilled_patch16_224", pretrained=pretrain_source == "imagenet")
         elif model_size == "base224":
-            self.v = timm.create_model("vit_deit_base_distilled_patch16_224", pretrained=imagenet_pretrain)
+            self.v = timm.create_model("vit_deit_base_distilled_patch16_224", pretrained=pretrain_source == "imagenet")
         elif model_size == "base384":
-            self.v = timm.create_model("vit_deit_base_distilled_patch16_384", pretrained=imagenet_pretrain)
+            self.v = timm.create_model("vit_deit_base_distilled_patch16_384", pretrained=pretrain_source == "imagenet")
         else:
             raise ValueError("model_size must be one of tiny224, small224, base224, base384")
 
@@ -95,12 +101,12 @@ class ASTBackbone(nn.Module):
             kernel_size=(16, 16),
             stride=(fstride, tstride),
         )
-        if imagenet_pretrain:
+        if pretrain_source == "imagenet":
             new_proj.weight = nn.Parameter(torch.sum(self.v.patch_embed.proj.weight, dim=1).unsqueeze(1))
             new_proj.bias = self.v.patch_embed.proj.bias
         self.v.patch_embed.proj = new_proj
 
-        if imagenet_pretrain:
+        if pretrain_source == "imagenet":
             new_pos_embed = (
                 self.v.pos_embed[:, 2:, :]
                 .detach()
@@ -124,10 +130,13 @@ class ASTBackbone(nn.Module):
                 )
             new_pos_embed = new_pos_embed.reshape(1, self.original_embedding_dim, num_patches).transpose(1, 2)
             self.v.pos_embed = nn.Parameter(torch.cat([self.v.pos_embed[:, :2, :].detach(), new_pos_embed], dim=1))
-        else:
+        elif pretrain_source == "none":
             new_pos_embed = nn.Parameter(torch.zeros(1, self.v.patch_embed.num_patches + 2, self.original_embedding_dim))
             self.v.pos_embed = new_pos_embed
             trunc_normal_(self.v.pos_embed, std=0.02)
+        else:
+            self._load_audioset_pretrained(pretrained_path)
+            self._adapt_audioset_pos_embed(f_dim, t_dim)
 
     def _get_shape(self, fstride: int, tstride: int, input_fdim: int, input_tdim: int) -> Tuple[int, int]:
         test_input = torch.randn(1, 1, input_fdim, input_tdim)
@@ -136,6 +145,66 @@ class ASTBackbone(nn.Module):
         f_dim = test_out.shape[2]
         t_dim = test_out.shape[3]
         return f_dim, t_dim
+
+    def _resolve_pretrain_source(self, pretrained: str) -> str:
+        pretrained = pretrained.lower()
+        if pretrained not in {"imagenet", "audioset", "none"}:
+            raise ValueError("pretrained must be one of: imagenet, audioset, none")
+        return pretrained
+
+    def _load_audioset_pretrained(self, pretrained_path: str | None) -> None:
+        if pretrained_path is None:
+            default_dir = os.path.join(os.getcwd(), "pretrained_models")
+            pretrained_path = os.path.join(default_dir, "audioset_10_10_0.4593.pth")
+        if not os.path.exists(pretrained_path):
+            raise FileNotFoundError(
+                f"audioset checkpoint not found at {pretrained_path}. "
+                "Download it or pass pretrained_path."
+            )
+        state = torch.load(pretrained_path, map_location="cpu")
+        if isinstance(state, dict) and "state_dict" in state:
+            state = state["state_dict"]
+        v_state = self.v.state_dict()
+        filtered = {}
+        for key, value in state.items():
+            normalized = key
+            if normalized.startswith("module."):
+                normalized = normalized[len("module."):]
+            if normalized.startswith("v."):
+                normalized = normalized[len("v."):]
+            if normalized in v_state:
+                filtered[normalized] = value
+        self.v.load_state_dict(filtered, strict=False)
+
+    def _adapt_audioset_pos_embed(self, f_dim: int, t_dim: int) -> None:
+        pos_embed = self.v.pos_embed
+        audio_tokens = pos_embed.shape[1] - 2
+        orig_f_dim, orig_t_dim = 12, 101
+        if audio_tokens != orig_f_dim * orig_t_dim:
+            raise ValueError(
+                f"Unexpected audioset positional tokens: {audio_tokens}. "
+                "Update _adapt_audioset_pos_embed for this checkpoint."
+            )
+        embed_dim = pos_embed.shape[2]
+        new_pos_embed = (
+            pos_embed[:, 2:, :]
+            .detach()
+            .reshape(1, orig_f_dim * orig_t_dim, embed_dim)
+            .transpose(1, 2)
+            .reshape(1, embed_dim, orig_f_dim, orig_t_dim)
+        )
+        if t_dim < orig_t_dim:
+            start = int(orig_t_dim / 2) - int(t_dim / 2)
+            new_pos_embed = new_pos_embed[:, :, :, start : start + t_dim]
+        else:
+            new_pos_embed = torch.nn.functional.interpolate(new_pos_embed, size=(orig_f_dim, t_dim), mode="bilinear")
+        if f_dim < orig_f_dim:
+            start = int(orig_f_dim / 2) - int(f_dim / 2)
+            new_pos_embed = new_pos_embed[:, :, start : start + f_dim, :]
+        elif f_dim > orig_f_dim:
+            new_pos_embed = torch.nn.functional.interpolate(new_pos_embed, size=(f_dim, t_dim), mode="bilinear")
+        new_pos_embed = new_pos_embed.reshape(1, embed_dim, f_dim * t_dim).transpose(1, 2)
+        self.v.pos_embed = nn.Parameter(torch.cat([pos_embed[:, :2, :].detach(), new_pos_embed], dim=1))
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         if x.dim() == 3:

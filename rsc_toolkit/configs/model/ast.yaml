@@ -5,6 +5,5 @@ params:
   tstride: 10
   input_fdim: 128
   input_tdim: 1024
-  imagenet_pretrain: true
   model_size: tiny224
   dropout: 0.0
