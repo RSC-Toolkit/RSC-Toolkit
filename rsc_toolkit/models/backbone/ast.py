@@ -65,8 +65,8 @@ class ASTBackbone(nn.Module):
             ) from _timm_import_error
 
         pretrain_source = self._resolve_pretrain_source(pretrained)
-        if pretrain_source == "audioset" and model_size != "base384":
-            raise ValueError("audioset pretrained weights are only available for model_size=base384")
+        if pretrain_source == "audioset_imagenet" and model_size != "base384":
+            raise ValueError("audioset_imagenet weights are only available for model_size=base384")
 
         if verbose:
             logger.info(
@@ -152,8 +152,8 @@ class ASTBackbone(nn.Module):
 
     def _resolve_pretrain_source(self, pretrained: str) -> str:
         pretrained = pretrained.lower()
-        if pretrained not in {"imagenet", "audioset", "none"}:
-            raise ValueError("pretrained must be one of: imagenet, audioset, none")
+        if pretrained not in {"imagenet", "audioset_imagenet", "none"}:
+            raise ValueError("pretrained must be one of: imagenet, audioset_imagenet, none")
         return pretrained
 
     def _load_audioset_pretrained(self, pretrained_path: str | None, download_if_missing: bool) -> None:
