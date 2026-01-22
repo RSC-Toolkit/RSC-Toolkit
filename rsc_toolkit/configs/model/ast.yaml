@@ -5,5 +5,6 @@ params:
   tstride: 10
   input_fdim: 128
   input_tdim: 1024
-  model_size: tiny224
+  model_size: base384
+  pretrained: audioset
   dropout: 0.0

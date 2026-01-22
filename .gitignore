@@ -199,3 +199,4 @@ cython_debug/
 outputs
 downloaded_datasets
 lightning_logs
+pretrained_models

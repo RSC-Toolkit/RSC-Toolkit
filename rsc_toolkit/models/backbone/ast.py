@@ -7,6 +7,7 @@ import os
 import torch
 import torch.nn as nn
 
+from rsc_toolkit.datasets.download_utils import download_file
 try: # TODO cleanup
     import timm
     from timm.models.layers import to_2tuple, trunc_normal_
@@ -42,6 +43,8 @@ class ASTBackbone(nn.Module):
     Audio Spectrogram Transformer backbone (feature extractor).
     """
 
+    AUDIOSET_URL = "https://www.dropbox.com/s/cv4knew8mvbrnvq/audioset_0.4593.pth?dl=1"
+
     def __init__(
         self,
         fstride: int = 10,
@@ -50,6 +53,7 @@ class ASTBackbone(nn.Module):
         input_tdim: int = 1024,
         pretrained: str = "imagenet",
         pretrained_path: str | None = None,
+        download_if_missing: bool = True,
         model_size: str = "base384",
         verbose: bool = True,
     ):
@@ -135,7 +139,7 @@ class ASTBackbone(nn.Module):
             self.v.pos_embed = new_pos_embed
             trunc_normal_(self.v.pos_embed, std=0.02)
         else:
-            self._load_audioset_pretrained(pretrained_path)
+            self._load_audioset_pretrained(pretrained_path, download_if_missing)
             self._adapt_audioset_pos_embed(f_dim, t_dim)
 
     def _get_shape(self, fstride: int, tstride: int, input_fdim: int, input_tdim: int) -> Tuple[int, int]:
@@ -152,15 +156,18 @@ class ASTBackbone(nn.Module):
             raise ValueError("pretrained must be one of: imagenet, audioset, none")
         return pretrained
 
-    def _load_audioset_pretrained(self, pretrained_path: str | None) -> None:
+    def _load_audioset_pretrained(self, pretrained_path: str | None, download_if_missing: bool) -> None:
         if pretrained_path is None:
             default_dir = os.path.join(os.getcwd(), "pretrained_models")
             pretrained_path = os.path.join(default_dir, "audioset_10_10_0.4593.pth")
         if not os.path.exists(pretrained_path):
-            raise FileNotFoundError(
-                f"audioset checkpoint not found at {pretrained_path}. "
-                "Download it or pass pretrained_path."
-            )
+            if not download_if_missing:
+                raise FileNotFoundError(
+                    f"audioset checkpoint not found at {pretrained_path}. "
+                    "Download it or pass pretrained_path."
+                )
+            os.makedirs(os.path.dirname(pretrained_path), exist_ok=True)
+            download_file(self.AUDIOSET_URL, pretrained_path)
         state = torch.load(pretrained_path, map_location="cpu")
         if isinstance(state, dict) and "state_dict" in state:
             state = state["state_dict"]

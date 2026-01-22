@@ -17,6 +17,7 @@ class ASTClassifier(BaseRSCModel, nn.Module):
         input_tdim: int = 1024,
         pretrained: str = "imagenet",
         pretrained_path: str | None = None,
+        download_if_missing: bool = True,
         model_size: str = "base384",
         dropout: float = 0.0,
     ):
@@ -28,6 +29,7 @@ class ASTClassifier(BaseRSCModel, nn.Module):
             input_tdim=input_tdim,
             pretrained=pretrained,
             pretrained_path=pretrained_path,
+            download_if_missing=download_if_missing,
             model_size=model_size,
         )
         self.dropout = nn.Dropout(dropout) if dropout > 0 else None
