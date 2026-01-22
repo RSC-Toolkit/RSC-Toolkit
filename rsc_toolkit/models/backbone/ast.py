@@ -168,23 +168,39 @@ class ASTBackbone(nn.Module):
                 )
             os.makedirs(os.path.dirname(pretrained_path), exist_ok=True)
             download_file(self.AUDIOSET_URL, pretrained_path)
-        state = torch.load(pretrained_path, map_location="cpu")
+        try:
+            state = torch.load(pretrained_path, map_location="cpu")
+        except RuntimeError as exc:
+            if not "failed reading zip archive" in str(exc):
+                raise
+            logger.error("Bad archive, re-downloading weights.")
+            download_file(self.AUDIOSET_URL, pretrained_path)
+            state = torch.load(pretrained_path, map_location="cpu")
         if isinstance(state, dict) and "state_dict" in state:
             state = state["state_dict"]
         v_state = self.v.state_dict()
         filtered = {}
+        audioset_pos_embed = None
         for key, value in state.items():
             normalized = key
             if normalized.startswith("module."):
                 normalized = normalized[len("module."):]
             if normalized.startswith("v."):
                 normalized = normalized[len("v."):]
+            if normalized == "pos_embed":
+                audioset_pos_embed = value
+                continue
             if normalized in v_state:
                 filtered[normalized] = value
         self.v.load_state_dict(filtered, strict=False)
+        if audioset_pos_embed is None:
+            raise ValueError("audioset checkpoint missing pos_embed")
+        self._audioset_pos_embed = audioset_pos_embed
 
     def _adapt_audioset_pos_embed(self, f_dim: int, t_dim: int) -> None:
-        pos_embed = self.v.pos_embed
+        if not hasattr(self, "_audioset_pos_embed"):
+            raise ValueError("audioset pos_embed not loaded")
+        pos_embed = self._audioset_pos_embed
         audio_tokens = pos_embed.shape[1] - 2
         orig_f_dim, orig_t_dim = 12, 101
         if audio_tokens != orig_f_dim * orig_t_dim:
