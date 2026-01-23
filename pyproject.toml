@@ -16,6 +16,7 @@ dependencies = [
     "librosa",
     "tqdm",
     "platformdirs",
+    "pandas",
 
     # Below versions must be compatible with eachother
     "torch==2.7.0",
@@ -28,6 +29,7 @@ dependencies = [
 trainer = [
     "hydra-core",
     "lightning",
+    "tensorboard",
 ]
 models = [
     "timm>=0.4.5",
