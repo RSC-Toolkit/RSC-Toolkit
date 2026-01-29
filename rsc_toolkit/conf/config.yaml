@@ -1,7 +1,0 @@
-# Global entrypoint
-defaults:
-  - dataset: icbhi
-  - model: bts
-  
-  # experiment is optional for reproducing results
-  - experiment: null

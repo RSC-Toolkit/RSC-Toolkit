@@ -5,7 +5,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 
 # re-install as editable
-RUN pip uninstall -y rsc-toolkit && pip install -e .[dev]
+ARG PIP_EXTRAS="dev,trainer,models"
+RUN pip uninstall -y rsc-toolkit && pip install -e ".[${PIP_EXTRAS}]"
 
 # Cache hack: copy all project files after install
 COPY . .

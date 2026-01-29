@@ -1,5 +1,5 @@
-# Use an official PyTorch CUDA base image (Python 3.10 + CUDA 12.1 + cuDNN)
-FROM pytorch/pytorch:2.3.0-cuda12.1-cudnn8-runtime
+# Use a PyTorch CUDA base image aligned with pyproject.toml torch pins
+FROM pytorch/pytorch:2.7.0-cuda12.1-cudnn9-runtime
 
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -16,6 +16,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3-dev \
     libgl1 \
     libglib2.0-0 \
+    libsndfile1 \
     ffmpeg \
     p7zip-full \
     && rm -rf /var/lib/apt/lists/*
@@ -24,7 +25,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel build
 
 COPY . .
-RUN pip install --no-cache-dir .
+ARG PIP_EXTRAS="trainer,models"
+RUN pip install --no-cache-dir ".[${PIP_EXTRAS}]"
 
 # Default command (can be overridden at runtime)
 CMD ["python"]

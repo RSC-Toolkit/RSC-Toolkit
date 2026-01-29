@@ -13,9 +13,28 @@ license-files = ["LICENSE"]
 
 dependencies = [
     "pydantic",
+    "librosa",
+    "tqdm",
+    "platformdirs",
+    "pandas",
+
+    # Below versions must be compatible with eachother
+    "torch==2.7.0",
+    "torchaudio==2.7.0", # before torchcodec change
+    "torchvision==0.22.0",
+    "torchcodec",
 ]
 
 [project.optional-dependencies]
+trainer = [
+    "hydra-core",
+    "lightning",
+    "tensorboard",
+]
+models = [
+    "timm>=0.4.5",
+    "transformers",
+]
 dev = [
     "pytest",
     "black",
@@ -24,8 +43,17 @@ dev = [
 ]
 
 [project.scripts]
-rsc-toolkit-train = "rsc_toolkit.train:hydra_main"
-rsc-toolkit-datasets = "rsc_toolkit.cli:main"
+rsc-toolkit-train = "rsc_toolkit.train:main"
+rsc-toolkit = "rsc_toolkit.cli:main"
+rsctk = "rsc_toolkit.cli:main"
 
 [tool.setuptools]
-packages = ["rsc_toolkit"]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["rsc_toolkit*"]
+
+[tool.setuptools.package-data]
+rsc_toolkit = ["configs/**/*.yaml", "configs/**/*.yml"]
+"rsc_toolkit.datasets.icbhi" = ["data/*.txt"]

@@ -1,0 +1,7 @@
+params:
+  desired_length_sec: 8.0
+  pad_type: repeat
+  specaugment:
+    enabled: false
+    policy: icbhi_ast_sup
+    mask: mean

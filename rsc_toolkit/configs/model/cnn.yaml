@@ -1,0 +1,6 @@
+name: cnn
+params:
+  n_cls: 4
+  backbone: cnn10
+  dropout: 0.0
+  pretrained_path: null

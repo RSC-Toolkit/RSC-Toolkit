@@ -1,0 +1,18 @@
+params:
+  max_epochs: 50
+  accelerator: auto
+  devices: 1
+  log_every_n_steps: 10
+  
+  logger:
+    _target_: lightning.pytorch.loggers.TensorBoardLogger
+    save_dir: lightning_logs
+    name: ${run.name}
+
+  # Optional: instantiate Lightning callbacks via Hydra.
+  callbacks:
+    - _target_: rsc_toolkit.trainer.callbacks.ema.EMACallback
+      beta: 0.5
+      model_attr: rsc_model
+      apply_to_validation: true
+      apply_to_test: true

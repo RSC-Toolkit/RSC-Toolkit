@@ -198,3 +198,5 @@ cython_debug/
 .cache/
 outputs
 downloaded_datasets
+lightning_logs
+pretrained_models

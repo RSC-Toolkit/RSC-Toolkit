@@ -23,5 +23,4 @@ def main():
 
     # entrypoint handling here
     if args.command == "datasets":
-        if args.dataset_command == "download":
-            datasets.handle_command(args)
+        datasets.handle_command(args)

@@ -1,0 +1,33 @@
+name: toy
+params:
+  datamodule_name: index
+
+  dataset_name: toy
+  index_dataset_cls: rsc_toolkit.datasets.index_dataset.IndexDataset
+  project_root: ${hydra:runtime.cwd}
+  split_file: sample_data/toy_dataset/official_split.txt
+
+  sampling_rate: 16000
+  sample_level: cycle
+
+  # Split labels from your split file / index. Can be arbitrary strings or numbers.
+  train_splits: [train]
+  val_splits: [test]
+  test_splits: [test]
+
+  batch_size: 32
+  num_workers: 4
+  shuffle_train: true
+
+  # optional feature caching (if your DataModule supports it)
+  features:
+    enabled: true
+    kind: clap
+    cache_dir: downloaded_datasets/features_cache
+    clap_model_name: laion/clap-htsat-unfused
+
+  # Optional: warm up feature cache at datamodule setup (rank 0 only).
+  # This ensures training doesn't spend time computing features on-the-fly.
+  feature_precompute: true
+  feature_precompute_batch_size: 8
+  feature_precompute_num_workers: 0
