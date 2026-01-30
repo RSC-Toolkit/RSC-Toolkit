@@ -28,6 +28,11 @@ Priorities:
 - Independence:
   - Avoid tight coupling to any trainer or model framework.
   - Prefer adapters so Hugging Face or PyTorch Lightning can plug in.
+- Models:
+  - Register new models in `rsc_toolkit/trainer/registries/model_registry.py`.
+  - Provide a default config in `rsc_toolkit/configs/model/*.yaml` that runs without downloads.
+  - Keep forward paths deterministic and input-shape checked; prefer `[B, F, T]` inputs and add channel internally.
+  - Add a lightweight forward smoke test in `tests/unit/models/` (no external downloads).
 
 ## Testing guidance
 - Maintain tests for:
