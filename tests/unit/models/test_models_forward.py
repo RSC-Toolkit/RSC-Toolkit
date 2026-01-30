@@ -4,6 +4,7 @@ import pytest
 import torch
 
 from rsc_toolkit.models.cnn import CNNClassifier
+from rsc_toolkit.models.efficientnet import EfficientNetClassifier
 from rsc_toolkit.models.resnet import ResNetClassifier
 
 
@@ -20,6 +21,15 @@ def test_cnn_classifier_forward(backbone: str) -> None:
 @pytest.mark.parametrize("backbone", ["resnet10", "resnet18", "resnet34", "resnet50", "resnet101"])
 def test_resnet_classifier_forward(backbone: str) -> None:
     model = ResNetClassifier(n_cls=4, backbone=backbone, pretrained=None, track_bn=True)
+    x = torch.randn(2, 64, 64)
+    y = model(x)
+    assert y.shape == (2, 4)
+
+
+@pytest.mark.slow
+@pytest.mark.parametrize("backbone", ["efficientnet_b0", "efficientnet_b1", "efficientnet_b2"])
+def test_efficientnet_classifier_forward(backbone: str) -> None:
+    model = EfficientNetClassifier(n_cls=4, backbone=backbone, pretrained=None)
     x = torch.randn(2, 64, 64)
     y = model(x)
     assert y.shape == (2, 4)
