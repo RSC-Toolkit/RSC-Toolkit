@@ -45,6 +45,15 @@ class SPRSoundDatasetProcessor(BaseRSCDatasetProcessor):
 
     def _resolve_data_root(self) -> pathlib.Path:
         base = self.data_folder
+        if base.name.lower() == "classification":
+            parent = base.parent
+            if (
+                (parent / "train_classification_wav").exists()
+                or (parent / "valid_classification_wav").exists()
+                or (parent / "train_classification_json").exists()
+                or (parent / "valid_classification_json").exists()
+            ):
+                return parent.resolve()
         if (
             (base / "train_classification_wav").exists()
             or (base / "valid_classification_wav").exists()
