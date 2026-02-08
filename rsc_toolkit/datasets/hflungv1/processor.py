@@ -261,18 +261,18 @@ class HFLungV1DatasetProcessor(BaseRSCDatasetProcessor):
                     recording_path_str = str(recording_path)
 
                 recording_id = normalize_recording_id(filename)
-            meta = dict(metadata_map.get(recording_id, {}))
-            split_val = None
-            if labels_split_col and split is not None:
-                split_val = str(split).strip().lower()
-                meta.setdefault("split", split_val)
-            elif "split" in meta:
-                split_val = str(meta["split"]).strip().lower()
-            meta["recording_id"] = recording_path.stem
+                meta = dict(metadata_map.get(recording_id, {}))
+                split_val = None
+                if labels_split_col and split is not None:
+                    split_val = str(split).strip().lower()
+                    meta.setdefault("split", split_val)
+                elif "split" in meta:
+                    split_val = str(meta["split"]).strip().lower()
+                meta["recording_id"] = recording_path.stem
 
-            label = label_encoder.encode(row[labels_label_col]) if labels_label_col else None
-            t0 = float(row[start_col])
-            t1 = float(row[end_col])
+                label = label_encoder.encode(row[labels_label_col]) if labels_label_col else None
+                t0 = float(row[start_col])
+                t1 = float(row[end_col])
 
                 records.append(
                     SampleRecord(
