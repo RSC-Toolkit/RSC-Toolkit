@@ -101,7 +101,8 @@ def resolve_recording_path(
     filename: str,
     split: Optional[str],
 ) -> Optional[pathlib.Path]:
-    p = pathlib.Path(str(filename))
+    cleaned = str(filename).strip()
+    p = pathlib.Path(cleaned)
 
     if p.is_absolute() and p.exists():
         return p
