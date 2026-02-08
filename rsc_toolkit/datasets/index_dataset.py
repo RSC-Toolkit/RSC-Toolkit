@@ -76,8 +76,15 @@ class IndexDataset(Dataset):
             raise ValueError(f"Index CSV missing columns: {sorted(missing)}")
 
         if split is not None:
-            split_map = self._load_official_split_map(split_file)
-            self._filter_df_by_split(split_map, split)
+            if split_file is not None:
+                split_map = self._load_official_split_map(split_file)
+                self._filter_df_by_split(split_map, split)
+            elif "split" in self.df.columns:
+                self._filter_df_by_split_column(split)
+            else:
+                raise ValueError(
+                    "Split requested but no split_file provided and index CSV has no 'split' column."
+                )
 
     def __len__(self) -> int:
         return int(len(self.df))
@@ -133,6 +140,21 @@ class IndexDataset(Dataset):
             before,
             after,
             unassigned,
+        )
+        if len(self.df) == 0:
+            raise ValueError(f"No data found for split {split}")
+
+    def _filter_df_by_split_column(self, split: str) -> None:
+        before = int(len(self.df))
+        split_series = self.df["split"].astype(str).str.strip().str.lower()
+        mask = split_series == str(split).strip().lower()
+        self.df = self.df.loc[mask].reset_index(drop=True)
+        after = int(len(self.df))
+        logger.info(
+            "IndexDataset split=%s filtered %d -> %d samples (split column)",
+            split,
+            before,
+            after,
         )
         if len(self.df) == 0:
             raise ValueError(f"No data found for split {split}")
