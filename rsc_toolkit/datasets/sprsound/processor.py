@@ -168,6 +168,9 @@ class SPRSoundDatasetProcessor(BaseRSCDatasetProcessor):
                 split=split,
             )
             if recording_path is None or not recording_path.exists():
+                logger.warning(
+                    f"{data_root} {filename} {split}"
+                )
                 logger.warning("Skipping missing audio file: %s", recording_path)
                 continue
 
