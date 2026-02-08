@@ -40,10 +40,31 @@ class HFLungV1DatasetProcessor(BaseRSCDatasetProcessor):
             raise ValueError("raw_data_directory not set")
         return pathlib.Path(self.raw_data_directory).expanduser().resolve()
 
+    def _resolve_data_root(self) -> pathlib.Path:
+        base = self.data_folder
+        candidate = base / "data"
+        if (
+            (base / "metadata.csv").exists()
+            or (base / "train").exists()
+            or (base / "test").exists()
+        ):
+            return base
+        if (
+            candidate.exists()
+            and (
+                (candidate / "metadata.csv").exists()
+                or (candidate / "train").exists()
+                or (candidate / "test").exists()
+            )
+        ):
+            return candidate.resolve()
+        return base
+
     def _get_metadata_path(self) -> pathlib.Path:
         if self.metadata_file:
             return pathlib.Path(self.metadata_file).expanduser().resolve()
-        return (self.data_folder / "metadata.csv").resolve()
+        data_root = self._resolve_data_root()
+        return (data_root / "metadata.csv").resolve()
 
     def _build_split_map(self, df, filename_col: str, split_col: Optional[str]) -> Dict[str, str]:
         split_map: Dict[str, str] = {}
@@ -216,7 +237,7 @@ class HFLungV1DatasetProcessor(BaseRSCDatasetProcessor):
     def process_dataset(self) -> None:
         metadata_path = self._get_metadata_path()
         df = load_metadata(metadata_path)
-        data_root = self.data_folder.resolve()
+        data_root = self._resolve_data_root().resolve()
 
         for level in ("cycle", "clip"):
             index = self._build_index_for_level(df=df, data_root=data_root, sample_level=level)  # type: ignore[arg-type]
@@ -230,7 +251,7 @@ class HFLungV1DatasetProcessor(BaseRSCDatasetProcessor):
     def build_index(self, sample_level: Literal["cycle", "clip"] = "cycle") -> SampleIndex:
         metadata_path = self._get_metadata_path()
         df = load_metadata(metadata_path)
-        data_root = self.data_folder.resolve()
+        data_root = self._resolve_data_root().resolve()
 
         index = self._build_index_for_level(df=df, data_root=data_root, sample_level=sample_level)
         self.index_dir_path.mkdir(parents=True, exist_ok=True)
