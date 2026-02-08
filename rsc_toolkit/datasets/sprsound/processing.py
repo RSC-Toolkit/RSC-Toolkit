@@ -83,6 +83,18 @@ def normalize_split(value: Optional[str]) -> Optional[str]:
     return split
 
 
+def infer_split_from_path(value: str) -> Optional[str]:
+    parts = [p.lower() for p in pathlib.Path(str(value)).parts]
+    for part in parts:
+        if "classification" not in part:
+            continue
+        if part.startswith("train") or part == "train":
+            return "train"
+        if part.startswith(("valid", "val", "test")) or part in {"valid", "val", "test"}:
+            return "test"
+    return None
+
+
 def resolve_recording_path(
     *,
     data_root: pathlib.Path,

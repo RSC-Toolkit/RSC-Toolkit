@@ -18,6 +18,7 @@ from .processing import (
     resolve_recording_path,
     normalize_recording_id,
     normalize_split,
+    infer_split_from_path,
     _normalize_columns,
     _pick_column,
     coerce_number,
@@ -167,6 +168,8 @@ class SPRSoundDatasetProcessor(BaseRSCDatasetProcessor):
             filename = str(row[filename_col])
             raw_split = row[split_col] if split_col else None
             split = normalize_split(raw_split)
+            if split is None:
+                split = infer_split_from_path(filename)
             recording_path = resolve_recording_path(
                 data_root=data_root,
                 filename=filename,
@@ -248,6 +251,8 @@ class SPRSoundDatasetProcessor(BaseRSCDatasetProcessor):
             row = group.iloc[0]
             raw_split = row[split_col] if split_col else None
             split = normalize_split(raw_split)
+            if split is None:
+                split = infer_split_from_path(str(filename))
 
             recording_path = resolve_recording_path(
                 data_root=data_root,
