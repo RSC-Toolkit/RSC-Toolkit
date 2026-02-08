@@ -123,21 +123,42 @@ def resolve_recording_path(
     valid_dir = data_root / "valid_classification_wav"
     valid_2022_dir = valid_dir / "2022"
 
+    def _rglob_first(root: pathlib.Path, patterns: Iterable[str]) -> Optional[pathlib.Path]:
+        for pattern in patterns:
+            match = next(root.rglob(pattern), None)
+            if match is not None:
+                return match.resolve()
+        return None
+
+    rglob_patterns = [f"{base}.wav", base]
+
     if split == "train":
         for candidate in candidates:
             if (train_dir / candidate).exists():
                 return (train_dir / candidate).resolve()
+        match = _rglob_first(train_dir, rglob_patterns)
+        if match is not None:
+            return match
     elif split in {"test", "valid"}:
         for candidate in candidates:
             if (valid_2022_dir / candidate).exists():
                 return (valid_2022_dir / candidate).resolve()
             if (valid_dir / candidate).exists():
                 return (valid_dir / candidate).resolve()
+        match = _rglob_first(valid_2022_dir, rglob_patterns)
+        if match is not None:
+            return match
+        match = _rglob_first(valid_dir, rglob_patterns)
+        if match is not None:
+            return match
 
     for sub in (train_dir, valid_2022_dir, valid_dir):
         for candidate in candidates:
             if (sub / candidate).exists():
                 return (sub / candidate).resolve()
+        match = _rglob_first(sub, rglob_patterns)
+        if match is not None:
+            return match
 
     return None
 
