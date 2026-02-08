@@ -44,11 +44,16 @@ class SPRSoundDatasetProcessor(BaseRSCDatasetProcessor):
 
     def _resolve_data_root(self) -> pathlib.Path:
         base = self.data_folder
+        if (
+            (base / "train_classification_wav").exists()
+            or (base / "valid_classification_wav").exists()
+            or (base / "train_classification_json").exists()
+            or (base / "valid_classification_json").exists()
+        ):
+            return base.resolve()
+
         if (base / "Classification").exists():
             return (base / "Classification").resolve()
-
-        if (base / "train_classification_wav").exists() or (base / "valid_classification_wav").exists():
-            return base.resolve()
 
         for candidate in ("SPRSound", "SPRSound-main"):
             if (base / candidate / "Classification").exists():
