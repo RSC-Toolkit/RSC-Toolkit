@@ -57,13 +57,13 @@ class SPRSoundDatasetProcessor(BaseRSCDatasetProcessor):
         return base.resolve()
 
     def _package_data_dir(self) -> pathlib.Path:
-        return (pathlib.Path(__file__).parent / "metadata.csv").resolve()
+        return (pathlib.Path(__file__).parent / "data" / "metadata.csv").resolve()
 
     def _get_metadata_path(self) -> pathlib.Path:
         if self.metadata_file:
             return pathlib.Path(self.metadata_file).expanduser().resolve()
         data_root = self._resolve_data_root()
-        primary = (data_root / "metadata.csv").resolve()
+        primary = (data_root / "data" / "metadata.csv").resolve()
         if primary.exists():
             return primary
         return self._package_data_dir().resolve()
