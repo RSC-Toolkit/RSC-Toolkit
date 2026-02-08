@@ -5,6 +5,8 @@ import pathlib
 import logging
 import json
 
+import pandas as pd
+
 from rsc_toolkit.datasets.base import BaseRSCDatasetProcessor
 from rsc_toolkit.datasets.sample_index import SampleIndex, SampleRecord
 
@@ -16,6 +18,7 @@ from .processing import (
     resolve_recording_path,
     find_annotation_path,
     parse_cycle_annotations,
+    normalize_recording_id,
     _normalize_columns,
     _pick_column,
 )
@@ -30,6 +33,7 @@ class HFLungV1DatasetProcessor(BaseRSCDatasetProcessor):
     # Raw unpacked data directory containing train/ test/ metadata.csv
     raw_data_directory: Optional[str] = None
     metadata_file: Optional[str] = None
+    labels_files: Optional[List[str]] = None
 
     def validate_processed_files(self) -> bool:
         return False  # TODO: add index validation
@@ -60,11 +64,61 @@ class HFLungV1DatasetProcessor(BaseRSCDatasetProcessor):
             return candidate.resolve()
         return base
 
+    def _package_data_dir(self) -> pathlib.Path:
+        return (pathlib.Path(__file__).parent / "data").resolve()
+
     def _get_metadata_path(self) -> pathlib.Path:
         if self.metadata_file:
             return pathlib.Path(self.metadata_file).expanduser().resolve()
         data_root = self._resolve_data_root()
-        return (data_root / "metadata.csv").resolve()
+        primary = (data_root / "metadata.csv").resolve()
+        if primary.exists():
+            return primary
+        fallback = self._package_data_dir() / "metadata.csv"
+        return fallback.resolve()
+
+    def _resolve_labels_files(self, metadata_path: pathlib.Path) -> List[pathlib.Path]:
+        if self.labels_files:
+            return [pathlib.Path(p).expanduser().resolve() for p in self.labels_files]
+
+        labels_dir = metadata_path.parent
+        intra = [
+            labels_dir / "train_intra_segmented_labels.csv",
+            labels_dir / "test_intra_segmented_labels.csv",
+        ]
+        unified = [
+            labels_dir / "train_unified_segmented_labels.csv",
+            labels_dir / "test_unified_segmented_labels.csv",
+        ]
+
+        intra_existing = [p.resolve() for p in intra if p.exists()]
+        if intra_existing:
+            return intra_existing
+
+        return [p.resolve() for p in unified if p.exists()]
+
+    def _load_segmented_labels(self, metadata_path: pathlib.Path) -> Optional[pd.DataFrame]:
+        label_files = self._resolve_labels_files(metadata_path)
+        if not label_files:
+            return None
+
+        dfs: List[pd.DataFrame] = []
+        for path in label_files:
+            df = pd.read_csv(path)
+            if "split" not in df.columns:
+                stem = path.stem.lower()
+                split = None
+                if "train" in stem:
+                    split = "train"
+                elif "test" in stem:
+                    split = "test"
+                if split:
+                    df = df.copy()
+                    df["split"] = split
+            dfs.append(df)
+        if not dfs:
+            return None
+        return pd.concat(dfs, ignore_index=True)
 
     def _build_split_map(self, df, filename_col: str, split_col: Optional[str]) -> Dict[str, str]:
         split_map: Dict[str, str] = {}
@@ -161,61 +215,61 @@ class HFLungV1DatasetProcessor(BaseRSCDatasetProcessor):
         label_encoder = LabelEncoder()
         records: List[SampleRecord] = []
 
+        metadata_map: Dict[str, Dict[str, object]] = {}
         for _, row in df.iterrows():
-            filename = str(row[filename_col])
-            split = row[split_col] if split_col else None
-            recording_path = resolve_recording_path(
-                data_root=data_root,
-                filename=filename,
-                split=str(split).strip().lower() if split is not None else None,
-            )
-            if recording_path is None or not recording_path.exists():
-                logger.warning("Skipping missing audio file: %s", filename)
-                continue
-
-            try:
-                recording_path_str = str(recording_path.relative_to(data_root))
-            except ValueError:
-                recording_path_str = str(recording_path)
-
-            label = label_encoder.encode(row[label_col]) if label_col else None
+            key = normalize_recording_id(str(row[filename_col]))
             meta = self._build_meta(
                 row=row,
                 device_col=device_col,
                 location_col=location_col,
                 split_col=split_col,
             )
-            meta["recording_id"] = recording_path.stem
+            metadata_map[key] = meta
 
-            if sample_level == "clip":
-                records.append(
-                    SampleRecord(
-                        sample_id=recording_path.stem,
-                        recording_path=recording_path_str,
-                        sample_level="clip",
-                        t0=None,
-                        t1=None,
-                        label=label,
-                        meta=meta,
-                    )
+        labels_df = None
+        if sample_level == "cycle":
+            labels_df = self._load_segmented_labels(self._get_metadata_path())
+
+        if labels_df is not None and sample_level == "cycle":
+            labels_cols = _normalize_columns(labels_df)
+            labels_filename_col = _pick_column(labels_cols, ["filename", "file", "filepath", "path", "audio"])
+            if not labels_filename_col:
+                raise ValueError("segmented labels missing a filename column")
+            labels_label_col = _pick_column(labels_cols, ["final", "label", "class", "diagnosis", "target", "y"])
+            labels_split_col = _pick_column(labels_cols, ["split", "set", "subset", "partition", "fold"])
+            start_col = _pick_column(labels_cols, ["start", "begin", "t0", "onset"])
+            end_col = _pick_column(labels_cols, ["end", "stop", "t1", "offset"])
+
+            if start_col is None or end_col is None:
+                raise ValueError("segmented labels missing start/end columns")
+
+            for _, row in labels_df.iterrows():
+                filename = str(row[labels_filename_col])
+                split = row[labels_split_col] if labels_split_col else None
+                recording_path = resolve_recording_path(
+                    data_root=data_root,
+                    filename=filename,
+                    split=str(split).strip().lower() if split is not None else None,
                 )
-                continue
+                if recording_path is None or not recording_path.exists():
+                    logger.warning("Skipping missing audio file: %s", filename)
+                    continue
 
-            annotation_path = find_annotation_path(recording_path)
-            if annotation_path is None:
-                logger.warning("Missing annotations for %s; skipping cycle index.", recording_path.name)
-                continue
+                try:
+                    recording_path_str = str(recording_path.relative_to(data_root))
+                except ValueError:
+                    recording_path_str = str(recording_path)
 
-            cycles = parse_cycle_annotations(
-                annotation_path,
-                label_encoder=label_encoder,
-                default_label=label,
-            )
-            if not cycles:
-                logger.warning("No cycles parsed for %s", recording_path.name)
-                continue
+                recording_id = normalize_recording_id(filename)
+                meta = dict(metadata_map.get(recording_id, {}))
+                if labels_split_col and split is not None:
+                    meta.setdefault("split", str(split).strip().lower())
+                meta["recording_id"] = recording_path.stem
 
-            for t0, t1, cycle_label in cycles:
+                label = label_encoder.encode(row[labels_label_col]) if labels_label_col else None
+                t0 = float(row[start_col])
+                t1 = float(row[end_col])
+
                 records.append(
                     SampleRecord(
                         sample_id=self._make_cycle_sample_id(recording_path.stem, t0, t1),
@@ -223,10 +277,77 @@ class HFLungV1DatasetProcessor(BaseRSCDatasetProcessor):
                         sample_level="cycle",
                         t0=t0,
                         t1=t1,
-                        label=cycle_label,
+                        label=label,
                         meta=meta,
                     )
                 )
+        else:
+            for _, row in df.iterrows():
+                filename = str(row[filename_col])
+                split = row[split_col] if split_col else None
+                recording_path = resolve_recording_path(
+                    data_root=data_root,
+                    filename=filename,
+                    split=str(split).strip().lower() if split is not None else None,
+                )
+                if recording_path is None or not recording_path.exists():
+                    logger.warning("Skipping missing audio file: %s", filename)
+                    continue
+
+                try:
+                    recording_path_str = str(recording_path.relative_to(data_root))
+                except ValueError:
+                    recording_path_str = str(recording_path)
+
+                label = label_encoder.encode(row[label_col]) if label_col else None
+                meta = self._build_meta(
+                    row=row,
+                    device_col=device_col,
+                    location_col=location_col,
+                    split_col=split_col,
+                )
+                meta["recording_id"] = recording_path.stem
+
+                if sample_level == "clip":
+                    records.append(
+                        SampleRecord(
+                            sample_id=recording_path.stem,
+                            recording_path=recording_path_str,
+                            sample_level="clip",
+                            t0=None,
+                            t1=None,
+                            label=label,
+                            meta=meta,
+                        )
+                    )
+                    continue
+
+                annotation_path = find_annotation_path(recording_path)
+                if annotation_path is None:
+                    logger.warning("Missing annotations for %s; skipping cycle index.", recording_path.name)
+                    continue
+
+                cycles = parse_cycle_annotations(
+                    annotation_path,
+                    label_encoder=label_encoder,
+                    default_label=label,
+                )
+                if not cycles:
+                    logger.warning("No cycles parsed for %s", recording_path.name)
+                    continue
+
+                for t0, t1, cycle_label in cycles:
+                    records.append(
+                        SampleRecord(
+                            sample_id=self._make_cycle_sample_id(recording_path.stem, t0, t1),
+                            recording_path=recording_path_str,
+                            sample_level="cycle",
+                            t0=t0,
+                            t1=t1,
+                            label=cycle_label,
+                            meta=meta,
+                        )
+                    )
 
         self._write_label_map(label_encoder)
         split_map = self._build_split_map(df, filename_col=filename_col, split_col=split_col)

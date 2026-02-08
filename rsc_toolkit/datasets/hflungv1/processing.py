@@ -69,6 +69,15 @@ def _pick_column(cols: Dict[str, str], candidates: Iterable[str]) -> Optional[st
     return None
 
 
+def normalize_recording_id(value: str) -> str:
+    name = pathlib.Path(str(value)).name
+    if name.endswith("_label"):
+        name = name[:-6]
+    if "." in name:
+        name = pathlib.Path(name).stem
+    return name
+
+
 def resolve_recording_path(
     *,
     data_root: pathlib.Path,
@@ -80,24 +89,35 @@ def resolve_recording_path(
     if p.is_absolute() and p.exists():
         return p
 
-    if (data_root / p).exists():
-        return (data_root / p).resolve()
+    base = normalize_recording_id(p.name)
+    candidates: List[pathlib.Path] = []
+    if p.parent and str(p.parent) != ".":
+        candidates.append(p)
+        candidates.append(p.parent / base)
+        candidates.append(p.parent / f"{base}.wav")
+    candidates.append(pathlib.Path(p.name))
+    candidates.append(pathlib.Path(base))
+    candidates.append(pathlib.Path(f"{base}.wav"))
+
+    for candidate in candidates:
+        if (data_root / candidate).exists():
+            return (data_root / candidate).resolve()
 
     if split:
         split_dir = data_root / str(split).lower()
-        if (split_dir / p).exists():
-            return (split_dir / p).resolve()
-        if (split_dir / p.name).exists():
-            return (split_dir / p.name).resolve()
+        for candidate in candidates:
+            if (split_dir / candidate).exists():
+                return (split_dir / candidate).resolve()
 
     # Try common train/test fallbacks if split not provided
     for sub in ("train", "test"):
         candidate = data_root / sub / p
         if candidate.exists():
             return candidate.resolve()
-        candidate = data_root / sub / p.name
-        if candidate.exists():
-            return candidate.resolve()
+        for name in (p.name, base, f"{base}.wav"):
+            candidate = data_root / sub / name
+            if candidate.exists():
+                return candidate.resolve()
 
     return None
 

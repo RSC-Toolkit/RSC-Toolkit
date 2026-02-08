@@ -5,8 +5,8 @@ params:
   dataset_name: hflungv1
   index_dataset_cls: rsc_toolkit.datasets.index_dataset.IndexDataset
   project_root: ${hydra:runtime.cwd}
-  data_dir: rsc_toolkit/datasets/hflungv1/data
-  split_file: rsc_toolkit/datasets/hflungv1/data/index/official_split.txt
+  data_dir: downloaded_datasets/hflungv1
+  split_file: downloaded_datasets/hflungv1/index/official_split.txt
 
   sampling_rate: 48000
   sample_level: cycle
