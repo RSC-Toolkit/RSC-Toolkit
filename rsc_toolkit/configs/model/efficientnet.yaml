@@ -1,0 +1,5 @@
+name: efficientnet
+params:
+  n_cls: 4
+  backbone: efficientnet_b0
+  pretrained: null

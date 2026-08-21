@@ -77,15 +77,29 @@ class ASTBackbone(nn.Module):
 
         timm.models.vision_transformer.PatchEmbed = PatchEmbed
         if model_size == "tiny224":
-            self.v = timm.create_model("vit_deit_tiny_distilled_patch16_224", pretrained=pretrain_source == "imagenet")
+            model_name = "vit_deit_tiny_distilled_patch16_224"
+            fallback_name = "deit_tiny_distilled_patch16_224"
         elif model_size == "small224":
-            self.v = timm.create_model("vit_deit_small_distilled_patch16_224", pretrained=pretrain_source == "imagenet")
+            model_name = "vit_deit_small_distilled_patch16_224"
+            fallback_name = "deit_small_distilled_patch16_224"
         elif model_size == "base224":
-            self.v = timm.create_model("vit_deit_base_distilled_patch16_224", pretrained=pretrain_source == "imagenet")
+            model_name = "vit_deit_base_distilled_patch16_224"
+            fallback_name = "deit_base_distilled_patch16_224"
         elif model_size == "base384":
-            self.v = timm.create_model("vit_deit_base_distilled_patch16_384", pretrained=pretrain_source == "imagenet")
+            model_name = "vit_deit_base_distilled_patch16_384"
+            fallback_name = "deit_base_distilled_patch16_384"
         else:
             raise ValueError("model_size must be one of tiny224, small224, base224, base384")
+
+        try:
+            self.v = timm.create_model(model_name, pretrained=pretrain_source == "imagenet")
+        except RuntimeError as exc:
+            if "Unknown model" not in str(exc):
+                raise
+            self.v = timm.create_model(fallback_name, pretrained=pretrain_source == "imagenet")
+
+        # Ensure timm's PatchEmbed size assertion matches our spectrogram dims.
+        self.v.patch_embed.img_size = (input_fdim, input_tdim)
 
         self.original_num_patches = self.v.patch_embed.num_patches
         self.original_hw = int(self.original_num_patches ** 0.5)

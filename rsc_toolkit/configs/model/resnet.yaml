@@ -1,0 +1,6 @@
+name: resnet
+params:
+  n_cls: 4
+  backbone: resnet18
+  pretrained: null
+  track_bn: true

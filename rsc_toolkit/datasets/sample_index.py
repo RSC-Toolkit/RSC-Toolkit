@@ -14,6 +14,7 @@ CSV_COLUMNS = [
     "sample_level",
     "t0",
     "t1",
+    "split",
     "label",
     "meta",
 ]
@@ -25,6 +26,7 @@ class SampleRecord(BaseModel):
     sample_level: Literal["cycle", "clip"]
     t0: Optional[float] = None
     t1: Optional[float] = None
+    split: Optional[str] = None
     label: Optional[int] = None
     meta: Dict[str, Any] = Field(default_factory=dict)
 
@@ -46,6 +48,7 @@ class SampleIndex(BaseModel):
                     "sample_level": record.sample_level,
                     "t0": record.t0,
                     "t1": record.t1,
+                    "split": record.split,
                     "label": record.label,
                     "meta": json.dumps(record.meta, sort_keys=True),
                 }
@@ -79,6 +82,7 @@ class SampleIndex(BaseModel):
                     sample_level=row["sample_level"],
                     t0=float(row["t0"]) if row["t0"] else None,
                     t1=float(row["t1"]) if row["t1"] else None,
+                    split=row.get("split") or None,
                     label=int(row["label"]) if row["label"] else None,
                     meta=meta,
                 )

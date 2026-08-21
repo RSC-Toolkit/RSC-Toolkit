@@ -19,9 +19,23 @@ class DatasetFactory:
         @DatasetFactory.register_dataset_class("icbhi")
         """
         package = sys.modules[__package__]  # this gives rsc_toolkit.datasets
-        for _, module_name, _ in pkgutil.iter_modules(package.__path__):
+        for _, module_name, is_pkg in pkgutil.iter_modules(package.__path__):
             if "_dataset" in module_name:
                 importlib.import_module(f"rsc_toolkit.datasets.{module_name}")
+                continue
+
+            if not is_pkg:
+                continue
+
+            subpackage = importlib.import_module(f"rsc_toolkit.datasets.{module_name}")
+            if not hasattr(subpackage, "__path__"):
+                continue
+
+            for _, submodule_name, _ in pkgutil.iter_modules(subpackage.__path__):
+                if "_dataset" in submodule_name:
+                    importlib.import_module(
+                        f"rsc_toolkit.datasets.{module_name}.{submodule_name}"
+                    )
 
     @classmethod
     def register_dataset_class(cls, dataset_name: str):
