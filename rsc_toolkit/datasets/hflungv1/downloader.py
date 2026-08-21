@@ -108,6 +108,21 @@ class HFLungV1DatasetDownloader(BaseRSCDatasetDownloader):
         except OSError:
             pass
 
+    def _package_metadata_path(self) -> pathlib.Path:
+        return (pathlib.Path(__file__).parent / "data" / "metadata.csv").resolve()
+
+    def _ensure_metadata(self) -> None:
+        # 업스트림 GitLab 저장소에는 metadata.csv가 없으므로 (라벨 CSV로부터 생성된)
+        # 패키지 번들본을 데이터 폴더로 복사해 validate 계약을 만족시킨다.
+        if self.metadata_path.exists():
+            return
+        bundled = self._package_metadata_path()
+        if not bundled.exists():
+            logger.warning("Bundled metadata.csv not found at %s", bundled)
+            return
+        logger.info("Copying bundled metadata.csv -> %s", self.metadata_path)
+        shutil.copyfile(bundled, self.metadata_path)
+
     def download_dataset(self) -> None:
         logger.info(
             "Preparing to download HF_Lung_V1.\n"
@@ -130,3 +145,4 @@ class HFLungV1DatasetDownloader(BaseRSCDatasetDownloader):
             logger.info("✅ Found test folder, skipping extraction.")
 
         self._maybe_flatten_layout()
+        self._ensure_metadata()
