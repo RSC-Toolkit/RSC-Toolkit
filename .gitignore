@@ -200,3 +200,5 @@ outputs
 downloaded_datasets
 lightning_logs
 pretrained_models
+# macOS
+.DS_Store
