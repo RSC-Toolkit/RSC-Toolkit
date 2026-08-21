@@ -44,6 +44,7 @@ def test_toy_dataset_index_csv_headers(dataset):
         "sample_level",
         "t0",
         "t1",
+        "split",
         "label",
         "meta",
     ]
