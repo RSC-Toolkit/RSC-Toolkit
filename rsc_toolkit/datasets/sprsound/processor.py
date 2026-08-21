@@ -78,9 +78,12 @@ class SPRSoundDatasetProcessor(BaseRSCDatasetProcessor):
         if self.metadata_file:
             return pathlib.Path(self.metadata_file).expanduser().resolve()
         data_root = self._resolve_data_root()
-        primary = (data_root / "data" / "metadata.csv").resolve()
-        if primary.exists():
-            return primary
+        for candidate in (
+            data_root / "metadata.csv",
+            data_root / "data" / "metadata.csv",
+        ):
+            if candidate.exists():
+                return candidate.resolve()
         return self._package_data_dir().resolve()
 
     def _write_split_file(self, split_map: Dict[str, str]) -> Optional[pathlib.Path]:
@@ -186,9 +189,11 @@ class SPRSoundDatasetProcessor(BaseRSCDatasetProcessor):
             )
             if recording_path is None or not recording_path.exists():
                 logger.warning(
-                    f"{data_root} {filename} {split}"
+                    "Skipping missing audio file: %s (data_root=%s, split=%s)",
+                    filename,
+                    data_root,
+                    split,
                 )
-                logger.warning("Skipping missing audio file: %s", recording_path)
                 continue
 
             try:
