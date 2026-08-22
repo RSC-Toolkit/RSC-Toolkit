@@ -6,6 +6,7 @@ import torch
 import torch.nn as nn
 
 from .base import BaseRSCModel
+from .factory import ModelFactory
 from .backbone.cnn import CNN6, CNN10, CNN14, load_cnn_checkpoint
 
 
@@ -16,6 +17,7 @@ _CNN_BACKBONES: Dict[str, Type[nn.Module]] = {
 }
 
 
+@ModelFactory.register_model_class("cnn")
 class CNNClassifier(BaseRSCModel, nn.Module):
     def __init__(
         self,

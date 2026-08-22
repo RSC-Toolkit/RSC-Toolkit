@@ -4,9 +4,11 @@ import torch
 import torch.nn as nn
 
 from .base import BaseRSCModel
+from .factory import ModelFactory
 from .backbone.ast import ASTBackbone
 
 
+@ModelFactory.register_model_class("ast")
 class ASTClassifier(BaseRSCModel, nn.Module):
     def __init__(
         self,

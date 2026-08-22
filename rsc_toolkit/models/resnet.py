@@ -6,6 +6,7 @@ import torch
 import torch.nn as nn
 
 from .base import BaseRSCModel
+from .factory import ModelFactory
 from .backbone.resnet import ResNet10, ResNet18, ResNet34, ResNet50, ResNet101
 
 
@@ -18,6 +19,7 @@ _RESNET_BACKBONES: Dict[str, Type[nn.Module]] = {
 }
 
 
+@ModelFactory.register_model_class("resnet")
 class ResNetClassifier(BaseRSCModel, nn.Module):
     def __init__(
         self,

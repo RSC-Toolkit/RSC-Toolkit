@@ -6,6 +6,7 @@ import torch
 import torch.nn as nn
 
 from .base import BaseRSCModel
+from .factory import ModelFactory
 from .backbone.efficientnet import EfficientNetB0, EfficientNetB1, EfficientNetB2
 
 
@@ -16,6 +17,7 @@ _EFFICIENTNET_BACKBONES: Dict[str, Type[nn.Module]] = {
 }
 
 
+@ModelFactory.register_model_class("efficientnet")
 class EfficientNetClassifier(BaseRSCModel, nn.Module):
     def __init__(
         self,

@@ -1,10 +1,12 @@
 import torch.nn as nn
 
 from .base import BaseRSCModel
+from .factory import ModelFactory
 from .backbone.clap import PretrainedCLAPWithProjection
 
 
 
+@ModelFactory.register_model_class("audioclap")
 class AudioCLAP(BaseRSCModel, nn.Module): # shuold inherit from nn.Module
     # TODO can move this code to clap class and just import there.
     # In case of BTS, only ClapModel is used
