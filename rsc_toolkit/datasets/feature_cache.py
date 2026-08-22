@@ -57,6 +57,25 @@ class FeatureCache:
             except Exception:
                 pass
             
+    def validate_entries(self, sample_ids) -> Dict[str, object]:
+        """
+        주어진 sample_id 들의 캐시가 온전한지 본다.
+
+        피처의 모양은 가정하지 않는다 — CLAP 임베딩(1, 512)과 fbank(1024, 128)처럼
+        모델/피처 종류마다 다르기 때문이다. 존재 여부와 로드 가능 여부만 본다.
+        모양까지 맞추고 싶으면 호출자가 반환된 항목을 직접 검사한다.
+        """
+        ids = [str(s) for s in sample_ids]
+        missing = [sid for sid in ids if not self.is_cached(sid)]
+        missing_set = set(missing)
+        corrupted = [sid for sid in ids if sid not in missing_set and self.get(sid) is None]
+        return {
+            "total": len(ids),
+            "missing": missing,
+            "corrupted": corrupted,
+            "ok": not missing and not corrupted,
+        }
+
     def get_cache_stats(self) -> Dict[str, object]:
         """
         Computes stats by scanning the cache directory.

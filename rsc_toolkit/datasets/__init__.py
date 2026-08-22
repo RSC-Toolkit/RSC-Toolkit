@@ -193,7 +193,7 @@ def handle_command(args) -> int:
             logger.error("❌ 다운로드 파일 검증 실패 (%s)", dataset_dir)
 
         if processed_ok is None:
-            logger.warning("⏭️  전처리 산출물 검증은 아직 구현되지 않음 (검사 안 함)")
+            logger.warning("⏭️  전처리 산출물 없음 — 아직 build-index 를 안 했거나 검증 미구현 (실패 아님)")
         elif processed_ok:
             logger.info("✅ 전처리 산출물 검증 통과")
         else:

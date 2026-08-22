@@ -42,10 +42,6 @@ class ICBHIDatasetProcessor(BaseRSCDatasetProcessor):
     # Metadata file (optional)
     metadata_file: Optional[str] = None  # if None, defaults to package data/metadata.txt
 
-    def validate_processed_files(self) -> Optional[bool]:
-        # TODO: 인덱스 검증 미구현. None = 검사 안 함(실패 아님).
-        return None
-
     @property
     def data_folder(self) -> pathlib.Path:
         if not self.raw_data_directory:

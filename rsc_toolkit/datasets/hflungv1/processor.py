@@ -35,9 +35,9 @@ class HFLungV1DatasetProcessor(BaseRSCDatasetProcessor):
     metadata_file: Optional[str] = None
     labels_files: Optional[List[str]] = None
 
-    def validate_processed_files(self) -> Optional[bool]:
-        # TODO: 인덱스 검증 미구현. None = 검사 안 함(실패 아님).
-        return None
+    def processed_extra_files(self) -> List[str]:
+        # 인덱스를 쓸 때 함께 쓰는 공식 split 파일. 없으면 split 필터가 걸릴 곳이 없다.
+        return ["official_split.txt"]
 
     @property
     def data_folder(self) -> pathlib.Path:
