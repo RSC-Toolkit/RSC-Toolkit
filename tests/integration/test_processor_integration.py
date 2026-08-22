@@ -1,6 +1,7 @@
 """
 Integration tests for dataset processor with feature preprocessing
 """
+import logging
 import pytest
 import torch
 import pathlib
@@ -27,7 +28,7 @@ class MockProcessor(BaseAudioProcessor):
         self.param = param
         super().__init__(**kwargs)
     
-    def _get_processor_config(self):
+    def get_processor_config(self):
         return {"param": self.param}
     
     def make_features(self, audio: torch.Tensor, sample_id=None):
@@ -228,3 +229,48 @@ def test_processor_preprocessing_skips_cached(tmp_path, feature_cache):
     # Note: This is a simplified test - in reality, the skip happens inside preprocess_samples
     assert processor.feature_processor.feature_cache.is_cached(cached_sample_id)
 
+
+
+def test_cache_dir_reflects_real_processor_config(tmp_path):
+    """
+    실제 processor(MelBankAudioProcessor)의 설정이 캐시 키에 반영되는지 확인한다.
+
+    이전에는 base.py 가 `_get_processor_config()`(밑줄) 를 호출하고
+    AttributeError 를 삼켰다. 실제 이름은 밑줄이 없어서 설정이 조용히
+    캐시 키에서 빠졌고, n_mels 가 달라도 같은 캐시 디렉토리를 썼다.
+
+    위쪽 MockProcessor 로만 검사하면 더미가 오타 이름을 정의하는 한
+    같은 실수를 다시 놓친다. 그래서 여기서는 실제 processor 를 쓴다.
+    """
+    from rsc_toolkit.processors.mel import MelBankAudioProcessor
+
+    proc_64 = MockDatasetProcessor(
+        name="test",
+        outputs_directory=str(tmp_path),
+        feature_processor=MelBankAudioProcessor(n_mels=64, sampling_rate=16000),
+    )
+    proc_128 = MockDatasetProcessor(
+        name="test",
+        outputs_directory=str(tmp_path),
+        feature_processor=MelBankAudioProcessor(n_mels=128, sampling_rate=16000),
+    )
+
+    assert proc_64.cache_dir_path != proc_128.cache_dir_path
+
+
+def test_cache_dir_warns_when_processor_has_no_config(tmp_path, caplog):
+    """get_processor_config() 가 없는 processor 면 조용히 넘어가지 말고 경고한다."""
+
+    class _NoConfig:
+        pass
+
+    processor = MockDatasetProcessor(
+        name="test",
+        outputs_directory=str(tmp_path),
+        feature_processor=_NoConfig(),
+    )
+
+    with caplog.at_level(logging.WARNING):
+        _ = processor.cache_dir_path
+
+    assert any("get_processor_config" in r.message for r in caplog.records)

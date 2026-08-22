@@ -37,7 +37,7 @@ class MockProcessor(BaseAudioProcessor):
     feature_dim: int = 128
     _feature_cache: Optional[Any] = None
     
-    def _get_processor_config(self) -> Dict[str, Any]:
+    def get_processor_config(self) -> Dict[str, Any]:
         return {"feature_dim": self.feature_dim}
     
     def make_features(self, audio: torch.Tensor, sample_id: Optional[str] = None):

@@ -70,15 +70,25 @@ class BaseRSCDatasetProcessor(ABC, BaseModel):
             # Hash for compact unique identifier
             return hashlib.md5(serialized.encode()).hexdigest()
         
-        # Include feature processor config in cache key if present
+        # Include feature processor config in cache key if present.
+        #
+        # 예전에는 `_get_processor_config()`(밑줄) 를 호출하고 AttributeError 를
+        # 통째로 삼켰다. 실제 이름은 밑줄 없는 `get_processor_config()` 라서
+        # 설정이 조용히 캐시 키에서 빠졌고, n_mels 가 달라도 같은 캐시를 쓰게 됐다.
+        # 메서드 유무는 getattr 로 보고, 메서드 안에서 난 AttributeError 는
+        # 삼키지 않고 그대로 드러낸다.
         kwargs = {}
-        if self.feature_processor:
-            try:
-                proc_config = self.feature_processor._get_processor_config()
-                kwargs["feature_processor"] = proc_config
-            except AttributeError:
-                pass
-        
+        if self.feature_processor is not None:
+            getter = getattr(self.feature_processor, "get_processor_config", None)
+            if callable(getter):
+                kwargs["feature_processor"] = getter()
+            else:
+                logger.warning(
+                    "%s 에 get_processor_config() 가 없어 설정이 캐시 키에서 빠진다. "
+                    "설정이 다른 피처가 같은 캐시를 공유할 수 있다.",
+                    type(self.feature_processor).__name__,
+                )
+
         key = _create_unique_name(
             preprocess_mode=self.preprocess_mode,
             **kwargs
