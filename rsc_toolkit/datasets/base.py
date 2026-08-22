@@ -227,15 +227,23 @@ class BaseRSCDatasetProcessor(ABC, BaseModel):
         if not self.feature_processor or not self.preprocess_features:
             return
         
+        from rsc_toolkit.datasets.feature_cache import FeatureCache
         from rsc_toolkit.datasets.preprocessing import ParallelPreprocessor
-        
-        # Enable caching in processor if not already enabled
-        if not self.feature_processor.cache_features:
-            self.feature_processor.cache_features = True
-            self.feature_processor.cache_dir = str(self.cache_dir_path)
-            # Re-initialize cache
-            self.feature_processor._init_cache()
-        
+
+        # 캐시가 아직 없으면 붙인다.
+        #
+        # 예전에는 여기서 processor 의 `cache_features` / `cache_dir` /
+        # `_init_cache()` 를 건드렸는데, BaseAudioProcessor 에는 그런 속성이 없다.
+        # 실제 API 는 `feature_cache` 하나다. 그래서 이 경로는 실제 processor 로
+        # 부르면 AttributeError 로 죽었다.
+        if self.feature_processor.feature_cache is None:
+            cache = FeatureCache(cache_dir=self.cache_dir_path)
+            cache.configure(
+                processor_config=self.feature_processor.get_processor_config(),
+                processor_name=type(self.feature_processor).__name__,
+            )
+            self.feature_processor.feature_cache = cache
+
         # Default to threads to avoid pickling issues with local functions
         # Threads work well for both CPU and GPU-bound tasks
         use_threads = True
@@ -257,8 +265,8 @@ class BaseRSCDatasetProcessor(ABC, BaseModel):
             return features
         
         def check_cached(sample_id):
-            if self.feature_processor._feature_cache:
-                return self.feature_processor._feature_cache.is_cached(sample_id)
+            if self.feature_processor.feature_cache:
+                return self.feature_processor.feature_cache.is_cached(sample_id)
             return False
         
         # Process all samples

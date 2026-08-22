@@ -2,6 +2,7 @@
 Tests for FeatureCache functionality
 """
 import pytest
+import logging
 import pathlib
 
 import torch
@@ -213,9 +214,15 @@ def test_feature_cache_isolation(tmp_path):
     assert mel_retrieved.shape == (64, 128)
 
 
-@pytest.mark.skip(reason="metadata was agent hallucination?")
 def test_feature_cache_missing_file(tmp_path):
-    """Test handling of missing cache files"""
+    """
+    캐시에 없는 sample_id 를 조회해도 죽지 않는다.
+
+    원래 이 테스트는 `cache.metadata` 와 `cache._save_metadata()` 를 썼는데
+    FeatureCache 에는 그런 속성이 없다(스킵 사유 "metadata was agent
+    hallucination?" 가 가리키던 것). 현재 구현은 metadata 파일 없이
+    디렉토리를 스캔하므로, 실제 동작에 맞춰 다시 썼다.
+    """
     cache = FeatureCache(
         cache_dir=tmp_path,
     )
@@ -225,15 +232,36 @@ def test_feature_cache_missing_file(tmp_path):
     )
 
     sample_id = "missing_sample"
-    
-    # Add to metadata but don't create file (simulate corruption/deletion)
-    cache.metadata[sample_id] = {"cached": True, "shape": [128, 512], "dtype": "float32"}
-    cache._save_metadata()
-    
-    # Should return None and not crash
-    assert cache.get(sample_id) is None
-    # Should not be considered cached anymore
+
     assert not cache.is_cached(sample_id)
+    assert cache.get(sample_id) is None
+
+
+def test_feature_cache_corrupted_file_returns_none(tmp_path, caplog):
+    """
+    캐시 파일이 깨져 있으면 예외를 던지지 말고 None 을 돌려준다.
+
+    put() 은 임시 파일에 쓴 뒤 os.replace 로 원자적으로 옮기므로 정상 경로에서는
+    깨진 파일이 생기지 않지만, 외부 요인으로 손상된 경우를 방어한다.
+    """
+    cache = FeatureCache(
+        cache_dir=tmp_path,
+    )
+    cache.configure(
+        processor_config={"test": "config"},
+        processor_name="TestProcessor"
+    )
+
+    sample_id = "corrupted_sample"
+    cache.put(sample_id, torch.randn(8, 8))
+    assert cache.is_cached(sample_id)
+
+    # 내용을 망가뜨린다 (파일은 그대로 있으므로 is_cached 는 여전히 True)
+    cache._get_cache_path(sample_id).write_bytes(b"not a torch file")
+
+    with caplog.at_level(logging.WARNING):
+        assert cache.get(sample_id) is None
+    assert any("Failed to load cache" in r.message for r in caplog.records)
 
 
 def test_feature_cache_stats(tmp_path):

@@ -18,11 +18,16 @@ logger = logging.getLogger(__name__)
 
 class SimpleTestProcessor(BaseAudioProcessor):
     """Simple processor for testing - computes mean features"""
-    feature_dim: int = 128
-    
+
+    def __init__(self, feature_dim: int = 128, **kwargs):
+        # BaseAudioProcessor 는 pydantic 모델이 아니라 평범한 ABC 다.
+        # 클래스 어노테이션만 적어두면 생성자 인자로 받아지지 않는다.
+        super().__init__(**kwargs)
+        self.feature_dim = feature_dim
+
     def get_processor_config(self) -> Dict[str, Any]:
         return {"feature_dim": self.feature_dim}
-    
+
     def make_features(self, audio: torch.Tensor, sample_id: Optional[str] = None):
         """
         Simple feature extraction: mean pooling with dimension expansion.
@@ -44,13 +49,25 @@ class SimpleTestProcessor(BaseAudioProcessor):
         return features[:, :self.feature_dim]
 
 
+def _repo_root() -> pathlib.Path:
+    """pyproject.toml 이 있는 디렉토리를 리포 루트로 본다."""
+    for candidate in pathlib.Path(__file__).resolve().parents:
+        if (candidate / "pyproject.toml").exists():
+            return candidate
+    raise RuntimeError("리포 루트를 찾지 못했다 (pyproject.toml 없음)")
+
+
 @pytest.fixture
 def toy_dataset_path():
-    """Get path to toy dataset"""
-    project_root = pathlib.Path(__file__).parent.parent.parent
-    toy_path = project_root / "sample_data" / "toy_dataset" / "files"
-    if not toy_path.exists():
-        pytest.skip(f"Toy dataset not found at {toy_path}")
+    """
+    번들된 toy 데이터셋 경로.
+
+    이전에는 parent 를 한 번 덜 올라가 tests/sample_data/... 를 찾았고,
+    없으니 pytest.skip 으로 빠져 3건이 조용히 넘어갔다. 데이터는 리포에
+    항상 들어 있으므로 없으면 skip 이 아니라 실패로 다뤄야 한다.
+    """
+    toy_path = _repo_root() / "sample_data" / "toy_dataset" / "files"
+    assert toy_path.exists(), f"번들된 toy 데이터셋이 없다: {toy_path}"
     return toy_path
 
 
@@ -66,8 +83,6 @@ def test_toy_dataset_preprocessing(tmp_path, toy_dataset_path):
         preprocess_features=True,
         feature_processor=SimpleTestProcessor(
             feature_dim=128,
-            cache_features=True,
-            cache_dir=cache_dir
         ),
         num_preprocess_workers=2,  # Use 2 workers for testing
         force=True  # Force reprocessing
@@ -79,25 +94,26 @@ def test_toy_dataset_preprocessing(tmp_path, toy_dataset_path):
         processor=processor
     )
     
-    # Process dataset (this will preprocess features)
-    logger.info("Starting dataset processing with feature preprocessing...")
+    # process_dataset() 은 인덱스만 만들고 피처 전처리는 하지 않는다.
+    # 전처리는 preprocess_all_features() 가 담당하므로 직접 부른다.
     dataset.process()
+    processor.preprocess_all_features(processor._discover_recordings())
     
     # Verify cache was created
-    assert processor.feature_processor._feature_cache is not None
+    assert processor.feature_processor.feature_cache is not None
     
     # Check cache stats
-    cache_stats = processor.feature_processor._feature_cache.get_cache_stats()
+    cache_stats = processor.feature_processor.feature_cache.get_cache_stats()
     logger.info(f"Cache stats: {cache_stats}")
     
     # Should have cached some samples
-    assert cache_stats["total_entries"] > 0
-    assert cache_stats["existing_files"] > 0
+    assert cache_stats["pt_files"] > 0
     
     # Verify cache directory structure
     cache_features_dir = pathlib.Path(cache_stats["cache_dir"])
     assert cache_features_dir.exists()
-    assert (cache_features_dir / "cache_metadata.json").exists()
+    # FeatureCache 는 metadata 파일을 두지 않고 디렉토리를 스캔한다.
+    assert list(cache_features_dir.glob("*.pt"))
 
 
 @pytest.mark.slow
@@ -112,8 +128,6 @@ def test_toy_dataset_preprocessing_cache_reuse(tmp_path, toy_dataset_path):
         preprocess_features=True,
         feature_processor=SimpleTestProcessor(
             feature_dim=128,
-            cache_features=True,
-            cache_dir=cache_dir
         ),
         num_preprocess_workers=2,
         force=True
@@ -125,8 +139,9 @@ def test_toy_dataset_preprocessing_cache_reuse(tmp_path, toy_dataset_path):
     )
     
     dataset1.process()
-    first_run_stats = processor1.feature_processor._feature_cache.get_cache_stats()
-    first_run_count = first_run_stats["total_entries"]
+    processor1.preprocess_all_features(processor1._discover_recordings())
+    first_run_stats = processor1.feature_processor.feature_cache.get_cache_stats()
+    first_run_count = first_run_stats["pt_files"]
     
     # Second run - should reuse cache
     processor2 = ToyDataset.make_processor(
@@ -135,8 +150,6 @@ def test_toy_dataset_preprocessing_cache_reuse(tmp_path, toy_dataset_path):
         preprocess_features=True,
         feature_processor=SimpleTestProcessor(
             feature_dim=128,
-            cache_features=True,
-            cache_dir=cache_dir
         ),
         num_preprocess_workers=2,
         force=False  # Don't force, should use cache
@@ -148,11 +161,11 @@ def test_toy_dataset_preprocessing_cache_reuse(tmp_path, toy_dataset_path):
     )
     
     dataset2.process()
-    second_run_stats = processor2.feature_processor._feature_cache.get_cache_stats()
+    processor2.preprocess_all_features(processor2._discover_recordings())
+    second_run_stats = processor2.feature_processor.feature_cache.get_cache_stats()
     
     # Should have same number of cached entries
-    assert second_run_stats["total_entries"] == first_run_count
-    assert second_run_stats["existing_files"] == first_run_count
+    assert second_run_stats["pt_files"] == first_run_count
 
 
 @pytest.mark.slow
@@ -167,8 +180,6 @@ def test_toy_dataset_different_processors_isolated_cache(tmp_path, toy_dataset_p
         preprocess_features=True,
         feature_processor=SimpleTestProcessor(
             feature_dim=128,
-            cache_features=True,
-            cache_dir=cache_dir
         ),
         num_preprocess_workers=2,
         force=True
@@ -179,8 +190,9 @@ def test_toy_dataset_different_processors_isolated_cache(tmp_path, toy_dataset_p
         processor=processor1
     )
     dataset1.process()
-    
-    cache1_key = processor1.feature_processor._feature_cache.cache_key
+    processor1.preprocess_all_features(processor1._discover_recordings())
+
+    cache1_key = processor1.feature_processor.feature_cache.cache_key
     
     # Processor with feature_dim=256 (different config)
     processor2 = ToyDataset.make_processor(
@@ -189,8 +201,6 @@ def test_toy_dataset_different_processors_isolated_cache(tmp_path, toy_dataset_p
         preprocess_features=True,
         feature_processor=SimpleTestProcessor(
             feature_dim=256,  # Different dimension
-            cache_features=True,
-            cache_dir=cache_dir
         ),
         num_preprocess_workers=2,
         force=True
@@ -201,20 +211,21 @@ def test_toy_dataset_different_processors_isolated_cache(tmp_path, toy_dataset_p
         processor=processor2
     )
     dataset2.process()
-    
-    cache2_key = processor2.feature_processor._feature_cache.cache_key
+    processor2.preprocess_all_features(processor2._discover_recordings())
+
+    cache2_key = processor2.feature_processor.feature_cache.cache_key
     
     # Should have different cache keys (different processor configs)
     assert cache1_key != cache2_key
     
     # Should have different cache directories
-    cache1_dir = processor1.feature_processor._feature_cache.features_dir
-    cache2_dir = processor2.feature_processor._feature_cache.features_dir
+    cache1_dir = processor1.feature_processor.feature_cache.features_dir
+    cache2_dir = processor2.feature_processor.feature_cache.features_dir
     assert cache1_dir != cache2_dir
     
     # Both should have cached samples
-    stats1 = processor1.feature_processor._feature_cache.get_cache_stats()
-    stats2 = processor2.feature_processor._feature_cache.get_cache_stats()
-    assert stats1["total_entries"] > 0
-    assert stats2["total_entries"] > 0
+    stats1 = processor1.feature_processor.feature_cache.get_cache_stats()
+    stats2 = processor2.feature_processor.feature_cache.get_cache_stats()
+    assert stats1["pt_files"] > 0
+    assert stats2["pt_files"] > 0
 

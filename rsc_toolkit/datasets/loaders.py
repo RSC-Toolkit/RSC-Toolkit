@@ -94,10 +94,12 @@ class BaseRSCPyTorchDataset(Dataset, ABC):
     def _load_features(self, sample: Any, sample_id: str) -> torch.Tensor:
         """Load features for a sample, using cache if available"""
         # Check if cached features exist
+        # BaseAudioProcessor 의 캐시 속성 이름은 `feature_cache` 다.
+        # 예전 `_feature_cache`(밑줄) 는 존재하지 않아 캐시가 항상 무시됐다.
         if self.use_cached_features and self.feature_processor:
-            if self.feature_processor._feature_cache:
-                if self.feature_processor._feature_cache.is_cached(sample_id):
-                    return self.feature_processor._feature_cache.get(sample_id)
+            if self.feature_processor.feature_cache:
+                if self.feature_processor.feature_cache.is_cached(sample_id):
+                    return self.feature_processor.feature_cache.get(sample_id)
         
         # Extract audio
         if hasattr(sample, 'audio'):
