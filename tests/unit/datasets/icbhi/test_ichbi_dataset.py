@@ -197,32 +197,85 @@ def test_split_filters_rows_with_custom_split_file(tmp_path: pathlib.Path):
     assert len(ds_test) == 1
     assert str(ds_test.df.iloc[0]["sample_id"]).startswith("rec_b")
 
-@pytest.mark.skip(reason="data not downloaded by default.")
-def test_split_filters_rows_using_packaged_official_split_file(tmp_path: pathlib.Path):
-    """
-    Smoke test: packaged `official_split.txt` is used by default.
-    This test does not touch audio; it only checks row filtering by `recording_path` stem.
-    """
-    recording_id = "101_1b1_Al_sc_Meditron"
-
-    index_csv = tmp_path / "index_clip.csv"
+def _write_clip_index(index_csv: pathlib.Path, recording_ids) -> None:
     idx = SampleIndex(
         records=[
             SampleRecord(
-                sample_id=recording_id,
-                recording_path=f"{recording_id}.wav",
+                sample_id=rid,
+                recording_path=f"{rid}.wav",
                 sample_level="clip",
                 t0=None,
                 t1=None,
                 label=None,
                 meta={},
             )
+            for rid in recording_ids
         ]
     )
     idx.to_csv(index_csv)
 
-    ds_test = IndexDataset(index_csv=index_csv, split="test")
-    assert len(ds_test) == 1
+
+def test_split_uses_sibling_official_split_file(tmp_path: pathlib.Path):
+    """
+    split 컬럼이 비어 있으면 인덱스 CSV 옆의 official_split.txt 로 거른다.
+
+    ICBHI 인덱스는 split 컬럼을 채우지 않는다. 예전에는 컬럼 존재만 확인하고
+    그 경로를 타서 매칭이 0건이 되고 `No data found for split test` 로 죽었다.
+    (sprsound·hflungv1 processor 는 이미 index_dir 에 이 파일을 쓰고,
+    ICBHI processor 도 이제 패키지본을 같은 위치에 복사한다.)
+    """
+    index_csv = tmp_path / "index_clip.csv"
+    _write_clip_index(index_csv, ["rec_a", "rec_b"])
+    (tmp_path / "official_split.txt").write_text("rec_a train\nrec_b test\n")
 
     ds_train = IndexDataset(index_csv=index_csv, split="train")
-    assert len(ds_train) == 0
+    assert len(ds_train) == 1
+    assert str(ds_train.df.iloc[0]["sample_id"]) == "rec_a"
+
+    ds_test = IndexDataset(index_csv=index_csv, split="test")
+    assert len(ds_test) == 1
+    assert str(ds_test.df.iloc[0]["sample_id"]) == "rec_b"
+
+
+def test_explicit_split_file_wins_over_sibling(tmp_path: pathlib.Path):
+    """명시적으로 준 split_file 이 옆 파일보다 우선한다."""
+    index_csv = tmp_path / "index_clip.csv"
+    _write_clip_index(index_csv, ["rec_a", "rec_b"])
+    (tmp_path / "official_split.txt").write_text("rec_a train\nrec_b test\n")
+
+    other = tmp_path / "other_split.txt"
+    other.write_text("rec_a test\nrec_b train\n")
+
+    ds_test = IndexDataset(index_csv=index_csv, split="test", split_file=other)
+    assert [str(s) for s in ds_test.df["sample_id"]] == ["rec_a"]
+
+
+def test_split_errors_clearly_when_nothing_to_use(tmp_path: pathlib.Path):
+    """split 컬럼도 비었고 옆 파일도 없으면 무엇이 필요한지 알려주며 실패한다."""
+    index_csv = tmp_path / "index_clip.csv"
+    _write_clip_index(index_csv, ["rec_a"])
+
+    with pytest.raises(ValueError, match="official_split.txt"):
+        IndexDataset(index_csv=index_csv, split="test")
+
+
+def test_populated_split_column_is_preferred_over_sibling(tmp_path: pathlib.Path):
+    """
+    split 컬럼에 값이 있으면 그걸 쓴다 (sprsound·hflungv1 경로).
+
+    옆에 official_split.txt 가 있어도 컬럼이 우선이다.
+    """
+    import pandas as pd
+
+    index_csv = tmp_path / "index_clip.csv"
+    _write_clip_index(index_csv, ["rec_a", "rec_b"])
+
+    df = pd.read_csv(index_csv)
+    df["split"] = ["train", "test"]
+    df.to_csv(index_csv, index=False)
+
+    # 컬럼과 반대로 적어둔다. 컬럼이 이기면 이 파일은 무시된다.
+    (tmp_path / "official_split.txt").write_text("rec_a test\nrec_b train\n")
+
+    ds_train = IndexDataset(index_csv=index_csv, split="train")
+    assert [str(s) for s in ds_train.df["sample_id"]] == ["rec_a"]

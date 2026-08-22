@@ -76,15 +76,7 @@ class IndexDataset(Dataset):
             raise ValueError(f"Index CSV missing columns: {sorted(missing)}")
 
         if split is not None:
-            if split_file is not None:
-                split_map = self._load_official_split_map(split_file)
-                self._filter_df_by_split(split_map, split)
-            elif "split" in self.df.columns:
-                self._filter_df_by_split_column(split)
-            else:
-                raise ValueError(
-                    "Split requested but no split_file provided and index CSV has no 'split' column."
-                )
+            self._apply_split(split, split_file)
 
     def __len__(self) -> int:
         return int(len(self.df))
@@ -98,18 +90,61 @@ class IndexDataset(Dataset):
             return (self.index_csv.parent / p).resolve()
         return (self.data_root / p).resolve()
 
-    @staticmethod
-    def _default_split_file() -> pathlib.Path: # TODO not good to provide default
-        return (pathlib.Path(__file__).parent / "data" / "official_split.txt").resolve()
+    # 인덱스 CSV 옆에 두는 split 파일 이름.
+    # sprsound·hflungv1 processor 가 이미 이 이름으로 index_dir 에 써 놓는다.
+    SPLIT_FILE_NAME = "official_split.txt"
+
+    def _sibling_split_file(self) -> pathlib.Path:
+        return (self.index_csv.parent / self.SPLIT_FILE_NAME).resolve()
+
+    def _split_column_has_values(self) -> bool:
+        """
+        split 컬럼이 실제로 쓸 수 있는 값을 갖고 있는지 본다.
+
+        ICBHI 인덱스는 split 컬럼이 있지만 전 행이 비어 있다. 컬럼 존재만 보고
+        이 경로를 타면 매칭이 0건이라 `No data found for split ...` 로 죽는다.
+        """
+        if "split" not in self.df.columns:
+            return False
+        # 결측을 먼저 떨궈야 한다. pandas 3 에서 astype(str) 은 결측을 문자열
+        # "nan" 으로 바꾸지 않고 결측인 채로 두므로, 문자열 비교로는 거를 수 없다.
+        values = self.df["split"].dropna().astype(str).str.strip()
+        return bool((values != "").any())
+
+    def _apply_split(self, split: str, split_file: Optional[Union[str, pathlib.Path]]) -> None:
+        """
+        split 을 적용한다. 우선순위:
+          1. 명시적으로 준 split_file
+          2. 값이 들어 있는 split 컬럼
+          3. 인덱스 CSV 옆의 official_split.txt
+        """
+        if split_file is not None:
+            self._filter_df_by_split(self._load_official_split_map(split_file), split)
+            return
+
+        if self._split_column_has_values():
+            self._filter_df_by_split_column(split)
+            return
+
+        sibling = self._sibling_split_file()
+        if sibling.exists():
+            logger.info("split 컬럼이 비어 있어 %s 를 사용한다.", sibling)
+            self._filter_df_by_split(self._load_official_split_map(sibling), split)
+            return
+
+        raise ValueError(
+            f"split={split!r} 을 적용할 수 없다. split_file 을 직접 주거나, "
+            f"인덱스에 split 값이 들어 있거나, {sibling} 가 있어야 한다."
+        )
 
     def _load_official_split_map(
-        self, split_file: Optional[Union[str, pathlib.Path]]
+        self, split_file: Union[str, pathlib.Path]
     ) -> Mapping[str, str]:
         """
         Returns mapping: recording_id -> split ("train" or "test").
         """
-        path = pathlib.Path(split_file).expanduser().resolve() if split_file else self._default_split_file()
-        if not path.exists():   
+        path = pathlib.Path(split_file).expanduser().resolve()
+        if not path.exists():
             raise FileNotFoundError(f"Split file not found: {path}")
 
         mapping: Dict[str, str] = {}

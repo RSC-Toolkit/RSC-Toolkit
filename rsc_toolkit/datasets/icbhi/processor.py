@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from typing import Optional, List, Literal
+import shutil
 import pathlib
 import logging
 import torch
@@ -57,6 +58,30 @@ class ICBHIDatasetProcessor(BaseRSCDatasetProcessor):
         if self.metadata_file:
             return pathlib.Path(self.metadata_file).expanduser().resolve()
         return self._default_metadata_path
+
+    @property
+    def _packaged_split_path(self) -> pathlib.Path:
+        return (pathlib.Path(__file__).parent / "data" / "official_split.txt").resolve()
+
+    def _write_split_file(self) -> Optional[pathlib.Path]:
+        """
+        패키지에 든 공식 split 을 인덱스 옆에 복사한다.
+
+        ICBHI 인덱스는 split 컬럼을 채우지 않는다(공식 split 은 recording 단위라
+        행마다 넣기보다 별도 파일로 두는 편이 원본에 가깝다). sprsound·hflungv1
+        processor 는 이미 index_dir 에 official_split.txt 를 쓰고 있고,
+        IndexDataset 도 그 위치를 찾는다. ICBHI 만 빠져 있어서
+        `IndexDataset(csv, split="test")` 가 걸릴 곳이 없었다.
+        """
+        src = self._packaged_split_path
+        if not src.exists():
+            logger.warning("패키지에 official_split.txt 가 없다: %s", src)
+            return None
+        dst = self.index_dir_path / "official_split.txt"
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(src, dst)
+        logger.info("Wrote official split to %s", dst)
+        return dst
 
     def _discover_recordings(self) -> List[RecordingRef]:
         return discover_recordings(self.data_folder)
@@ -137,6 +162,8 @@ class ICBHIDatasetProcessor(BaseRSCDatasetProcessor):
             index.write_stats(stats_path)
             logger.info("Wrote %s index to %s", level, index_path)
 
+        self._write_split_file()
+
 
     def build_index(self, sample_level: Literal["cycle", "clip"] = "cycle") -> SampleIndex:
         recordings = self._discover_recordings()
@@ -153,6 +180,7 @@ class ICBHIDatasetProcessor(BaseRSCDatasetProcessor):
         index.to_csv(index_path)
         index.write_stats(stats_path)
         logger.info("Wrote index to %s", index_path)
+        self._write_split_file()
         return index
 
     # def preprocess_features_from_index(
