@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import logging
-import os
 from typing import Any, Dict, Iterable, List
 
 import hydra
+import lightning as L
 from omegaconf import DictConfig, OmegaConf
 
 from rsc_toolkit.trainer.adapters.pl_adapter import PLAdapter
@@ -13,6 +13,9 @@ from rsc_toolkit.trainer.factories.build_loss import build_loss
 from rsc_toolkit.trainer.factories.build_metrics import build_train_val_metric_factories
 from rsc_toolkit.trainer.factories.build_datamodule import build_datamodule
 from rsc_toolkit.trainer.factories.build_trainer import build_trainer
+
+
+logger = logging.getLogger(__name__)
 
 
 def _to_plain_dict(cfg: DictConfig) -> Dict[str, Any]:
@@ -56,6 +59,22 @@ def _collect_run_metadata(cfg_dict: Dict[str, Any]) -> Dict[str, Any]:
     return {key: value for key, value in metadata.items() if value is not None}
 
 
+def _apply_seed(cfg_dict: Dict[str, Any]) -> None:
+    """
+    config 의 seed 를 실제로 적용한다.
+
+    이전에는 config 에 `seed: 123` 이 있어도 코드에서 아무도 읽지 않아
+    매 실행이 다른 난수로 돌았다. 모델 초기화보다 먼저 불러야 한다.
+    workers=True 로 DataLoader 워커의 시드까지 파생시킨다.
+    """
+    seed = cfg_dict.get("seed")
+    if seed is None:
+        logger.warning("config 에 seed 가 없다. 실행마다 결과가 달라진다.")
+        return
+    L.seed_everything(int(seed), workers=True)
+    logger.info("seed=%s 적용 (workers=True)", seed)
+
+
 def _log_run_metadata(trainer: L.Trainer, cfg_dict: Dict[str, Any]) -> None:
     metadata = _collect_run_metadata(cfg_dict)
     if not metadata:
@@ -75,6 +94,9 @@ def main(cfg: DictConfig) -> None:
     print(OmegaConf.to_yaml(cfg, resolve=True))
 
     cfg_dict = _to_plain_dict(cfg)
+
+    # 난수를 쓰는 첫 단계(모델 초기화)보다 반드시 앞에 와야 한다.
+    _apply_seed(cfg_dict)
 
     # --- Build components from config ---
     model = build_model(cfg_dict["model"])

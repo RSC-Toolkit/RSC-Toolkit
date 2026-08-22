@@ -9,10 +9,6 @@ params:
     save_dir: lightning_logs
     name: ${run.name}
 
-  # Optional: instantiate Lightning callbacks via Hydra.
-  callbacks:
-    - _target_: rsc_toolkit.trainer.callbacks.ema.EMACallback
-      beta: 0.5
-      model_attr: rsc_model
-      apply_to_validation: true
-      apply_to_test: true
+  # 콜백은 여기 인라인으로 두지 않고 `callbacks` config 그룹에서 고른다.
+  # (configs/callbacks/{ema,none}.yaml — 상위 config 의 defaults 목록 참고)
+  callbacks: []
