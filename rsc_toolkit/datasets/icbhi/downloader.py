@@ -4,7 +4,7 @@ import functools
 import shutil
 
 from rsc_toolkit.datasets.base import BaseRSCDatasetDownloader
-from rsc_toolkit.datasets.download_utils import download_file, extract_zip
+from rsc_toolkit.datasets.download_utils import download_file, extract_zip, is_valid_zip
 
 
 logger = logging.getLogger(__name__)
@@ -13,6 +13,8 @@ logger = logging.getLogger(__name__)
 class ICBHIDatasetDownloader(BaseRSCDatasetDownloader):
     name: str = "icbhi"
     dataset_download_url: str = "https://bhichallenge.med.auth.gr/sites/default/files/ICBHI_final_database/ICBHI_final_database.zip"
+    # 배포본은 2019-01-10 이후 바뀌지 않았다. 받은 파일이 온전한지 대조하는 데 쓴다.
+    dataset_download_size: int = 1_978_998_275
 
     @functools.cached_property
     def outputs_path(self) -> pathlib.Path:
@@ -91,8 +93,14 @@ class ICBHIDatasetDownloader(BaseRSCDatasetDownloader):
             f"\t- Download and unzip single archive from {self.dataset_download_url}\n"
             )
 
-        if self.force or not self.zip_path.exists():
-            download_file(url=self.dataset_download_url, out_path=self.zip_path)
+        # 존재만 보지 않고 온전한지까지 확인한다. 받다 만 zip 을 완료로 오인하면
+        # 이어서 압축 해제가 깨진다.
+        if self.force or not is_valid_zip(self.zip_path):
+            download_file(
+                url=self.dataset_download_url,
+                out_path=self.zip_path,
+                expected_size=self.dataset_download_size,
+            )
         else:
             logger.info(f"Found dataset at {self.zip_path}, skipping download!")
 

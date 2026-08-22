@@ -4,7 +4,7 @@ import pathlib
 import shutil
 
 from rsc_toolkit.datasets.base import BaseRSCDatasetDownloader
-from rsc_toolkit.datasets.download_utils import download_file, extract_zip
+from rsc_toolkit.datasets.download_utils import download_file, extract_zip, is_valid_zip
 
 
 logger = logging.getLogger(__name__)
@@ -78,7 +78,9 @@ class SPRSoundDatasetDownloader(BaseRSCDatasetDownloader):
             f"\t- Download and unzip archive from {self.dataset_download_url}\n"
         )
 
-        if self.force or not self.zip_path.exists():
+        # 상류가 GitHub 의 main 브랜치 zip 이라 크기가 고정이 아니다.
+        # 대신 zip 이 온전한지로 완료를 판정한다.
+        if self.force or not is_valid_zip(self.zip_path):
             download_file(url=self.dataset_download_url, out_path=str(self.zip_path))
         else:
             logger.info("✅ Found %s, skipping download.", self.zip_path.name)
