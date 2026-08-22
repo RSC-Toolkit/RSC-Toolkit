@@ -55,6 +55,9 @@ where = ["."]
 include = ["rsc_toolkit*"]
 
 [tool.setuptools.package-data]
+# 런타임 코드가 읽는 번들 데이터. 글롭은 각 패키지 디렉토리 기준 상대 경로다.
+# (tests/unit/test_packaging.py 가 이 글롭들이 실제 파일과 맞는지 검사한다)
 rsc_toolkit = ["configs/**/*.yaml", "configs/**/*.yml"]
 "rsc_toolkit.datasets.icbhi" = ["data/*.txt"]
-"rsc_toolkit.datasets.sprsound" = ["metadata.csv"]
+"rsc_toolkit.datasets.sprsound" = ["data/metadata.csv"]
+"rsc_toolkit.datasets.hflungv1" = ["data/metadata.csv"]
