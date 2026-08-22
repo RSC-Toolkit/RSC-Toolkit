@@ -21,4 +21,8 @@
 - 상류 저장소는 main 브랜치 zip 으로 받으므로 시점에 따라 내용이 늘어날 수 있다.
   번들 `metadata.csv` 는 train + 2022 inter-test 범위만 덮는다.
 - 이전에 있던 `get_data.py`(gdown 으로 Google Drive 미러에서 받는 스크립트)는 제거했다.
-  공식 다운로더가 같은 일을 하고, gdown 은 프로젝트 의존성이 아니며, 미러의 출처가 불분명했다.
+  공식 다운로더가 같은 일을 하고, gdown 은 프로젝트 의존성이 아니다.
+- 그 스크립트가 받던 미러 (출처·스냅샷 시점 미확인):
+  https://drive.google.com/file/d/1rgq1ev7yk-vPTnlfJW3K_eWj-cy3ywL8/view?usp=sharing
+  공식 저장소가 닿지 않을 때의 수동 폴백 후보로만 둔다. 어느 시점의 데이터인지 확인된 바 없으므로
+  재현 목적이면 공식 저장소(`rsctk datasets download sprsound`)를 우선한다.
