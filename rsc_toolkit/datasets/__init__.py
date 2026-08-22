@@ -253,7 +253,8 @@ def _handle_preprocess(args, *, project_root: pathlib.Path, dataset_dir: pathlib
         )
 
 
-def handle_command(args) -> None:
+def handle_command(args) -> int:
+    """서브커맨드를 실행하고 프로세스 종료 코드(0=성공)를 돌려준다."""
     project_root_arg = getattr(args, "project_root", None)
     project_root = (
         pathlib.Path(project_root_arg).expanduser().resolve()
@@ -272,7 +273,7 @@ def handle_command(args) -> None:
         return 0
     elif args.dataset_command == "preprocess":
         _handle_preprocess(args, project_root=project_root, dataset_dir=dataset_dir)
-        return
+        return 0
     elif args.dataset_command == "build-index":
         processor = dataset.processor
 
