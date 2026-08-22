@@ -4,7 +4,12 @@ import pathlib
 import shutil
 
 from rsc_toolkit.datasets.base import BaseRSCDatasetDownloader
-from rsc_toolkit.datasets.download_utils import download_file, extract_zip, is_valid_zip
+from rsc_toolkit.datasets.download_utils import (
+    download_file,
+    extract_zip,
+    is_valid_zip,
+    record_download_provenance,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -82,6 +87,8 @@ class SPRSoundDatasetDownloader(BaseRSCDatasetDownloader):
         # 대신 zip 이 온전한지로 완료를 판정한다.
         if self.force or not is_valid_zip(self.zip_path):
             download_file(url=self.dataset_download_url, out_path=str(self.zip_path))
+            # main 브랜치 zip 은 시점마다 내용이 달라지므로, 어떤 스냅샷을 받았는지 기록해 둔다.
+            record_download_provenance(self.zip_path, url=self.dataset_download_url)
         else:
             logger.info("✅ Found %s, skipping download.", self.zip_path.name)
 

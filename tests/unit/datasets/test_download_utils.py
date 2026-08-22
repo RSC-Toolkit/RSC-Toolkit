@@ -18,6 +18,8 @@ from rsc_toolkit.datasets.download_utils import (
     PART_SUFFIX,
     download_file,
     is_valid_zip,
+    record_download_provenance,
+    sha256_of,
 )
 
 
@@ -186,3 +188,57 @@ def test_is_valid_zip_rejects_truncated_zip(tmp_path):
 
 def test_is_valid_zip_rejects_missing_file(tmp_path):
     assert is_valid_zip(tmp_path / "nope.zip") is False
+
+
+def test_sha256_of_matches_hashlib(tmp_path):
+    import hashlib
+
+    p = tmp_path / "blob.bin"
+    p.write_bytes(PAYLOAD)
+    assert sha256_of(p) == hashlib.sha256(PAYLOAD).hexdigest()
+
+
+def test_provenance_is_recorded_and_matches_known_values(tmp_path):
+    import hashlib
+    import json
+
+    p = tmp_path / "data.zip"
+    p.write_bytes(PAYLOAD)
+    rec = record_download_provenance(
+        p, url="http://x/data.zip",
+        known_size=len(PAYLOAD), known_sha256=hashlib.sha256(PAYLOAD).hexdigest(),
+    )
+    assert rec["matches_known"] is True
+    saved = json.loads((tmp_path / "data.zip.provenance.json").read_text())
+    assert saved["size"] == len(PAYLOAD) and saved["sha256"] == rec["sha256"]
+    assert saved["url"] == "http://x/data.zip"
+
+
+def test_provenance_warns_but_continues_on_upstream_change(tmp_path, caplog):
+    """
+    알려진 크기/해시와 다르면 상류가 바뀐 것이다. 기본 정책은 경고 + 기록이지 거부가 아니다 —
+    어떤 데이터로 실험했는지 남기는 것이 목적이다.
+    """
+    import logging
+
+    p = tmp_path / "data.zip"
+    p.write_bytes(PAYLOAD)
+    with caplog.at_level(logging.WARNING):
+        rec = record_download_provenance(p, url="u", known_size=len(PAYLOAD) + 1)
+    assert rec["matches_known"] is False
+    assert any("상류 배포본" in r.message for r in caplog.records)
+    assert (tmp_path / "data.zip.provenance.json").exists()
+
+
+def test_provenance_strict_mode_raises_on_upstream_change(tmp_path):
+    p = tmp_path / "data.zip"
+    p.write_bytes(PAYLOAD)
+    with pytest.raises(DownloadError, match="상류 배포본"):
+        record_download_provenance(p, url="u", known_size=len(PAYLOAD) + 1, strict=True)
+
+
+def test_provenance_without_known_values_just_records(tmp_path):
+    p = tmp_path / "snap.zip"
+    p.write_bytes(PAYLOAD)
+    rec = record_download_provenance(p, url="u")
+    assert rec["matches_known"] is None

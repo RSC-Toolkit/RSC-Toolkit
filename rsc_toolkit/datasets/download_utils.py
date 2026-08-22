@@ -1,8 +1,11 @@
+import hashlib
+import json
 import logging
 import os
 import pathlib
 import time
 import zipfile
+from datetime import datetime, timezone
 from typing import Optional, Union
 
 import requests
@@ -179,6 +182,67 @@ def download_file(
     os.replace(part, out)
     logger.info("✅ 다운로드 완료: %s (%d bytes)", out.name, size)
     return out
+
+
+def sha256_of(path: PathLike, chunk_size: int = 8 * 1024 * 1024) -> str:
+    digest = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(chunk_size), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def record_download_provenance(
+    path: PathLike,
+    *,
+    url: str,
+    known_size: Optional[int] = None,
+    known_sha256: Optional[str] = None,
+    strict: bool = False,
+) -> dict:
+    """
+    받은 파일의 크기·sha256 을 <파일명>.provenance.json 에 기록하고,
+    알려진 값(known_*)이 있으면 대조한다.
+
+    알려진 값과 다르면 상류 배포본이 바뀐 것이다. 기본은 경고만 하고 진행한다 —
+    목적은 "어떤 데이터로 실험했는지" 를 남기는 것이지 다운로드를 막는 것이 아니다.
+    바뀐 데이터를 절대 쓰면 안 되는 상황이면 strict=True 로 DownloadError 를 받는다.
+    """
+    p = pathlib.Path(path)
+    size = p.stat().st_size
+    digest = sha256_of(p)
+
+    matches: Optional[bool] = None
+    if known_size is not None or known_sha256 is not None:
+        matches = (known_size is None or size == known_size) and (
+            known_sha256 is None or digest == known_sha256
+        )
+
+    record = {
+        "url": url,
+        "file": p.name,
+        "size": size,
+        "sha256": digest,
+        "known_size": known_size,
+        "known_sha256": known_sha256,
+        "matches_known": matches,
+        "downloaded_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+    }
+    out = p.with_name(p.name + ".provenance.json")
+    out.write_text(json.dumps(record, indent=2, ensure_ascii=False))
+
+    if matches is False:
+        msg = (
+            f"상류 배포본이 알려진 것과 다르다: {p.name} size={size} sha256={digest[:12]}… "
+            f"(알려진 size={known_size}, sha256={(known_sha256 or '')[:12]}…). "
+            f"데이터가 바뀌었을 수 있으니 재현 결과를 비교할 때 주의하라. 기록: {out}"
+        )
+        if strict:
+            raise DownloadError(msg)
+        logger.warning("⚠️ %s", msg)
+    else:
+        logger.info("다운로드 출처 기록: %s", out)
+    return record
 
 
 def is_valid_zip(zip_path: PathLike, *, deep: bool = False) -> bool:
