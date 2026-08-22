@@ -23,4 +23,5 @@ def main():
 
     # entrypoint handling here
     if args.command == "datasets":
-        datasets.handle_command(args)
+        # 검증 실패를 스크립트/CI 가 알 수 있도록 종료 코드로 전달한다.
+        sys.exit(datasets.handle_command(args) or 0)

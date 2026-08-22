@@ -119,7 +119,8 @@ def create_dataset(args):
     )
     return dataset
 
-def handle_command(args) -> None:
+def handle_command(args) -> int:
+    """서브커맨드를 실행하고 프로세스 종료 코드(0=성공)를 돌려준다."""
     project_root_arg = getattr(args, "project_root", None)
     project_root = (
         pathlib.Path(project_root_arg).expanduser().resolve()
@@ -135,7 +136,7 @@ def handle_command(args) -> None:
     
     if args.dataset_command == "download":
         dataset.download()
-        return
+        return 0
     elif args.dataset_command == "preprocess":
         processor = dataset.processor
 
@@ -159,7 +160,7 @@ def handle_command(args) -> None:
             num_workers=args.workers,
             cache_dir=_resolve_under_root(project_root, args.cache_dir) if args.cache_dir else None,
         )
-        return
+        return 0
     elif args.dataset_command == "build-index":
         processor = dataset.processor
 
@@ -173,7 +174,7 @@ def handle_command(args) -> None:
             processor.build_index(sample_level=args.sample_level)
         else:
             raise NotImplementedError("Processor does not support index building")
-        return
+        return 0
     elif args.dataset_command == "validate":
         processor = dataset.processor
 
@@ -183,10 +184,27 @@ def handle_command(args) -> None:
             dataset_dir=dataset_dir,
         )
 
-        dataset.downloader.validate_downloaded_files()
-        processor.validate_processed_files()
+        downloaded_ok = dataset.downloader.validate_downloaded_files()
+        processed_ok = processor.validate_processed_files()
 
-        logger.info("✅ Dataset validation passed")
-        return
+        if downloaded_ok:
+            logger.info("✅ 다운로드 파일 검증 통과")
+        else:
+            logger.error("❌ 다운로드 파일 검증 실패 (%s)", dataset_dir)
+
+        if processed_ok is None:
+            logger.warning("⏭️  전처리 산출물 검증은 아직 구현되지 않음 (검사 안 함)")
+        elif processed_ok:
+            logger.info("✅ 전처리 산출물 검증 통과")
+        else:
+            logger.error("❌ 전처리 산출물 검증 실패")
+
+        failed = (not downloaded_ok) or (processed_ok is False)
+        if failed:
+            logger.error("❌ 데이터셋 '%s' 검증 실패", args.dataset)
+            return 1
+
+        logger.info("✅ 데이터셋 '%s' 검증 통과", args.dataset)
+        return 0
 
     raise NotImplementedError(args.dataset_command)

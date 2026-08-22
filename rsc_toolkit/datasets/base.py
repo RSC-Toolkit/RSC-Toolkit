@@ -95,8 +95,13 @@ class BaseRSCDatasetProcessor(ABC, BaseModel):
         return path
 
     @abstractmethod
-    def validate_processed_files(self) -> bool:
-        ...
+    def validate_processed_files(self) -> Optional[bool]:
+        """
+        전처리 산출물이 온전한지 검사한다.
+
+        True  = 통과, False = 실패, None = 아직 구현되지 않음.
+        None 을 돌려주면 CLI 는 실패가 아니라 '검사 안 함' 으로 보고한다.
+        """
 
     @abstractmethod
     def process_dataset(self) -> None:

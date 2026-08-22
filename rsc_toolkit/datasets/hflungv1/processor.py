@@ -35,8 +35,9 @@ class HFLungV1DatasetProcessor(BaseRSCDatasetProcessor):
     metadata_file: Optional[str] = None
     labels_files: Optional[List[str]] = None
 
-    def validate_processed_files(self) -> bool:
-        return False  # TODO: add index validation
+    def validate_processed_files(self) -> Optional[bool]:
+        # TODO: 인덱스 검증 미구현. None = 검사 안 함(실패 아님).
+        return None
 
     @property
     def data_folder(self) -> pathlib.Path:
