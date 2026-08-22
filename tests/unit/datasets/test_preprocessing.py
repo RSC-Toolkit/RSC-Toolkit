@@ -1,6 +1,8 @@
 """
 Tests for parallel preprocessing functionality
 """
+import multiprocessing as mp
+
 import pytest
 import torch
 import time
@@ -208,4 +210,26 @@ def test_parallel_preprocessor_threads_vs_processes(tmp_path):
     
     assert len(proc_results) == 5
     assert len(thread_results) == 5
+
+
+def test_process_pool_does_not_use_fork():
+    """
+    프로세스 풀이 fork 로 워커를 만들지 않는지 확인한다.
+
+    fork 를 쓰면 부모가 이미 띄워둔 torch 스레드/공유메모리 fd 상태를 물려받아
+    워커가 기동 중 교착한다. 교착은 '실패'가 아니라 '무한 대기'로 나타나 CI 에서
+    잡기 어려우므로, 기능 테스트 대신 start method 자체를 직접 검증한다.
+    """
+    preprocessor = ParallelPreprocessor(num_workers=2)
+
+    with preprocessor._make_executor() as executor:
+        assert executor._mp_context.get_start_method() != "fork"
+
+
+def test_process_pool_falls_back_when_start_method_unavailable():
+    """쓸 수 없는 start method 를 주면 사용 가능한 것으로 대체한다."""
+    preprocessor = ParallelPreprocessor(num_workers=2, mp_start_method="nonexistent")
+
+    with preprocessor._make_executor() as executor:
+        assert executor._mp_context.get_start_method() in mp.get_all_start_methods()
 

@@ -9,6 +9,15 @@ from tqdm import tqdm
 logger = logging.getLogger(__name__)
 
 
+# 워커 프로세스를 fork 로 만들면, 부모가 이미 띄워둔 torch 의 스레드와 공유메모리
+# 파일 디스크립터 상태(multiprocessing.resource_sharer)를 그대로 물려받아 워커가
+# 기동 중 교착한다. process_fn 이 torch.Tensor 를 반환하면 결과를 돌려줄 때도 같은
+# fd 전달 경로를 타므로 재현 확률이 높다.
+# Linux 는 기본 start method 가 fork 라 이 문제가 드러나고, macOS 는 spawn 이라
+# 드러나지 않는다. spawn 은 워커를 새 인터프리터로 띄워 그 상태를 물려받지 않으므로
+# 두 플랫폼의 동작이 같아진다.
+DEFAULT_MP_START_METHOD = "spawn"
+
 
 class ParallelPreprocessor:
     """
@@ -20,12 +29,33 @@ class ParallelPreprocessor:
         self,
         num_workers: int = 4,
         use_threads: bool = False,  # Use threads for GPU-bound tasks
-        batch_size: Optional[int] = None  # For batching GPU operations
+        batch_size: Optional[int] = None,  # For batching GPU operations
+        mp_start_method: Optional[str] = None,  # None이면 DEFAULT_MP_START_METHOD
     ):
         self.num_workers = num_workers
         self.use_threads = use_threads
         self.batch_size = batch_size
-        self.executor_class = ThreadPoolExecutor if use_threads else ProcessPoolExecutor
+        self.mp_start_method = mp_start_method or DEFAULT_MP_START_METHOD
+
+    def _make_executor(self):
+        """스레드 풀 또는 (교착을 피하는 start method 를 쓰는) 프로세스 풀을 만든다."""
+        if self.use_threads:
+            return ThreadPoolExecutor(max_workers=self.num_workers)
+
+        method = self.mp_start_method
+        available = mp.get_all_start_methods()
+        if method not in available:
+            logger.warning(
+                "multiprocessing start method '%s' 를 쓸 수 없어 '%s' 로 대체한다.",
+                method,
+                available[0],
+            )
+            method = available[0]
+
+        return ProcessPoolExecutor(
+            max_workers=self.num_workers,
+            mp_context=mp.get_context(method),
+        )
     
     def preprocess_samples(
         self,
@@ -67,7 +97,7 @@ class ParallelPreprocessor:
             return []
         
         results = []
-        with self.executor_class(max_workers=self.num_workers) as executor:
+        with self._make_executor() as executor:
             # Submit all tasks
             future_to_id = {
                 executor.submit(process_fn, sample, sid): sid
