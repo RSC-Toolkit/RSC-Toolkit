@@ -22,6 +22,11 @@ LOCATION_TO_ID = {
     "p4": 3,
 }
 
+# SPRSound 파일명은 <환자번호>_<나이>_<성별>_<위치>_<녹음번호> 형태라 나이 필드에
+# 소수점이 들어간다(예: 40138127_14.7_0_p3_139 = 14.7세). 따라서 "점이 있으면
+# 확장자" 라고 볼 수 없고, 알려진 확장자일 때만 떼어내야 한다.
+RECORDING_SUFFIXES = {".wav", ".flac", ".ogg", ".mp3", ".m4a", ".json", ".txt"}
+
 
 class LabelEncoder:
     def __init__(self) -> None:
@@ -66,8 +71,10 @@ def _pick_column(cols: Dict[str, str], candidates: Iterable[str]) -> Optional[st
 
 
 def normalize_recording_id(value: str) -> str:
+    """파일명/경로에서 recording id 를 뽑는다. 알려진 확장자만 떼어낸다."""
     name = pathlib.Path(str(value)).name
-    if "." in name:
+    suffix = pathlib.Path(name).suffix.lower()
+    if suffix in RECORDING_SUFFIXES:
         name = pathlib.Path(name).stem
     return name
 
