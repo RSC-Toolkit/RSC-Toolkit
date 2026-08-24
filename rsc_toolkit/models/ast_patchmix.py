@@ -48,6 +48,7 @@ import torch.nn as nn
 
 from .base import BaseRSCModel
 from .factory import ModelFactory
+from .projector import Projector
 
 try:  # timm 은 models extra 의존성
     import timm
@@ -146,6 +147,17 @@ class PatchMixAST(BaseRSCModel, nn.Module):
         mix_beta: float = 1.0,
         pretrained_path: Optional[str] = None,
         verbose: bool = False,
+        # ---- 학습 방법 (원본 main.py 의 --method 와 관련 인자들) ----
+        method: str = "ce",              # "ce" | "patchmix" | "patchmix_cl"
+        proj_dim: int = 768,
+        temperature: float = 0.06,
+        alpha: float = 1.0,
+        negative_pair: str = "all",
+        target_type: str = "grad_block",
+        time_domain: bool = False,
+        # 툴킷 datamodule 은 (B, n_mels, frames) 로 주므로 "freq_time".
+        # 원본과 같은 (B, frames, n_mels) 직접 입력이면 "time_freq" (기본, 충실).
+        input_layout: str = "time_freq",
     ):
         super().__init__()
         if timm is None:  # pragma: no cover
@@ -169,6 +181,24 @@ class PatchMixAST(BaseRSCModel, nn.Module):
 
         # 원본 main.py:259 — classifier 는 (새로 초기화된) mlp_head 의 deepcopy.
         self.classifier = deepcopy(self.mlp_head)
+
+        if method not in {"ce", "patchmix", "patchmix_cl"}:
+            raise ValueError(f"method must be ce|patchmix|patchmix_cl, got {method!r}")
+        if input_layout not in {"time_freq", "freq_time"}:
+            raise ValueError(f"input_layout must be time_freq|freq_time, got {input_layout!r}")
+        self.method = method
+        self.alpha = alpha
+        self.target_type = target_type
+        self.time_domain = time_domain
+        self.input_layout = input_layout
+        # 원본 set_model: patchmix_cl 일 때만 Projector, 아니면 Identity (optimizer 포함 동일)
+        if method == "patchmix_cl":
+            self.projector = Projector(self.final_feat_dim, proj_dim)
+            from rsc_toolkit.methods.patchmix import PatchMixConLoss
+
+            self.patchmix_con_loss = PatchMixConLoss(temperature=temperature, negative_pair=negative_pair)
+        else:
+            self.projector = nn.Identity()
 
     # ------------------------------------------------------------------ 구성
     def _build_imagenet_or_scratch(self, n_cls, fstride, tstride, input_fdim, input_tdim,
@@ -373,9 +403,59 @@ class PatchMixAST(BaseRSCModel, nn.Module):
         else:
             return x, y_a, y_b, lam, index
 
+    def _to_paper_layout(self, x: torch.Tensor) -> torch.Tensor:
+        """툴킷 피처(freq_time: B,128,798)를 원본 입력(time_freq: B,798,128)으로."""
+        if self.input_layout == "freq_time":
+            return x.transpose(-2, -1)
+        return x
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return self.classifier(self.forward_features(x))
+        return self.classifier(self.forward_features(self._to_paper_layout(x)))
 
     def training_forward(self, audio_batch, labels, loss_func):
-        logits = self.forward(audio_batch)
-        return logits, loss_func(logits, labels)
+        """
+        원본 main.py train() 의 method 분기와 동일. 평가 모드(validate)는 원본처럼
+        항상 ce 경로다 (원본 validate 는 features→classifier→criterion[0]).
+
+        loss_func 은 build_loss 산물이다: ce 방법은 weighted CE
+        (--weighted_loss), patchmix/patchmix_cl 은 비가중 CE (스크립트와 동일).
+        """
+        x = self._to_paper_layout(audio_batch)
+
+        if (not self.training) or self.method == "ce":
+            feats = self.forward_features(x)
+            logits = self.classifier(feats)
+            return logits, loss_func(logits, labels)
+
+        if self.method == "patchmix":
+            from rsc_toolkit.methods.patchmix import PatchMixLoss
+
+            mix_feats, y_a, y_b, lam, index = self.forward_features(
+                x, y=labels, patch_mix=True, time_domain=self.time_domain
+            )
+            logits = self.classifier(mix_feats)
+            loss = PatchMixLoss(criterion=loss_func)(logits, y_a, y_b, lam)
+            return logits, loss
+
+        # patchmix_cl (원본 main.py:355-372)
+        feats = self.forward_features(x)
+        logits = self.classifier(feats)
+        loss = loss_func(logits, labels)
+
+        if self.target_type == "grad_block":
+            proj1 = feats.detach().clone()
+        elif self.target_type == "grad_flow":
+            proj1 = feats
+        elif self.target_type == "project_block":
+            proj1 = self.projector(feats).detach().clone()
+        elif self.target_type == "project_flow":
+            proj1 = self.projector(feats)
+        else:
+            raise ValueError(f"Unknown target_type: {self.target_type!r}")
+
+        mix_feats, y_a, y_b, lam, index = self.forward_features(
+            x, y=labels, patch_mix=True, time_domain=self.time_domain
+        )
+        proj2 = self.projector(mix_feats)
+        loss = loss + self.alpha * self.patchmix_con_loss(proj1, proj2, labels, y_b, lam, index)
+        return logits, loss

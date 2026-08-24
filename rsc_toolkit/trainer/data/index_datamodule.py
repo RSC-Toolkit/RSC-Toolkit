@@ -91,6 +91,7 @@ class IndexDataModule(L.LightningDataModule):
         batch_size: int = 32,
         num_workers: int = 4,
         shuffle_train: bool = True,
+        drop_last_train: bool = False,
         pin_memory: bool = False,
         persistent_workers: bool = False,
         # feature caching
@@ -138,6 +139,7 @@ class IndexDataModule(L.LightningDataModule):
         self.batch_size = int(batch_size)
         self.num_workers = int(num_workers)
         self.shuffle_train = bool(shuffle_train)
+        self.drop_last_train = bool(drop_last_train)  # 논문 프로토콜 재현용 (원본 train loader drop_last=True)
         self.pin_memory = bool(pin_memory)
         self.persistent_workers = bool(persistent_workers)
 
@@ -462,6 +464,7 @@ class IndexDataModule(L.LightningDataModule):
             self.train_ds,
             batch_size=self.batch_size,
             shuffle=self.shuffle_train,
+            drop_last=self.drop_last_train,
             num_workers=self.num_workers,
             collate_fn=_tuple_collate,
             pin_memory=self.pin_memory,

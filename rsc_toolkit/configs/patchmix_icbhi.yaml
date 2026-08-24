@@ -1,0 +1,29 @@
+# patch-mix 계열 재현 실행 config.
+#
+#   AST SFT      : rsctk-train --config-name patchmix_icbhi
+#   Patch-Mix CE : ... model.params.method=patchmix loss=cross_entropy run.name=icbhi-patchmix-ce
+#   Patch-Mix CL : ... model.params.method=patchmix_cl loss=cross_entropy run.name=icbhi-patchmix-cl
+#   (seed 1~5 로 반복: seed=N)
+#
+# 전제: .datasets/icbhi 에 다운로드 + build-index 완료.
+defaults:
+  - model: ast_patchmix
+  - data_defaults@data: base
+  - data: icbhi_patchmix
+  - loss: cross_entropy_weighted_icbhi
+  - metrics: icbhi_metrics
+  - optimizer: adam            # lr 5e-5, wd 1e-6 — 논문 값 그대로
+  - trainer: default           # max_epochs 50
+  - callbacks: patchmix_paper
+  - _self_
+
+seed: 1
+
+trainer:
+  params:
+    precision: 16-mixed        # 원본 AMP(GradScaler+autocast)
+
+run:
+  name: icbhi-ast-sft
+  group: patchmix
+  tags: [patchmix, icbhi]
