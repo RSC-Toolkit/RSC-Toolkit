@@ -1,0 +1,48 @@
+# sgscl 계열(DAT·SG-SCL)의 ICBHI 데이터 설정.
+# icbhi_patchmix 와 동일 피처 체인(캐시 공유)이되:
+#   - SpecAugment 는 datamodule 이 아니라 모델이 배치 단위로 적용 (두 뷰 누적 마스킹)
+#   - train 배치에 meta 라벨(dev = 청진기 4종)을 붙인다
+name: icbhi_sgscl
+params:
+  datamodule_name: index
+
+  dataset_name: icbhi
+  index_dataset_cls: rsc_toolkit.datasets.index_dataset.IndexDataset
+  project_root: ${hydra:runtime.cwd}
+  split_file: rsc_toolkit/datasets/icbhi/data/official_split.txt
+  data_dir: .datasets/icbhi
+
+  sampling_rate: 16000
+  sample_level: cycle
+  desired_length_sec: 8.0
+  pad_type: repeat_fade          # 원본 cut_pad_sample_torchaudio (fade_out 포함)
+
+  train_splits: [train]
+  val_splits: [test]             # 논문 프로토콜: 매 epoch 공식 test 평가 (best-on-test)
+  test_splits: [test]
+
+  batch_size: 8
+  num_workers: 8
+  shuffle_train: true
+  drop_last_train: true          # 원본 train loader drop_last=True
+  pin_memory: true
+
+  features:
+    enabled: true
+    kind: fbank
+    cache_dir: downloaded_datasets/features_cache
+    n_mels: 128
+    target_frames: 798           # 8초 -> kaldi fbank 798 프레임 (원본 h=798)
+    frame_shift: 10
+    window_type: hanning
+    dither: 0.0
+    normalize: true
+
+  feature_precompute: true
+  feature_precompute_batch_size: 8
+  feature_precompute_num_workers: 0
+
+  specaugment:
+    enabled: false               # 모델(ast_sgscl)이 배치 단위로 적용한다
+
+  meta_label_mode: dev           # (x, y, meta) — 원본처럼 train 에만

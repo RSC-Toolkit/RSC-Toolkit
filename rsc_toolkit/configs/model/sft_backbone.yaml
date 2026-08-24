@@ -1,0 +1,20 @@
+# sgscl 저장소의 비-AST 백본 (등록명으로 고른다):
+#   model.name=resnet18_sft | resnet34_sft | efficientnet_b0_sft | cnn6_sft
+# method:
+#   SFT(CE) : method=ce (기본) + loss=cross_entropy_weighted_icbhi (스크립트 --weighted_loss)
+#   SG-SCL  : model.params.method=sgscl + loss=cross_entropy
+#             (비-AST SG-SCL 은 공식 스크립트가 없어 AST 스크립트의 방법 인자를 준용 —
+#              레시피 확정은 저자 확인 대기, docs/REPRODUCTION_TARGETS.md 참고)
+name: resnet18_sft
+params:
+  n_cls: 4
+  from_sl_official: true
+  input_layout: freq_time
+  method: ce
+  m_cls: 4
+  proj_dim: 768
+  temperature: 0.06
+  alpha: 1.0
+  target_type: project1_project2block
+  specaug_policy: icbhi_ast_sup   # 원본 train 루프의 배치 단위 SpecAugment
+  specaug_mask: mean

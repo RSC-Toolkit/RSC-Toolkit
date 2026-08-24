@@ -1,0 +1,22 @@
+# SG-SCL 논문(ICASSP 2024)의 AST — 공식 코드 충실 이식 (P0 골든 고정).
+# method 는 오버라이드로 고른다 (셋 다 loss=cross_entropy — 원본은 DAT/SG-SCL 에 비가중 CE):
+#   SG-SCL : model.params.method=sgscl (기본)
+#   DAT    : model.params.method=dat
+#   CE     : model.params.method=ce   (AST SFT 는 patchmix_icbhi config 쪽이 원본 스크립트와 일치)
+name: ast_sgscl
+params:
+  n_cls: 4
+  method: sgscl
+  m_cls: 4                       # meta=dev (청진기 4종)
+  proj_dim: 768
+  temperature: 0.06
+  alpha: 1.0
+  target_type: project1_project2block
+  grl_alpha: 1.0                 # 원본 스케줄이 공식 레시피에서 1.0 으로 포화 (methods/sgscl.py)
+  specaug_policy: icbhi_ast_sup  # 원본 train 루프의 배치 단위 SpecAugment (두 뷰 누적 마스킹)
+  specaug_mask: mean
+  # 툴킷 datamodule 은 (B, n_mels=128, frames=798) 로 준다
+  input_layout: freq_time
+  # 아래 둘은 일부러 뒤집힌 원본 quirk (models/ast_patchmix.py docstring 참고)
+  input_fdim: 798
+  input_tdim: 128

@@ -1,0 +1,14 @@
+# @package _global_
+# sgscl 저장소 비-AST 레시피 콜백 (other_architectures/*_ce.sh):
+#   lr 1e-3, 400 epochs, cosine(eta_min = lr * 0.1^3), MA 0.5, best-on-test(Se>5)
+trainer:
+  params:
+    callbacks:
+      - _target_: rsc_toolkit.trainer.callbacks.ma_update.LiveWeightAveraging
+        beta: 0.5
+      - _target_: rsc_toolkit.trainer.callbacks.paper_cosine_lr.PaperCosineLR
+        learning_rate: 1e-3
+        epochs: 400
+      - _target_: rsc_toolkit.trainer.callbacks.icbhi_best_checkpoint.ICBHIBestScoreCheckpoint
+        dirpath: outputs/sgscl/${run.name}
+        min_se: 5.0

@@ -75,9 +75,9 @@ class SpecAugment(nn.Module):
         mask_value = self._mask_value(x)
         v = x.shape[1]
         for _ in range(self.m_F):
+            # 참조 구현과 난수 소모를 맞추기 위해 f==0 이어도 randint 를 뽑는다
+            # (참조는 빈 슬라이스에 대입 — 값은 동일, RNG 스트림 평행 유지)
             f = int(np.random.uniform(0, self.F))
-            if f <= 0 or v <= 0:
-                continue
             f0 = random.randint(0, max(0, v - f))
             x[:, f0 : f0 + f, :] = mask_value
         return x
@@ -89,8 +89,6 @@ class SpecAugment(nn.Module):
         tau = x.shape[2]
         for _ in range(self.m_T):
             t = int(np.random.uniform(0, self.T))
-            if t <= 0 or tau <= 0:
-                continue
             t0 = random.randint(0, max(0, tau - t))
             x[:, :, t0 : t0 + t] = mask_value
         return x

@@ -225,19 +225,73 @@ class CNN6SFT(nn.Module):
 
 # ------------------------------------------------------------- 등록 래퍼 (set_model 상당)
 class _SFTClassifierModel(BaseRSCModel, nn.Module):
-    """backbone + nn.Linear 분류기 (원본 set_model 의 비-AST 구성)."""
+    """
+    backbone + nn.Linear 분류기 (원본 set_model 의 비-AST 구성).
+
+    method:
+    - "ce"    — SFT 기준선. SpecAugment 는 원본 train 루프처럼 배치 단위 1회.
+    - "dat"   — 도메인 적대 학습: nn.Linear(feat_dim, m_cls) 도메인 헤드 + GRL + 비가중 CE.
+    - "sgscl" — Projector(feat_dim, proj_dim) + MetaCL, 두 뷰(두 번째는 첫 뷰 위 누적 마스킹).
+    분기 구성과 손실은 rsc_toolkit/methods/sgscl.py (원본 main.py train() 이식) 공용.
+
+    specaug_policy=None 이면 학습 증강 없음 — 기존 SFT 골든/스모크와 datamodule 쪽
+    per-sample SpecAugment 구성을 그대로 유지하기 위한 기본값이다. 논문 프로토콜
+    재현 시에는 config 에서 policy 를 주고 datamodule 증강을 끈다.
+    """
 
     backbone_cls = None  # 서브클래스에서 지정
 
-    def __init__(self, n_cls: int = 4, from_sl_official: bool = True, input_layout: str = "freq_time"):
+    def __init__(
+        self,
+        n_cls: int = 4,
+        from_sl_official: bool = True,
+        input_layout: str = "freq_time",
+        method: str = "ce",
+        m_cls: int = 4,
+        proj_dim: int = 768,
+        temperature: float = 0.06,
+        alpha: float = 1.0,
+        target_type: str = "project1_project2block",
+        grl_alpha: float = 1.0,
+        specaug_policy: Optional[str] = None,
+        specaug_mask: str = "mean",
+    ):
         super().__init__()
         if input_layout not in {"time_freq", "freq_time"}:
             raise ValueError(f"input_layout must be time_freq|freq_time, got {input_layout!r}")
+        if method not in {"ce", "dat", "sgscl"}:
+            raise ValueError(f"method must be ce|dat|sgscl, got {method!r}")
         self.backbone = self.backbone_cls()
         self.classifier = nn.Linear(self.backbone.final_feat_dim, n_cls)
         self.input_layout = input_layout
+        self.method = method
+        self.alpha = alpha
+        self.grl_alpha = grl_alpha
+        self.target_type = target_type
         if from_sl_official:
             self.backbone.load_sl_official_weights()
+
+        from rsc_toolkit.methods.sgscl import MetaCL
+        from rsc_toolkit.models.projector import Projector
+
+        if method == "dat":
+            # 원본 main.py:244 — 비-AST 는 nn.Linear(final_feat_dim, m_cls)
+            self.domain_classifier = nn.Linear(self.backbone.final_feat_dim, m_cls)
+            self.metacl = None
+        elif method == "sgscl":
+            # 원본 main.py:247 — Projector(final_feat_dim, proj_dim)
+            self.domain_classifier = Projector(self.backbone.final_feat_dim, proj_dim)
+            self.metacl = MetaCL(temperature=temperature)
+        else:
+            self.domain_classifier = None
+            self.metacl = None
+
+        if specaug_policy is not None:
+            from rsc_toolkit.augmentations.specaugment import SpecAugment
+
+            self.specaug = SpecAugment(policy=specaug_policy, mask=specaug_mask)
+        else:
+            self.specaug = None
 
     def _to_paper_layout(self, x: torch.Tensor) -> torch.Tensor:
         if x.dim() == 3:
@@ -249,12 +303,39 @@ class _SFTClassifierModel(BaseRSCModel, nn.Module):
     def forward_features(self, x: torch.Tensor) -> torch.Tensor:
         return self.backbone(self._to_paper_layout(x))
 
+    def _paper_features(self, x_paper: torch.Tensor) -> torch.Tensor:
+        """(B, T, F) 페이퍼 레이아웃 3D → 특징 (methods/sgscl.py 공용 경로용)."""
+        return self.backbone(x_paper.unsqueeze(1))
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return self.classifier(self.forward_features(x))
 
-    def training_forward(self, audio_batch, labels, loss_func):
-        logits = self.forward(audio_batch)
-        return logits, loss_func(logits, labels)
+    def training_forward(self, audio_batch, labels, loss_func, meta_labels=None):
+        if not self.training:
+            logits = self.forward(audio_batch)
+            return logits, loss_func(logits, labels)
+
+        from rsc_toolkit.methods.sgscl import sgscl_training_losses
+
+        x = audio_batch
+        if x.dim() == 4:
+            x = x.squeeze(1)
+        x_paper = x.transpose(-2, -1) if self.input_layout == "freq_time" else x  # (B, T, F)
+        return sgscl_training_losses(
+            method=self.method,
+            paper_features=self._paper_features,
+            x_paper=x_paper,
+            specaug=self.specaug,
+            classifier=self.classifier,
+            domain_classifier=self.domain_classifier,
+            metacl=self.metacl,
+            loss_func=loss_func,
+            labels=labels,
+            meta_labels=meta_labels,
+            alpha=self.alpha,
+            grl_alpha=self.grl_alpha,
+            target_type=self.target_type,
+        )
 
 
 @ModelFactory.register_model_class("resnet18_sft")

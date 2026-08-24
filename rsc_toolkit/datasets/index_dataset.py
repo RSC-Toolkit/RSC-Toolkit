@@ -253,10 +253,19 @@ class IndexDataset(Dataset):
 
 class IndexFeatureDataset(Dataset):
 
-    def __init__(self, index_ds, feature_processor, feature_transform: Optional[Any] = None):
+    def __init__(
+        self,
+        index_ds,
+        feature_processor,
+        feature_transform: Optional[Any] = None,
+        meta_label_fn: Optional[Any] = None,
+    ):
         self.index_ds = index_ds
         self.fp = feature_processor
         self.feature_transform = feature_transform
+        # sgscl 계열(DAT·SG-SCL)용: 아이템 dict → meta 라벨 정수.
+        # 지정하면 4번째 원소로 meta 라벨을 돌려준다 (원본은 train 셋에서만 meta 반환).
+        self.meta_label_fn = meta_label_fn
 
     def __len__(self):
         return len(self.index_ds)
@@ -267,4 +276,6 @@ class IndexFeatureDataset(Dataset):
         feats = self.fp.make_features_cached(audio, sample_id=item["sample_id"])
         if self.feature_transform is not None:
             feats = self.feature_transform(feats)
+        if self.meta_label_fn is not None:
+            return feats, item["label"], item["sample_id"], int(self.meta_label_fn(item))
         return feats, item["label"], item["sample_id"]

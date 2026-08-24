@@ -45,11 +45,15 @@ class SpecAugmentOptions:
     mask: str = "mean"
 
 
-def _tuple_collate(batch: List[Dict[str, Any]]) -> Tuple[torch.Tensor, torch.Tensor]:
+def _tuple_collate(batch: List[Dict[str, Any]]) -> Tuple[torch.Tensor, ...]:
     xs = [b[0] for b in batch]
     ys = [b[1] for b in batch]
     x = torch.stack(xs, dim=0)
     y = torch.as_tensor(ys, dtype=torch.long)
+    # 4번째 원소 = meta 라벨 (IndexFeatureDataset 에 meta_label_fn 을 준 경우 — sgscl 계열)
+    if len(batch[0]) >= 4:
+        meta = torch.as_tensor([b[3] for b in batch], dtype=torch.long)
+        return x, y, meta
     return x, y
 
 
@@ -101,6 +105,7 @@ class IndexDataModule(L.LightningDataModule):
         feature_precompute_batch_size: int = 8,
         feature_precompute_num_workers: int = 0,
         specaugment: Optional[dict] = None,
+        meta_label_mode: Optional[str] = None,
     ):
         super().__init__()
 
@@ -151,6 +156,9 @@ class IndexDataModule(L.LightningDataModule):
         self.feature_precompute_batch_size = int(feature_precompute_batch_size)
         self.feature_precompute_num_workers = int(feature_precompute_num_workers)
         self.specaugment_cfg = SpecAugmentOptions(**(specaugment or {}))
+        # sgscl 계열(DAT·SG-SCL)용 meta 라벨 (예: "dev" = ICBHI 청진기 4종).
+        # 원본처럼 train 배치에만 (x, y, meta) 로 붙는다.
+        self.meta_label_mode = meta_label_mode
 
         # set later
         self.index_csv: Optional[Path] = None
@@ -289,7 +297,7 @@ class IndexDataModule(L.LightningDataModule):
             )
         raise ValueError(f"Unknown features.kind: {self.features_cfg.kind}")
 
-    def _wrap_with_features(self, base_ds, *, feature_transform=None):
+    def _wrap_with_features(self, base_ds, *, feature_transform=None, meta_label_fn=None):
         cache_dir = (
             Path(self.features_cfg.cache_dir)
             if self.features_cfg.cache_dir
@@ -301,7 +309,7 @@ class IndexDataModule(L.LightningDataModule):
         fp = self._build_feature_processor(feature_cache)
         feature_cache.configure(fp.get_processor_config(), processor_name=fp.__class__.__name__)
 
-        return IndexFeatureDataset(base_ds, fp, feature_transform=feature_transform)
+        return IndexFeatureDataset(base_ds, fp, feature_transform=feature_transform, meta_label_fn=meta_label_fn)
 
     def _build_feature_transform(self, *, training: bool):
         if not training:
@@ -439,7 +447,14 @@ class IndexDataModule(L.LightningDataModule):
 
             if self.features_cfg.enabled:
                 train_transform = self._build_feature_transform(training=True)
-                self.train_ds = self._wrap_with_features(self.train_ds, feature_transform=train_transform)
+                meta_label_fn = None
+                if self.meta_label_mode is not None:
+                    from rsc_toolkit.datasets.meta_labels import build_meta_label_fn
+
+                    meta_label_fn = build_meta_label_fn(self.meta_label_mode)
+                self.train_ds = self._wrap_with_features(
+                    self.train_ds, feature_transform=train_transform, meta_label_fn=meta_label_fn
+                )
                 self.val_ds = self._wrap_with_features(self.val_ds, feature_transform=None)
 
             if self.features_cfg.enabled and self.feature_precompute:

@@ -32,10 +32,17 @@ class PLAdapter(L.LightningModule):
         audio_batch = batch[0].squeeze(1)
         labels = batch[1]
 
+        extra = {}
+        if len(batch) > 2:
+            # datamodule 의 meta_label_mode 가 켜진 경우에만 존재 (sgscl 계열 DAT·SG-SCL).
+            # 받는 모델의 training_forward 는 meta_labels 인자를 지원해야 한다.
+            extra["meta_labels"] = batch[2]
+
         logits, loss = self.rsc_model.training_forward(
             audio_batch=audio_batch,
             labels=labels,
             loss_func=self.loss_func,
+            **extra,
         )
         self.log("train_loss", loss, prog_bar=True, on_step=True, on_epoch=True)
 
