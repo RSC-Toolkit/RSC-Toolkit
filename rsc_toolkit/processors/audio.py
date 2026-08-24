@@ -9,7 +9,13 @@ import torch
 @dataclass(frozen=True)
 class AudioPreprocessConfig:
     desired_length_sec: Optional[float] = None
-    pad_type: str = "repeat"  # "repeat" | "zero"
+    # "repeat"      : 반복 패딩 (fade 없음)
+    # "zero"        : 끝쪽 zero 패딩
+    # "repeat_fade" : patch-mix/SCL 계열 논문의 cut_pad_sample_torchaudio 와 동일 —
+    #                 반복 패딩 후 끝 sr/16 샘플에 linear fade_out. 원본 quirk 그대로:
+    #                 길이가 정확히 목표와 같아도 pad 분기로 들어가 fade_out 이 적용된다.
+    #                 (참조: raymin0223/patch-mix util/icbhi_util.py cut_pad_sample_torchaudio)
+    pad_type: str = "repeat"  # "repeat" | "zero" | "repeat_fade"
 
 
 class AudioPreprocessor:
@@ -26,6 +32,22 @@ class AudioPreprocessor:
             return audio
 
         channels, length = audio.shape
+
+        if self.cfg.pad_type == "repeat_fade":
+            # 원본 제어 흐름 그대로: 길면 앞부분만 자르고(fade 없음), 그 외에는
+            # (길이가 같아도) 반복-패딩 분기로 들어가 fade_out 을 적용한다.
+            if length > target_samples:
+                return audio[:, :target_samples]
+            reps = -(-target_samples // length)  # ceil
+            data = audio.repeat(1, reps)[:, :target_samples]
+            fade_samples = int(self.sampling_rate / 16)
+            if fade_samples > 0:
+                import torchaudio.transforms as T
+
+                fade_out = T.Fade(fade_in_len=0, fade_out_len=fade_samples, fade_shape="linear")
+                data = fade_out(data)
+            return data
+
         if length == target_samples:
             return audio
         if length > target_samples:

@@ -1,0 +1,80 @@
+{
+ "data_folder_note": "sample_data/toy_dataset/files",
+ "entries": [
+  {
+   "filename": "107_2b3_Al_mc_AKGC417L",
+   "cycles": [
+    {
+     "start": 0.887,
+     "end": 2.601,
+     "crackles": 1,
+     "wheezes": 0,
+     "label": 1,
+     "audio_fingerprint": {
+      "shape": [
+       1,
+       128000
+      ],
+      "mean": -0.006316318176686764,
+      "std": 0.4202180802822113,
+      "tail_mean_abs": 0.10388209670782089
+     }
+    },
+    {
+     "start": 2.601,
+     "end": 5.327,
+     "crackles": 1,
+     "wheezes": 0,
+     "label": 1,
+     "audio_fingerprint": {
+      "shape": [
+       1,
+       128000
+      ],
+      "mean": -0.0012557648587971926,
+      "std": 0.35197994112968445,
+      "tail_mean_abs": 0.09860390424728394
+     }
+    }
+   ]
+  },
+  {
+   "filename": "107_2b3_Ar_mc_AKGC417L",
+   "cycles": [
+    {
+     "start": 0.887,
+     "end": 2.601,
+     "crackles": 1,
+     "wheezes": 0,
+     "label": 1,
+     "audio_fingerprint": {
+      "shape": [
+       1,
+       128000
+      ],
+      "mean": -0.013512775301933289,
+      "std": 0.5077114701271057,
+      "tail_mean_abs": 0.1246245875954628
+     }
+    },
+    {
+     "start": 2.601,
+     "end": 5.327,
+     "crackles": 1,
+     "wheezes": 1,
+     "label": 3,
+     "audio_fingerprint": {
+      "shape": [
+       1,
+       128000
+      ],
+      "mean": 0.0057219467125833035,
+      "std": 0.4185856282711029,
+      "tail_mean_abs": 0.09182140231132507
+     }
+    }
+   ]
+  }
+ ],
+ "torch": "2.7.0+cu126"
+}
