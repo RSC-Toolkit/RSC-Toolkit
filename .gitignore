@@ -202,3 +202,6 @@ lightning_logs
 pretrained_models
 # macOS
 .DS_Store
+
+# 논문 재현용 참조 가상환경 (구버전 torch/timm)
+.venv-ref-*/
