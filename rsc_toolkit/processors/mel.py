@@ -24,7 +24,13 @@ def generate_fbank(
     normalize: bool = True,
     mean: float = -4.2677393,
     std: float = 4.5689974,
+    per_sample_stats: bool = False,
 ) -> torch.Tensor:
+    """
+    per_sample_stats=True 는 patch-mix/SG-SCL 계열 공식 코드의 비-AST 분기 재현:
+    고정 상수 대신 해당 fbank 자신의 mean/std 로 (x - mean) / (std * 2) 정규화한다.
+    (참조: kaen2891/sgscl util/icbhi_util.py generate_fbank — AST 만 고정 상수)
+    """
     audio = _ensure_2d_audio(audio)
     fbank = torchaudio.compliance.kaldi.fbank(
         audio,
@@ -37,6 +43,8 @@ def generate_fbank(
         frame_shift=frame_shift,
     )
     if normalize:
+        if per_sample_stats:
+            mean, std = fbank.mean(), fbank.std()
         fbank = (fbank - mean) / (std * 2)
     return fbank
 
@@ -52,6 +60,7 @@ class MelBankAudioProcessor(BaseAudioProcessor):
         window_type: str = "hanning",
         dither: float = 0.0,
         normalize: bool = True,
+        per_sample_stats: bool = False,
         **kwargs,
     ):
         self.n_mels = n_mels
@@ -61,9 +70,11 @@ class MelBankAudioProcessor(BaseAudioProcessor):
         self.window_type = window_type
         self.dither = dither
         self.normalize = normalize
+        self.per_sample_stats = per_sample_stats
         super().__init__(**kwargs)
     
     def get_processor_config(self) -> Dict[str, Any]:
+        # per_sample_stats 는 캐시 키에 반드시 포함 — 정규화가 다른 피처가 섞이면 안 된다
         return {
             "sampling_rate": self.sampling_rate,
             "n_mels": self.n_mels,
@@ -72,6 +83,7 @@ class MelBankAudioProcessor(BaseAudioProcessor):
             "window_type": self.window_type,
             "dither": self.dither,
             "normalize": self.normalize,
+            "per_sample_stats": self.per_sample_stats,
         }
 
     def make_features(self, audio: torch.Tensor, sample_id: Optional[str] = None):
@@ -83,6 +95,7 @@ class MelBankAudioProcessor(BaseAudioProcessor):
             window_type=self.window_type,
             dither=self.dither,
             normalize=self.normalize,
+            per_sample_stats=self.per_sample_stats,
         )
         # fbank: [frames, n_mels] -> [n_mels, frames]
         fbank = fbank.transpose(0, 1)

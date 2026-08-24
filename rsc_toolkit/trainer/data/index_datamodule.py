@@ -35,6 +35,7 @@ class FeatureConfig:
     window_type: str = "hanning"
     dither: float = 0.0
     normalize: bool = True
+    per_sample_stats: bool = False  # 비-AST 계열 논문 재현용 (샘플별 mean/std)
 
 
 @dataclass
@@ -283,6 +284,7 @@ class IndexDataModule(L.LightningDataModule):
                 window_type=self.features_cfg.window_type,
                 dither=self.features_cfg.dither,
                 normalize=self.features_cfg.normalize,
+                per_sample_stats=self.features_cfg.per_sample_stats,
                 feature_cache=feature_cache,
             )
         raise ValueError(f"Unknown features.kind: {self.features_cfg.kind}")
