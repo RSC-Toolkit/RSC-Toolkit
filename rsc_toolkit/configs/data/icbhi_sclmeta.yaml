@@ -1,0 +1,41 @@
+# SCL-metadata ICBHI 데이터: cycle 구간을 원 sr 로 잘라 16 kHz 리샘플 → fade in/out → 8초 순환 패딩+fade_out
+# → torchaudio dB-mel(64, 1024/512, 50–2000 Hz) 캐시. 배치 min-max·SpecAug·Standardize 는 모델 안.
+name: icbhi_sclmeta
+params:
+  datamodule_name: index
+  dataset_name: icbhi
+  index_dataset_cls: rsc_toolkit.datasets.index_dataset.IndexDataset
+  project_root: ${hydra:runtime.cwd}
+  split_file: rsc_toolkit/datasets/icbhi/data/official_split.txt
+  data_dir: .datasets/icbhi
+
+  sampling_rate: 16000
+  sample_level: cycle
+  desired_length_sec: 8.0
+  pad_type: sclmeta
+  fade: false                      # fade 는 pad_type=sclmeta 가 구간에 직접 적용
+  resample_after_slice: true       # 원본 dataset.py: 구간 로드 후 리샘플
+
+  train_splits: [train]
+  val_splits: [test]               # 매 epoch 공식 test 평가, Sc 최고 (Se 게이트 없음)
+  test_splits: [test]
+
+  batch_size: 128
+  num_workers: 8
+  shuffle_train: true
+  drop_last_train: false           # 원본 DataLoader drop_last 없음 (마지막 배치 46개)
+  pin_memory: true
+
+  features:
+    enabled: true
+    kind: sclmeta_mel
+    cache_dir: downloaded_datasets/features_cache
+    n_mels: 64
+  feature_precompute: true
+  feature_precompute_batch_size: 8
+  feature_precompute_num_workers: 0
+
+  specaugment:
+    enabled: false                 # 모델 안(torchaudio iid) 에서 적용
+
+  meta_label_mode: sa              # 성별 x 연령군 4클래스 (M-SCL)

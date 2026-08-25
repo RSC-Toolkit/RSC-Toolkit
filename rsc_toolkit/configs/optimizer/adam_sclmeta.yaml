@@ -1,0 +1,11 @@
+# SCL-metadata main.py:86-93 — Adam(lr 1e-4 AudioSet / 1e-3 scratch, wd 1e-4) + CosineAnnealingLR(T_max=40, eta_min=1e-6) epoch step
+# (T_max 40 이라 lr 이 80 epoch 주기로 진동 — 코드 그대로)
+name: adam
+params:
+  lr: 1e-4
+  weight_decay: 1e-4
+lr_scheduler:
+  name: cosine_annealing
+  params:
+    T_max: 40
+    eta_min: 1e-6

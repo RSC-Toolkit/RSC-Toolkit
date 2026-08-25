@@ -12,6 +12,7 @@ def build_optimizer(cfg: Dict[str, Any], parameters) -> optim.Optimizer:
     """
     name = cfg["name"]
     params = cfg.get("params", {})
+    # lr_scheduler 는 PLAdapter.configure_optimizers 가 처리한다
 
     if name not in OPTIMIZERS:
         raise KeyError(f"Unknown optimizer '{name}'. Available: {sorted(OPTIMIZERS.keys())}")

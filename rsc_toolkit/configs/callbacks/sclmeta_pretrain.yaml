@@ -1,0 +1,9 @@
+# @package _global_
+# SCL/M-SCL 사전학습: 평가 없음, 마지막 epoch 상태 저장 (scl.py:51 final_state), 재개 지원
+trainer:
+  params:
+    callbacks:
+      - _target_: rsc_toolkit.trainer.callbacks.final_state.FinalStateCheckpoint
+        dirpath: outputs/sclmeta/${run.name}
+      - _target_: rsc_toolkit.trainer.callbacks.resume_checkpoint.EpochResumeCheckpoint
+        dirpath: outputs/sclmeta/${run.name}

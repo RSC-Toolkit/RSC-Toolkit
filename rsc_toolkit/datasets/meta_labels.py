@@ -6,12 +6,31 @@ meta(도메인) 라벨 — sgscl 계열(DAT·SG-SCL) 학습이 쓰는 보조 라
 """
 from __future__ import annotations
 
-from typing import Any, Callable, Dict
+from typing import Any, Callable, Dict, Mapping
 
 # 원본 icbhi_dataset.py:41 — device_to_id (meta_cls_list 순서와 동일)
 ICBHI_DEVICE_TO_ID = {"Meditron": 0, "LittC2SE": 1, "Litt3200": 2, "AKGC417L": 3}
 
 MetaLabelFn = Callable[[Dict[str, Any]], int]
+
+
+def _num(v):
+    try:
+        f = float(v)
+    except (TypeError, ValueError):
+        return None
+    return None if f != f else f
+
+
+def _is_adult(meta: Mapping[str, Any]) -> bool:
+    """ICBHI 메타: 성인은 adult_BMI, 소아는 child_weight/child_height 가 기재된다; 둘 다 없으면 나이 19세 기준."""
+    if _num(meta.get("adult_BMI")) is not None:
+        return True
+    if _num(meta.get("child_weight")) is not None or _num(meta.get("child_height")) is not None:
+        return False
+    age = _num(meta.get("age"))
+    # 메타가 전혀 없는 환자(ICBHI 223)는 원본 metadata.csv 가 M·A(=0) 로 둔다 → 결측은 성인으로
+    return age is None or age >= 19
 
 
 def build_meta_label_fn(mode: str) -> MetaLabelFn:
@@ -42,7 +61,23 @@ def build_meta_label_fn(mode: str) -> MetaLabelFn:
 
         return fn
 
+    if mode == "sa":
+        # SCL-metadata(ilyassmoummad/scl_icbhi2017) metadata.csv 의 sa_class_num:
+        # 성별(M/F) x 연령군(A=성인, C=소아) → M·A 0, F·A 1, F·C 2, M·C 3.
+        # A/C 는 ICBHI 메타의 성인(BMI 기재)/소아(신장·체중 기재) 구분 (나이 19세 경계와 일치).
+        # 결측(환자 223: 성별·나이 없음)은 원본 CSV 대로 M·A → 0. 전 6898 cycle 대조로 확인.
+        def fn(item: Dict[str, Any]) -> int:
+            m = item["meta"]
+            sex = m.get("sex")
+            female = sex in ("F", "f", 1, 1.0, "1", "1.0")
+            adult = _is_adult(m)
+            if adult:
+                return 1 if female else 0
+            return 2 if female else 3
+
+        return fn
+
     raise NotImplementedError(
-        f"meta_label_mode={mode!r} 는 아직 지원하지 않는다 (지원: 'dev', 'patient'). "
+        f"meta_label_mode={mode!r} 는 아직 지원하지 않는다 (지원: 'dev', 'patient', 'sa'). "
         "필요해지는 논문이 정해지면 원본 get_meta_infor 매핑대로 추가할 것."
     )

@@ -42,6 +42,7 @@ class IndexDataset(Dataset):
         return_meta: bool = True,
         fade: bool = True,
         audio_preprocessor: Optional[Any] = None,
+        resample_after_slice: bool = False,
     ):
         self.index_csv = pathlib.Path(index_csv).expanduser().resolve()
         if not self.index_csv.exists():
@@ -56,6 +57,10 @@ class IndexDataset(Dataset):
         self.return_meta = bool(return_meta)
         self.fade = bool(fade)
         self.audio_preprocessor = audio_preprocessor
+        # True: 원 sr 로 [t0,t1) 구간만 잘라 그 구간을 리샘플 (SCL-metadata 계열 dataset.py —
+        #       torchaudio.load(frame_offset, num_frames) 후 Resample). 녹음 전체 리샘플 후 자르는 것과
+        #       경계 샘플이 미세하게 다르다. fade 는 적용하지 않는다(전처리기가 담당).
+        self.resample_after_slice = bool(resample_after_slice)
 
         if sample_level is None:
             # infer from first row
@@ -205,16 +210,34 @@ class IndexDataset(Dataset):
                 f"Audio file not found: {wav_path} (from recording_path={recording_path!r}, data_root={self.data_root})"
             )
 
-        # Load audio. Resample + Fade here. Previously it was done to each cycle, why?
-        wav = load_audio(wav_path, target_sampling_rate=self.sampling_rate, fade=self.fade)
-
         level = str(row["sample_level"])
-        if level == "cycle":
+        if level == "cycle" and self.resample_after_slice:
+            import torchaudio
+            import torchaudio.transforms as T
+
+            t0 = float(row["t0"])
+            t1 = float(row["t1"])
+            wav_native, sr = torchaudio.load(str(wav_path))
+            audio = slice_audio(wav_native, t0=t0, t1=t1, sampling_rate=sr)
+            if audio.shape[0] > 1:
+                audio = torch.mean(audio, dim=0, keepdim=True)
+            if sr != self.sampling_rate:
+                audio = T.Resample(sr, self.sampling_rate)(audio)
+            if self.audio_preprocessor is not None:
+                audio = self.audio_preprocessor(audio)
+            wav = None
+        else:
+            # Load audio. Resample + Fade here. Previously it was done to each cycle, why?
+            wav = load_audio(wav_path, target_sampling_rate=self.sampling_rate, fade=self.fade)
+
+        if level == "cycle" and wav is not None:
             t0 = float(row["t0"])
             t1 = float(row["t1"])
             audio = slice_audio(wav, t0=t0, t1=t1, sampling_rate=self.sampling_rate)
             if self.audio_preprocessor is not None:
                 audio = self.audio_preprocessor(audio)
+        elif level == "cycle":
+            pass
         elif level == "clip":
             audio = wav
             t0 = None

@@ -1,0 +1,5 @@
+# SCL-metadata 선형 평가: Adam(lr 0.1, wd 1e-4), 스케줄 없음 (main.py:87)
+name: adam
+params:
+  lr: 0.1
+  weight_decay: 1e-4

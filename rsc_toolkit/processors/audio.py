@@ -15,7 +15,9 @@ class AudioPreprocessConfig:
     #                 반복 패딩 후 끝 sr/16 샘플에 linear fade_out. 원본 quirk 그대로:
     #                 길이가 정확히 목표와 같아도 pad 분기로 들어가 fade_out 이 적용된다.
     #                 (참조: raymin0223/patch-mix util/icbhi_util.py cut_pad_sample_torchaudio)
-    pad_type: str = "repeat"  # "repeat" | "zero" | "repeat_fade"
+    # "sclmeta"     : ilyassmoummad/scl_icbhi2017 dataset.py — 구간 로드 직후 fade in/out(sr/16) 을
+    #                 먼저 걸고, 길면 앞부분 절단, 짧으면 순환 반복 후 절단 + fade_out(sr/16) 재적용.
+    pad_type: str = "repeat"  # "repeat" | "zero" | "repeat_fade" | "sclmeta"
 
 
 class AudioPreprocessor:
@@ -32,6 +34,17 @@ class AudioPreprocessor:
             return audio
 
         channels, length = audio.shape
+
+        if self.cfg.pad_type == "sclmeta":
+            import torchaudio.transforms as T
+
+            fade_samples = int(self.sampling_rate / 16)
+            audio = T.Fade(fade_in_len=fade_samples, fade_out_len=fade_samples, fade_shape="linear")(audio)
+            if audio.shape[-1] > target_samples:
+                return audio[..., :target_samples]
+            ratio = -(-target_samples // audio.shape[-1])
+            audio = audio.repeat(1, ratio)[..., :target_samples]
+            return T.Fade(fade_in_len=0, fade_out_len=fade_samples, fade_shape="linear")(audio)
 
         if self.cfg.pad_type == "repeat_fade":
             # 원본 제어 흐름 그대로: 길면 앞부분만 자르고(fade 없음), 그 외에는

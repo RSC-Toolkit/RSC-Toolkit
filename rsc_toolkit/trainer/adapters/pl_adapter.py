@@ -87,4 +87,16 @@ class PLAdapter(L.LightningModule):
             metric.reset()
 
     def configure_optimizers(self):
-        return build_optimizer(self.optimizer_cfg, self.parameters())
+        cfg = dict(self.optimizer_cfg)
+        sched_cfg = cfg.pop("lr_scheduler", None)
+        optimizer = build_optimizer(cfg, self.parameters())
+        if not sched_cfg:
+            return optimizer
+        # epoch 단위 torch 스케줄러 (예: SCL-metadata 의 CosineAnnealingLR(T_max=40, eta_min=1e-6) —
+        # 원본은 매 epoch 끝에 scheduler.step(); Lightning 도 interval="epoch" 면 같은 시점에 step 한다)
+        import torch.optim.lr_scheduler as S
+
+        name = sched_cfg["name"]
+        params = dict(sched_cfg.get("params", {}))
+        cls = {"cosine_annealing": S.CosineAnnealingLR, "step": S.StepLR}[name]
+        return {"optimizer": optimizer, "lr_scheduler": {"scheduler": cls(optimizer, **params), "interval": "epoch"}}

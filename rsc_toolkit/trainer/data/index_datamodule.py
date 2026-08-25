@@ -106,6 +106,8 @@ class IndexDataModule(L.LightningDataModule):
         feature_precompute_num_workers: int = 0,
         specaugment: Optional[dict] = None,
         meta_label_mode: Optional[str] = None,
+        fade: bool = True,
+        resample_after_slice: bool = False,
     ):
         super().__init__()
 
@@ -159,6 +161,8 @@ class IndexDataModule(L.LightningDataModule):
         # sgscl 계열(DAT·SG-SCL)용 meta 라벨 (예: "dev" = ICBHI 청진기 4종).
         # 원본처럼 train 배치에만 (x, y, meta) 로 붙는다.
         self.meta_label_mode = meta_label_mode
+        self.fade = bool(fade)
+        self.resample_after_slice = bool(resample_after_slice)
 
         # set later
         self.index_csv: Optional[Path] = None
@@ -263,6 +267,11 @@ class IndexDataModule(L.LightningDataModule):
             split=split,
             audio_preprocessor=self.audio_preprocessor,
         )
+        # 기본값이 아닐 때만 넘긴다 — 커스텀 index_dataset_cls 가 이 인자를 모를 수 있다
+        if not self.fade:
+            kwargs["fade"] = False
+        if self.resample_after_slice:
+            kwargs["resample_after_slice"] = True
         if self.split_file is not None:
             kwargs["split_file"] = self.split_file
         return self.index_dataset_cls(**kwargs)
@@ -295,6 +304,10 @@ class IndexDataModule(L.LightningDataModule):
                 per_sample_stats=self.features_cfg.per_sample_stats,
                 feature_cache=feature_cache,
             )
+        if self.features_cfg.kind == "sclmeta_mel":
+            from rsc_toolkit.processors.sclmeta_mel import SCLMetaMelProcessor
+            return SCLMetaMelProcessor(sampling_rate=self.sampling_rate, n_mels=self.features_cfg.n_mels,
+                                       feature_cache=feature_cache)
         if self.features_cfg.kind == "waveform":
             # 모델 내부에서 fbank 를 만드는 백본(BEATs 등): 파형 그대로, 캐시 없음
             from rsc_toolkit.processors.waveform import WaveformProcessor
