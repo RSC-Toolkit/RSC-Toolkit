@@ -1,0 +1,44 @@
+# SCL-metadata 의 SPRSound(2022 inter-patient test) 데이터: 이벤트 구간을 ms 정수 온셋으로 원 sr(8 kHz) 에서 잘라 16 kHz 리샘플
+# → fade in/out → 8초 순환 패딩+fade_out → torchaudio dB-mel(64) 캐시. 7-class (Normal/Fine Crackle/Wheeze/Coarse Crackle/Wheeze+Crackle/Rhonchi/Stridor).
+# 인덱스의 split 컬럼(train/test) 사용 — test = 2022 inter_test (사용자 결정: 이벤트 단위·2022·inter).
+name: sprsound_sclmeta
+params:
+  datamodule_name: index
+  dataset_name: sprsound
+  index_dataset_cls: rsc_toolkit.datasets.index_dataset.IndexDataset
+  project_root: ${hydra:runtime.cwd}
+  data_dir: .datasets/sprsound
+  raw_data_subdir: Classification   # recording_path 는 Classification/ 기준 상대경로
+  index_filename: index_cycle.csv
+
+  sampling_rate: 16000
+  sample_level: cycle
+  desired_length_sec: 8.0
+  pad_type: sclmeta
+  fade: false
+  resample_after_slice: true
+  time_unit: ms_int              # 원본 dataset.py:202 — onset*int(sr/1000)
+
+  train_splits: [train]
+  val_splits: [test]
+  test_splits: [test]
+
+  batch_size: 128
+  num_workers: 8
+  shuffle_train: true
+  drop_last_train: false
+  pin_memory: true
+
+  features:
+    enabled: true
+    kind: sclmeta_mel
+    cache_dir: downloaded_datasets/features_cache
+    n_mels: 64
+  feature_precompute: true
+  feature_precompute_batch_size: 8
+  feature_precompute_num_workers: 0
+
+  specaugment:
+    enabled: false
+
+  meta_label_mode: sa_sprs       # gender x age_group(<5 / ≥5세)

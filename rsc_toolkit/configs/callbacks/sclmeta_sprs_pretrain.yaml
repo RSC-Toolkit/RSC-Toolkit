@@ -1,0 +1,8 @@
+# @package _global_
+trainer:
+  params:
+    callbacks:
+      - _target_: rsc_toolkit.trainer.callbacks.final_state.FinalStateCheckpoint
+        dirpath: outputs/sclmeta_sprs/${run.name}
+      - _target_: rsc_toolkit.trainer.callbacks.resume_checkpoint.EpochResumeCheckpoint
+        dirpath: outputs/sclmeta_sprs/${run.name}

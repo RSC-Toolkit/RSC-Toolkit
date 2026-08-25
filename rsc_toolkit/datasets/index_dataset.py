@@ -43,6 +43,7 @@ class IndexDataset(Dataset):
         fade: bool = True,
         audio_preprocessor: Optional[Any] = None,
         resample_after_slice: bool = False,
+        time_unit: str = "s",
     ):
         self.index_csv = pathlib.Path(index_csv).expanduser().resolve()
         if not self.index_csv.exists():
@@ -61,6 +62,11 @@ class IndexDataset(Dataset):
         #       torchaudio.load(frame_offset, num_frames) 후 Resample). 녹음 전체 리샘플 후 자르는 것과
         #       경계 샘플이 미세하게 다르다. fade 는 적용하지 않는다(전처리기가 담당).
         self.resample_after_slice = bool(resample_after_slice)
+        # "ms_int": SPRSound 계열(scl_icbhi2017 dataset.py:202) — 온셋/오프셋이 ms 정수라
+        #          start = ms * int(sr/1000) 로 자른다 (t0 는 초로 저장돼 있어 round(t0*1000) 으로 복원).
+        if time_unit not in ("s", "ms_int"):
+            raise ValueError(f"time_unit must be 's' or 'ms_int', got {time_unit!r}")
+        self.time_unit = time_unit
 
         if sample_level is None:
             # infer from first row
@@ -220,7 +226,11 @@ class IndexDataset(Dataset):
             # 원본(scl_icbhi2017 dataset.py:93-94)처럼 구간만 읽는다: frame_offset=int(t0*sr),
             # num_frames=int(t1*sr)-int(t0*sr). WAV 라 전체를 읽고 자르는 것과 샘플이 같고 훨씬 빠르다.
             sr = torchaudio.info(str(wav_path)).sample_rate
-            start, end = int(t0 * sr), int(t1 * sr)
+            if self.time_unit == "ms_int":
+                k = int(sr / 1000)
+                start, end = int(round(t0 * 1000)) * k, int(round(t1 * 1000)) * k
+            else:
+                start, end = int(t0 * sr), int(t1 * sr)
             audio, _ = torchaudio.load(str(wav_path), frame_offset=start, num_frames=max(end - start, 0))
             if audio.shape[0] > 1:
                 audio = torch.mean(audio, dim=0, keepdim=True)

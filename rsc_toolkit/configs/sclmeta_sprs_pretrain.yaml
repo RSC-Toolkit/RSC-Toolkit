@@ -1,0 +1,32 @@
+# 논문은 SPRS 200ep 를 보고하지만 코드 기본값(args.py --epochs 400)을 따른다 (P0 원칙; 문서 참고).
+# SCL-metadata 사전학습 run (SCL / M-SCL): 400ep, bs128, Adam 1e-4/wd 1e-4 + cosine(T_max 40), 평가 없음, 마지막 상태 저장.
+#   M-SCL : rsctk-train --config-name sclmeta_icbhi_pretrain run.name=sprs-sclmeta-mscl-pre-s1 seed=1
+#   SCL   : ... model.params.method=scl run.name=sprs-sclmeta-scl-pre-s1
+defaults:
+  - model: cnn6_sclmeta
+  - data_defaults@data: base
+  - data: sprsound_sclmeta
+  - loss: cross_entropy   # 미사용 (SupCon 만)
+  - metrics: sprsound_metrics
+  - optimizer: adam_sclmeta
+  - trainer: default
+  - callbacks: sclmeta_sprs_pretrain
+  - _self_
+
+seed: 1
+model:
+  params:
+    n_cls: 7
+    method: mscl
+
+trainer:
+  params:
+    max_epochs: 400
+    precision: 32
+    limit_val_batches: 0        # 원본 사전학습은 평가 없음
+    num_sanity_val_steps: 0
+
+run:
+  name: sprs-sclmeta-mscl-pre
+  group: sclmeta
+  tags: [sclmeta, sprsound, pretrain]

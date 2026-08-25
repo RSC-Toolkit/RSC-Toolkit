@@ -114,6 +114,8 @@ class IndexDataModule(L.LightningDataModule):
         meta_label_mode: Optional[str] = None,
         fade: bool = True,
         resample_after_slice: bool = False,
+        time_unit: str = "s",
+        raw_data_subdir: Optional[str] = None,   # 원음이 data_dir 하위 폴더에 있을 때 (예: SPRSound 'Classification')
     ):
         super().__init__()
 
@@ -131,7 +133,10 @@ class IndexDataModule(L.LightningDataModule):
         else:
             self.data_dir = self._resolve_path(data_dir)
 
+        self.raw_data_subdir = raw_data_subdir
         self.raw_data_directory = self._resolve_raw_data_directory()
+        if raw_data_subdir:
+            self.raw_data_directory = (self.raw_data_directory / raw_data_subdir).resolve()
         self.outputs_directory = self.data_dir
         self.split_file = self._resolve_path(split_file) if split_file else None
 
@@ -169,6 +174,7 @@ class IndexDataModule(L.LightningDataModule):
         self.meta_label_mode = meta_label_mode
         self.fade = bool(fade)
         self.resample_after_slice = bool(resample_after_slice)
+        self.time_unit = str(time_unit)
 
         # set later
         self.index_csv: Optional[Path] = None
@@ -278,6 +284,8 @@ class IndexDataModule(L.LightningDataModule):
             kwargs["fade"] = False
         if self.resample_after_slice:
             kwargs["resample_after_slice"] = True
+        if self.time_unit != "s":
+            kwargs["time_unit"] = self.time_unit
         if self.split_file is not None:
             kwargs["split_file"] = self.split_file
         return self.index_dataset_cls(**kwargs)

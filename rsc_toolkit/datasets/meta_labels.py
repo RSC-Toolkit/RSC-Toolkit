@@ -77,7 +77,19 @@ def build_meta_label_fn(mode: str) -> MetaLabelFn:
 
         return fn
 
+    if mode == "sa_sprs":
+        # SCL-metadata SPRS metadata.csv 의 sa_class_num: gender(0/1) x age_group(0: <5세, 1: ≥5세) → gender*2 + age_group
+        # (train 분포 2004/1558/1527/1567; age_group 경계 4.9 | 5.0 — 원본 CSV 전수 대조로 확인)
+        def fn(item: Dict[str, Any]) -> int:
+            m = item["meta"]
+            gender = int(float(m.get("gender", 0)))
+            age = _num(m.get("age"))
+            age_group = 1 if (age is not None and age >= 5.0) else 0
+            return gender * 2 + age_group
+
+        return fn
+
     raise NotImplementedError(
-        f"meta_label_mode={mode!r} 는 아직 지원하지 않는다 (지원: 'dev', 'patient', 'sa'). "
+        f"meta_label_mode={mode!r} 는 아직 지원하지 않는다 (지원: 'dev', 'patient', 'sa', 'sa_sprs'). "
         "필요해지는 논문이 정해지면 원본 get_meta_infor 매핑대로 추가할 것."
     )
