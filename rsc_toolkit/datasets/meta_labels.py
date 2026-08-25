@@ -35,7 +35,14 @@ def build_meta_label_fn(mode: str) -> MetaLabelFn:
 
         return fn
 
+    if mode == "patient":
+        # PAFA(wa976/PAFA icbhi_dataset.py): 파일명 앞 환자 번호를 정수 그대로 쓴다
+        def fn(item: Dict[str, Any]) -> int:
+            return int(item["meta"]["patient_id"])
+
+        return fn
+
     raise NotImplementedError(
-        f"meta_label_mode={mode!r} 는 아직 지원하지 않는다 (지원: 'dev'). "
+        f"meta_label_mode={mode!r} 는 아직 지원하지 않는다 (지원: 'dev', 'patient'). "
         "필요해지는 논문이 정해지면 원본 get_meta_infor 매핑대로 추가할 것."
     )

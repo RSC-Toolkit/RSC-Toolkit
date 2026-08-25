@@ -295,6 +295,10 @@ class IndexDataModule(L.LightningDataModule):
                 per_sample_stats=self.features_cfg.per_sample_stats,
                 feature_cache=feature_cache,
             )
+        if self.features_cfg.kind == "waveform":
+            # 모델 내부에서 fbank 를 만드는 백본(BEATs 등): 파형 그대로, 캐시 없음
+            from rsc_toolkit.processors.waveform import WaveformProcessor
+            return WaveformProcessor(sampling_rate=self.sampling_rate, feature_cache=None)
         raise ValueError(f"Unknown features.kind: {self.features_cfg.kind}")
 
     def _wrap_with_features(self, base_ds, *, feature_transform=None, meta_label_fn=None):

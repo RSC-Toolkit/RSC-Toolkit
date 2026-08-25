@@ -1,0 +1,27 @@
+# PAFA 계열 재현 실행 config (공식 scripts/beats_{ce,pafa}.sh: 100ep, bs32, adam 5e-5/wd 1e-6, cosine, MA 0.5, 비가중 CE, AMP, nospec).
+#
+#   BEATs + PAFA : rsctk-train --config-name pafa_icbhi run.name=icbhi-beats-pafa-s1 seed=1
+#   BEATs + CE   : ... model.params.method=ce run.name=icbhi-beats-ce-s1
+#   2-class 는 model.params.n_cls=2 + 데이터 2-class 인덱스 (별도 학습; 추후)
+defaults:
+  - model: beats
+  - data_defaults@data: base
+  - data: icbhi_pafa_beats
+  - loss: cross_entropy
+  - metrics: icbhi_metrics
+  - optimizer: adam            # lr 5e-5, wd 1e-6
+  - trainer: default
+  - callbacks: pafa_paper
+  - _self_
+
+seed: 1
+
+trainer:
+  params:
+    max_epochs: 100
+    precision: 16-mixed        # 원본 AMP
+
+run:
+  name: icbhi-beats-pafa
+  group: pafa
+  tags: [pafa, beats, icbhi]

@@ -1,0 +1,15 @@
+# PAFA 논문(Interspeech 2025)의 BEATs 미세조정 — 공식 코드 충실 이식 (P0 골든 고정).
+#   BEATs + CE (SFT): model.params.method=ce
+#   BEATs + PAFA    : model.params.method=pafa (기본; 스크립트 beats_pafa.sh 값)
+name: beats
+params:
+  n_cls: 4
+  method: pafa
+  w_ce: 1.0
+  w_pafa: 1.0
+  lambda_pcsl: 50.0
+  lambda_gpal: 0.0005
+  hidden_dim: null
+  output_dim: 768
+  norm_type: ln
+  proj_type: end2end
