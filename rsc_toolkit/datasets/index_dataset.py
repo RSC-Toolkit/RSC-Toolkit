@@ -217,8 +217,11 @@ class IndexDataset(Dataset):
 
             t0 = float(row["t0"])
             t1 = float(row["t1"])
-            wav_native, sr = torchaudio.load(str(wav_path))
-            audio = slice_audio(wav_native, t0=t0, t1=t1, sampling_rate=sr)
+            # 원본(scl_icbhi2017 dataset.py:93-94)처럼 구간만 읽는다: frame_offset=int(t0*sr),
+            # num_frames=int(t1*sr)-int(t0*sr). WAV 라 전체를 읽고 자르는 것과 샘플이 같고 훨씬 빠르다.
+            sr = torchaudio.info(str(wav_path)).sample_rate
+            start, end = int(t0 * sr), int(t1 * sr)
+            audio, _ = torchaudio.load(str(wav_path), frame_offset=start, num_frames=max(end - start, 0))
             if audio.shape[0] > 1:
                 audio = torch.mean(audio, dim=0, keepdim=True)
             if sr != self.sampling_rate:

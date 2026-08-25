@@ -141,3 +141,21 @@ def test_specaugment_gate_uses_randn_quirk():
     torch.manual_seed(0)
     applied = sum(int(not torch.equal(sa(x), x)) for _ in range(200))
     assert 140 < applied < 195  # p=1.0 인데 randn 게이트라 ≈84%
+
+
+@needs_data
+def test_segment_loading_equals_full_load_then_slice():
+    """frame_offset/num_frames 구간 로드가 전체 로드 후 슬라이스와 동일한 샘플을 준다 (경계 포함)."""
+    import torchaudio
+    from rsc_toolkit.datasets.icbhi.processing import slice_audio
+    from rsc_toolkit.datasets.index_dataset import IndexDataset
+
+    ds = IndexDataset(index_csv=DATA / "index/index_cycle.csv", data_root=DATA, sampling_rate=16000,
+                      sample_level="cycle", fade=False, resample_after_slice=True)
+    for i in (0, 1, 2500, len(ds) - 1):
+        row = ds.df.iloc[i]
+        wav, sr = torchaudio.load(str(DATA / row["recording_path"]))
+        ref = slice_audio(wav, t0=float(row["t0"]), t1=float(row["t1"]), sampling_rate=sr)
+        if sr != 16000:
+            ref = torchaudio.transforms.Resample(sr, 16000)(ref)
+        assert torch.equal(ds[i]["audio"], ref), row["sample_id"]
