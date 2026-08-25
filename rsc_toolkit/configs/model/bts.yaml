@@ -1,0 +1,13 @@
+# BTS 논문(Interspeech 2024)의 메타데이터-텍스트 융합 CLAP — 공식 코드 충실 이식 (P0: 저자 ckpt 로드 시 README 수치 재현).
+#   BTS (meta all) : 기본
+#   메타 조합 ablation : model.params.meta_mode=age_sex_loc 등 (논문 Table 5)
+#   Audio-CLAP 기준선 : model=audioclap (오디오 전용)
+name: bts
+params:
+  n_cls: 4
+  pretrained_name: laion/clap-htsat-unfused
+  final_feat_dim: 512
+  clap_final: concat
+  te_alpha: 0.5
+  meta_mode: all
+  text_max_length: 64

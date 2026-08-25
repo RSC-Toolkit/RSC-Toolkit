@@ -55,10 +55,17 @@ class PLAdapter(L.LightningModule):
         audio_batch = batch[0].squeeze(1)
         labels = batch[1]
 
+        extra = {}
+        if len(batch) > 2:
+            # BTS 처럼 평가에도 meta 가 필요한 모델 (bts_precomputed datamodule 은 val 에도 붙인다).
+            # index datamodule 은 val 배치에 meta 를 붙이지 않으므로 sgscl 계열은 여기 안 온다.
+            extra["meta_labels"] = batch[2]
+
         logits, loss = self.rsc_model.training_forward(
             audio_batch=audio_batch,
             labels=labels,
             loss_func=self.loss_func,
+            **extra,
         )
 
         self.log("val_loss", loss, prog_bar=True, on_step=False, on_epoch=True)

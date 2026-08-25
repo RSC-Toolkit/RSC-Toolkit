@@ -12,6 +12,8 @@ class PretrainedCLAPWithProjection(nn.Module):
         self.final_feat_dim = final_feat_dim
         
     def forward(self, x):
+        if x.dim() == 3:  # (B, T, F) -> (B, 1, T, F): transformers 5.x 는 4D 만 받는다
+            x = x.unsqueeze(1)
         x = self.audio_features(x)
         return x.audio_embeds
     

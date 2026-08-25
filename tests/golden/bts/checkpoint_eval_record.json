@@ -1,0 +1,22 @@
+{
+ "checkpoint": "pretrained_models/upstream/bts/best.pth (README Google Drive, epoch 50, seed 25)",
+ "test": "pretrained_models/upstream/bts/test.pt (2756 cycles)",
+ "date": "2026-08-25",
+ "transformers": "5.15.1",
+ "amp": {
+  "S_p": 82.58,
+  "S_e": 45.11,
+  "icbhi_score": 63.85
+ },
+ "fp32": {
+  "S_p": 82.52,
+  "S_e": 45.2,
+  "icbhi_score": 63.86
+ },
+ "readme": {
+  "S_p": 82.58,
+  "S_e": 45.11,
+  "icbhi_score": 63.85
+ },
+ "note": "scripts/reproduction/eval_bts_checkpoint.py --amp \ub85c \uc7ac\ud604. \uc6d0\ubcf8 validate \ub294 autocast \ud3c9\uac00."
+}

@@ -1,0 +1,13 @@
+# BTS 저자 배포 사전 전처리 텐서 (48 kHz → 8초 repeat/fade → HF ClapProcessor log-mel 1001x64).
+# 툴킷 자체 파이프라인(IndexDataset 48k + repeat_fade + CLAPProcessor)이 이 텐서와 비트 단위로
+# 일치함을 확인했으나, 논문 수치와 같은 입력을 보장하기 위해 배포본을 그대로 읽는다.
+name: bts_precomputed
+params:
+  datamodule_name: bts_precomputed
+  train_path: pretrained_models/upstream/bts/training.pt
+  test_path: pretrained_models/upstream/bts/test.pt
+  batch_size: 8
+  num_workers: 8
+  shuffle_train: true
+  drop_last_train: true          # 원본 train loader drop_last=True
+  pin_memory: true
