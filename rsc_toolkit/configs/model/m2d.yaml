@@ -1,0 +1,17 @@
+# M2D ViT-B(80x200, 패치 16x4) 미세조정 — nttcslab/m2d app/icbhi_sprs 재현 (툴킷 재구현).
+#   베이스 (M2D/0.7 16x4, 목표 61.93±0.25): pretrained_path=pretrained_models/upstream/m2d/m2d_vit_base-80x200p16x4-230529/checkpoint-300.pth
+#   M2D-X ICBHI s5 (η=0.3, 목표 63.29±0.22 — 4 시드 중 1개): pretrained_path=pretrained_models/upstream/m2d/m2d_x_vit_base-80x200p16x4-230814-Ddffsd50ks5blr0003bs128a2nr.3-e600/checkpoint-600.pth
+name: m2d
+params:
+  n_cls: 4
+  pretrained_path: pretrained_models/upstream/m2d/m2d_vit_base-80x200p16x4-230529/checkpoint-300.pth
+  input_size: [80, 200]
+  patch_size: [16, 4]
+  freeze_embed: true             # --freeze_embed
+  std_mean: 0.3671               # ICBHI Standardize (SPRS: 0.2000 / 0.2094)
+  std_std: 0.2391
+  freq_mask: 20
+  time_mask: 40
+  freq_stripes: 2
+  time_stripes: 2
+  specaug_p: 1.0

@@ -36,6 +36,12 @@ class FeatureConfig:
     dither: float = 0.0
     normalize: bool = True
     per_sample_stats: bool = False  # 비-AST 계열 논문 재현용 (샘플별 mean/std)
+    # sclmeta_mel (torchaudio MelSpectrogram) 파라미터
+    n_fft: int = 1024
+    win_length: Optional[int] = None
+    hop_length: int = 512
+    f_min: float = 50.0
+    f_max: float = 2000.0
 
 
 @dataclass
@@ -306,8 +312,10 @@ class IndexDataModule(L.LightningDataModule):
             )
         if self.features_cfg.kind == "sclmeta_mel":
             from rsc_toolkit.processors.sclmeta_mel import SCLMetaMelProcessor
-            return SCLMetaMelProcessor(sampling_rate=self.sampling_rate, n_mels=self.features_cfg.n_mels,
-                                       feature_cache=feature_cache)
+            fc = self.features_cfg
+            return SCLMetaMelProcessor(sampling_rate=self.sampling_rate, n_mels=fc.n_mels, n_fft=fc.n_fft,
+                                       win_length=fc.win_length or fc.n_fft, hop_length=fc.hop_length,
+                                       f_min=fc.f_min, f_max=fc.f_max, feature_cache=feature_cache)
         if self.features_cfg.kind == "waveform":
             # 모델 내부에서 fbank 를 만드는 백본(BEATs 등): 파형 그대로, 캐시 없음
             from rsc_toolkit.processors.waveform import WaveformProcessor

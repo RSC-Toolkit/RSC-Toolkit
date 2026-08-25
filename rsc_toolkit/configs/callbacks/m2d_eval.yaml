@@ -1,0 +1,10 @@
+# @package _global_
+# M2D 미세조정 평가 프로토콜: 매 epoch test Score 최고 (strict >, Se 게이트 없음), 재개 지원
+trainer:
+  params:
+    callbacks:
+      - _target_: rsc_toolkit.trainer.callbacks.icbhi_best_checkpoint.ICBHIBestScoreCheckpoint
+        dirpath: outputs/m2d/${run.name}
+        min_se: -1.0
+      - _target_: rsc_toolkit.trainer.callbacks.resume_checkpoint.EpochResumeCheckpoint
+        dirpath: outputs/m2d/${run.name}

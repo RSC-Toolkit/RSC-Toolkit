@@ -108,7 +108,15 @@ def main(cfg: DictConfig) -> None:
     trainer = build_trainer(cfg_dict["trainer"])
 
     # --- LightningModule ---
-    pl_module = PLAdapter(
+    # adapter: {name: split_iter, params: {split_iter: 4}} 면 분할 배치 어댑터 (M2D 미세조정 quirk)
+    adapter_cfg = cfg_dict.get("adapter") or {}
+    if adapter_cfg.get("name") == "split_iter":
+        from rsc_toolkit.trainer.adapters.split_iter_adapter import SplitIterAdapter
+
+        adapter_cls = lambda **kw: SplitIterAdapter(**kw, **adapter_cfg.get("params", {}))  # noqa: E731
+    else:
+        adapter_cls = PLAdapter
+    pl_module = adapter_cls(
         rsc_model=model,
         loss_func=loss_func,
         train_metric_fns=train_metric_fns,
