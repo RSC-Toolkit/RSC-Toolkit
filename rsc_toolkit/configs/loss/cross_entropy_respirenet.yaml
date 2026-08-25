@@ -1,0 +1,4 @@
+# RespireNet train.py:140-146 — [3,1,1,1] 사전분포 → 정규화·역수·정규화 = [0.1, 0.3, 0.3, 0.3]
+name: cross_entropy_from_prior
+params:
+  prior: [3.0, 1.0, 1.0, 1.0]

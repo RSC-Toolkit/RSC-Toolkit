@@ -34,6 +34,9 @@ trainer = [
 models = [
     "timm>=0.4.5",
     "transformers",
+    # RespireNet 특징 파이프라인 (cv2 resize/컬러 변환, librosa kaiser_best 리샘플)
+    "opencv-python-headless",
+    "resampy",
 ]
 dev = [
     "pytest",
@@ -59,5 +62,6 @@ include = ["rsc_toolkit*"]
 # (tests/unit/test_packaging.py 가 이 글롭들이 실제 파일과 맞는지 검사한다)
 rsc_toolkit = ["configs/**/*.yaml", "configs/**/*.yml"]
 "rsc_toolkit.datasets.icbhi" = ["data/*.txt"]
+"rsc_toolkit.processors" = ["data/*.npy"]
 "rsc_toolkit.datasets.sprsound" = ["data/metadata.csv"]
 "rsc_toolkit.datasets.hflungv1" = ["data/metadata.csv"]

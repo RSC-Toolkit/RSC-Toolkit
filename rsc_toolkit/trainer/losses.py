@@ -28,3 +28,23 @@ class WeightedCrossEntropyFromCounts(nn.Module):
 
     def forward(self, pred, target):
         return self.ce(pred, target)
+
+
+class WeightedCrossEntropyFromPrior(nn.Module):
+    """
+    RespireNet train.py:140-146 의 가중 CE:
+      w = prior / prior.sum();  w = 1 / w;  w = w / w.sum()
+    prior [3, 1, 1, 1] → [0.1, 0.3, 0.3, 0.3].
+    """
+
+    def __init__(self, prior: Sequence[float], **ce_kwargs):
+        super().__init__()
+        w = torch.tensor(list(prior), dtype=torch.float32)
+        w = w / w.sum()
+        w = 1.0 / w
+        w = w / w.sum()
+        self.register_buffer("weight", w)
+        self.ce_kwargs = ce_kwargs
+
+    def forward(self, logits, target):
+        return nn.functional.cross_entropy(logits, target, weight=self.weight, **self.ce_kwargs)

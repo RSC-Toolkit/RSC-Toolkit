@@ -1,0 +1,6 @@
+# RespireNet(EMBC 2021) CNN — resnet34(ImageNet) + MLP 헤드. 입력 (B, 3, 192, 753) magma 이미지.
+name: respirenet
+params:
+  n_cls: 4
+  drop_prob: 0.5
+  imagenet_pretrain: true

@@ -1,0 +1,10 @@
+# @package _global_
+# RespireNet 학습 프로토콜: 매 epoch test 셋을 청크→cycle 다수결로 평가, **cycle accuracy 최고** 일 때 best 저장
+# (train.py:266 — Score 기준 아님). MA/cosine 없음. epoch 재개 지원.
+trainer:
+  params:
+    callbacks:
+      - _target_: rsc_toolkit.trainer.callbacks.respirenet_vote_eval.RespireNetVoteEval
+        dirpath: outputs/respirenet/${run.name}
+      - _target_: rsc_toolkit.trainer.callbacks.resume_checkpoint.EpochResumeCheckpoint
+        dirpath: outputs/respirenet/${run.name}
