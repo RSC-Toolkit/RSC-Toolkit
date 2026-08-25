@@ -12,14 +12,14 @@ import statistics
 PAPER = {  # SG-SCL 논문(2312.09603) Table 3 (5 seeds, ICBHI official 4-class)
     "icbhi-ast-sgscl": ("SG-SCL (AST)",    (79.87, 8.89), (43.55, 5.93), (61.71, 1.61)),
     "icbhi-ast-dat":   ("DAT (AST, dev)",  (77.11, 7.20), (41.99, 5.00), (59.81, 1.25)),
-    # 비-AST (SFT 400ep 레시피; CE 행은 SG-SCL 논문 Table 3 자체 실행치)
-    "icbhi-resnet18-ce":       ("ResNet18 SFT",        (76.63, 1.87), (31.06, 2.45), (53.84, 1.26)),
+    # 비-AST — SG-SCL 논문 Table 3 (같은 저장소 레시피 bs64/400ep 로 저자가 재실행한 값).
+    # patch-mix 논문 Table 1 의 값(ResNet18 53.84±1.26, EffB0 56.56±0.79)은 다른 실행이라 참고만.
+    "icbhi-resnet18-ce":       ("ResNet18 SFT",        (74.72, 3.43), (33.95, 3.88), (54.33, 0.91)),
     "icbhi-resnet18-sgscl":    ("ResNet18 + SG-SCL",   (75.58, 6.36), (34.63, 5.98), (55.10, 1.18)),
-    "icbhi-effb0-ce":          ("EffNet-B0 SFT",       (80.07, 4.74), (33.05, 4.14), (56.56, 0.79)),
+    "icbhi-effb0-ce":          ("EffNet-B0 SFT",       (73.48, 5.93), (39.24, 2.43), (57.46, 1.05)),
     "icbhi-effb0-sgscl":       ("EffNet-B0 + SG-SCL",  (81.58, 3.38), (33.85, 3.75), (57.72, 1.32)),
     "icbhi-cnn6-ce":           ("CNN6 SFT",            (80.13, 2.64), (35.91, 3.52), (58.10, 0.59)),
     "icbhi-cnn6-sgscl":        ("CNN6 + SG-SCL",       (78.16, 3.49), (38.05, 4.41), (58.11, 0.64)),
-    # ResNet34 SFT 는 두 논문 모두 자체 수치 없음 (Interspeech'23 의 55.20 은 인용) — 목표치 미설정
     "icbhi-resnet34-ce":       ("ResNet34 SFT",        None, None, None),
 }
 
