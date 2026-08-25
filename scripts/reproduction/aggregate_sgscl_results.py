@@ -23,16 +23,32 @@ PAPER = {  # SG-SCL 논문(2312.09603) Table 3 (5 seeds, ICBHI official 4-class)
     "icbhi-resnet34-ce":       ("ResNet34 SFT",        None, None, None),
 }
 
+def _completed(root: pathlib.Path, run: str) -> bool:
+    """
+    런처가 학습 종료 시 쓰는 logs/<run>.done (EXIT=0) 이 있어야 완료로 본다.
+    best.json 은 매 best 갱신마다 쓰이므로 중간에 죽은 run 도 갖고 있다 —
+    그걸 완료본처럼 집계하면 안 된다 (2026-08-25 Slurm 잡 종료 사고).
+    """
+    done = root / "logs" / f"{run}.done"
+    return done.exists() and "EXIT=0" in done.read_text()
+
+
 def main():
     root = pathlib.Path("outputs/sgscl")
     groups = {k: [] for k in PAPER}
+    partial = []
     for best in sorted(root.glob("*/best.json")):
         run = best.parent.name
         m = re.fullmatch(r"(.+?)(?:-s(\d+))?", run)
         base, seed = m.group(1), int(m.group(2) or 1)
         if base in groups:
+            if not _completed(root, run):
+                partial.append(run)
+                continue
             d = json.loads(best.read_text())
             groups[base].append((seed, d["S_p"], d["S_e"], d["icbhi_score"], d.get("epoch")))
+    if partial:
+        print("(미완료 run — 집계 제외: " + ", ".join(partial) + ")")
 
     for base, rows in groups.items():
         if not rows:
