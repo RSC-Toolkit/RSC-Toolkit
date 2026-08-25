@@ -40,6 +40,15 @@ class ICBHIBestScoreCheckpoint(L.Callback):
         self.best_score = float("-inf")
         self.best_info = None
 
+    # 재개(EpochResumeCheckpoint) 시 best 기준이 이어져야 한다 — 없으면 재개 후 첫
+    # epoch 가 무조건 best 로 덮어써 프로토콜(전 구간 Score 최고)이 깨진다.
+    def state_dict(self):
+        return {"best_score": self.best_score, "best_info": self.best_info}
+
+    def load_state_dict(self, state_dict):
+        self.best_score = float(state_dict.get("best_score", float("-inf")))
+        self.best_info = state_dict.get("best_info")
+
     def on_validation_end(self, trainer, pl_module):
         if trainer.sanity_checking:
             return

@@ -12,3 +12,6 @@ trainer:
       - _target_: rsc_toolkit.trainer.callbacks.icbhi_best_checkpoint.ICBHIBestScoreCheckpoint
         dirpath: outputs/sgscl/${run.name}
         min_se: 5.0
+      # epoch 단위 재개용 last.ckpt (외부 요인으로 죽어도 이어서; 정상 종료 시 삭제)
+      - _target_: rsc_toolkit.trainer.callbacks.resume_checkpoint.EpochResumeCheckpoint
+        dirpath: outputs/sgscl/${run.name}

@@ -119,7 +119,20 @@ def main(cfg: DictConfig) -> None:
     _log_run_metadata(trainer, cfg_dict)
 
     # --- Run ---
-    trainer.fit(pl_module, datamodule=datamodule)
+    # resume: "auto"(기본) 면 EpochResumeCheckpoint 의 last.ckpt 가 있을 때 이어간다.
+    # "never" 면 무시하고 처음부터 (CLI: +resume=never).
+    ckpt_path = None
+    resume = str(cfg_dict.get("resume", "auto"))
+    if resume == "auto":
+        from rsc_toolkit.trainer.callbacks.resume_checkpoint import find_resume_path
+
+        ckpt_path = find_resume_path(trainer)
+        if ckpt_path is not None:
+            logger.info("재개: %s 에서 이어서 학습한다", ckpt_path)
+    elif resume != "never":
+        raise ValueError(f"resume 은 auto|never 여야 한다: {resume!r}")
+
+    trainer.fit(pl_module, datamodule=datamodule, ckpt_path=str(ckpt_path) if ckpt_path else None)
 
 
 if __name__ == "__main__":
