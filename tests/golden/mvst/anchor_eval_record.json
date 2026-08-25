@@ -1,12 +1,44 @@
 {
  "date": "2026-08-25",
  "ckpt": "pretrained_models/upstream/mvst/16/best.pth (저자 배포 16x16 뷰)",
- "paper_table1_16x16": {"S_p": 78.48, "S_e": 46.62, "icbhi_score": 62.55},
- "eval": {
-  "seed1_split_920_stems (train 552/test 368, 2685 cycles)": {"S_p": 79.02, "S_e": 52.20, "icbhi_score": 65.61},
-  "seed1_split_with_our_2_extra_txt (922 stems)": {"S_p": 81.59, "S_e": 57.42, "icbhi_score": 69.50},
-  "seed1_split_patchmix_6_extra_txt (926 stems)": {"S_p": 81.11, "S_e": 58.16, "icbhi_score": 69.64},
-  "official_60_40_test (2756 cycles)": {"S_p": 93.73, "S_e": 82.33, "icbhi_score": 88.03}
+ "paper_table1_16x16": {
+  "S_p": 78.48,
+  "S_e": 46.62,
+  "icbhi_score": 62.55
  },
- "conclusion": "저자 폴더 구성(부속 파일 stem)을 모르면 seed-1 스플릿을 정확히 복원할 수 없다. 재구성 스플릿 결과가 논문보다 높고 공식 test 에서 88 이 나오는 것은 배포 ckpt 가 공식 test 녹음 다수를 학습에 썼음(환자 누수)을 뜻한다. 앵커는 근사(±3)로만 사용."
+ "eval": {
+  "seed1_split_920_stems (train 552/test 368, 2685 cycles)": {
+   "S_p": 79.02,
+   "S_e": 52.2,
+   "icbhi_score": 65.61
+  },
+  "seed1_split_with_our_2_extra_txt (922 stems)": {
+   "S_p": 81.59,
+   "S_e": 57.42,
+   "icbhi_score": 69.5
+  },
+  "seed1_split_patchmix_6_extra_txt (926 stems)": {
+   "S_p": 81.11,
+   "S_e": 58.16,
+   "icbhi_score": 69.64
+  },
+  "official_60_40_test (2756 cycles)": {
+   "S_p": 93.73,
+   "S_e": 82.33,
+   "icbhi_score": 88.03
+  }
+ },
+ "conclusion": "저자 폴더 구성(부속 파일 stem)을 모르면 seed-1 스플릿을 정확히 복원할 수 없다. 재구성 스플릿 결과가 논문보다 높고 공식 test 에서 88 이 나오는 것은 배포 ckpt 가 공식 test 녹음 다수를 학습에 썼음(환자 누수)을 뜻한다. 앵커는 근사(±3)로만 사용.",
+ "fusion_author_ckpts_on_seed1_split_920": {
+  "S_p": 81.03,
+  "S_e": 54.22,
+  "icbhi_score": 67.62,
+  "epoch": 5,
+  "paper_mvst": {
+   "S_p": 81.99,
+   "S_e": 51.1,
+   "icbhi_score": 66.55
+  },
+  "note": "저자 뷰 ckpt 5개 → 툴킷 특징 덤프·FuseMLP 융합(fusion.py 프로토콜). 단일 뷰와 같은 방향(+1)의 스플릿 불일치 편향."
+ }
 }
