@@ -1,0 +1,5 @@
+# MVST util/misc.py:69-72 — `--optimizer adam` 이 실제로는 AdamW (lr 5e-5, wd 1e-6). patch-mix/sgscl 계열(Adam)과 다르다.
+name: adamw
+params:
+  lr: 5e-5
+  weight_decay: 1e-6
