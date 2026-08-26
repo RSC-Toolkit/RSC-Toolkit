@@ -1,0 +1,5 @@
+# DDE-MAE 1단계: AdamW lr 2e-4, wd 5e-4 (논문 §3.3 명시), 스케줄 미기재 → 없음(가정)
+name: adamw
+params:
+  lr: 2.0e-4
+  weight_decay: 5.0e-4

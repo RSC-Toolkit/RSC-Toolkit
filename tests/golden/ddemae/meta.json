@@ -1,0 +1,6 @@
+{
+ "repo": "/raid/doyoung/projects/RSC-Toolkit/outputs/reference/audiomae",
+ "ckpt": "pretrained_models/upstream/audiomae/pretrained.pth",
+ "timm": "0.4.5",
+ "torch": "2.13.0+cu130"
+}

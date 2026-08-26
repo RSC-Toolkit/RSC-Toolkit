@@ -1,0 +1,11 @@
+# @package _global_
+# DDE-MAE 1단계(분리 FT): 평가 없음, 마지막 epoch 상태 저장(final_state.pth — E_R·E_I·디코더·q_θ 전부), 재개 지원
+# quirk: q_θ(vCLUB) 보조 Adam 의 optimizer 상태는 last.ckpt 에 없다 — 재개 시 q_θ 파라미터는 state_dict 로 복원되지만 Adam 모멘트는 초기화됨.
+trainer:
+  params:
+    callbacks:
+      - _target_: rsc_toolkit.trainer.callbacks.final_state.FinalStateCheckpoint
+        dirpath: outputs/ddemae/${run.name}
+      - _target_: rsc_toolkit.trainer.callbacks.resume_checkpoint.EpochResumeCheckpoint
+        dirpath: outputs/ddemae/${run.name}
+      - _target_: rsc_toolkit.trainer.callbacks.ddemae_losses.DDEMAELossLogger

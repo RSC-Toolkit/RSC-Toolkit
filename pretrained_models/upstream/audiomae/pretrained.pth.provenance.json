@@ -1,0 +1,12 @@
+{
+  "file": "pretrained.pth",
+  "description": "Audio-MAE ViT-B/16 AudioSet-2M self-supervised pretrained checkpoint (encoder + decoder), from facebookresearch/AudioMAE README (Google Drive id 1ni_DV4dRf7GxM8k-Eirx71WP9Gg89wwu), mirrored on HF",
+  "source_url": "https://huggingface.co/lpepino/audiomae_ckpts/resolve/main/pretrained.pth",
+  "hf_repo": "lpepino/audiomae_ckpts",
+  "upstream_repo": "https://github.com/facebookresearch/AudioMAE",
+  "license": "CC-BY-NC-4.0 (Attribution-NonCommercial 4.0 International; AudioMAE LICENSE) \u2014 research-local use only, no redistribution",
+  "sha256": "5a71507cf57513fd513c76c72c74b6396787c1e345bd93936ac154185a75dc29",
+  "size_bytes": 1639079507,
+  "downloaded_at": "2026-08-26T23:41:42.688903",
+  "used_by": "rsc_toolkit/models/audiomae_dde.py (DDE-MAE reproduction, Wei et al. Interspeech 2025)"
+}

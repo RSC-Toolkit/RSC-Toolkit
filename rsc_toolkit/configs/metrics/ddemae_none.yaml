@@ -1,0 +1,3 @@
+# DDE-MAE 1단계: training_forward 가 더미 0 로짓을 내므로 분류 지표는 무의미 → 지표 없음 (손실 분해는 callbacks/ddemae_stage1 의 DDEMAELossLogger)
+train: []
+val: []
