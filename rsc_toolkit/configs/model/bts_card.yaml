@@ -1,0 +1,27 @@
+# BTS-CARD (ICASSP 2026, RSC-Toolkit/BTS-CARD a9982a0) — BTS 위 반사실(RUBI)·적대(GRL) 편향 제거, 공식 코드 충실 이식.
+# 기본값 = 공식 코드 quirk 그대로 (KL 무효, c=1 고정, 마스킹 = None 생략). 논문형 전환은 플래그.
+#   ablation w/o (a)/(b)/(c): model.params.use_counterfactual=false / use_adversarial=false / use_meta_aug=false
+#   (정의는 저자 확인 전 잠정 — docs/AUTHOR_QUESTIONS_2026-08-26.md BTS-CARD 8번)
+name: bts_card
+params:
+  n_cls: 4
+  pretrained_name: laion/clap-htsat-unfused
+  final_feat_dim: 512
+  clap_final: concat
+  te_alpha: 0.5
+  meta_mode: all
+  text_max_length: 64
+  nde_pretrained_name: pretrained_models/upstream/hf/tiny-clinicalbert   # nlpie/tiny-clinicalbert 로컬 사본 (provenance.json)
+  alpha: 0.0            # 추론 TIE o1 − α·o2; 툴킷 주 결과 프로토콜 α=0 고정 (§3.2.4), 스윕은 eval 스크립트
+  lambda_loc: 0.01
+  lambda_dev: 0.1
+  grl_lambda: 1.0
+  p_mask: 0.25
+  kl_dead: true         # true = 원본(그래디언트 없는 KL), false = 논문 Eq.8
+  const_trainable: false
+  mask_mode: omit       # omit = 원본(None 생략) | unknown = 논문 §2.3 placeholder
+  n_loc: 7
+  n_dev: 4
+  use_counterfactual: true
+  use_adversarial: true
+  use_meta_aug: true

@@ -1,0 +1,6 @@
+# BTS-CARD 공식 스크립트: --optimizer adam --learning_rate 5e-5 --weight_decay 1e-6 (6개 param group 모두 같은 lr).
+# 논문 §3.1 은 AdamW 5e-5 → optimizer=adam_btscard optimizer.name=adamw optimizer.params.weight_decay=1e-4 (parse_args 기본) 등으로 오버라이드.
+name: adam
+params:
+  lr: 5e-5
+  weight_decay: 1e-6

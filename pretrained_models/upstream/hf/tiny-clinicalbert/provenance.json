@@ -1,0 +1,44 @@
+{
+ "url": "https://huggingface.co/nlpie/tiny-clinicalbert",
+ "repo_id": "nlpie/tiny-clinicalbert",
+ "files": {
+  ".gitattributes": {
+   "size": 1477,
+   "sha256": "db7c0371f46f0840b8f25794c1e3321c9b5820a8cb6ba9694a46fc64b8fae5a6"
+  },
+  "README.md": {
+   "size": 1579,
+   "sha256": "bf95966ac6a3114aff76e89d9276a3868a48c231c1df093b654d60ce41045a94"
+  },
+  "config.json": {
+   "size": 866,
+   "sha256": "4db43c8c53b137559789135604a32b8e1b8e74ed75e2992814ff322699ede6f4"
+  },
+  "generation_config.json": {
+   "size": 95,
+   "sha256": "e1b179a5720aa30d3f3fc52432eeacd634d345af8b10765694ebe84d21cee1a4"
+  },
+  "pytorch_model.bin": {
+   "size": 55641540,
+   "sha256": "b9200290540012db6ce9a2d5ab0c546dd9fd139c7b2d3bff151c15b675b00834"
+  },
+  "special_tokens_map.json": {
+   "size": 125,
+   "sha256": "b6d346be366a7d1d48332dbc9fdf3bf8960b5d879522b7799ddba59e76237ee3"
+  },
+  "tokenizer.json": {
+   "size": 668923,
+   "sha256": "343989712a36cd8b253efeaf8baf6a08b9d2583f78e395e83832e8ee9f8d8ee1"
+  },
+  "tokenizer_config.json": {
+   "size": 347,
+   "sha256": "095ee61cd234ae40c360b82e6b4a1dc194ea123ae511e1bdff82b1ced12cfe1a"
+  },
+  "vocab.txt": {
+   "size": 213450,
+   "sha256": "eeaa9875b23b04b4c54ef759d03db9d1ba1554838f8fb26c5d96fa551df93d02"
+  }
+ },
+ "downloaded_at": "2026-08-26T15:53:56.132391+00:00",
+ "used_by": "BTS-CARD NDE branch (models/tinybert.py AutoModel.from_pretrained('nlpie/tiny-clinicalbert'))"
+}

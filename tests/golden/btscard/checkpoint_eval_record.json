@@ -1,0 +1,67 @@
+{
+ "checkpoint": "pretrained_models/upstream/btscard/best.pth (README Google Drive 1Pn6…; ckpt 내부 alpha=0.0, epoch=-1, best_acc=[87.27,41.80,64.54])",
+ "icbhi_test": "pretrained_models/upstream/bts/test.pt (2756 cycles)",
+ "sprsound_ood": "pretrained_models/upstream/btscard/valid_spr.pt (1429 events, 4-class)",
+ "date": "2026-08-27",
+ "transformers": "5.15.1",
+ "amp": true,
+ "icbhi_alpha0": {
+  "S_p": 87.27042431918383,
+  "S_e": 41.80118946473731,
+  "icbhi_score": 64.53580689196058
+ },
+ "icbhi_alpha_sweep": {
+  "alpha=0.0": 64.53580689196058,
+  "alpha=0.1": 64.79069219357483,
+  "alpha=0.2": 64.83317307717721,
+  "alpha=0.3": 64.8015074660309,
+  "alpha=0.4": 64.76984185488462,
+  "alpha=0.5": 64.85402341586742,
+  "alpha=0.6": 64.85402341586742,
+  "alpha=0.7": 64.87565396077957,
+  "alpha=0.8": 64.91813484438195,
+  "alpha=0.9": 64.92895011683802,
+  "alpha=1.0": 64.76984185488462
+ },
+ "icbhi_TE": {
+  "S_p": 87.01709943001349,
+  "S_e": 42.31096006796582,
+  "icbhi_score": 64.66402974898966
+ },
+ "icbhi_NDE": {
+  "S_p": 65.86447118428968,
+  "S_e": 11.97960917586984,
+  "icbhi_score": 38.92204018007976
+ },
+ "sprsound_author_alpha0": {
+  "S_p": 82.98076923076125,
+  "S_e": 43.95886889459024,
+  "icbhi_score": 63.46981906267575
+ },
+ "sprsound_alpha_sweep": {
+  "alpha=0.0": 63.46981906267575,
+  "alpha=0.1": 63.005734625262264,
+  "alpha=0.2": 63.00672335375735,
+  "alpha=0.3": 62.6064119042814,
+  "alpha=0.4": 62.350331224036196,
+  "alpha=0.5": 61.99809669763716,
+  "alpha=0.6": 61.517327466867975,
+  "alpha=0.7": 61.21316986354586,
+  "alpha=0.8": 59.46274965393581,
+  "alpha=0.9": 56.571213169855056,
+  "alpha=1.0": 52.84370674312079
+ },
+ "paper_table2": {
+  "icbhi": [
+   84.42,
+   44.83,
+   64.63
+  ],
+  "sprsound": [
+   82.02,
+   41.9,
+   61.96
+  ]
+ },
+ "note": "ICBHI α=0 이 ckpt 의 best_acc 와 소수점까지 일치(저자 validate 재현). scripts/reproduction/eval_btscard_checkpoint.py --ckpt_format author --amp 로 재현. 논문 값은 5 runs 평균·α 스윕 최고값이라 단일 ckpt 는 근접 비교만."
+}

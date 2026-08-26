@@ -1,0 +1,29 @@
+# BTS-CARD 재현 실행 config — 기본 = 공식 스크립트(scripts/icbhi_causal_adversarial_debiasing_bts_meta_all.sh):
+#   15 ep, bs 8 drop_last, adam 5e-5 / wd 1e-6, cosine(eta_min lr·1e-3), MA 0.5, AMP, 비가중 CE, seed 111 단일.
+# 논문 §3.1 레시피(30 ep, AdamW) 는 오버라이드 예:
+#   rsctk-train --config-name btscard_icbhi trainer.params.max_epochs=30 optimizer.name=adamw run.name=icbhi-btscard-paper-s1 seed=1
+# 툴킷 주 결과 프로토콜: α=0 고정, ICBHI 공식 test 기준 best(Se>5), seed 1–5; SPRSound OOD 는 ICBHI-best ckpt 로
+#   scripts/reproduction/eval_btscard_checkpoint.py --ckpt outputs/btscard/<run>/best.pth --sprsound author,toolkit (α 스윕 병기).
+#
+#   rsctk-train --config-name btscard_icbhi run.name=icbhi-btscard-s1 seed=1
+defaults:
+  - model: bts_card
+  - data: bts_precomputed
+  - loss: cross_entropy
+  - metrics: icbhi_metrics
+  - optimizer: adam_btscard
+  - trainer: default
+  - callbacks: btscard_paper
+  - _self_
+
+seed: 1
+
+trainer:
+  params:
+    max_epochs: 15             # 공식 스크립트 (논문 30)
+    precision: 16-mixed        # 원본 autocast + GradScaler (train: CLAP 만 autocast, 나머지 fp32 — 모델 내부에서 재현)
+
+run:
+  name: icbhi-btscard
+  group: btscard
+  tags: [btscard, bts, icbhi, ood-sprsound]
