@@ -1,0 +1,16 @@
+# @package _global_
+# ADD-RSC 학습 프로토콜 (patch-mix 계열 main.py 그대로): MA 0.5 live 평균(model+denoise+classifier), epoch 코사인(η_min=lr·1e-3),
+# best-on-test Score 최고 && Se > 5, 재개 지원
+trainer:
+  params:
+    callbacks:
+      - _target_: rsc_toolkit.trainer.callbacks.ma_update.LiveWeightAveraging
+        beta: 0.5
+      - _target_: rsc_toolkit.trainer.callbacks.paper_cosine_lr.PaperCosineLR
+        learning_rate: 5e-5
+        epochs: 50
+      - _target_: rsc_toolkit.trainer.callbacks.icbhi_best_checkpoint.ICBHIBestScoreCheckpoint
+        dirpath: outputs/addrsc/${run.name}
+        min_se: 5.0
+      - _target_: rsc_toolkit.trainer.callbacks.resume_checkpoint.EpochResumeCheckpoint
+        dirpath: outputs/addrsc/${run.name}

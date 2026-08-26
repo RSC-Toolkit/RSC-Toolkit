@@ -1,0 +1,26 @@
+# ADD-RSC(AST) ICBHI 4-class — 공식 코드 기본값: 50ep, bs8 drop_last, AdamW 5e-5/wd 1e-6 + epoch 코사인, 비가중 CE + LabelSmoothing(0.2) 0.5/0.5,
+#   MA 0.5, SpecAug(icbhi_ast_sup, mean) → Resize(1024,256), fp16 autocast(무 GradScaler), best-on-test(Se>5). 논문(단일 seed 0): 85.13/45.94/65.53.
+#   주 결과 = 공식 60/40 (data: icbhi_patchmix). 코드 스플릿(random.Random(1) 파일 단위) 비교: data.params.split_file=rsc_toolkit/datasets/icbhi/data/addrsc_random1_split.txt
+#   실행: rsctk-train --config-name addrsc_icbhi run.name=icbhi-addrsc-s1 seed=1
+defaults:
+  - model: ast_addrsc
+  - data_defaults@data: base
+  - data: icbhi_patchmix
+  - loss: cross_entropy         # 원본 기본 --weighted_loss off (켜면 NameError)
+  - metrics: icbhi_metrics
+  - optimizer: adamw_addrsc     # AdamW lr 5e-5, wd 1e-6 (원본 misc.py: adam → AdamW)
+  - trainer: default
+  - callbacks: addrsc_paper
+  - _self_
+
+seed: 1
+
+trainer:
+  params:
+    max_epochs: 50
+    precision: 32               # AMP 는 모델 내부 autocast (GradScaler 없음, 원본 그대로)
+
+run:
+  name: icbhi-addrsc
+  group: addrsc
+  tags: [addrsc, icbhi]

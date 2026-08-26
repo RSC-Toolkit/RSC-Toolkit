@@ -1,0 +1,5 @@
+# ADD-RSC util/misc.py set_optimizer: --optimizer adam 이 실제로는 AdamW (lr 5e-5, wd 1e-6)
+name: adamw
+params:
+  lr: 5e-5
+  weight_decay: 1e-6
