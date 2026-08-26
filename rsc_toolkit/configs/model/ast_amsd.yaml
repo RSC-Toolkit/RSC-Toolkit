@@ -1,0 +1,28 @@
+# AMS-D(ICASSP 2026, CcnNnn/AMS-D) AST base384 16/16, 128×798 → 8×49 토큰, AudioSet 16/16 ckpt(HF 변환본) 통째 로드 + pos_embed 시간축 절단.
+# 공식 main.py 기본값: mask_ratio 0.39(153/392), mask_dense 0(하드), attentive, α 1.0 / β 0.03 / γ 0.3 / τ 1, soft 증류(이중 softmax teacher 유지).
+# method: amsd(기본) | sd_mask | sd_only | baseline (Table 3), mask_mode: attentive | random | time_inter | freq_inter (Table 2)
+name: ast_amsd
+params:
+  n_cls: 4
+  input_fdim: 128
+  input_tdim: 798
+  fshape: 16
+  tshape: 16
+  fstride: 16
+  tstride: 16
+  pretrained_path: null            # pretrained_models/upstream/audioset_16_16_0.4422.pth
+  mask_ratio: 0.39
+  mask_dense: 0.0
+  mask_mode: attentive
+  method: amsd
+  num_train_samples: 4142          # 공식 60/40 train cycle 수 (콜백이 datamodule 길이로 보정)
+  alpha: 1.0
+  beta: 0.03
+  gamma: 0.3
+  tau: 1.0
+  distillation_type: soft
+  teacher_is_prob: false           # 가정 플래그: true 면 논문 식 1 문자 그대로(이중 softmax 제거)
+  noise_enabled: true              # epoch ≥10 잡음+시간 roll (mydataset.py:126-129; 진폭·roll 은 파생 RNG 가정)
+  noise_start_epoch: 10
+  noise_seed: 2345
+  input_layout: freq_time

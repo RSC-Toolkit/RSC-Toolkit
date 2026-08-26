@@ -98,5 +98,5 @@ class PLAdapter(L.LightningModule):
 
         name = sched_cfg["name"]
         params = dict(sched_cfg.get("params", {}))
-        cls = {"cosine_annealing": S.CosineAnnealingLR, "step": S.StepLR}[name]
+        cls = {"cosine_annealing": S.CosineAnnealingLR, "step": S.StepLR, "multistep": S.MultiStepLR}[name]  # multistep: AMS-D main.py adjust_learning_rate
         return {"optimizer": optimizer, "lr_scheduler": {"scheduler": cls(optimizer, **params), "interval": "epoch"}}

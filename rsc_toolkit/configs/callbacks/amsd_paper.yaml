@@ -1,0 +1,16 @@
+# @package _global_
+# AMS-D 학습 프로토콜: epoch 인식·버퍼 콜백, best-on-test (기본 판정 키 = 논문 이진 paper_score, Se 게이트 없음; best.json 에 표준 4-class 병기),
+# epoch 재개(last.ckpt 에 per-sample 버퍼 포함). MultiStepLR 은 optimizer/adam_amsd.yaml 의 lr_scheduler.
+# 표준 산식으로 best 를 고르려면: trainer.params.callbacks.1.score_key=icbhi_score ...se_key=S_e ...sp_key=S_p
+trainer:
+  params:
+    callbacks:
+      - _target_: rsc_toolkit.trainer.callbacks.amsd_epoch.AMSDEpochCallback
+      - _target_: rsc_toolkit.trainer.callbacks.amsd_best_checkpoint.AMSDBestScoreCheckpoint
+        dirpath: outputs/amsd/${run.name}
+        score_key: paper_score
+        se_key: paper_S_e
+        sp_key: paper_S_p
+        min_se: -1.0
+      - _target_: rsc_toolkit.trainer.callbacks.resume_checkpoint.EpochResumeCheckpoint
+        dirpath: outputs/amsd/${run.name}

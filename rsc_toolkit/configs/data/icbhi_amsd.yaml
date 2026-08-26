@@ -1,0 +1,60 @@
+# AMS-D ICBHI 4-class, 공식 60/40 (툴킷 목적). 공식 loader/mydataset.py 재현:
+#   클립 → kaldi fbank 128/10 ms → (798 프레임 미만이면 raw 영역 0-패딩 / 초과면 절단: 코드 fallback) → [train] torchaudio
+#   FrequencyMasking(freqm//2)·TimeMasking(timem//2) 값 0 → 정규화 (x-mean)/(2·std). epoch ≥10 잡음/roll 은 모델(ast_amsd) 이 적용.
+#   dataset_aug(시간영역 증강으로 클래스 불균형 보정, 논문 §3.1; 생성 스크립트·내용 미상) 는 **쓰지 않는다** → 앵커 대비 알려진 결손.
+#
+# 클립 길이 — 가정(저자 질문 #10, 저자 확인 전): 공식 코드에 클립 생성 스크립트가 없다. 논문 §3.1 "16 kHz 리샘플 + 8 s loop-pad" 를 기본값으로
+#   채택 (desired_length_sec 8.0, pad_type repeat = 반복 패딩·fade 없음; 8 s = 정확히 798 프레임이라 코드의 fbank 0-패딩 분기는 실행되지 않음).
+#   두 번째 가정(파형 패딩 없이 fbank 영역 무음 0-패딩, 패딩값 +0.467):  data.params.desired_length_sec=null data.params.pad_type=zero
+#   캐시는 AMSDDataModule 이 cache_dir/pad-<pad_type>-<desired_length_sec>-fade<fade>/ 로 자동 분리한다 (가정 전환 시 재생성, 8 워커 수십 초).
+# 가정값(누락 config_train.yaml, 질문 #3): amsd_freqm 48 / amsd_timem 192 (AST AudioSet 관례; 코드 //2 로 실효 24/96) — 논문 §3.1 은 SpecAugment 를
+#   언급하지 않으므로 0/0 도 동등한 후보 (data.params.amsd_freqm=0 data.params.amsd_timem=0). mean/std 는 논문 미기재 → AST 상수 가정.
+name: icbhi_amsd
+params:
+  datamodule_name: amsd
+
+  dataset_name: icbhi
+  index_dataset_cls: rsc_toolkit.datasets.index_dataset.IndexDataset
+  project_root: ${hydra:runtime.cwd}
+  split_file: rsc_toolkit/datasets/icbhi/data/official_split.txt
+  data_dir: .datasets/icbhi
+
+  sampling_rate: 16000
+  sample_level: cycle
+  desired_length_sec: 8.0        # 가정(질문 #10): 논문 §3.1 8 s loop-pad. null 이면 코드 fallback(fbank 0-패딩) 가정
+  pad_type: repeat               # 논문 'loop-padded' = 반복 패딩 (fade 없음)
+  fade: false                    # 원본 로더는 fade 없음
+
+  train_splits: [train]
+  val_splits: [test]             # 매 epoch 공식 test 평가 (툴킷 프로토콜 best-on-test; 공식 코드의 train 80/20 valid 선택·epoch 45 는 문서화만)
+  test_splits: [test]
+
+  batch_size: 24
+  num_workers: 8
+  shuffle_train: true
+  drop_last_train: true          # myloader.py:161 drop_last=True
+  pin_memory: true
+
+  features:
+    enabled: true
+    kind: fbank
+    cache_dir: downloaded_datasets/features_cache_amsd   # fade 없음·normalize 없음 → 전용 캐시; 실제 경로는 /pad-*/ 하위 (AMSDDataModule)
+    n_mels: 128
+    target_frames: 798
+    frame_shift: 10
+    window_type: hanning
+    dither: 0.0
+    normalize: false             # raw fbank 캐시 — 정규화는 마스킹 뒤 AMSDFeatureDataset 이
+
+  feature_precompute: true
+  feature_precompute_batch_size: 8
+  feature_precompute_num_workers: 8   # 첫 캐시 생성 가속 — 워커 0 이면 사이클당 녹음 전체 로드로 ~2 h
+
+  specaugment:
+    enabled: false               # 툴킷 SpecAugment 정책과 다름 — AMSDFeatureDataset 의 torchaudio 마스킹 사용
+
+  amsd_freqm: 48                 # 가정 (저자 확인 전; 논문 미언급 → 0 도 후보)
+  amsd_timem: 192                # 가정 (저자 확인 전; 논문 미언급 → 0 도 후보)
+  amsd_mean: -4.2677393          # 가정 (AST AudioSet 상수; 논문 미기재)
+  amsd_std: 4.5689974            # 가정
+  amsd_return_index: true        # train 배치 4번째 원소 = 샘플 인덱스 (PS-KD 버퍼·잡음 시드)

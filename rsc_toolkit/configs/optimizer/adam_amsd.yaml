@@ -1,0 +1,12 @@
+# AMS-D main.py:177 Adam(lr 5e-5, weight_decay 5e-7, betas (0.95, 0.999)) + adjust_learning_rate(main.py:88-95):
+# epoch ≥ milestone 마다 ×0.2 (milestones [15,25,30,35,40,45]) — MultiStepLR(interval epoch) 과 epoch 정렬 동일 (epoch 15 부터 1e-5).
+name: adam
+params:
+  lr: 5e-5
+  weight_decay: 5e-7
+  betas: [0.95, 0.999]
+lr_scheduler:
+  name: multistep
+  params:
+    milestones: [15, 25, 30, 35, 40, 45]
+    gamma: 0.2

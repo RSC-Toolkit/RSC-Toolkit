@@ -1,0 +1,32 @@
+# AMS-D(ICASSP 2026) ICBHI 4-class.
+#   공식 코드 사실: AST 16/16 + attentive masked self-distillation, 50 ep, bs 24 drop_last, Adam 5e-5/wd 5e-7/betas(.95,.999),
+#     MultiStep ×0.2 @[15,25,30,35,40,45] (main.py:52; 논문 서술 'epoch 15 이후 5 epoch 마다' 는 20 포함 → 질문 #12, 코드 기본 유지.
+#     논문 서술로 돌리려면 optimizer.lr_scheduler.params.milestones=[15,20,25,30,35,40,45]), AMP·MA 없음.
+#   툴킷 프로토콜(공식과 다름): 공식 train 100% + 매 epoch 공식 test 평가 best-on-test(paper_score) — 공식 코드는 (train+dataset_aug) 80% 서브셋
+#     학습 + 20% valid best_acc/best_score, test.py 기본 epoch 45. dataset_aug 없음(알려진 결손).
+#   가정(저자 확인 전): 클립 8 s loop-pad(#10), freqm/timem·mean/std(#3), 잡음 진폭·roll 파생 RNG — data/icbhi_amsd.yaml, model/ast_amsd.yaml 참고.
+#   앵커(논문 §3.1 이진 산식, 비표준): AMS-D Se 60.92 / Sp 74.16 / Score 67.54; baseline 64.47/67.15/65.81 (run 수·± 미기재).
+#   실행: rsctk-train --config-name amsd_icbhi run.name=icbhi-amsd-s1 seed=1
+#   변형: model.params.method=baseline|sd_only|sd_mask, model.params.mask_mode=random|time_inter|freq_inter
+defaults:
+  - model: ast_amsd
+  - data_defaults@data: base
+  - data: icbhi_amsd
+  - loss: cross_entropy         # 검증 CE(main.py criterion_CE) / baseline 의 L_task; AMS-D 학습 손실은 모델 내부 AMSDLoss
+  - metrics: amsd_metrics
+  - optimizer: adam_amsd
+  - trainer: default
+  - callbacks: amsd_paper
+  - _self_
+
+seed: 1
+
+trainer:
+  params:
+    max_epochs: 50
+    precision: 32               # 원본 AMP 없음
+
+run:
+  name: icbhi-amsd
+  group: amsd
+  tags: [amsd, icbhi]
