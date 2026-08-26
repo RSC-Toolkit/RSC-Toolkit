@@ -1,0 +1,14 @@
+# @package _global_
+# LoRA-RSC 학습 프로토콜: 스텝 단위 CosineAnnealingLR(T_max=259×100, eta_min 0, warmup 없음), MA/EMA 없음,
+# best-on-test = 매 epoch 공식 test Score 최고 (Se 게이트 없음 → min_se -1), 재개 지원.
+trainer:
+  params:
+    callbacks:
+      - _target_: rsc_toolkit.trainer.callbacks.step_cosine_lr.StepCosineLR
+        epochs: 100
+        eta_min: 0.0
+      - _target_: rsc_toolkit.trainer.callbacks.icbhi_best_checkpoint.ICBHIBestScoreCheckpoint
+        dirpath: outputs/lorarsc/${run.name}
+        min_se: -1.0
+      - _target_: rsc_toolkit.trainer.callbacks.resume_checkpoint.EpochResumeCheckpoint
+        dirpath: outputs/lorarsc/${run.name}

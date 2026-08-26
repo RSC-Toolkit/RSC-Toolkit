@@ -1,0 +1,18 @@
+# @package _global_
+# LungAdapter 학습 프로토콜 — 논문 'mostly follows [13]'(Bae Patch-Mix) 상속 **추정**:
+#   - MA 0.5 live 평균 (Bae --ma_update --ma_beta 0.5; 동결 파라미터는 값 불변이라 무해) — 끄려면 callbacks=... 에서 제거
+#   - epoch cosine LR (논문 'cosine scheduling'; eta_min = lr·0.1³, warmup 없음 은 Bae 상속 추정), lr 5e-4 (논문 명시)
+#   - best-on-test: Score 최고 && Se > 5 (Bae validate 규칙; 논문 모델 선택 기준 미기재)
+trainer:
+  params:
+    callbacks:
+      - _target_: rsc_toolkit.trainer.callbacks.ma_update.LiveWeightAveraging
+        beta: 0.5
+      - _target_: rsc_toolkit.trainer.callbacks.paper_cosine_lr.PaperCosineLR
+        learning_rate: 5e-4
+        epochs: 50
+      - _target_: rsc_toolkit.trainer.callbacks.icbhi_best_checkpoint.ICBHIBestScoreCheckpoint
+        dirpath: outputs/lungadapter/${run.name}
+        min_se: 5.0
+      - _target_: rsc_toolkit.trainer.callbacks.resume_checkpoint.EpochResumeCheckpoint
+        dirpath: outputs/lungadapter/${run.name}

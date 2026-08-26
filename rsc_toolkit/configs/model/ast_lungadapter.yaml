@@ -1,0 +1,27 @@
+# LungAdapter(Interspeech 2024) — 논문 명세 재구현 (공식 코드 없음). 동결 PatchMixAST(IN+AS, 뒤집힌 798×128 quirk) + 블록별
+# Attention-Adapter(hidden 16, MHSA 출력 뒤 직렬) + Res-Adapter(ratio 0.15 → 115, MLP 병렬). 어댑터 + classifier(LN+Linear)만 학습.
+# 기본 플래그 = 논문 식·Fig.1 그대로(res_input x, res_scale none): 파라미터 Attn만 0.34M ✓ / Res만 2.13M(2.14, ±0.01M 안) /
+# 둘 다 2.468M(논문 2.48 과 0.0116M 차 — 미해결). 세 값을 동시에 맞추려면 res_scale: vector (발명 파라미터, models/ast_lungadapter.py docstring).
+# Table 2 ablation: model.params.use_res_adapter=false (Attn만) / model.params.use_attn_adapter=false (Res만)
+name: ast_lungadapter
+params:
+  n_cls: 4
+  use_attn_adapter: true
+  use_res_adapter: true
+  attn_hidden: 16
+  res_ratio: 0.15
+  # ---- 논문 미기재 항목 (플래그; 값은 추정) ----
+  conv_dim: 2d            # 2d(패치 격자 12×79, cls/dist 는 DWConv 우회) | 1d(토큰 축)
+  scale_form: vector      # s1∈R^768, s2∈R^16 학습 | scalar
+  s1_init: 1.0
+  s2_init: 1.0
+  attn_insert: pre_residual   # x = x + Adapter(attn(norm1 x)) | post_residual (Mona 코드 방식)
+  res_input: x            # Fig.1: ⊕ 뒤·LN2 앞 잔차 스트림 x 에서 분기 | norm2 (MLP 와 공유, 대안)
+  res_scale: none         # 논문 식(8)에는 스케일 없음 | vector(768-d 학습; 2.48M 맞춤 추정) | scalar
+  res_scale_init: 1.0
+  zero_init_up: true      # W_up 0 초기화 → 시작 시 동결 AST 와 동일 출력
+  freeze_backbone: true
+  # ---- PatchMixAST 상속 인자 ----
+  input_layout: freq_time
+  input_fdim: 798         # 일부러 뒤집힌 Bae 코드 quirk (models/ast_patchmix.py docstring)
+  input_tdim: 128
