@@ -1,0 +1,55 @@
+# QLung 의 ICBHI 데이터 설정 — icbhi_patchmix/icbhi_sgscl 와 동일 피처 체인(캐시 공유) + AQS float 를 배치 3번째 원소로.
+#   AQS 변형: data.params.qlung.entropy_source=rms(기본, 코드 버그 그대로) | entropy(코드식+엔트로피, Figure 1)
+#             data.params.qlung.formula=code(기본) | paper(논문 식 5 문자 그대로)
+name: icbhi_qlung
+params:
+  datamodule_name: qlung
+
+  dataset_name: icbhi
+  index_dataset_cls: rsc_toolkit.datasets.qlung_data.QLungAQSIndexDataset
+  project_root: ${hydra:runtime.cwd}
+  split_file: rsc_toolkit/datasets/icbhi/data/official_split.txt
+  data_dir: .datasets/icbhi
+
+  sampling_rate: 16000
+  sample_level: cycle
+  desired_length_sec: 8.0
+  pad_type: repeat_fade          # 원본 cut_pad_sample_torchaudio (fade_out 포함) — AQS 도 이 파형에서 계산
+
+  train_splits: [train]
+  val_splits: [test]             # 논문 프로토콜: 매 epoch 공식 test 평가 (best-on-test)
+  test_splits: [test]
+
+  batch_size: 8
+  num_workers: 8
+  shuffle_train: true
+  drop_last_train: true          # 원본 train loader drop_last=True
+  pin_memory: true
+
+  features:
+    enabled: true
+    kind: fbank
+    cache_dir: downloaded_datasets/features_cache
+    n_mels: 128
+    target_frames: 798
+    frame_shift: 10
+    window_type: hanning
+    dither: 0.0
+    normalize: true
+
+  feature_precompute: true
+  feature_precompute_batch_size: 8
+  feature_precompute_num_workers: 0
+
+  specaugment:
+    enabled: false               # 모델(ast_qlung)이 배치 단위로 적용한다
+
+  qlung:
+    alpha: 0.7               # --quality_alpha
+    beta: 0.3                # --quality_beta
+    entropy_source: rms          # icbhi_dataset.py:177 버그 그대로 (H 자리에 rms) | entropy(문자 그대로, 무음 71건 nan) | entropy_nanmean
+    formula: code                # get_acoustic_features.py 정규화식
+    cache_dir: downloaded_datasets/aqs_cache
+    precompute: true
+    precompute_num_workers: 8
+    attach_val: true

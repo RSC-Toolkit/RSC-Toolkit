@@ -1,0 +1,20 @@
+# @package _global_
+# QLung 학습 프로토콜 콜백 (scripts/train_qlung_icbhi.sh + train_qlung.py):
+#   - 매 iteration 직전 가중치와 0.6:0.4 live 평균 (--ma_update --ma_beta 0.6) — DFAM(dfam.*) 제외 (train_qlung.py:490-499)
+#   - epoch 단위 cosine LR (eta_min = lr * 0.1^3), warmup 없음 (util/misc.py:12-24)
+#   - best-on-test 선택: Score 최고 && Se > 5 일 때 저장 (train_qlung.py:574-577)
+trainer:
+  params:
+    callbacks:
+      - _target_: rsc_toolkit.trainer.callbacks.qlung_ma_update.LiveWeightAveragingExcluding
+        beta: 0.6
+        exclude_prefixes: ["dfam."]
+      - _target_: rsc_toolkit.trainer.callbacks.paper_cosine_lr.PaperCosineLR
+        learning_rate: 5e-5
+        epochs: 50
+      - _target_: rsc_toolkit.trainer.callbacks.icbhi_best_checkpoint.ICBHIBestScoreCheckpoint
+        dirpath: outputs/qlung/${run.name}
+        min_se: 5.0
+      # epoch 단위 재개용 last.ckpt (외부 요인으로 죽어도 이어서; 정상 종료 시 삭제)
+      - _target_: rsc_toolkit.trainer.callbacks.resume_checkpoint.EpochResumeCheckpoint
+        dirpath: outputs/qlung/${run.name}

@@ -1,0 +1,22 @@
+# QLung(Interspeech 2026)의 AST — 공식 코드 충실 이식 (P0 골든 고정).
+#   QLung  : model.params.method=aqm (기본)  — AngularClassifier(s_a 37) CE + 0.4·CE(DFAM s_d 15)
+#   CE     : model.params.method=ce          — 코드의 CE 경로 quirk(학습 비정규화/평가 정규화) 그대로 (Patch-Mix 원 코드와 다름)
+name: ast_qlung
+params:
+  n_cls: 4
+  method: aqm
+  s_a: 37.0
+  s_d: 15.0
+  kappa: 0.5                     # DFAM m (품질 마진 계수)
+  gamma: 0.5
+  m_target: 0.2
+  lambda_aqm: 0.4                # --alpha
+  class_nums: [2063, 1215, 501, 363]   # ICBHI 공식 train 4-class 개수 → π_y
+  easy_margin: false
+  specaug_policy: icbhi_ast_sup  # 원본 train 루프의 배치 단위 SpecAugment (randn 게이트)
+  specaug_mask: mean
+  # 툴킷 datamodule 은 (B, n_mels=128, frames=798) 로 준다
+  input_layout: freq_time
+  # 아래 둘은 일부러 뒤집힌 원본 quirk (models/ast_patchmix.py docstring 참고)
+  input_fdim: 798
+  input_tdim: 128
