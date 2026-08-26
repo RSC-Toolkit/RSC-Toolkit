@@ -1,0 +1,19 @@
+{
+  "panns_repo": "https://github.com/qiuqiangkong/audioset_tagging_cnn",
+  "panns_dir": "/raid/doyoung/projects/RSC-Toolkit/outputs/reference/panns",
+  "panns_commit": "d2f4b8c18eab44737fcc0de1248ae21eb43f6aa4",
+  "panns_dirty": false,
+  "panns_license": "MIT",
+  "ckpt": "pretrained_models/upstream/Cnn14_16k_mAP=0.438.pth",
+  "ckpt_zenodo": "https://zenodo.org/record/3987831 (Cnn14_16k_mAP=0.438.pth)",
+  "torch": "2.7.0+cu126",
+  "torchlibrosa": "0.1.0",
+  "config": {
+    "sample_rate": 16000,
+    "window_size": 512,
+    "hop_size": 160,
+    "mel_bins": 64,
+    "fmin": 50,
+    "fmax": 8000
+  }
+}

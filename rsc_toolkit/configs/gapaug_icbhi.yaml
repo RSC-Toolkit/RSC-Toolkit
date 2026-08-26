@@ -1,0 +1,30 @@
+# GaP-Aug(Chang et al., ICASSP 2024) 재현 — **논문 명세 재구현·가정 런** (공식·비공식 코드 없음, 등급 C).
+#   CNN14(AudioSet 16k) + GaP-aug + Mixup + NLL + triplet(Algo. 1 비가중 합; model.params.w_trip=0.01 은 자매 논문 이탈 플래그), 20,000 iter(=40 epoch × 500 step), bs 16 균형 배치, Adam 1e-5, AMP 없음.
+#   앵커(공식 60/40, 단일 값): Table 1 GaP-aug+Mixup Se 58.20 / Sp 77.07 / Score 67.64 (Acc 69.01); Table 2 Naïve 48.34/64.28/56.31,
+#   GaP-aug w/o Mixup 56.49/76.94/66.72, SpecAug w/ Mixup 48.63/79.54/64.09, PatchMask w/ Mixup 54.88/77.01/65.94, Mixup 55.88/71.82/63.85.
+#   실행: rsctk-train --config-name gapaug_icbhi run.name=icbhi-gapaug-s1 seed=1
+#   변형: model.params.method=naive|gapaug_nomixup|specaug|patchmask|mixup_only  (model.params.mixup=false 로 w/o Mixup)
+#   가정 플래그: configs/model/cnn14_gapaug.yaml 주석 참고.
+defaults:
+  - model: cnn14_gapaug
+  - data_defaults@data: base
+  - data: icbhi_gapaug
+  - loss: cross_entropy        # 평가 손실(및 naive 의 NLL); 학습 손실은 모델 내부(NLL+triplet)
+  - metrics: icbhi_metrics
+  - optimizer: adam_gapaug
+  - trainer: default
+  - callbacks: gapaug_paper
+  - _self_
+
+seed: 1
+
+trainer:
+  params:
+    max_epochs: 40             # 40 × 500 step
+    max_steps: 20000           # 논문 20,000 iterations
+    precision: 32              # AMP 언급 없음
+
+run:
+  name: icbhi-gapaug
+  group: gapaug
+  tags: [gapaug, cnn14, icbhi]

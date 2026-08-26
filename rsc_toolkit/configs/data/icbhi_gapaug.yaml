@@ -1,0 +1,42 @@
+# GaP-Aug ICBHI 데이터: 공식 60/40, 16 kHz, 사이클 10 s (짧으면 repeat 이어붙임 / 길면 앞 절단), 파형 그대로(모델 내부 log-mel),
+# 클래스 균형 배치(4/클래스 × 4 = 16, 복원 추출 가정), epoch = 500 step (20,000 iter = 40 epoch), best-on-test 프로토콜.
+# 가정: 10 s 초과 사이클은 앞 절단(논문 'divided into 10-second segments' — 다중 세그먼트 분할 가능성, AUTHOR_QUESTIONS #6);
+#       녹음 단위 fade 없음(fade: false; 논문 언급 없음 — opera 선례와 동일 명시).
+name: icbhi_gapaug
+params:
+  datamodule_name: gapaug
+  dataset_name: icbhi
+  index_dataset_cls: rsc_toolkit.datasets.index_dataset.IndexDataset
+  project_root: ${hydra:runtime.cwd}
+  split_file: rsc_toolkit/datasets/icbhi/data/official_split.txt
+  data_dir: .datasets/icbhi
+
+  sampling_rate: 16000
+  sample_level: cycle
+  desired_length_sec: 10.0
+  pad_type: repeat
+  fade: false                      # 가정: 논문 언급 없음 (IndexDataModule 기본 true 를 끔)
+
+  train_splits: [train]
+  val_splits: [test]               # 매 epoch(500 step) 공식 test 평가 → best-on-test (논문 모델 선택 기준 미기재)
+  test_splits: [test]
+
+  batch_size: 16                   # 평가 배치 / 참고값 (학습 배치는 gapaug.per_class × 4)
+  num_workers: 8
+  shuffle_train: true
+  drop_last_train: false
+  pin_memory: true
+
+  features:
+    enabled: true
+    kind: waveform                 # 캐시 없음 — 모델이 log-mel 계산
+  feature_precompute: false
+
+  specaugment:
+    enabled: false                 # 증강은 모델 내부(method)
+
+  gapaug:
+    per_class: 4
+    steps_per_epoch: 500
+    n_classes: 4
+    seed: null                     # null: torch.initial_seed() 파생

@@ -1,0 +1,5 @@
+# GaP-Aug §3.1: Adam, lr 1e-5 (weight decay·스케줄 미기재 → wd 0, 스케줄 없음 가정)
+name: adam
+params:
+  lr: 1e-5
+  weight_decay: 0.0

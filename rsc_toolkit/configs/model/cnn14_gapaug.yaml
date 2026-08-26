@@ -1,0 +1,49 @@
+# GaP-Aug(ICASSP 2024) — PANNs 원형 Cnn14 (AudioSet 16 kHz ckpt) + Algorithm 1. 논문 명세 재구현 (코드 없음).
+#   method: gapaug | gapaug_nomixup | naive | specaug | patchmask | mixup_only  (mixup: null=method 기본, true/false override)
+#   가정 플래그(저자 확인 전): norm_mode(#1: sample_minmax | sample_minmax_restore | batch_minmax | db_offset | none), mixup_alpha(#2),
+#   w_trip(1.0 = Algorithm 1 line 14 비가중 합(문면); 0.01 = 자매 논문 근거 의도적 이탈 플래그)/triplet_*(#3), feature_preset(#5: paper 400/100 vs panns16k 512/160),
+#   pretrained(#4: 16k|32k), window(hann=ckpt 학습 설정 | hamming=자매 논문 관례), head_input(#4: emb=공식 Transfer_Cnn14 post-dropout | feat),
+#   triplet_layer(#3: emb | feat | pooled), n_patches/max_*/gamma_per/aug_p(#7), specaug_*(PANNs 기본값),
+#   joint_forward(false = Algo. 1 line 13 문면 2회 forward | true = 결합 1회, 비문면), head_init
+#   특징 정의 = PANNs 식(파워 → slaney mel 50–8000 → 10·log10 dB) 가정(#5)
+name: cnn14_gapaug
+params:
+  n_cls: 4
+  method: gapaug
+  mixup: null
+  pretrained: 16k
+  pretrained_path: null
+  sample_rate: 16000
+  feature_preset: paper
+  n_fft: null
+  hop: null
+  n_mels: 64
+  fmin: 50.0
+  fmax: 8000.0
+  window: hann
+  norm_mode: sample_minmax
+  db_offset: 100.0
+  n_patches: 32
+  max_freq: 16
+  max_time: 16
+  min_freq: 1
+  min_time: 1
+  gamma_min: 1.7
+  gamma_max: 2.0
+  gain: 1.0
+  gamma_per: patch
+  aug_p: 1.0
+  specaug_time_width: 64
+  specaug_time_stripes: 2
+  specaug_freq_width: 8
+  specaug_freq_stripes: 2
+  mixup_alpha: 1.0
+  mixup_loss: soft
+  w_trip: 1.0                      # Algo. 1 line 14 비가중 합(문면); 0.01 = 자매 논문 근거 이탈 플래그
+  triplet_margin: 1.0
+  triplet_p: 2.0
+  triplet_source: xa
+  triplet_layer: emb
+  head_input: emb
+  joint_forward: false             # 문면(M(X_mix)·M(X_a) 2회 forward). true = 결합 1회(속도)
+  head_init: xavier
