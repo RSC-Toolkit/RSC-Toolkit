@@ -1,0 +1,47 @@
+# Lungmix(ICASSP 2025) SPRSound 데이터 — 논문 §III-A 이벤트 7-class → ICBHI 식 4-class 병합(파생 라벨: Normal→0,
+# Fine/Coarse Crackle→1, Wheeze/Rhonchi/Stridor→2, Both→3). 가정(#7): 2022 inter-patient test(번들 official_split 'valid'→test).
+# **비표준**: 툴킷 표준 SPRSound 프로토콜(7-class)과 다르다 — 논문이 쓴 방식으로 먼저 재현. 전처리는 icbhi_lungmix 와 동일.
+name: sprsound_lungmix
+params:
+  datamodule_name: lungmix
+  dataset_name: sprsound
+  index_dataset_cls: rsc_toolkit.datasets.lungmix_data.LungmixIndexDataset
+  project_root: ${hydra:runtime.cwd}
+  data_dir: .datasets/sprsound
+  raw_data_subdir: Classification
+  index_filename: index_cycle.csv
+
+  sampling_rate: 16000
+  sample_level: cycle
+  desired_length_sec: 9.0
+  pad_type: repeat
+  fade: false
+  resample_after_slice: true     # sprsound 계열 선례(8 kHz 원 구간 → 16 kHz)
+  time_unit: ms_int
+
+  train_splits: [train]
+  val_splits: [test]
+  test_splits: [test]
+
+  batch_size: 4
+  num_workers: 4
+  shuffle_train: true
+  drop_last_train: false
+  pin_memory: true
+
+  features:
+    enabled: true
+    kind: waveform
+  feature_precompute: false
+
+  lungmix:
+    label_map: sprsound_7to4
+    emit_valid_len: true       # train 배치 meta_labels 에 원 구간 길이(패딩 전) 를 실음 (model mix_stage=raw 기본 경로; padded 대안이면 false 가능)
+    bandpass:
+      enabled: true
+      kind: butter
+      order: 4
+      zero_phase: true
+      low_hz: 50.0
+      high_hz: 1500.0
+      before_pad: true           # 사이클 구간 단위 적용(가정; 녹음 단위 대안 미구현)

@@ -1,0 +1,42 @@
+# Lungmix(ICASSP 2025) AST — 논문 명세 재구현 (models/ast_lungmix.py docstring 의 가정·플래그 참고).
+#   기준선(w/o Mixup): model.params.variant=none
+#   주 방법           : variant=non_linear + apply_loudness_mask=true (논문 식 3 = Table I 'Lungmix (non-linear)')
+#   코드판            : apply_loudness_mask=false = 공식 lungmix() 출력(random mask 만) = Table I 'Lungmix (w/o loudness)' 행
+#                       (§III-C "without the loudness mask (using only a random mask)"; 저자 질문 #1 미확인). 이 파일의 기본값은
+#                       P0(공식 코드) 인 false 이고, 실험 config(lungmix_icbhi/sprs) 가 true 로 덮어쓴다.
+#   그 외             : linear | combined | label_preservation | vanilla_mixup | lungmix_patchmix
+name: ast_lungmix
+params:
+  n_cls: 4
+  fstride: 10                    # 가정: stride 미기재 → AudioSet 10/10 ckpt
+  tstride: 10
+  input_fdim: 128                # 원 AST 레이아웃 (pos_embed 12×101 보간 없음)
+  input_tdim: 1024
+  pool: mean_all                 # 가정: 전 hidden state 평균에 cls/dist 포함 (mean_patches 로 제외)
+  use_bn: true                   # BatchNorm1d(768) → Linear(n_cls)
+  head: bn_linear                # 가정: BN 이 원 AST 분류기의 LayerNorm 을 대체 (bn_ln_linear = BN → LN → Linear)
+  specaugment:
+    enabled: false               # 논문 미언급 → 없음 (켜면 fbank 뒤 툴킷 SpecAugment; data.specaugment 는 waveform 경로에서 무효)
+    policy: icbhi_ast_sup
+    mask: mean
+  sample_rate: 16000
+  n_mels: 128
+  target_frames: 1024            # 9 s ≈ 898 frame + 0-패딩 (가정)
+  fbank_pad_before_norm: true    # 가정: 원 AST 순서(패딩 후 정규화)
+  variant: non_linear
+  apply_loudness_mask: false     # false = 공식 lungmix() 출력(random mask 만, P0 = 'w/o loudness' 행) / true = 논문 식 3('non-linear' 행)
+  overlap: lam                   # 식 3 경로의 random∧loudness 겹침값(가정): lam = 공식 반환 mask((1+λ)−1) | one = 식 8 OR 해석
+  smooth: false                  # 공식 코드 옵션(논문 없음)
+  mix_prob: 1.0                  # 가정: 전 배치 믹싱 확률 (randperm 짝·원본 대체는 플래그 없이 고정)
+  out_len_sec: 9.0
+  fit_mode: cut_first            # 가정: 믹싱 출력(max_len+shift2) repeat 후 앞 9 s 절단 (cut_last | random_crop | none)
+  mix_stage: raw                 # 가정(#5, 기본·주 런): 원 구간만 섞고 9 s 로 맞춤 (논문 식 3 maxlen(x_i,x_j) 표기·공식 함수 길이 맞춤 구조가 시사;
+                                 #   data lungmix.emit_valid_len=true 필요) | padded = 9 s 패딩된 파형을 섞음 (대안 — 출력 기대 25% 상수 패딩)
+  vanilla_alpha: 0.5             # vanilla_mixup 의 Beta(α,α) (가정: 공식 lungmix 의 0.5 와 맞춤)
+  lambda1: 1.0
+  lambda2_mode: ratio            # combined: λ2 = L_CE.detach()/L_mix.detach() (가정) | fixed
+  lambda2: 1.0
+  mix_beta: 1.0                  # lungmix_patchmix 의 patch_mix β
+  patchmix_label_mode: mixup     # lungmix_patchmix 의 라벨(가정): mixup(PatchMixLoss 보간) | preserve(CE(y_or), §III-C 라벨 보존 결합)
+  time_domain: false
+  mix_num_threads: 1             # CPU 믹싱 스레드 (수치 무관; 64 스레드는 부하 서버에서 배치당 5–7 s)

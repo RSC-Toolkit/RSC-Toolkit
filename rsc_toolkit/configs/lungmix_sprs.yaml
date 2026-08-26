@@ -1,0 +1,35 @@
+# Lungmix(ICASSP 2025) SPRSound 재현 — 4-class 병합(비표준, 논문 방식), 2022 inter-patient test 가정. 나머지는 lungmix_icbhi 와 동일.
+#   rsctk-train --config-name lungmix_sprs run.name=sprs-lungmix-nonlinear-s1 seed=1          (식 3, 'non-linear' 행)
+#   rsctk-train --config-name lungmix_sprs model.params.apply_loudness_mask=false run.name=sprs-lungmix-woloudness-s1 seed=1
+#   rsctk-train --config-name lungmix_sprs model.params.variant=none run.name=sprs-lungmix-none-s1 seed=1
+#   rsctk-train --config-name lungmix_sprs model.params.mix_stage=padded run.name=sprs-lungmix-padded-s1 seed=1   (대안, 선택 런)
+# 주 런은 mix_stage=raw(원 구간 믹싱 후 9 s; 데이터 emit_valid_len=true).
+# 앵커: Fig.1 SPR→SPR 83.67(선택 기준 미기재; Fig.1 HF 열 = Table I w/o Mixup HF 행 → 같은 선택 기준 가능성), Table I non-linear 80.61 /
+#       w/o loudness 76.27 / w/o Mixup 80.44.
+defaults:
+  - model: ast_lungmix
+  - data_defaults@data: base
+  - data: sprsound_lungmix
+  - loss: cross_entropy
+  - metrics: icbhi_metrics       # 4-class 병합이므로 ICBHI 식 Sp/Se/Score
+  - optimizer: adamw_lungmix
+  - trainer: default
+  - callbacks: lungmix_paper
+  - _self_
+
+seed: 1
+
+model:
+  params:
+    apply_loudness_mask: true    # 주 런 = 논문 식 3 ('non-linear' 행). false = 공식 코드 출력('w/o loudness' 행)
+
+trainer:
+  params:
+    max_epochs: 50
+    accumulate_grad_batches: 8
+    precision: 32
+
+run:
+  name: sprs-lungmix-nonlinear
+  group: lungmix
+  tags: [lungmix, sprsound, 4class]
