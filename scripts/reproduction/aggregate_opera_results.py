@@ -12,10 +12,11 @@ import re
 import statistics
 
 PAPER = {
-    "icbhi-operact-frozen": ("OPERA-CT 동결 + Tfm (ICBHI 4-class)", 48.97, 1.21),
-    "sprs-operact-frozen":  ("OPERA-CT 동결 + Tfm (SPRSound 7-class)", 71.62, 0.84),
-    "icbhi-operact-ft":     ("OPERA-CT 전체 미세조정 (ICBHI, 툴킷 레시피)", None, None),
-    "sprs-operact-ft":      ("OPERA-CT 전체 미세조정 (SPRSound, 툴킷 레시피)", None, None),
+    # EMBC'25 Table I / II OPERA-CT 행: (Sp, Se, Score) mean±std
+    "icbhi-operact-frozen": ("OPERA-CT 동결 + Tfm (ICBHI 4-class)", ((79.09, 9.51), (18.86, 8.95), (48.97, 1.21))),
+    "sprs-operact-frozen":  ("OPERA-CT 동결 + Tfm (SPRSound 7-class)", ((83.23, 4.72), (60.00, 5.58), (71.62, 0.84))),
+    "icbhi-operact-ft":     ("OPERA-CT 전체 미세조정 (ICBHI, 툴킷 레시피)", None),
+    "sprs-operact-ft":      ("OPERA-CT 전체 미세조정 (SPRSound, 툴킷 레시피)", None),
 }
 
 
@@ -37,7 +38,7 @@ def main():
     for base, rows in groups.items():
         if not rows:
             continue
-        name, psc, pstd = PAPER[base]
+        name, paper = PAPER[base]
         rows.sort()
         print(f"\n== {name} ({base}) — {len(rows)} seeds ==")
         for seed, sp, se, sc, ep in rows:
@@ -46,8 +47,9 @@ def main():
             ms = lambda i: (statistics.mean([r[i] for r in rows]), statistics.stdev([r[i] for r in rows]))  # noqa: E731
             sp, se, sc = ms(1), ms(2), ms(3)
             print(f"  우리 평균 : Sp {sp[0]:6.2f}±{sp[1]:.2f}  Se {se[0]:6.2f}±{se[1]:.2f}  Score {sc[0]:6.2f}±{sc[1]:.2f}")
-            if psc is not None:
-                print(f"  EMBC 보고 : Score {psc:6.2f}±{pstd:.2f}   차이: {sc[0]-psc:+.2f}")
+            if paper is not None:
+                (psp, psps), (pse, pses), (psc, pscs) = paper
+                print(f"  EMBC 보고 : Sp {psp:6.2f}±{psps:.2f}  Se {pse:6.2f}±{pses:.2f}  Score {psc:6.2f}±{pscs:.2f}   Score 차이: {sc[0]-psc:+.2f}")
             else:
                 print("  논문 목표치 없음 (툴킷 정의 레시피)")
 
