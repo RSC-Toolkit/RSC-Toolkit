@@ -1,0 +1,20 @@
+{
+  "data": {
+    "repo": "/raid/doyoung/projects/RSC-Toolkit/outputs/reference/pcmcl",
+    "torch": "2.7.0+cu126",
+    "python": "3.11.5",
+    "seed": 1
+  },
+  "ast": {
+    "repo": "/raid/doyoung/projects/RSC-Toolkit/outputs/reference/pcmcl",
+    "torch": "2.13.0+cu130",
+    "python": "3.11.5",
+    "seed": 1
+  },
+  "beats": {
+    "repo": "/raid/doyoung/projects/RSC-Toolkit/outputs/reference/pcmcl",
+    "torch": "2.7.0+cu126",
+    "python": "3.11.5",
+    "seed": 1
+  }
+}

@@ -1,0 +1,3 @@
+# PC-MCL 3-label 주 손실: torch.nn.BCEWithLogitsLoss() (wa976/PC-MCL main.py:421, 가중치 없음)
+name: bce_with_logits
+params: {}

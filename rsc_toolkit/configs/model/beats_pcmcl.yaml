@@ -1,0 +1,18 @@
+# PC-MCL BEATs (주 결과): BEATs iter3+ AS2M → 토큰 평균 → Linear(768,3) + PM Linear(768,2). 손실 (1-w)·BCE + w·CE (코드 기본).
+#   Table 3 'Concat+Multi'(PM 없음): model.params.enable_ssl=false
+#   Table 3 'Multi only'          : model.params.enable_ssl=false + data.params.pcmcl.mode=noconcat_multi
+#   Table 3 'Concat only'         : model.params.label_mode=single model.params.n_cls=4 loss=cross_entropy metrics=icbhi_metrics data.params.pcmcl.mode=concat_single
+name: beats_pcmcl
+params:
+  n_cls: 3
+  label_mode: multilabel
+  pretrained_path: null          # pretrained_models/upstream/BEATs_iter3_plus_AS2M.pt
+  enable_ssl: true
+  ssl_weight: 0.1                # 논문 α=0.1 ↔ --ssl_weight — 가정(저자 확인 전; argparse 기본 0.5)
+  ssl_separate_training: false   # --ssl_separate_training (projector 768→256→LN→ReLU→768) 미사용 가정
+  ssl_projection_dim: 256
+  loss_combine: code             # code: (1-w)·main + w·ssl (main.py:586) | paper: main + α·ssl (논문 식, 플래그)
+  threshold: 0.5                 # 논문 명시
+  specaug: false                 # 가정: PAFA 계보 --nospec (원본 기본은 SpecAugment on)
+  specaug_policy: icbhi_ast_sup
+  specaug_mask: mean

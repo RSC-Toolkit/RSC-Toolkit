@@ -1,0 +1,53 @@
+# PC-MCL(AST) ICBHI: kaldi fbank 128 mel (mean -4.2677393 / std 4.5689974), 10 s → 998 프레임, 학습 = 동적 연결·PM 쌍, 평가 = 사이클 단독.
+name: icbhi_pcmcl_ast
+params:
+  datamodule_name: pcmcl
+
+  dataset_name: icbhi
+  index_dataset_cls: rsc_toolkit.datasets.index_dataset.IndexDataset
+  project_root: ${hydra:runtime.cwd}
+  split_file: rsc_toolkit/datasets/icbhi/data/official_split.txt
+  data_dir: .datasets/icbhi
+
+  sampling_rate: 16000
+  sample_level: cycle
+  desired_length_sec: 10.0
+  pad_type: repeat_fade
+
+  train_splits: [train]
+  val_splits: [test]
+  test_splits: [test]
+
+  batch_size: 32
+  num_workers: 8
+  shuffle_train: true
+  drop_last_train: true
+  pin_memory: true
+
+  features:
+    enabled: true
+    kind: fbank
+    cache_dir: downloaded_datasets/features_cache
+    n_mels: 128
+    target_frames: 998           # 10 s → h = 998 (main.py:257)
+    frame_shift: 10
+    window_type: hanning
+    dither: 0.0
+    normalize: true
+  feature_precompute: true       # 평가셋(test) fbank 캐시
+  feature_precompute_batch_size: 8
+  feature_precompute_num_workers: 0
+
+  specaugment:
+    enabled: false               # SpecAugment 는 모델(ast_pcmcl.specaug) 이 배치 단위로 적용 (원본 main.py:531)
+
+  pcmcl:
+    mode: default
+    mixing_prob: 1.0
+    conditional_mixing: false
+    mixing_label_strategy: additive
+    enable_ssl: true
+    ssl_prob: 0.3
+    patient_id_mode: recording
+    hard_negative_mode: dict_order
+    cache_dir: outputs/pcmcl/cache

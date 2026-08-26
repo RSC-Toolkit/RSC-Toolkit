@@ -1,0 +1,22 @@
+# PC-MCL AST: AudioSet 10/10 AST (input_fdim=998/input_tdim=128 뒤집힌 quirk) → (cls+dist)/2 → Linear(768,3) + PM Linear(768,2).
+#   학습 시 SpecAugment(icbhi_ast_sup, 배치 단위) — 원본 코드 기본 on (--nospec 미확인 → 코드 기본 유지, 가정). fp16 autocast 무 GradScaler.
+name: ast_pcmcl
+params:
+  n_cls: 3
+  label_mode: multilabel
+  input_fdim: 998                # desired_length 10 s → 100*10-2 (main.py:257)
+  input_tdim: 128
+  imagenet_pretrain: true
+  audioset_pretrain: true
+  pretrained_path: null          # pretrained_models/upstream/audioset_0.4593.pth
+  input_layout: freq_time
+  enable_ssl: true
+  ssl_weight: 0.1                # 가정(저자 확인 전)
+  ssl_separate_training: false
+  ssl_projection_dim: 256
+  loss_combine: code
+  threshold: 0.5
+  specaug: true
+  specaug_policy: icbhi_ast_sup
+  specaug_mask: mean
+  amp: true

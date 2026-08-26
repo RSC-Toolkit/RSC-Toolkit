@@ -1,0 +1,17 @@
+# @package _global_
+# PC-MCL 학습 프로토콜 콜백 — 학습 스크립트 부재 → PAFA 계보 **가정**: MA 0.5(--ma_update, argparse 기본 beta 0), epoch 코사인(lr 5e-5, 100 ep,
+# eta_min=lr·1e-3; misc.py adjust_learning_rate), best-on-test Score 최고 && Se > 0.1 (main.py:960 — Se 는 % 단위라 min_se 0.1), 재개 지원.
+# warmup(--warm, 10 ep) 은 미사용 가정.
+trainer:
+  params:
+    callbacks:
+      - _target_: rsc_toolkit.trainer.callbacks.ma_update.LiveWeightAveraging
+        beta: 0.5
+      - _target_: rsc_toolkit.trainer.callbacks.paper_cosine_lr.PaperCosineLR
+        learning_rate: 5e-5
+        epochs: 100
+      - _target_: rsc_toolkit.trainer.callbacks.icbhi_best_checkpoint.ICBHIBestScoreCheckpoint
+        dirpath: outputs/pcmcl/${run.name}
+        min_se: 0.1
+      - _target_: rsc_toolkit.trainer.callbacks.resume_checkpoint.EpochResumeCheckpoint
+        dirpath: outputs/pcmcl/${run.name}

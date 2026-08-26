@@ -1,0 +1,6 @@
+# PC-MCL: 학습 스크립트 부재 → **가정(저자 확인 전)** PAFA 계보 스크립트 값 Adam lr 5e-5, wd 1e-6 (misc.py set_optimizer 'adam' = torch Adam).
+# 원본 argparse 기본값은 lr 1e-3, wd 1e-4 (main.py:71,74) — 논문 서술과 맞지 않아 채택하지 않음.
+name: adam
+params:
+  lr: 5e-5
+  weight_decay: 1e-6
