@@ -1,0 +1,19 @@
+# @package _global_
+# Lung-SRAD 학습 프로토콜 (main.py 그대로): MA 0.5 live 평균(model+projector), epoch 코사인(η_min=lr·1e-3, warmup 없음),
+# best-on-test Score 최고 && Se > 5 (4-class ICBHIScore 기준) — best.json 에 2-class 파생(paper_S_p/paper_S_e/paper_score; preds>0→abnormal) 병기, 재개 지원
+trainer:
+  params:
+    callbacks:
+      - _target_: rsc_toolkit.trainer.callbacks.ma_update.LiveWeightAveraging
+        beta: 0.5
+      - _target_: rsc_toolkit.trainer.callbacks.paper_cosine_lr.PaperCosineLR
+        learning_rate: 5e-5
+        epochs: 50
+      - _target_: rsc_toolkit.trainer.callbacks.amsd_best_checkpoint.AMSDBestScoreCheckpoint
+        dirpath: outputs/lungsrad/${run.name}
+        score_key: icbhi_score
+        se_key: S_e
+        sp_key: S_p
+        min_se: 5.0
+      - _target_: rsc_toolkit.trainer.callbacks.resume_checkpoint.EpochResumeCheckpoint
+        dirpath: outputs/lungsrad/${run.name}

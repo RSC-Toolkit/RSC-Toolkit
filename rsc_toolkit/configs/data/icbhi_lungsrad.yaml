@@ -1,0 +1,47 @@
+# Lung-SRAD ICBHI 데이터 설정 = icbhi_patchmix 복제 + batch 16 + per_sample_stats (원본 icbhi_util.py:241-245 (x−mean)/(2·std), main.py:227 bs16 drop_last).
+# SpecAugment(icbhi_ast_sup, mean, randn 게이트)는 여기서 datamodule 이 적용 — 모델 안에서는 적용하지 않는다. Resize(1024,128)은 모델 안.
+name: icbhi_lungsrad
+params:
+  datamodule_name: index
+
+  dataset_name: icbhi
+  index_dataset_cls: rsc_toolkit.datasets.index_dataset.IndexDataset
+  project_root: ${hydra:runtime.cwd}
+  split_file: rsc_toolkit/datasets/icbhi/data/official_split.txt
+  data_dir: .datasets/icbhi
+
+  sampling_rate: 16000
+  sample_level: cycle
+  desired_length_sec: 8.0
+  pad_type: repeat_fade          # 원본 cut_pad_sample_torchaudio (fade_out 포함)
+
+  train_splits: [train]
+  val_splits: [test]             # 논문 프로토콜: 매 epoch 공식 test 평가 (best-on-test)
+  test_splits: [test]
+
+  batch_size: 16
+  num_workers: 8
+  shuffle_train: true
+  drop_last_train: true          # 원본 train loader drop_last=True
+  pin_memory: true
+
+  features:
+    enabled: true
+    kind: fbank
+    cache_dir: downloaded_datasets/features_cache
+    n_mels: 128
+    target_frames: 798           # 8초 -> kaldi fbank 798 프레임 (원본 h=798)
+    frame_shift: 10
+    window_type: hanning
+    dither: 0.0
+    normalize: true
+    per_sample_stats: true      # (x − mean) / (2·std) per-sample (비-AST 분기)
+
+  feature_precompute: true
+  feature_precompute_batch_size: 8
+  feature_precompute_num_workers: 0
+
+  specaugment:
+    enabled: true
+    policy: icbhi_ast_sup
+    mask: mean
