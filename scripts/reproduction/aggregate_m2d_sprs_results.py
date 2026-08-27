@@ -11,6 +11,8 @@ import statistics
 
 PAPER = {  # EMBC'25(2504.18004) Table II 인용 M2D(16x4, 230529) SPRS 미세조정 Score; TASLP M2D-X SPRS 89.77 은 가중치 미공개
     "sprs-m2d-base": ("M2D/0.7 (16x4, 230529 공개 ckpt) SPRS 미세조정", 88.78, 0.43),
+    # M2D-Resp(AS+Resp400K, 16x16): 논문(2505.15307)은 OPERA 7 태스크만 보고 → SPRS 목표치 없음(참고용)
+    "sprs-m2dresp":  ("M2D-Resp (AS+Resp400K, 16x16, 250826 공개 ckpt) SPRS 미세조정 — 논문 목표치 없음", None, None),
 }
 LOGS = pathlib.Path("outputs/m2d/logs")
 
@@ -48,7 +50,10 @@ def main():
             ms = lambda i: (statistics.mean([r[i] for r in rows]), statistics.stdev([r[i] for r in rows]))  # noqa: E731
             sp, se, sc = ms(1), ms(2), ms(3)
             print(f"  우리 평균 : Sp {sp[0]:6.2f}±{sp[1]:.2f}  Se {se[0]:6.2f}±{se[1]:.2f}  Score {sc[0]:6.2f}±{sc[1]:.2f}")
-            print(f"  논문 보고 : Score {psc:6.2f}±{pstd:.2f} (EMBC'25 Table II)   차이: {sc[0]-psc:+.2f}")
+            if psc is None:
+                print("  논문 목표치 없음 (참고용; 대조: M2D/0.7 base SPRS 88.78±0.43)")
+            else:
+                print(f"  논문 보고 : Score {psc:6.2f}±{pstd:.2f} (EMBC'25 Table II)   차이: {sc[0]-psc:+.2f}")
 
 
 if __name__ == "__main__":
