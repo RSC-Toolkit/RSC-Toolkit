@@ -12,7 +12,9 @@ params:
   temperature: 0.06
   alpha: 1.0
   target_type: project1_project2block
-  grl_alpha: 1.0                 # 원본 스케줄이 공식 레시피에서 1.0 으로 포화 (methods/sgscl.py)
+  grl_alpha: 1.0
+  cls_feat: feat0                # feat1 = 분류기 입력을 GRL(x) 로 (실험, 2026-08-28)
+  con_feat: feat0                # feat1 = 대조 특징을 GRL(x) 로 (GitHub HEAD 2ed1bac; feat0 = 클론 6656460 = 기존 P1)                 # 원본 스케줄이 공식 레시피에서 1.0 으로 포화 (methods/sgscl.py)
   specaug_policy: icbhi_ast_sup  # 원본 train 루프의 배치 단위 SpecAugment (두 뷰 누적 마스킹)
   specaug_mask: mean
   # 툴킷 datamodule 은 (B, n_mels=128, frames=798) 로 준다

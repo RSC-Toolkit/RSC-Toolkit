@@ -120,6 +120,8 @@ def sgscl_training_losses(
     alpha: float,                # 손실 가중 (--alpha, 기본 1.0)
     grl_alpha: float,            # GRL 계수 — 공식 레시피에선 항상 1.0 (아래 참고)
     target_type: str,
+    cls_feat: str = "feat0",     # 분류기 입력: "feat0"=x (공식 main.py:374) | "feat1"=GRL(x) (실험, 2026-08-28 사용자 지시)
+    con_feat: str = "feat0",     # sgscl 대조 특징: "feat0"=x (클론 6656460, 기존 P1) | "feat1"=GRL(x) (GitHub HEAD 2ed1bac)
 ):
     """
     원본 main.py train() 의 method=='ce' 아래 세 분기와 동일한 손실 구성.
@@ -129,9 +131,15 @@ def sgscl_training_losses(
     (bs8→len=517, epochs=50, epoch 는 1부터)에서는 최솟값 p≈10.3 이라
     exp(-103) 이 언더플로해 **모든 반복에서 정확히 1.0** 이다. 그래서 상수로 둔다.
     """
+    if cls_feat not in {"feat0", "feat1"} or con_feat not in {"feat0", "feat1"}:
+        raise ValueError(f"cls_feat/con_feat must be feat0|feat1, got {cls_feat!r}/{con_feat!r}")
+    from rsc_toolkit.models.grl import ReverseLayerF  # 지연 임포트 (아래 dat 분기와 동일 사유)
+
     view1 = apply_specaug_paper(specaug, x_paper) if specaug is not None else x_paper
     feats1 = paper_features(view1)
-    logits = classifier(feats1)
+    # 원본 forward(training=True)의 features = (x, GRL(x)) — features[1] 은 값이 같고 기울기만 −grl_alpha 배.
+    cls_in = ReverseLayerF.apply(feats1, grl_alpha) if cls_feat == "feat1" else feats1
+    logits = classifier(cls_in)
     class_loss = loss_func(logits, labels)
 
     if method == "ce":
@@ -144,10 +152,6 @@ def sgscl_training_losses(
         )
 
     if method == "dat":
-        # 지연 임포트: models/__init__ 의 일괄 등록과 순환을 피한다
-        # (models.ast_sgscl → methods.sgscl → models.grl → models/__init__)
-        from rsc_toolkit.models.grl import ReverseLayerF
-
         domain_feats = ReverseLayerF.apply(feats1, grl_alpha)
         meta_loss = F.cross_entropy(domain_classifier(domain_feats), meta_labels)  # 원본 criterion2: 비가중 CE
         return logits, class_loss + alpha * meta_loss
@@ -156,7 +160,13 @@ def sgscl_training_losses(
         # 원본은 in-place SpecAugment 라 두 번째 호출이 뷰1 위에 마스크를 쌓는다.
         view2 = apply_specaug_paper(specaug, view1) if specaug is not None else x_paper
         feats2 = paper_features(view2)
-        proj1, proj2 = sgscl_projections(feats1, feats2, domain_classifier, target_type)
+        if con_feat == "feat1":
+            # GitHub HEAD 2ed1bac(main.py:379-380): feat1/feat2 = features[1] = GRL(x) — 값 동일, 대조 손실의
+            # 백본 기울기만 반전. 클론 6656460(우리 기존 P1)은 features[0].
+            f1, f2 = ReverseLayerF.apply(feats1, grl_alpha), ReverseLayerF.apply(feats2, grl_alpha)
+        else:
+            f1, f2 = feats1, feats2
+        proj1, proj2 = sgscl_projections(f1, f2, domain_classifier, target_type)
         meta_loss = metacl(proj1, proj2, meta_labels)
         return logits, class_loss + alpha * meta_loss
 

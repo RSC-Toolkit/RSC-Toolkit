@@ -15,8 +15,12 @@ SG-SCL 논문(ICASSP 2024)의 AST — 공식 코드 충실 이식 (P0).
 - SpecAugment 는 train 루프에서 배치 전체에 적용된다(배치당 마스크 1벌). in-place
   구현이라 SG-SCL 의 두 번째 뷰는 첫 뷰 위에 마스크가 누적된다
   (methods/sgscl.py docstring 참고). 평가에는 적용하지 않는다.
-- SG-SCL 에서 GRL 은 forward 에서 계산되지만 결과(features[1])가 손실에 안 쓰여
-  효과가 없다 — 재현하지 않는다. DAT 에서만 GRL 이 실제로 작동한다.
+- SG-SCL 에서 GRL(features[1]) 사용은 저장소 버전에 따라 다르다: 우리 골든 앵커인
+  클론 6656460(2024-12-05)은 대조 특징에 features[0](GRL 미사용)을 쓰고, 이후 GitHub
+  HEAD 커밋 2ed1bac 은 features[1](GRL 통과)로 바꿨다. 기본값 con_feat="feat0" 은
+  클론(=기존 P1) 동작이고, con_feat="feat1" 이 GitHub HEAD, cls_feat="feat1" 은
+  분류기 입력까지 GRL 로 바꾸는 실험 플래그(2026-08-28 사용자 지시)다. GRL 은
+  파라미터가 없어 어느 조합이든 state_dict·평가 경로는 동일하다(기존 ckpt 호환).
 - 원본의 미사용 projector(생성만 되고 MA 로 스냅샷과 섞이는 것)는 재현하지 않는다.
 """
 from __future__ import annotations
@@ -57,6 +61,8 @@ class SGSCLAST(PatchMixAST):
         alpha: float = 1.0,
         target_type: str = "project1_project2block",
         grl_alpha: float = 1.0,          # 공식 레시피에서 스케줄이 1.0 으로 포화 (methods/sgscl.py)
+        cls_feat: str = "feat0",         # 분류기 입력 features[0]|[1] (feat1 = GRL 통과, 2026-08-28 실험 플래그)
+        con_feat: str = "feat0",         # sgscl 대조 특징 features[0]|[1] (feat1 = GitHub HEAD 2ed1bac)
         specaug_policy: str = "icbhi_ast_sup",
         specaug_mask: str = "mean",
         input_layout: str = "time_freq",
@@ -75,6 +81,8 @@ class SGSCLAST(PatchMixAST):
         self.alpha = alpha
         self.grl_alpha = grl_alpha
         self.target_type = target_type
+        self.cls_feat = cls_feat
+        self.con_feat = con_feat
 
         # 원본 ast.py:72/138 — DAT 일 때만 m_cls, 그 외엔 기본 527 인 채 미사용 잔존.
         domain_label_dim = m_cls if method == "dat" else 527
@@ -120,4 +128,6 @@ class SGSCLAST(PatchMixAST):
             alpha=self.alpha,
             grl_alpha=self.grl_alpha,
             target_type=self.target_type,
+            cls_feat=self.cls_feat,
+            con_feat=self.con_feat,
         )

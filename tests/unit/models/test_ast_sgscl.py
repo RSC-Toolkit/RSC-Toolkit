@@ -353,3 +353,58 @@ def test_index_feature_dataset_appends_meta_label():
 
     ds_plain = IndexFeatureDataset(_FakeIndexDS(), _FakeFP())
     assert len(ds_plain[0]) == 3
+
+
+# ------------------------------------------------ cls_feat/con_feat 플래그 (2026-08-28)
+def _flag_run(x0, *, alpha, cls_feat="feat0", con_feat="feat0", seed=0):
+    torch.manual_seed(seed)
+    labels = torch.tensor([0, 1, 2, 3])
+    meta = torch.tensor([0, 0, 1, 1])
+    classifier = nn.Linear(5, 4)
+    projector = nn.Linear(5, 5)
+    x = x0.clone().requires_grad_(True)
+    logits, loss = sgscl_training_losses(
+        method="sgscl", paper_features=lambda v: v.mean(dim=1), x_paper=x, specaug=None,
+        classifier=classifier, domain_classifier=projector, metacl=MetaCL(temperature=0.06),
+        loss_func=nn.CrossEntropyLoss(), labels=labels, meta_labels=meta,
+        alpha=alpha, grl_alpha=1.0, target_type="project1_project2block",
+        cls_feat=cls_feat, con_feat=con_feat,
+    )
+    loss.backward()
+    return logits.detach(), loss.detach(), x.grad.clone()
+
+
+def test_cls_feat1_keeps_loss_value_and_reverses_class_gradient():
+    """cls_feat=feat1(GitHub main.py:374 의 features[1] 실험): GRL forward 는 항등이라
+    logits·손실 값은 feat0 과 동일하고, 분류 손실의 백본 기울기만 부호 반전된다 (alpha=0 로 대조 항 차단)."""
+    x0 = torch.randn(4, 6, 5)
+    lo0, l0, g0 = _flag_run(x0, alpha=0.0, cls_feat="feat0")
+    lo1, l1, g1 = _flag_run(x0, alpha=0.0, cls_feat="feat1")
+    assert torch.allclose(lo0, lo1) and torch.allclose(l0, l1)
+    assert torch.allclose(g1, -g0, atol=1e-6)
+    assert g0.abs().sum() > 0
+
+
+def test_con_feat1_keeps_loss_value_and_reverses_only_contrastive_gradient():
+    """con_feat=feat1(GitHub HEAD 2ed1bac): 손실 값 동일, 대조 항 기울기만 반전 →
+    (feat0 기울기 + feat1 기울기)/2 = 분류 항 기울기(alpha=0 런과 일치)."""
+    x0 = torch.randn(4, 6, 5)
+    _, l_a, g_a = _flag_run(x0, alpha=1.0, con_feat="feat0")
+    _, l_b, g_b = _flag_run(x0, alpha=1.0, con_feat="feat1")
+    _, _, g_cls = _flag_run(x0, alpha=0.0)
+    assert torch.allclose(l_a, l_b)
+    assert not torch.allclose(g_a, g_b)
+    assert torch.allclose((g_a + g_b) / 2, g_cls, atol=1e-6)
+
+
+def test_flag_defaults_reproduce_existing_behavior():
+    """기본값(feat0/feat0)은 플래그 추가 전과 동일한 손실·기울기 (기존 P1 재현성 보존)."""
+    x0 = torch.randn(4, 6, 5)
+    _, l_def, g_def = _flag_run(x0, alpha=1.0)
+    _, l_exp, g_exp = _flag_run(x0, alpha=1.0, cls_feat="feat0", con_feat="feat0")
+    assert torch.allclose(l_def, l_exp) and torch.allclose(g_def, g_exp)
+
+
+def test_flag_invalid_value_raises():
+    with pytest.raises(ValueError):
+        _flag_run(torch.randn(4, 6, 5), alpha=0.0, cls_feat="feat2")
