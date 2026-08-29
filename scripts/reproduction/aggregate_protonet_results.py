@@ -19,7 +19,7 @@ PAPER = {
 
 
 def _completed(root, run):
-    done = root.parent / "logs" / f"{run}.done"
+    done = root / "logs" / f"{run}.done"
     return done.exists() and "EXIT=0" in done.read_text()
 
 
