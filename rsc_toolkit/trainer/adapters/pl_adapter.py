@@ -99,4 +99,8 @@ class PLAdapter(L.LightningModule):
         name = sched_cfg["name"]
         params = dict(sched_cfg.get("params", {}))
         cls = {"cosine_annealing": S.CosineAnnealingLR, "step": S.StepLR, "multistep": S.MultiStepLR}[name]  # multistep: AMS-D main.py adjust_learning_rate
-        return {"optimizer": optimizer, "lr_scheduler": {"scheduler": cls(optimizer, **params), "interval": "epoch"}}
+        # interval: 기본 "epoch". Prototype(ICASSP 2022)처럼 원본이 매 iteration scheduler.step() 하는 논문은 "step".
+        interval = str(sched_cfg.get("interval", "epoch"))
+        if interval not in {"epoch", "step"}:
+            raise ValueError(f"lr_scheduler.interval must be epoch|step, got {interval!r}")
+        return {"optimizer": optimizer, "lr_scheduler": {"scheduler": cls(optimizer, **params), "interval": interval}}

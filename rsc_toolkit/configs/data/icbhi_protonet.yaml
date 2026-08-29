@@ -1,0 +1,30 @@
+# Prototype(ICASSP 2022) ICBHI 데이터 — 4 kHz 리샘플 → 밴드패스 100–1800 Hz(녹음 전체) → 사이클 분할 → 4 s 크롭/wrap 패딩.
+# 모델이 log-mel 을 내부에서 계산하므로 파형을 그대로 넘긴다(kind: waveform, 캐시 없음).
+name: icbhi_protonet
+params:
+  datamodule_name: protonet
+  dataset_name: icbhi
+  index_dataset_cls: rsc_toolkit.datasets.index_dataset.IndexDataset
+  project_root: ${hydra:runtime.cwd}
+  split_file: rsc_toolkit/datasets/icbhi/data/official_split.txt
+  data_dir: .datasets/icbhi
+  sampling_rate: 4000            # 공식 preprocessing/config.py
+  sample_level: cycle
+  desired_length_sec: null       # 길이 고정은 ProtoIndexDataset 이 담당(랜덤/센터 크롭 구분)
+  fade: false                    # 공식에 없음 (툴킷 기본 sr/16 페이드를 끔)
+  bandpass: true                 # butter(5) 100–1800 Hz, 분할 전 녹음 전체에 적용
+  cycle_len: 16000
+  train_splits: [train]
+  val_splits: [test]             # 논문 Table 3 'Test' 열과 같은 대상
+  test_splits: [test]
+  batch_size: 16                 # 공식 main_pytorch_prototype.py:23
+  num_workers: 8
+  shuffle_train: true
+  drop_last_train: false
+  pin_memory: true
+  features:
+    enabled: true
+    kind: waveform               # 캐시 없음 — 모델이 torchlibrosa 로 log-mel 계산
+  feature_precompute: false
+  specaugment:
+    enabled: false               # 공식에 증강 없음
