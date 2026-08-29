@@ -1,5 +1,10 @@
 params:
   max_epochs: 50
+  # Lightning 기본 ModelCheckpoint 비활성화 (2026-08-29): 검증 가중치는 ICBHIBestScoreCheckpoint 가
+  # outputs/<run>/best.pth 로, 재개용은 EpochResumeCheckpoint 가 trainer.save_checkpoint 로 직접 저장한다.
+  # 기본 저장물(lightning_logs/<run>/version_*/checkpoints/epoch=*.ckpt, run 당 ~1 GB)은 아무도 참조하지
+  # 않으면서 268 GB 를 차지해 삭제했다. TensorBoard 로그(tfevents)는 그대로 남는다.
+  enable_checkpointing: false
   accelerator: auto
   devices: 1
   log_every_n_steps: 10
