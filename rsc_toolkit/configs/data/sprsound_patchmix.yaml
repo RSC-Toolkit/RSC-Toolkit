@@ -1,0 +1,43 @@
+# patch-mix 계열(AST/BEATs 백본, fbank 128×798) 논문을 **SPRSound 표준 태스크**로 확장할 때 쓰는 데이터 설정.
+# 논문들은 ICBHI 만 실험했으므로 **논문 목표치가 없다** — 툴킷 자체 결과(교차 데이터 일반화 관찰용).
+# SPRSound 는 데이터 본래 목적대로 2022 inter-patient, 이벤트 단위 **7-class** 로만 쓴다(사용자 결정 ④).
+name: sprsound_patchmix
+params:
+  datamodule_name: index
+  dataset_name: sprsound
+  index_dataset_cls: rsc_toolkit.datasets.index_dataset.IndexDataset
+  project_root: ${hydra:runtime.cwd}
+  data_dir: .datasets/sprsound
+  raw_data_subdir: Classification
+  index_filename: index_cycle.csv
+  sampling_rate: 16000
+  sample_level: cycle
+  desired_length_sec: 8.0
+  pad_type: repeat_fade          # ICBHI 쪽 patch-mix 계열과 동일 체인
+  resample_after_slice: true
+  time_unit: ms_int
+  train_splits: [train]
+  val_splits: [test]             # 2022 inter-patient test
+  test_splits: [test]
+  batch_size: 8
+  num_workers: 8
+  shuffle_train: true
+  drop_last_train: true
+  pin_memory: true
+  features:
+    enabled: true
+    kind: fbank
+    cache_dir: downloaded_datasets/features_cache
+    n_mels: 128
+    target_frames: 798
+    frame_shift: 10
+    window_type: hanning
+    dither: 0.0
+    normalize: true
+  feature_precompute: true
+  feature_precompute_batch_size: 8
+  feature_precompute_num_workers: 0
+  specaugment:
+    enabled: true
+    policy: icbhi_ast_sup
+    mask: mean
