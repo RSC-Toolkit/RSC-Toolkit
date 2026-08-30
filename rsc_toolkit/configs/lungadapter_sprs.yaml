@@ -1,3 +1,7 @@
+# **M2D SPRS 프로토콜** 적용(2026-08-30 사용자 결정: "SPRSound 를 안 쓴 모델은 M2D 에서 활용한 학습·검증 방식으로").
+#   가져온 것: 8 s·pad sclmeta·ms_int 슬라이싱·batch 64·SpecAug 없음·Adam wd 1e-4 + cosine(T_max 40)·fp32·50 ep·
+#              비가중 CE·best-on-test Score(Se 게이트 없음)·MA 없음·7-class 2022 inter-patient.
+#   못 가져온 것: 특징 추출(M2D 는 sclmeta_mel 80-bin, AST 계열은 128x798 fbank 전제) 과 lr(백본 native 유지).
 # lungadapter 를 **SPRSound 표준 태스크(2022 inter-patient, 7-class)** 로 확장 — **논문 목표치 없음**(툴킷 자체 관찰).
 # 논문은 ICBHI 만 실험했다. 재현 판정 대상이 아니라 교차 데이터 일반화 관찰용이다.
 # LungAdapter(Interspeech 2024) ICBHI 4-class 공식 60/40 — 논문 명세 재구현 (코드 없음).
@@ -13,19 +17,19 @@
 defaults:
   - model: ast_lungadapter
   - data_defaults@data: base
-  - data: sprsound_patchmix
+  - data: sprsound_ast_m2dproto
   - loss: cross_entropy            # SPRS 확장은 비가중 CE (ICBHI 4-class 가중치는 클래스 수가 달라 사용 불가)
   - metrics: sprsound_metrics
-  - optimizer: adam_lungadapter   # Adam lr 5e-4 (논문), wd 1e-6 (Bae 추정)
+  - optimizer: adam_m2d          # M2D SPRS 프로토콜: Adam wd 1e-4 + cosine(T_max 40, eta_min 1e-6), lr 은 백본 native
   - trainer: default              # max_epochs 50
-  - callbacks: lungadapter_paper
+  - callbacks: sprs_m2d_protocol   # best-on-test(Se 게이트 없음) + 재개, MA 없음
   - _self_
 
 seed: 1
 
 trainer:
   params:
-    precision: 16-mixed           # Bae AMP(autocast+GradScaler) 상속 추정; 끄려면 trainer.params.precision=32
+    precision: 32              # M2D SPRS 프로토콜(fp32)
 
 run:
   name: sprs-lungadapter
