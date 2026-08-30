@@ -14,7 +14,7 @@ defaults:
   - model: ast_lungadapter
   - data_defaults@data: base
   - data: sprsound_patchmix
-  - loss: cross_entropy            # SPRS 확장은 비가중 CE (ICBHI 4-class 가중치는 클래스 수가 달라 사용 불가)
+  - loss: cross_entropy_weighted_sprsound   # ICBHI 레시피의 가중 CE 를 SPRS 분포로 대응(같은 산식)
   - metrics: sprsound_metrics
   - optimizer: adam_lungadapter   # Adam lr 5e-4 (논문), wd 1e-6 (Bae 추정)
   - trainer: default              # max_epochs 50
