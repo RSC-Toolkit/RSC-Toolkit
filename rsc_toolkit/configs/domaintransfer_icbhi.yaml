@@ -1,0 +1,34 @@
+# A Domain Transfer Based Data Augmentation Method for Automated Respiratory Classification
+# (Zijie Wang, Zhao Wang; ICASSP 2022 pp.9017-9020) 재현 — **공식 코드 없음, 등급 C(논문 명세 재구현)**.
+#   논문 구조 : rsctk-train --config-name domaintransfer_icbhi run.name=icbhi-domaintransfer-s1 seed=1
+#               (Table 2 마지막 행 'Baseline + augmentation' 앵커 Sp 70.4 / Se 40.2 / Sc 55.3)
+#   Baseline  : ... model.params.baseline=true model.params.mixup_alpha=0 \
+#               data.params.splice_per_class=0 data.params.use_noise=false \
+#               data.params.use_stretch=false data.params.use_pitch=false
+#               (Table 2 첫 행 앵커 Sp 68.6 / Se 28.7 / Sc 49.6)
+# 논문이 안 밝힌 값은 전부 가정이며 각 파일 docstring·주석에 근거를 남겼다:
+#   ResNeSt 깊이 · IBN 종류/위치 · 스펙트로그램 종류 · epoch 수 · warm-up 스케줄 · splice 개수 ·
+#   2단계 lr · 환경잡음 코퍼스(미적용).
+defaults:
+  - model: resnest_ibn_dt
+  - data_defaults@data: base
+  - data: icbhi_domaintransfer
+  - loss: cross_entropy          # 미사용 — 모델이 가중 soft-CE(+mixup·label smoothing) 를 직접 계산
+  - metrics: icbhi_metrics
+  - optimizer: adam_domaintransfer
+  - trainer: default
+  - callbacks: domaintransfer_paper
+  - _self_
+
+seed: 1
+
+trainer:
+  params:
+    max_epochs: 60                          # 1단계 50 + 2단계 10 (가정 — 논문 미기재)
+    precision: 16-mixed
+    reload_dataloaders_every_n_epochs: 1    # 2단계에서 splice 샘플이 빠져 학습셋 길이가 줄어든다
+
+run:
+  name: icbhi-domaintransfer
+  group: domaintransfer
+  tags: [domaintransfer, icbhi]

@@ -1,0 +1,20 @@
+# Domain Transfer (Wang & Wang, ICASSP 2022) §2.2 — 논문 명세 재구현(공식 코드 없음, 등급 C).
+#   논문 구조 : rsctk-train --config-name domaintransfer_icbhi run.name=icbhi-domaintransfer-s1 seed=1
+#   Baseline  : ... model.params.baseline=true model.params.mixup_alpha=0 (Table 2 첫 행, 앵커 49.6)
+name: resnest_ibn_dt
+params:
+  n_cls: 4
+  backbone: resnest50d      # 가정: 논문은 ResNeSt 깊이 미기재(출력 2048 은 50d/101e/200e/269e 공통)
+  pretrained: true          # ImageNet 사전학습
+  ibn: true                 # 가정: IBN-a 를 stage 1–3 의 bn1 에 (IBN-Net 기본 구성)
+  ibn_stages: [1, 2, 3]
+  baseline: false
+  dropout: 0.5              # 논문 §3.2 "All dropout rates are set to 0.5"
+  gem_p: 3.0
+  sample_rate: 8000         # 논문 §3.2
+  n_fft: 512
+  hop: 256
+  use_mel: false            # 가정: Fig.1 캡션이 log-spectrogram → 선형 STFT 로그
+  n_mels: 128
+  mixup_alpha: 0.2          # 논문 식 (1)
+  label_smoothing: 0.01     # 논문 §3.2

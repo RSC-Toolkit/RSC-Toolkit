@@ -1,0 +1,20 @@
+# @package _global_
+# Domain Transfer 학습 프로토콜:
+#   - balanced class weight 주입(논문 §2.1 소수 클래스 가중↑)
+#   - warm-up(5 ep) → cosine, 50 ep 후 **2단계**: 원본 데이터만·mixup 해제·lr 0.1배로 10 ep
+#   - 논문은 단일 run·모델 선택 방식 미기재 → best-on-test 를 주로 쓰되 final_* 도 병기
+trainer:
+  params:
+    callbacks:
+      - _target_: rsc_toolkit.trainer.callbacks.domaintransfer_stages.DomainTransferStages
+        learning_rate: 6.0e-4
+        stage1_epochs: 50
+        warmup_epochs: 5
+        stage2_lr_scale: 0.1
+      - _target_: rsc_toolkit.trainer.callbacks.icbhi_best_checkpoint.ICBHIBestScoreCheckpoint
+        dirpath: outputs/domaintransfer/${run.name}
+        min_se: 0.0
+      - _target_: rsc_toolkit.trainer.callbacks.gapaug_final_metrics.FinalMetricsToBestJson
+        dirpath: outputs/domaintransfer/${run.name}
+      - _target_: rsc_toolkit.trainer.callbacks.resume_checkpoint.EpochResumeCheckpoint
+        dirpath: outputs/domaintransfer/${run.name}

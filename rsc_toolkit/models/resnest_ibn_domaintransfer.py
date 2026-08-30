@@ -32,6 +32,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from rsc_toolkit.augmentations.domain_transfer import mixup_batch
+
 from .base import BaseRSCModel
 from .factory import ModelFactory
 
@@ -131,11 +133,17 @@ class ResNeStIBNDomainTransfer(BaseRSCModel, nn.Module):
         hop: int = 256,
         use_mel: bool = False,
         n_mels: int = 128,
+        mixup_alpha: float = 0.2,       # 논문 §2.1 식 (1)
+        label_smoothing: float = 0.01,  # 논문 §3.2 "label smoothing 0.01"
     ):
         super().__init__()
         import timm
 
         self.baseline = bool(baseline)
+        self.n_cls = int(n_cls)
+        self.mixup_alpha = float(mixup_alpha)
+        self.label_smoothing = float(label_smoothing)
+        self.register_buffer("_class_weight", torch.ones(n_cls), persistent=False)
         self.spec = LogSpectrogram(sample_rate, n_fft, hop, use_mel, n_mels)
 
         net = timm.create_model(backbone, pretrained=pretrained, num_classes=0, global_pool="")
@@ -206,8 +214,12 @@ class ResNeStIBNDomainTransfer(BaseRSCModel, nn.Module):
         logger.info("IBN-a 적용: %d 블록 (stage %s)", n, list(stages))
 
     # ------------------------------------------------------------------ forward
-    def forward(self, wav: torch.Tensor) -> torch.Tensor:
-        x = self.spec(wav)                    # (B, 1, F, T)
+    def set_class_weight(self, w) -> None:
+        """datamodule 의 balanced class weight 주입 — 논문 §2.1 '소수 클래스 가중치 ↑'."""
+        self._class_weight = torch.as_tensor(w, dtype=torch.float, device=self._class_weight.device)
+
+    def forward_from_spec(self, x: torch.Tensor) -> torch.Tensor:
+        """스펙트로그램 → 로짓. mixup 이 스펙트로그램 단계에서 일어나므로 분리해 둔다."""
         x = self.backbone(x)                  # (B, C, F', T')
         if self.baseline:
             x = F.adaptive_avg_pool2d(x, 1).flatten(1)
@@ -216,6 +228,40 @@ class ResNeStIBNDomainTransfer(BaseRSCModel, nn.Module):
             x = self.pool_t(x)                # 시간 축 축약   → (B, C)
         return self.head(x)
 
+    def forward(self, wav: torch.Tensor) -> torch.Tensor:
+        return self.forward_from_spec(self.spec(wav))
+
+    def _soft_targets(self, labels: torch.Tensor) -> torch.Tensor:
+        """one-hot 에 label smoothing ε 적용 — (1-ε)·onehot + ε/K (논문 §3.2, ε=0.01)."""
+        y = F.one_hot(labels, self.n_cls).to(torch.float)
+        e = self.label_smoothing
+        return y * (1.0 - e) + e / self.n_cls if e > 0 else y
+
+    def _weighted_soft_ce(self, logits: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
+        """
+        soft target CE + 클래스 가중.
+
+        하드 라벨일 때 `F.cross_entropy(..., weight=w)` 와 같은 정의를 쓴다 —
+        샘플 손실 −Σ_c y_c log p_c 에 샘플 가중 Σ_c y_c w_c 를 곱하고 **가중 합으로 나눈다**
+        (PyTorch 의 weighted mean reduction 과 동일). mixup 으로 y 가 두 클래스에 걸치면
+        가중치도 같은 비율로 섞인다.
+        """
+        w = self._class_weight.to(logits.device)
+        logp = F.log_softmax(logits, dim=-1)
+        per_sample = -(y * logp).sum(dim=-1)
+        sw = (y * w.unsqueeze(0)).sum(dim=-1)
+        return (per_sample * sw).sum() / torch.clamp(sw.sum(), min=1e-12)
+
     def training_forward(self, audio_batch, labels, loss_func, meta_labels=None):
-        logits = self.forward(audio_batch)
-        return logits, loss_func(logits, labels)
+        """
+        논문 §2.1·§3.2 학습 경로 — 스펙트로그램 mixup(α=0.2) + label smoothing 0.01 + 클래스 가중 CE.
+
+        mixup 은 **학습 때만** 적용한다. 2단계 학습의 재미세조정 구간에서는 콜백이
+        `mixup_alpha = 0` 으로 꺼서 원본 데이터·원본 라벨만 쓰게 한다.
+        """
+        spec = self.spec(audio_batch)
+        y = self._soft_targets(labels)
+        if self.training and self.mixup_alpha > 0:
+            spec, y = mixup_batch(spec, y, self.mixup_alpha)
+        logits = self.forward_from_spec(spec)
+        return logits, self._weighted_soft_ce(logits, y)

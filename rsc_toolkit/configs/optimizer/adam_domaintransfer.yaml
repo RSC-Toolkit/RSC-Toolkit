@@ -1,0 +1,7 @@
+# 논문 §3.2 — Adam lr 6e-4, weight decay 1e-3, warm-up 사용.
+# lr 스케줄(warm-up → cosine → 2단계 저 lr)은 DomainTransferStages 콜백이 직접 덮어쓰므로
+# 여기서는 스케줄러를 두지 않는다(PaperCosineLR 계열과 같은 방식).
+name: adam
+params:
+  lr: 6.0e-4
+  weight_decay: 1.0e-3
