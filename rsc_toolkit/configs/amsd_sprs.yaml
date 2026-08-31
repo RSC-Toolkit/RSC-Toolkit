@@ -9,7 +9,7 @@ defaults:
   - metrics: sprsound_metrics
   - optimizer: adam_amsd
   - trainer: default
-  - callbacks: amsd_paper
+  - callbacks: amsd_paper_sprs
   - _self_
 
 seed: 1

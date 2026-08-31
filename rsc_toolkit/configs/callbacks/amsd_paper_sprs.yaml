@@ -1,0 +1,21 @@
+# @package _global_
+# AMS-D **SPRSound 확장** 전용 콜백 — callbacks/amsd_paper.yaml 의 복제인데 best 선정 키만 표준으로 바꾼다.
+#
+# 왜 따로 두는가: amsd_paper 는 ICBHI 용이라 논문의 **이진** 산식 `paper_score` 로 best 를 고른다
+# (metrics/amsd_metrics.yaml 이 icbhi_paper_binary 를 함께 계산하기 때문). 그런데 SPRS 확장은
+# `sprsound_metrics`(표준 7-class)만 계산하므로 그 키가 존재하지 않고, 그대로 두면 매 epoch
+# "메트릭 paper_score 가 없어 best 선정을 건너뛴다" 경고만 남긴 채 **best.json·best.pth 가 만들어지지 않는다**
+# (2026-08-31 sprs-amsd-s1 에서 실제로 발생 — last.ckpt 만 남았다).
+# 논문의 이진 산식은 ICBHI 앵커 비교 전용이므로 SPRS 에서는 표준 7-class 로 고르는 것이 맞다.
+trainer:
+  params:
+    callbacks:
+      - _target_: rsc_toolkit.trainer.callbacks.amsd_epoch.AMSDEpochCallback
+      - _target_: rsc_toolkit.trainer.callbacks.amsd_best_checkpoint.AMSDBestScoreCheckpoint
+        dirpath: outputs/amsd/${run.name}
+        score_key: icbhi_score
+        se_key: S_e
+        sp_key: S_p
+        min_se: -1.0
+      - _target_: rsc_toolkit.trainer.callbacks.resume_checkpoint.EpochResumeCheckpoint
+        dirpath: outputs/amsd/${run.name}
