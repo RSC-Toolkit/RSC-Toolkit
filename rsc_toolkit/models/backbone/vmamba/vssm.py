@@ -680,6 +680,25 @@ class VSSM(nn.Module):
             x = x_flat.view(B, Fh, T, C).permute(0, 3, 1, 2)
         return x, target, target[index], lam, index
 
+    def patch_mix_dual_axis(self, x, target):
+        """
+        원본 `vmamba_patchmix.py:1524` 의 **죽은 코드** `patch_mix_dual_axis` 를 그대로 옮긴 것.
+
+        forward 에서 `elif mix_type == "dual":` 분기가 `'''...'''` 로 주석 처리되고 그 앞에
+        `else: raise ValueError` 가 있어 **공개 코드로는 절대 실행되지 않는다**. 우리 기본 dual 경로는
+        `main.py:338-352` 의 실제 동작(시간·주파수 **독립 forward 2회 + 대조손실 2개**)을 따른다.
+
+        이 함수는 공개되지 않은 `main_v2.py` 가 이 죽은 코드를 되살렸을 가능성을 **검증하기 위한 변형**이다
+        (`cl_mode=dual_seq`). 원본 그대로의 특징 3가지를 유지한다:
+          - 시간축 mix 를 먼저 하고, **그 결과 위에** 주파수축 mix 를 새 무작위 짝으로 한 번 더 건다(순차).
+          - 유효 λ 는 두 λ 의 곱(`lam_t * lam_f`) — 원본 주석 "approximate effective mixing ratio".
+          - **라벨은 시간축 mix 것만 쓴다**(`target_a`, `target_b`, `index_t`). 주파수축 mix 의 짝
+            정보(`target_b2`, `index_f`)는 원본이 그냥 버린다 — 입력만 섞고 라벨은 반영하지 않는 quirk 다.
+        """
+        x, target_a, target_b, lam_t, index_t = self.patch_mix_time_only(x, target)
+        x, _target_a2, _target_b2, lam_f, _index_f = self.patch_mix_freq_only(x, target)
+        return x, target_a, target_b, lam_t * lam_f, index_t
+
     def apply_patch_mix(self, x, y, mix_type: str):
         if mix_type == "2d":
             return self.patch_mix_2d_ast_equiv(x, y)
@@ -687,7 +706,9 @@ class VSSM(nn.Module):
             return self.patch_mix_time_only(x, y)
         if mix_type == "freq":
             return self.patch_mix_freq_only(x, y)
-        raise ValueError(f"Invalid mix_type {mix_type!r} (2d|time|freq)")
+        if mix_type == "dual_seq":
+            return self.patch_mix_dual_axis(x, y)
+        raise ValueError(f"Invalid mix_type {mix_type!r} (2d|time|freq|dual_seq)")
 
     # ------------------------------------------------------------------ forward
     def pool_features(self, x: torch.Tensor) -> torch.Tensor:

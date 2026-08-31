@@ -46,7 +46,7 @@ DASS_CKPT_CANDIDATES = (
     "outputs/reference/papers/lungsrad/DASS_medium_v2.pth",
 )
 METHODS = ("ce", "ce_blur", "patchmix_cl")
-CL_MODES = ("dual", "time", "freq", "2d")
+CL_MODES = ("dual", "time", "freq", "2d", "dual_seq")
 TARGET_TYPES = ("grad_block", "grad_flow", "project_block", "project_flow")
 
 
@@ -56,7 +56,7 @@ class DASSLungSRAD(BaseRSCModel, nn.Module):
         self,
         n_cls: int = 4,
         method: str = "ce",                       # ce (FT) | ce_blur (SAR) | patchmix_cl (Lung-SRAD 및 Table 2 변형)
-        cl_mode: str = "dual",                    # patchmix_cl: dual | time | freq | 2d
+        cl_mode: str = "dual",                    # patchmix_cl: dual | time | freq | 2d | dual_seq(죽은 코드 변형)
         mix_layout: str = "as_code",              # as_code (원본 동작) | as_paper (Eq.6-7)
         gaussian_blur: Optional[bool] = None,     # None → method != 'ce' (원본 --gaussian_blur 스크립트 기본)
         blur_blocks: Sequence[int] = (2, 3),
@@ -175,6 +175,10 @@ class DASSLungSRAD(BaseRSCModel, nn.Module):
                     loss = loss + self.alpha_time * self._axis_cl(images, labels, proj1, "time")
                 if self.cl_mode in ("freq", "dual"):
                     loss = loss + self.alpha_freq * self._axis_cl(images, labels, proj1, "freq")
+                if self.cl_mode == "dual_seq":
+                    # 죽은 코드 patch_mix_dual_axis 를 되살린 변형 — forward 1회·대조손실 1개.
+                    # 기본 dual(독립 forward 2회·손실 2개)과 **다른 방법**이므로 계수는 alpha 하나만 쓴다.
+                    loss = loss + self.alpha * self._axis_cl(images, labels, proj1, "dual_seq")
                 if self.cl_mode == "2d":
                     mix_feat, _, labels_b, lam, index = self.v.forward_features(images, y=labels, patch_mix=True, mix_type="2d")
                     if self.detach_mix_2d:
