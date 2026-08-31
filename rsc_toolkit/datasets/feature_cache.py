@@ -14,10 +14,56 @@ class FeatureCache:
         self.cache_dir = pathlib.Path(cache_dir)
         self.cache_dir.mkdir(parents=True, exist_ok=True)
 
-    def configure(self, processor_config: Dict, processor_name: str):
+    def configure(self, processor_config: Dict, processor_name: str, audio_chain: Optional[Dict] = None):
+        """
+        캐시 키는 **프로세서 설정만** 으로 만든다(n_mels·target_frames·정규화 등).
+
+        그런데 같은 프로세서 설정이라도 **그 앞단의 오디오 체인**(리샘플·구간 절단·패딩·fade·시간 단위)이 다르면
+        피처가 달라진다. 키에는 그 정보가 없으므로, 체인이 다른 두 config 가 같은 `cache_dir` 를 쓰면
+        **조용히 남의 피처를 읽는다**. 실제로 재현 결과를 통째로 무효화할 수 있는 종류의 사고다.
+
+        키 자체에 체인을 넣으면 기존 캐시가 전부 무효가 되어 수 시간을 다시 계산해야 하므로,
+        대신 **체인 대장(`_chain.json`)을 남기고 어긋나면 즉시 예외**를 던진다.
+        - 대장은 `{dataset_name: chain}` 형태다. **데이터셋이 다르면 sample_id 가 겹치지 않으므로**
+          같은 디렉터리를 공유해도 안전하다(ICBHI 와 SPRSound 가 features_cache 를 함께 쓰는 현재 구조).
+        - 같은 데이터셋인데 체인이 다르면 실행을 멈추고 `cache_dir` 분리를 요구한다.
+        """
         self.cache_key = self._create_cache_key(processor_config, processor_name)
         self.features_dir = self.cache_dir / "features" / self.cache_key
         self.features_dir.mkdir(parents=True, exist_ok=True)
+        if audio_chain:
+            self._check_audio_chain(dict(audio_chain))
+
+    # ------------------------------------------------------------------ 체인 대장
+    def _check_audio_chain(self, chain: Dict) -> None:
+        dataset = str(chain.pop("dataset_name", "?"))
+        path = self.features_dir / "_chain.json"
+        ledger: Dict[str, Dict] = {}
+        if path.exists():
+            try:
+                ledger = json.loads(path.read_text())
+            except Exception as e:      # 손상된 대장은 경고만 하고 새로 쓴다(캐시 자체는 멀쩡할 수 있다)
+                logger.warning("체인 대장을 읽지 못했다 (%s: %s) — 새로 쓴다", path, e)
+                ledger = {}
+        known = ledger.get(dataset)
+        if known is not None and known != chain:
+            raise RuntimeError(
+                f"피처 캐시 오디오 체인 불일치 — 같은 캐시 키를 서로 다른 전처리로 쓰려 한다.\n"
+                f"  캐시: {self.features_dir}\n"
+                f"  데이터셋: {dataset}\n"
+                f"  기존: {known}\n"
+                f"  요청: {chain}\n"
+                f"둘 중 하나의 config 에서 features.cache_dir 를 분리하라 "
+                f"(그대로 두면 다른 전처리로 만든 피처를 조용히 읽게 된다)."
+            )
+        if known is None:
+            ledger[dataset] = chain
+            tmp = path.with_suffix(f".json.tmp.{os.getpid()}")
+            try:
+                tmp.write_text(json.dumps(ledger, sort_keys=True, indent=2, default=str))
+                os.replace(tmp, path)
+            except Exception as e:
+                logger.warning("체인 대장을 쓰지 못했다 (%s: %s)", path, e)
 
     def _create_cache_key(self, config: Dict, name: str) -> str:
         serialized = json.dumps(config, sort_keys=True, default=str)

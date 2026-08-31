@@ -340,9 +340,26 @@ class IndexDataModule(L.LightningDataModule):
 
         feature_cache = FeatureCache(cache_dir=cache_dir)
         fp = self._build_feature_processor(feature_cache)
-        feature_cache.configure(fp.get_processor_config(), processor_name=fp.__class__.__name__)
+        feature_cache.configure(fp.get_processor_config(), processor_name=fp.__class__.__name__,
+                                audio_chain=self._audio_chain())
 
         return IndexFeatureDataset(base_ds, fp, feature_transform=feature_transform, meta_label_fn=meta_label_fn)
+
+    def _audio_chain(self) -> dict:
+        """
+        피처 캐시 키에 들어가지 않는 **앞단 오디오 체인**. FeatureCache 가 대장에 남겨
+        같은 데이터셋을 서로 다른 전처리로 캐시하는 사고를 막는다(feature_cache.configure 주석 참조).
+        """
+        return {
+            "dataset_name": getattr(self, "dataset_name", "?"),
+            "sampling_rate": getattr(self, "sampling_rate", None),
+            "sample_level": getattr(self, "sample_level", None),
+            "desired_length_sec": getattr(self, "desired_length_sec", None),
+            "pad_type": getattr(self, "pad_type", None),
+            "fade": getattr(self, "fade", None),
+            "resample_after_slice": getattr(self, "resample_after_slice", None),
+            "time_unit": getattr(self, "time_unit", None),
+        }
 
     def _build_feature_transform(self, *, training: bool):
         if not training:

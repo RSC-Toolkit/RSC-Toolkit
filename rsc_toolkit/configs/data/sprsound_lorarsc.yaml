@@ -1,0 +1,42 @@
+# LoRA-RSC 를 SPRSound 표준 태스크(7-class)로 확장. ICBHI 레시피 그대로:
+# 16 kHz 리샘플(구간 로드 후) → sclmeta 8 s 순환 패딩+fade_out → kaldi fbank 128 × 500 프레임(앞 5 s) → bs16, drop_last False.
+# 파형 잡음은 공개 코드 기준(스칼라 DC = 무효)이라 ICBHI 기본과 동일하게 적용하지 않는다.
+name: sprsound_lorarsc
+params:
+  datamodule_name: index
+  dataset_name: sprsound
+  index_dataset_cls: rsc_toolkit.datasets.index_dataset.IndexDataset
+  project_root: ${hydra:runtime.cwd}
+  data_dir: .datasets/sprsound
+  raw_data_subdir: Classification
+  index_filename: index_cycle.csv
+  sampling_rate: 16000
+  sample_level: cycle
+  desired_length_sec: 8.0
+  pad_type: sclmeta
+  fade: false
+  resample_after_slice: true
+  time_unit: ms_int
+  train_splits: [train]
+  val_splits: [test]
+  test_splits: [test]
+  batch_size: 16
+  num_workers: 8
+  shuffle_train: true
+  drop_last_train: false
+  pin_memory: true
+  features:
+    enabled: true
+    kind: fbank
+    cache_dir: downloaded_datasets/features_cache
+    n_mels: 128
+    target_frames: 500
+    frame_shift: 10
+    window_type: hanning
+    dither: 0.0
+    normalize: true
+  feature_precompute: true
+  feature_precompute_batch_size: 8
+  feature_precompute_num_workers: 8
+  specaugment:
+    enabled: false

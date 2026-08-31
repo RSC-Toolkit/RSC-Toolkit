@@ -1,0 +1,29 @@
+# PAFA(BEATs) SPRSound 확장
+# **논문 목표치 없음** — 논문은 ICBHI 만 실험했다. SPRSound 표준 태스크(2022 inter-patient, 7-class)로 확장한
+# 툴킷 자체 관찰이며 재현 판정 대상이 아니다. 레시피는 각 논문의 ICBHI 것을 그대로 쓴다(사용자 결정 2026-08-30).
+defaults:
+  - model: beats
+  - data_defaults@data: base
+  - data: sprsound_pafa_beats
+  - loss: cross_entropy
+  - metrics: sprsound_metrics
+  - optimizer: adam
+  - trainer: default
+  - callbacks: pafa_paper
+  - _self_
+
+seed: 1
+
+run:
+  name: sprs-beats-pafa
+  group: pafa
+  tags: [pafa, sprsound, extension]
+
+model:
+  params:
+    n_cls: 7
+
+trainer:
+  params:
+    max_epochs: 100
+    precision: 16-mixed

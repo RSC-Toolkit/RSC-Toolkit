@@ -50,5 +50,10 @@ class CLAPProcessor(BaseAudioProcessor):
         Audio should be shape [channels, samples] or [samples]
         """
         assert len(audio.shape) == 1, f"Got unexpected shape: {audio.shape}"
-        return self.processor(audio=audio, return_tensors="pt", padding=True)['input_features']
+        # transformers 의 ClapFeatureExtractor 는 **torch 1-D 텐서를 2-D(배치)로 오인**해
+        # 샘플 수 × 샘플 수 크기의 배열을 만들려다 MemoryError 를 낸다(48 kHz·8 s 면 3 TiB 요구).
+        # numpy 1-D 로 넘기면 정상 경로를 탄다. 이 우회는 SPRSound OOD 경로(datasets/sprsound_ood.py)
+        # 에서 먼저 쓰였고, 그 결과가 BTS 저자 배포 텐서와 비트 단위로 일치함을 ICBHI 에서 확인했다.
+        feats = self.processor(audio=audio.detach().cpu().numpy(), return_tensors="pt", padding=True)["input_features"]
+        return feats
     

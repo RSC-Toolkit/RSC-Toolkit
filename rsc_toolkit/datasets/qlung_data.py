@@ -239,7 +239,8 @@ class QLungDataModule(IndexDataModule):
         cache_dir.mkdir(parents=True, exist_ok=True)
         feature_cache = FeatureCache(cache_dir=cache_dir)
         fp = self._build_feature_processor(feature_cache)
-        feature_cache.configure(fp.get_processor_config(), processor_name=fp.__class__.__name__)
+        feature_cache.configure(fp.get_processor_config(), processor_name=fp.__class__.__name__,
+                                audio_chain=self._audio_chain())
         attach = True if base_ds is getattr(self, "train_ds", None) else self.aqs_cfg.attach_val
         if isinstance(base_ds, ConcatDataset):
             # 여러 split 결합(SPRSound train+test) — 캐시 웜업이 index_ds.df 를 못 보므로 IndexFeatureDataset 과 같은 fallback 사용

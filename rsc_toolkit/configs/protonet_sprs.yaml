@@ -1,0 +1,32 @@
+# Prototype SPRSound 확장
+# **논문 목표치 없음** — 논문은 ICBHI 만 실험했다. SPRSound 표준 태스크(2022 inter-patient, 7-class)로 확장한
+# 툴킷 자체 관찰이며 재현 판정 대상이 아니다. 레시피는 각 논문의 ICBHI 것을 그대로 쓴다(사용자 결정 2026-08-30).
+defaults:
+  - model: protonet
+  - data_defaults@data: base
+  - data: sprsound_protonet
+  - loss: cross_entropy
+  - metrics: sprsound_metrics
+  - optimizer: adam_protonet
+  - trainer: default
+  - callbacks: protonet_paper
+  - _self_
+
+seed: 1
+
+run:
+  name: sprs-protonet
+  group: protonet
+  tags: [protonet, sprsound, extension]
+
+model:
+  params:
+    n_cls: 7
+
+trainer:
+  params:
+    max_epochs: -1
+    max_steps: 10000             # ICBHI 와 동일한 공식 ITERATION_MAX
+    precision: 32
+    val_check_interval: 500
+    check_val_every_n_epoch: null
