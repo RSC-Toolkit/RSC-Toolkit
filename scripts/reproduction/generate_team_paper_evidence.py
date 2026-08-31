@@ -398,8 +398,29 @@ OUT.write_text(f'''<title>팀 논문 재현 확인 요청</title>
   <b>Δ 는 우리 Score − 논문 Score</b>. 팀 논문 3편은 강조 표시했습니다.
   기준선류(SFT·전이학습)가 거의 전부 재현된다는 점이, 앞서 말씀드린 "파이프라인은 정상" 의 근거입니다.</p>
   {all_models_table()}
-  <p class="fignote">Se/Sp/Score 순 표기 · 우리 값은 seed 1–5 평균±표준편차 · <span class="pill ok">✅</span> 논문 ± 안 또는 −0.5 이내 ·
-  <span class="pill warn">⚠️</span> 미달 · <span class="pill crit">⚠️⚠️</span> −5 이상 큰 미달 · <code>—</code> 는 그 논문이 해당 데이터로 실험하지 않았다는 뜻입니다.</p>
+  <p class="fignote">Se/Sp/Score 순 표기 · 우리 값은 seed 1–5 평균±표준편차 ·
+  <span class="pill ok">✅</span> 논문 ± 안 또는 −0.5 이내 · <span class="pill warn">⚠️</span> 미달 · <span class="pill crit">⚠️⚠️</span> −5 이상 큰 미달 ·
+  ICBHI 열의 <code>—</code> 는 해당 없음입니다.</p>
+
+  <h3>SPRSound 열을 읽는 법</h3>
+  <p>대부분의 논문은 SPRSound 를 쓰지 않아 <b>비교할 목표치가 없습니다</b>. 그래도 같은 방법이 다른 데이터에서 어떻게 도는지 보려고
+  각 논문의 ICBHI 레시피 그대로 SPRSound 표준 태스크(2022 inter-patient, 7-class)로 돌리고 있습니다 — <b>관찰이지 재현 판정이 아닙니다.</b>
+  열에 네 가지 상태가 섞여 있어 구분해 적었습니다:</p>
+  <div class="tablewrap"><table>
+    <thead><tr><th style="width:20%">표기</th><th>뜻</th><th style="width:34%">해당 논문</th></tr></thead>
+    <tbody>
+      <tr><td class="num"><b>값 ± 편차</b></td><td>우리가 5 seed 완주한 관찰값(논문 목표치 없음)</td>
+        <td>AST SFT 87.19 · Patch-Mix CL 88.35 · ADD-RSC 86.17 · LungAdapter 87.86<br>
+        <span class="sub">논문이 SPRSound 를 쓴 6편(SCL-meta·M2D·OPERA·QLung·BTS-CARD·LungMix)은 목표치가 있어 Δ 가 붙습니다</span></td></tr>
+      <tr><td class="num">학습 중 (n/5)</td><td>3차 배치, 지금 GPU 에서 도는 중</td><td>PAFA(1/5) · BTS · Audio-CLAP · LoRA-RSC · AMS-D · Prototype</td></tr>
+      <tr><td class="num">제외</td><td>방법 구조상 성립하지 않음</td>
+        <td>RespireNet·SG-SCL(SPRSound 는 <b>단일 청진기</b>라 장치 도메인 학습 불가) · PC-MCL(3-시그모이드 헤드가 7-class 표현 불가) · Gap-Aug·DDE-MAE(ICBHI 에서 이미 붕괴)</td></tr>
+      <tr><td class="num">미착수</td><td>가능하지만 아직 큐에 안 넣음</td><td>SFT 기준선 5종 · MVST · <b>Lung-SRAD</b> · Domain Transfer</td></tr>
+    </tbody>
+  </table></div>
+  <p class="fignote">SPRSound 점수가 85–89 로 ICBHI(50–65)보다 높은 것은 방법이 더 잘 통해서가 아니라,
+  inter-test 에 Rhonchi·Stridor 가 0건이고 Normal 이 73% 라 <b>평가상 실질이 3-class</b> 이기 때문입니다 —
+  <b>두 데이터의 절대값을 직접 비교하면 안 됩니다.</b></p>
 
   <h2><span class="n">06</span>요청 정리</h2>
   <ol class="checks">

@@ -82,7 +82,7 @@ for r in gain_rows:
 
 ok  = sum(1 for r in main_rows if len(r)>9 and r[9].startswith("✅"))
 bad = sum(1 for r in main_rows if len(r)>9 and r[9].startswith("⚠️"))
-now = "2026-08-31 16:00 KST"
+now = "2026-08-31 17:55 KST"
 
 OUT.write_text(f'''<title>RSC-Toolkit 재현 대장</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@600;700&family=Noto+Sans+KR:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
@@ -184,13 +184,18 @@ OUT.write_text(f'''<title>RSC-Toolkit 재현 대장</title>
     <div class="stat"><span class="k">재현 대상</span><span class="v">29</span><span class="s">SSAST 배제 · Domain Transfer·Prototype 추가</span></div>
     <div class="stat"><span class="k">✅ 재현 성립</span><span class="v">{ok}</span><span class="s">논문 ± 안 또는 −0.5 이내</span></div>
     <div class="stat"><span class="k">⚠️ 미달</span><span class="v">{bad}</span><span class="s">대부분 이득만 사라지는 형태</span></div>
-    <div class="stat"><span class="k">완주 run</span><span class="v">399</span><span class="s">누적 학습 종료</span></div>
-    <div class="stat"><span class="k">진행 중</span><span class="v">36</span><span class="s">A/B 10 · SPRS 3차 배치 30</span></div>
+    <div class="stat"><span class="k">완주 run</span><span class="v">404</span><span class="s">누적 학습 종료</span></div>
+    <div class="stat"><span class="k">진행 중</span><span class="v">50</span><span class="s">SPRS 3차 29 · 팀 진단 21</span></div>
   </div>
 
   <h2>요약 — 논문 29편</h2>
-  <p class="h2note"><code>—</code> 는 그 논문이 해당 데이터로 실험하지 않아 재현 대상이 아니라는 뜻이다(우리가 안 돌린 것이 아니다).
-  Δ 가 비어 있는 칸은 논문 내부 불일치 등으로 절대값 비교가 성립하지 않는 경우다.</p>
+  <p class="h2note"><b>SPRSound 열 읽는 법</b> — 대부분의 논문은 이 데이터를 쓰지 않아 <b>비교할 목표치가 없다</b>.
+  그래도 같은 방법이 다른 데이터에서 어떻게 도는지 보려고 각 논문의 ICBHI 레시피 그대로 돌리고 있다(관찰이지 판정이 아니다).
+  <b>값 ¹⁴</b> = 우리 5 seed 완주 관찰값 · <b>학습 중 (n/5)</b> = 3차 배치 진행 중 ·
+  <b>제외 ¹⁵</b> = 방법 구조상 성립 불가(단일 청진기·라벨 공간·ICBHI 에서 이미 붕괴) ·
+  <b>미착수 ¹⁶</b> = 가능하지만 아직 큐에 안 넣음. ICBHI 열의 <code>—</code> 는 해당 없음.
+  Δ 가 비어 있는 칸은 논문 목표치가 없거나 논문 내부 불일치로 절대값 비교가 성립하지 않는 경우다.
+  SPRSound 절대값은 ICBHI 와 직접 비교하면 안 된다(inter-test 가 실질 3-class).</p>
   <div class="tablewrap">
     <table>
       <thead><tr>
