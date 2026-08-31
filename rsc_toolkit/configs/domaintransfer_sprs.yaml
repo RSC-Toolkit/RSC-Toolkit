@@ -1,0 +1,34 @@
+# Domain Transfer 를 SPRSound 표준 태스크(7-class)로 확장. **논문 목표치 없음** — ICBHI 레시피 그대로.
+#   논문 구조 : rsctk-train --config-name domaintransfer_sprs seed=N run.name=sprs-dt-paper-sN
+#   Baseline  : ... model.params.baseline=true model.params.mixup_alpha=0 \
+#               data.params.splice_per_class=0 data.params.use_noise=false \
+#               data.params.use_stretch=false data.params.use_pitch=false
+# 클래스 가중은 DomainTransferDataModule 이 SPRSound train 분포(splice 포함)로 계산해 모델에 주입한다
+# (ICBHI 와 같은 sklearn balanced 산식 — 별도 손실 config 불필요).
+defaults:
+  - model: resnest_ibn_dt
+  - data_defaults@data: base
+  - data: sprsound_domaintransfer
+  - loss: cross_entropy          # 미사용 — 모델이 가중 soft-CE 를 직접 계산
+  - metrics: sprsound_metrics
+  - optimizer: adam_domaintransfer
+  - trainer: default
+  - callbacks: domaintransfer_paper
+  - _self_
+
+seed: 1
+
+trainer:
+  params:
+    max_epochs: 60
+    precision: 16-mixed
+    reload_dataloaders_every_n_epochs: 1
+
+run:
+  name: sprs-domaintransfer
+  group: domaintransfer
+  tags: [domaintransfer, sprsound, extension]
+
+model:
+  params:
+    n_cls: 7

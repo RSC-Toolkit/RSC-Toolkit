@@ -1,0 +1,37 @@
+# Domain Transfer 를 SPRSound 표준 태스크(7-class)로 확장. **논문 목표치 없음** — ICBHI 레시피 그대로.
+# 8 kHz → 이벤트 분할 → circular padding 8 s(test 포함) + 학습만 클래스별 splice·파형 증강 3종.
+# class weight 는 DomainTransferDataModule 이 SPRSound train 분포(splice 포함)로 자동 계산한다.
+name: sprsound_domaintransfer
+params:
+  datamodule_name: domaintransfer
+  dataset_name: sprsound
+  index_dataset_cls: rsc_toolkit.datasets.index_dataset.IndexDataset
+  project_root: ${hydra:runtime.cwd}
+  data_dir: .datasets/sprsound
+  raw_data_subdir: Classification
+  index_filename: index_cycle.csv
+  time_unit: ms_int
+  sampling_rate: 8000
+  sample_level: cycle
+  desired_length_sec: null
+  fade: false
+  target_len: 64000
+  splice_per_class: 500
+  aug_prob: 0.5
+  use_noise: true
+  use_stretch: true
+  use_pitch: true
+  train_splits: [train]
+  val_splits: [test]
+  test_splits: [test]
+  batch_size: 64
+  num_workers: 8
+  shuffle_train: true
+  drop_last_train: false
+  pin_memory: true
+  features:
+    enabled: true
+    kind: waveform
+  feature_precompute: false
+  specaugment:
+    enabled: false

@@ -20,10 +20,14 @@ from rsc_toolkit.trainer.data.index_datamodule import IndexDataModule
 VIEWS = (16, 32, 64, 128, 256)
 
 
-def build_dm(split_file, seed):
-    return IndexDataModule(
-        dataset_name="icbhi", index_dataset_cls="rsc_toolkit.datasets.index_dataset.IndexDataset",
-        project_root=str(pathlib.Path.cwd()), data_dir=".datasets/icbhi", split_file=split_file,
+def build_dm(split_file, seed, dataset="icbhi"):
+    """
+    뷰 5개의 특징을 뽑을 데이터로더. ICBHI 는 공식 스플릿 파일을, SPRSound 는 인덱스의 split 열을 쓴다
+    (configs/data/sprsound_patchmix.yaml 과 같은 체인 — 8 s repeat_fade, ms_int, 절단 후 리샘플).
+    """
+    common = dict(
+        index_dataset_cls="rsc_toolkit.datasets.index_dataset.IndexDataset",
+        project_root=str(pathlib.Path.cwd()),
         sampling_rate=16000, sample_level="cycle", desired_length_sec=8.0, pad_type="repeat_fade",
         train_splits=["train"], val_splits=["test"], test_splits=["test"], batch_size=8, num_workers=8,
         shuffle_train=True, drop_last_train=True,
@@ -31,10 +35,15 @@ def build_dm(split_file, seed):
                       target_frames=798, frame_shift=10, window_type="hanning", dither=0.0, normalize=True),
         feature_precompute=True, specaugment=dict(enabled=True, policy="icbhi_ast_sup", mask="mean"),
     )
+    if dataset == "sprsound":
+        return IndexDataModule(dataset_name="sprsound", data_dir=".datasets/sprsound",
+                               raw_data_subdir="Classification", index_filename="index_cycle.csv",
+                               time_unit="ms_int", resample_after_slice=True, **common)
+    return IndexDataModule(dataset_name="icbhi", data_dir=".datasets/icbhi", split_file=split_file, **common)
 
 
-def load_view(view, path, device):
-    m = MVSTViewAST(n_cls=4, view=view, audioset_pretrain=False)
+def load_view(view, path, device, n_cls=4):
+    m = MVSTViewAST(n_cls=n_cls, view=view, audioset_pretrain=False)
     ckpt = torch.load(path, map_location="cpu", weights_only=False)
     if "classifier" in ckpt:      # 저자 save_model 형식
         m.load_reference_checkpoint(path)
@@ -63,6 +72,9 @@ def main():
     ap.add_argument("--seed", type=int, default=1)
     ap.add_argument("--out", required=True)
     ap.add_argument("--device", default="cuda")
+    ap.add_argument("--dataset", default="icbhi", choices=["icbhi", "sprsound"],
+                    help="sprsound 는 SPRSound 표준 태스크(2022 inter-patient, 7-class) 확장용")
+    ap.add_argument("--n-cls", type=int, default=None, help="기본: icbhi 4 / sprsound 7")
     args = ap.parse_args()
     paths = {v: f"{args.ckpt_dir}/{v}/best.pth" for v in VIEWS} if args.ckpt_dir else {}
     for kv in args.ckpts:
@@ -70,8 +82,9 @@ def main():
     assert set(paths) == set(VIEWS), paths
     import lightning as L
     L.seed_everything(args.seed, workers=True)  # 원본 main.py 의 seed (셔플·SpecAug 마스크)
-    models = {v: load_view(v, paths[v], args.device) for v in VIEWS}
-    dm = build_dm(args.split, args.seed); dm.setup("fit")
+    n_cls = args.n_cls if args.n_cls else (7 if args.dataset == "sprsound" else 4)
+    models = {v: load_view(v, paths[v], args.device, n_cls) for v in VIEWS}
+    dm = build_dm(args.split, args.seed, args.dataset); dm.setup("fit")
     amp = args.device.startswith("cuda")
     tr_feats, tr_labels = dump(models, dm.train_dataloader(), args.device, amp)
     te_feats, te_labels = dump(models, dm.val_dataloader(), args.device, amp)
@@ -80,7 +93,7 @@ def main():
     torch.save({"train": tr_feats, "train_labels": tr_labels, "test": te_feats, "test_labels": te_labels}, out / "features.pt")
     best = train_fusion(tr_feats, tr_labels, te_feats, te_labels, seed=args.seed, device=args.device, amp=amp)
     torch.save({"model": best.pop("state_dict"), **best}, out / "best.pth")
-    json.dump({**best, "split": args.split, "ckpts": paths}, open(out / "best.json", "w"), indent=1)
+    json.dump({**best, "dataset": args.dataset, "n_cls": n_cls, "split": args.split, "ckpts": paths}, open(out / "best.json", "w"), indent=1)
     print(f"MVST 융합 best: Sp {best['S_p']:.2f} / Se {best['S_e']:.2f} / Score {best['icbhi_score']:.2f} (epoch {best['epoch']}) → {out}")
 
 
