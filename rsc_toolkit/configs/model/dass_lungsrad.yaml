@@ -7,6 +7,7 @@ params:
   method: ce
   cl_mode: dual
   mix_layout: as_code
+  train_projector: true          # false = main.py 동작(projector 미학습). 저자 실측 차이 +1.61 (63.00 vs 61.39)
   gaussian_blur: null            # null → method != ce
   blur_blocks: [2, 3]
   blur_stage: [2]

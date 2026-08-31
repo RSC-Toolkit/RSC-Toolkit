@@ -58,6 +58,7 @@ class DASSLungSRAD(BaseRSCModel, nn.Module):
         method: str = "ce",                       # ce (FT) | ce_blur (SAR) | patchmix_cl (Lung-SRAD 및 Table 2 변형)
         cl_mode: str = "dual",                    # patchmix_cl: dual | time | freq | 2d | dual_seq(죽은 코드 변형)
         mix_layout: str = "as_code",              # as_code (원본 동작) | as_paper (Eq.6-7)
+        train_projector: bool = True,             # False = main.py 동작(projector 를 optimizer 에 안 넣음)
         gaussian_blur: Optional[bool] = None,     # None → method != 'ce' (원본 --gaussian_blur 스크립트 기본)
         blur_blocks: Sequence[int] = (2, 3),
         blur_stage: Sequence[int] = (2,),
@@ -114,6 +115,16 @@ class DASSLungSRAD(BaseRSCModel, nn.Module):
 
         # main.py:265, 272
         self.projector = Projector(self.final_feat_dim, proj_dim) if method == "patchmix_cl" else nn.Identity()
+        # 원본 main.py:301 은 `optim_params = list(model.parameters())` 로 **projector 를 optimizer 에 넣지 않는다**
+        # — projector 가 model 과 별개 객체이기 때문이다. 따라서 대조손실용 투영 헤드는 **무작위 초기값 그대로 고정**된다.
+        # main_v2.py:279 는 `+ list(projector.parameters())` 로 넣는다. 저자 실측으로 이 차이가 크다:
+        #   main.py(미학습) 63.00±0.84 (59 run)  vs  main_v2.py(학습) 61.39±0.92 (40 run)  → **−1.61**
+        # 우리 이식은 projector 가 모델 서브모듈이라 `self.parameters()` 에 자동 포함돼 main_v2 쪽 동작이었다.
+        # train_projector=False 로 두면 main.py 를 따른다(가중치 갱신만 막고, 백본으로 가는 gradient 흐름은 유지).
+        self.train_projector = bool(train_projector)
+        if not self.train_projector:
+            for prm in self.projector.parameters():
+                prm.requires_grad_(False)
         self.patchmix_con_loss = PatchMixConLoss(temperature=self.temperature, negative_pair=negative_pair)
         logger.info("dass_lungsrad: method=%s cl_mode=%s mix_layout=%s blur=%s selective_scan=%s(cuda kernel %s)", method, cl_mode, mix_layout,
                     self.gaussian_blur, ssm_backend, cuda_kernel_available())
