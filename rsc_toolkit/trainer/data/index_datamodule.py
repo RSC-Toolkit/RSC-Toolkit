@@ -164,7 +164,7 @@ class IndexDataModule(L.LightningDataModule):
 
         self.features_cfg = FeatureConfig(**(features or {}))
         if self.features_cfg.cache_dir:
-            self.features_cfg.cache_dir = str(self._resolve_path(self.features_cfg.cache_dir))
+            self.features_cfg.cache_dir = str(self._resolve_feature_cache_dir(self.features_cfg.cache_dir))
         self.feature_precompute = bool(feature_precompute)
         self.feature_precompute_batch_size = int(feature_precompute_batch_size)
         self.feature_precompute_num_workers = int(feature_precompute_num_workers)
@@ -344,6 +344,24 @@ class IndexDataModule(L.LightningDataModule):
                                 audio_chain=self._audio_chain())
 
         return IndexFeatureDataset(base_ds, fp, feature_transform=feature_transform, meta_label_fn=meta_label_fn)
+
+    def _resolve_feature_cache_dir(self, cache_dir: str) -> "Path":
+        """
+        피처 캐시 위치. config 의 상대 경로는 프로젝트 루트 기준이지만,
+        환경변수 **`RSCTK_FEATURE_CACHE_ROOT`** 가 있으면 그 아래로 옮겨 붙인다.
+
+        캐시는 수십 GB 라 저장소 트리 밖(다른 볼륨)에 두고 싶을 때가 있는데,
+        config 를 열 몇 개씩 고치면 재현 기록이 지저분해진다. 경로만 갈아끼우는 이 방법이면
+        **config 는 그대로 두고** 환경변수 하나로 옮길 수 있다(디렉터리 이름은 그대로라 이동도 `mv` 한 번).
+        절대 경로가 config 에 박혀 있으면 그대로 존중한다.
+        """
+        import os
+
+        root = os.environ.get("RSCTK_FEATURE_CACHE_ROOT")
+        p = Path(cache_dir)
+        if root and not p.is_absolute():
+            return (Path(root).expanduser() / p).resolve()
+        return self._resolve_path(cache_dir)
 
     def _audio_chain(self) -> dict:
         """
