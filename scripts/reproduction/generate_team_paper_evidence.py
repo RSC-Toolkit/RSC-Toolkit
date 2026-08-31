@@ -123,6 +123,51 @@ def pipeline_strip():
                      f'<span class="pv {cls}">{d:+.2f}</span></div>')
     return f'<div class="pipe">{"".join(items)}</div>'
 
+# ── 검증된 모델 전체 목록 (docs/RESULTS_BY_DATASET.md §1 파싱) ──────────────
+import re
+def all_models_table():
+    src = pathlib.Path("docs/RESULTS_BY_DATASET.md")
+    if not src.exists():
+        return "<p class=fignote>(요약 표를 찾지 못했습니다)</p>"
+    lines = src.read_text().splitlines()
+    rows = []
+    for l in lines:
+        if not re.match(r"^\| \d+ \|", l): break_ = False
+        if re.match(r"^\| \d+ \|", l):
+            c = [x.strip() for x in l.strip().strip("|").split("|")]
+            if len(c) >= 10: rows.append(c)
+        elif rows:
+            break
+    def md(t):
+        t = t.replace("&","&amp;").replace("<","&lt;").replace(">","&gt;")
+        t = re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", t)
+        t = re.sub(r"~~(.+?)~~", r"<s>\1</s>", t)
+        return t
+    def verd(v):
+        core = re.sub(r"[⁰-⁹\s]", "", v)
+        if core.startswith("✅"): return '<span class="pill ok">✅</span>'
+        if core.startswith("⚠️⚠️"): return '<span class="pill crit">⚠️⚠️</span>'
+        if core.startswith("⚠️"): return '<span class="pill warn">⚠️</span>'
+        return f'<span class="pill na">{md(v)}</span>'
+    def dcell(d):
+        m = re.search(r"([+−-]?\d+\.\d+)", d.replace("**",""))
+        if not m: return '<td class="num muted">—</td>'
+        v = float(m.group(1).replace("−","-"))
+        return f'<td class="num {"pos" if v>=0 else "neg"}">{v:+.2f}</td>'
+    out = []
+    for c in rows:
+        idx, model, how, i_our, i_pap, i_d, s_our, s_pap, s_d, v = c[:10]
+        team = " team" if "(팀)" in model else ""
+        out.append(f'<tr class="{team.strip()}"><td class="num muted">{md(idx)}</td>'
+                   f'<td class="mname">{md(model)}<small>{md(how)}</small></td>'
+                   f'<td class="num">{md(i_our) or "—"}</td><td class="num muted">{md(i_pap) or "—"}</td>{dcell(i_d)}'
+                   f'<td class="num">{md(s_our) or "—"}</td>{dcell(s_d)}'
+                   f'<td>{verd(v)}</td></tr>')
+    return ("<div class=\"tablewrap\"><table class=\"all\"><thead><tr>"
+            "<th>#</th><th>모델</th><th>ICBHI 우리</th><th>ICBHI 논문</th><th>Δ</th>"
+            "<th>SPRSound 우리</th><th>Δ</th><th>판정</th></tr></thead><tbody>"
+            + "".join(out) + "</tbody></table></div>")
+
 # ── 페이지 ─────────────────────────────────────────────────────────────────
 OUT.write_text(f'''<title>팀 논문 재현 확인 요청</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=Noto+Serif+KR:wght@600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
@@ -214,6 +259,14 @@ OUT.write_text(f'''<title>팀 논문 재현 확인 요청</title>
   .pv {{ font-family:"IBM Plex Mono",monospace; font-size:12px; }}
   .pv.pos {{ color:var(--pos); }} .pv.neg {{ color:var(--neg); }}
   table {{ border-collapse:collapse; width:100%; font-size:13.5px; margin:12px 0; }}
+  table.all {{ min-width:880px; font-size:12.5px; }}
+  table.all td, table.all th {{ padding:7px 9px; }}
+  table.all td.mname {{ font-weight:600; min-width:150px; }}
+  table.all td.mname small {{ display:block; font-weight:400; color:var(--muted); font-size:11px; line-height:1.35; margin-top:1px; }}
+  table.all tr.team td {{ background:var(--accent-soft); }}
+  table.all td.muted {{ color:var(--muted); }}
+  table.all td.pos {{ color:var(--pos); }} table.all td.neg {{ color:var(--neg); }}
+  .pill.na {{ background:var(--surface-2); color:var(--muted); }}
   th,td {{ text-align:left; padding:8px 10px; border-bottom:1px solid var(--line); vertical-align:top; }}
   thead th {{ font-size:11.5px; letter-spacing:.04em; text-transform:uppercase; color:var(--muted); font-weight:500; background:var(--surface-2); }}
   td.num {{ font-family:"IBM Plex Mono",monospace; font-variant-numeric:tabular-nums; white-space:nowrap; }}
@@ -224,10 +277,11 @@ OUT.write_text(f'''<title>팀 논문 재현 확인 요청</title>
   .warn {{ background:var(--warn-bg); color:var(--warn-ink); }}
   .crit {{ background:var(--crit-bg); color:var(--crit-ink); }}
   ol.checks {{ padding-left:0; list-style:none; counter-reset:c; display:grid; gap:10px; margin:14px 0 0; }}
-  ol.checks li {{ counter-increment:c; display:grid; grid-template-columns:30px 1fr; gap:12px; background:var(--surface); border:1px solid var(--line); border-radius:6px; padding:13px 16px; }}
-  ol.checks li::before {{ content:counter(c); font-family:"IBM Plex Mono",monospace; font-weight:600; color:var(--accent); }}
-  ol.checks b {{ display:block; }}
-  ol.checks span {{ color:var(--ink-2); font-size:13.5px; }}
+  ol.checks li {{ counter-increment:c; display:grid; grid-template-columns:30px minmax(0,1fr); column-gap:12px; row-gap:4px;
+    background:var(--surface); border:1px solid var(--line); border-radius:6px; padding:13px 16px; }}
+  ol.checks li::before {{ content:counter(c); grid-column:1; grid-row:1; font-family:"IBM Plex Mono",monospace; font-weight:600; color:var(--accent); }}
+  ol.checks li > b {{ grid-column:2; grid-row:1; }}
+  ol.checks li > span {{ grid-column:2; grid-row:2; color:var(--ink-2); font-size:13.5px; }}
   @media (prefers-reduced-motion:reduce) {{ * {{ transition:none !important; }} }}
 </style>
 
@@ -339,7 +393,15 @@ OUT.write_text(f'''<title>팀 논문 재현 확인 요청</title>
     <p>여유가 되시면 — 논문 표의 학습 설정은 15 epoch/Adam(스크립트)인가요, 30 epoch/AdamW(본문 §3.1)인가요?</p>
   </div>
 
-  <h2><span class="n">05</span>요청 정리</h2>
+  <h2><span class="n">05</span>참고 — 지금까지 검증한 모델 전체</h2>
+  <p>같은 파이프라인·같은 공식 스플릿·같은 지표로 재현한 <b>29편 전부</b>입니다.
+  <b>Δ 는 우리 Score − 논문 Score</b>. 팀 논문 3편은 강조 표시했습니다.
+  기준선류(SFT·전이학습)가 거의 전부 재현된다는 점이, 앞서 말씀드린 "파이프라인은 정상" 의 근거입니다.</p>
+  {all_models_table()}
+  <p class="fignote">Se/Sp/Score 순 표기 · 우리 값은 seed 1–5 평균±표준편차 · <span class="pill ok">✅</span> 논문 ± 안 또는 −0.5 이내 ·
+  <span class="pill warn">⚠️</span> 미달 · <span class="pill crit">⚠️⚠️</span> −5 이상 큰 미달 · <code>—</code> 는 그 논문이 해당 데이터로 실험하지 않았다는 뜻입니다.</p>
+
+  <h2><span class="n">06</span>요청 정리</h2>
   <ol class="checks">
     <li><b>Lung-SRAD — <code>main_v2.py</code></b><span>스크립트가 부르는 파일이 저장소에 없습니다. diff 만으로도 충분합니다. <b>이것 없이는 다른 작업이 무의미합니다.</b></span></li>
     <li><b>QLung — 체크포인트 1개 + <code>pip freeze</code></b><span>BTS-CARD 에서 이미 통한 방법입니다. 하루 안에 “학습만의 문제인지”가 판정됩니다.</span></li>
