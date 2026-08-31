@@ -430,17 +430,38 @@ OUT.write_text(f'''<title>팀 논문 재현 확인 요청</title>
     <li><b>세 편 공통 — <code>pip freeze</code></b><span>QLung README 는 torch 2.0.1, Lung-SRAD <code>requirements.txt</code> 는 timm 0.4.12·transformers 4.35.2 인데 우리는 각각 2.7.0 / 1.0.28 / 5.15.1 입니다.</span></li>
   </ol>
 
+  <h2><span class="n">07</span>병행 실험 진행 현황 <span class="sub" style="font-size:14px;font-weight:400">— 2026-08-31 18:06</span></h2>
+  <p>저자 답변 없이도 확인할 수 있는 것은 지금 GPU 에서 돌리고 있습니다. <b>중간 결과부터 적습니다</b> —
+  완주 전 값은 그렇게 표시했으니 참고만 해주세요.</p>
+  <div class="tablewrap"><table>
+    <thead><tr><th style="width:30%">실험</th><th style="width:11%">진행</th><th style="width:24%">지금까지</th><th>읽는 법</th></tr></thead>
+    <tbody>
+      <tr><td><b>QLung 저자 환경 재현</b><br><span class="sub">py3.10 · torch 2.0.1+cu118 · timm 0.4.5, 저자 코드 무수정</span></td>
+        <td class="num">2/5<br><span class="sub">epoch ~32/50</span></td>
+        <td class="num">seed 1 <b>60.54</b><br>seed 2 <b>63.78</b><br><span class="sub">둘 다 학습 중 best</span></td>
+        <td><b>가장 주목하는 실험입니다.</b> 우리 툴킷의 같은 seed 는 60.43 / 61.15 인데,
+        저자 환경 seed 2 가 <b>+2.63 높고 이미 논문 62.01 을 넘었습니다</b>. 사실이라면 원인은 코드가 아니라 <b>환경</b>입니다.
+        다만 <b>2 seed·중간값</b>이라 단정하기 이릅니다 — 5 seed 완주 후 확정하겠습니다.</td></tr>
+      <tr><td><b>Lung-SRAD 죽은 코드 경로</b><br><span class="sub"><code>cl_mode=dual_seq</code> × 축 2종</span></td>
+        <td class="num">1/10</td><td class="num">seed 1 <b>59.33</b></td>
+        <td>현행 dual(61.59)보다 <b>2.3점 더 낮습니다</b>. 첫 신호는 “<code>main_v2</code> 가 이 죽은 코드를 되살린 것은 아니다” 쪽입니다.</td></tr>
+      <tr><td><b>BTS-CARD 논문 설정</b><br><span class="sub">30 epoch / AdamW</span></td>
+        <td class="num">4/5</td><td class="num">63.55 · 63.41<br>64.53 · 63.98<br><span class="sub">평균 63.87</span></td>
+        <td>스크립트 설정 같은 seed 는 63.92 · 63.57 · 64.63 · 63.24(평균 63.84) — <b>사실상 동일</b>합니다.
+        학습 설정 차이는 −1.16 의 원인이 아닙니다.</td></tr>
+      <tr><td><b>BTS-CARD seed 111</b><br><span class="sub">공개 스크립트의 유일한 seed</span></td>
+        <td class="num">0/2</td><td class="num">대기 중</td><td>스크립트와 정확히 같은 조건. seed 집합 가설의 직접 확인입니다.</td></tr>
+      <tr><td><b>QLung 논문 식 (5) 문자 그대로</b></td>
+        <td class="num">3/5</td><td class="num">54.68 · 61.00 · 54.36<br><span class="sub">평균 56.68</span></td>
+        <td>seed 마다 6점씩 흔들립니다 — <code>nan</code> AQS 가 학습을 불안정하게 만든 형태입니다.</td></tr>
+    </tbody>
+  </table></div>
+
   <div class="card" style="margin-top:26px">
-    <h3 style="margin-top:0">참고 — 우리가 병행하고 있는 것</h3>
-    <div class="tablewrap"><table>
-      <thead><tr><th>실험</th><th style="width:18%">규모</th><th>무엇을 가리나</th></tr></thead>
-      <tbody>
-        <tr><td>QLung 저자 환경 재현 (py3.10 · torch 2.0.1 · timm 0.4.5)</td><td>5 run</td><td>공개 코드를 저자 스택에서 그대로 — 환경이 원인인지</td></tr>
-        <tr><td>Lung-SRAD 죽은 코드 경로 <code>dual_seq</code></td><td>10 run</td><td><code>main_v2</code> 가 그 경로를 되살렸다는 가설</td></tr>
-        <tr><td>BTS-CARD seed 111 · 논문 설정 30ep/AdamW</td><td>7 run</td><td>공개 스크립트와 정확히 같은 조건</td></tr>
-        <tr><td>QLung 논문 식 (5) 문자 그대로</td><td>5 run</td><td>AQS 해석 3종 중 마지막</td></tr>
-      </tbody>
-    </table></div>
+    <h3 style="margin-top:0">참고 — 툴킷 전체 학습 현황</h3>
+    <p>누적 <b>407 run</b> 완주(실패 2건은 08-24 의 고아 프로세스). 지금 <b>91 run</b> 이 큐에 있고 GPU 8장이 모두 돌고 있습니다.
+    이 중 팀 논문 진단이 <b>21 run</b>, 나머지는 SPRSound 확장(3·4차 배치 78 run)입니다.
+    Lung-SRAD 의 SPRSound 확장도 방금 큐에 넣었습니다(FT 기준선 + dual 각 5 seed).</p>
     <p style="margin:14px 0 0" class="fignote">셋업 중 확인 — QLung 은 README 만으로 환경이 재현되지 않습니다:
     <code>models/ast.py:47</code> 이 <code>assert timm.__version__ == '0.4.5'</code> 로 timm 을 하드 고정하는데 README 에 없고,
     <code>librosa</code>·<code>scipy</code>·<code>soundfile</code> 이 설치 안내에서 빠져 있으며,

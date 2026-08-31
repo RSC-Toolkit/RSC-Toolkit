@@ -82,7 +82,7 @@ for r in gain_rows:
 
 ok  = sum(1 for r in main_rows if len(r)>9 and r[9].startswith("✅"))
 bad = sum(1 for r in main_rows if len(r)>9 and r[9].startswith("⚠️"))
-now = "2026-08-31 17:55 KST"
+now = "2026-08-31 18:06 KST"
 
 OUT.write_text(f'''<title>RSC-Toolkit 재현 대장</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@600;700&family=Noto+Sans+KR:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
@@ -184,16 +184,16 @@ OUT.write_text(f'''<title>RSC-Toolkit 재현 대장</title>
     <div class="stat"><span class="k">재현 대상</span><span class="v">29</span><span class="s">SSAST 배제 · Domain Transfer·Prototype 추가</span></div>
     <div class="stat"><span class="k">✅ 재현 성립</span><span class="v">{ok}</span><span class="s">논문 ± 안 또는 −0.5 이내</span></div>
     <div class="stat"><span class="k">⚠️ 미달</span><span class="v">{bad}</span><span class="s">대부분 이득만 사라지는 형태</span></div>
-    <div class="stat"><span class="k">완주 run</span><span class="v">404</span><span class="s">누적 학습 종료</span></div>
-    <div class="stat"><span class="k">진행 중</span><span class="v">50</span><span class="s">SPRS 3차 29 · 팀 진단 21</span></div>
+    <div class="stat"><span class="k">완주 run</span><span class="v">407</span><span class="s">누적 학습 종료 · 실패 2</span></div>
+    <div class="stat"><span class="k">큐 잔여</span><span class="v">91</span><span class="s">SPRS 확장 77 · 팀 진단 14</span></div>
   </div>
 
   <h2>요약 — 논문 29편</h2>
   <p class="h2note"><b>SPRSound 열 읽는 법</b> — 대부분의 논문은 이 데이터를 쓰지 않아 <b>비교할 목표치가 없다</b>.
   그래도 같은 방법이 다른 데이터에서 어떻게 도는지 보려고 각 논문의 ICBHI 레시피 그대로 돌리고 있다(관찰이지 판정이 아니다).
-  <b>값 ¹⁴</b> = 우리 5 seed 완주 관찰값 · <b>학습 중 (n/5)</b> = 3차 배치 진행 중 ·
-  <b>제외 ¹⁵</b> = 방법 구조상 성립 불가(단일 청진기·라벨 공간·ICBHI 에서 이미 붕괴) ·
-  <b>미착수 ¹⁶</b> = 가능하지만 아직 큐에 안 넣음. ICBHI 열의 <code>—</code> 는 해당 없음.
+  <b>값 ¹⁴</b> = 우리 5 seed 완주 관찰값 · <b>학습 중 (n/5) ¹⁴</b> = 3차 배치 진행 중 ·
+  <b>학습 중 (0/5) ¹⁶</b> = 4차 배치, 08-31 18:03 투입 · <b>제외 ¹⁵</b> = 방법 구조상 성립 불가(단일 청진기·라벨 공간·ICBHI 에서 이미 붕괴).
+  ICBHI 열의 <code>—</code> 는 해당 없음. <b>이제 확장 가능한 24편은 전부 완주했거나 큐에 올라 있다.</b>
   Δ 가 비어 있는 칸은 논문 목표치가 없거나 논문 내부 불일치로 절대값 비교가 성립하지 않는 경우다.
   SPRSound 절대값은 ICBHI 와 직접 비교하면 안 된다(inter-test 가 실질 3-class).</p>
   <div class="tablewrap">
@@ -228,17 +228,41 @@ OUT.write_text(f'''<title>RSC-Toolkit 재현 대장</title>
     </table>
   </div>
 
-  <h2>지금 돌고 있는 것</h2>
-  <div class="cards">
-    <div class="card"><h3>A/B 검증 10 run</h3>
-      <p><b>BTS-CARD</b> — 공식 스크립트는 15 epoch·Adam 인데 논문 본문은 30 epoch·AdamW 다. P0 원칙대로 코드를 따랐으니, 논문 설정으로도 5 seed 돌려 격차 −1.16 의 원인인지 가린다.</p>
-      <p><b>QLung</b> — 논문 식 5 를 문자 그대로 계산하면 디지털 무음 사이클 71 건이 <code>nan</code> AQS 가 된다. 인자 버그 수정판(60.38±0.46)은 이미 끝냈고, 남은 변형이 이것이다.</p></div>
-    <div class="card"><h3>SPRSound 확장 3차 배치 30 run</h3>
-      <p>PAFA · BTS · Audio-CLAP · LoRA-RSC · AMS-D · Prototype 각 5 seed. <b>각 논문의 ICBHI 레시피를 그대로</b> 쓰고, 클래스만 M2D 기준으로 7개 전부 사용한다.</p>
-      <p><b>PC-MCL 은 제외</b> — 방법의 핵심인 3-시그모이드 다중라벨 헤드가 ICBHI 4-class = 2×2 속성 구조에 묶여 있어, Rhonchi·Stridor 를 포함한 7-class 로는 표현할 수 없다. 라벨 공간을 바꾸면 방법 자체가 달라진다.</p></div>
+  <h2>지금 돌고 있는 것 — 큐 91 run</h2>
+  <p class="h2note">번들 5개가 GPU 8장에서 동시에 돈다. 재현 판정(§ 요약 표)은 이미 확정됐고, 아래는 ① 팀 논문 격차의 원인 규명 ② SPRSound 확장 관찰 두 갈래다.</p>
+  <div class="tablewrap">
+    <table style="min-width:900px">
+      <thead><tr><th>번들</th><th>진행</th><th>목적</th><th>지금까지</th></tr></thead>
+      <tbody>
+        <tr><td class="model">authorenv<small>QLung 저자 환경 재현</small></td><td class="num">2/5 <span style="color:var(--muted)">(epoch ~32/50)</span></td>
+          <td class="extra">저자 코드를 <b>저자 스택 그대로</b>(py3.10·torch 2.0.1+cu118·timm 0.4.5) 실행 — 원인이 코드인지 환경인지</td>
+          <td class="num">s1 60.54 · s2 <b>63.78</b><br><span style="color:var(--muted);font-size:11px">우리 툴킷 같은 seed 60.43 / 61.15 · 논문 62.01</span></td></tr>
+        <tr><td class="model">teamdiag<small>Lung-SRAD 죽은 코드 경로</small></td><td class="num">1/10</td>
+          <td class="extra"><code>patch_mix_dual_axis</code>(주석 처리된 순차 mix)를 <code>main_v2</code> 가 되살렸다는 가설</td>
+          <td class="num">s1 59.33<br><span style="color:var(--muted);font-size:11px">현행 dual 61.59 보다 낮음 → 가설 부정 쪽</span></td></tr>
+        <tr><td class="model">abtest<small>BTS-CARD·QLung A/B</small></td><td class="num">7/10</td>
+          <td class="extra">BTS-CARD 논문 설정(30ep/AdamW)·seed 111 · QLung 논문 식 (5) 문자 그대로</td>
+          <td class="num">BTS-CARD 논문설정 63.87 (4/5)<br><span style="color:var(--muted);font-size:11px">스크립트설정 63.84 — 사실상 동일, 설정은 원인 아님</span></td></tr>
+        <tr><td class="model">sprsext2<small>SPRSound 확장 3차</small></td><td class="num">1/30</td>
+          <td class="extra">PAFA·BTS·Audio-CLAP·LoRA-RSC·AMS-D·Prototype 각 5 seed</td>
+          <td class="num">PAFA s1 88.86</td></tr>
+        <tr><td class="model">sprsext3<small>SPRSound 확장 4차</small></td><td class="num">0/50</td>
+          <td class="extra">표에 '미착수' 로 남아 있던 8편 — SFT 기준선 5종·Lung-SRAD(FT+dual)·Domain Transfer(Baseline+논문)·MVST(뷰5+융합)</td>
+          <td class="num">방금 투입</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="cards" style="margin-top:18px">
+    <div class="card"><h3>팀 논문 3편은 서로 다른 문제였다</h3>
+      <p>공식 스크립트를 실측해 갈랐다. <b>Lung-SRAD</b> 는 스크립트가 부르는 <code>main_v2.py</code> 가 저장소에 없다 — 논문 수치를 낸 코드와 다른 코드를 재현한 셈이라 seed·환경으로 못 닫는다.</p>
+      <p><b>QLung</b> 은 스크립트 seed 가 <code>1 2 3 4 5</code> 로 우리와 같아 seed 가설이 배제된다 → 환경만 남고, 그 A/B 가 위 authorenv 다. <b>BTS-CARD</b> 는 스크립트에 seed 111 하나뿐이고 우리 seed 3 이 64.63(논문값과 동일)이라 seed 집합이 유력하다.</p></div>
     <div class="card"><h3>SPRS 가중 CE 1:344 편중 — 결론</h3>
-      <p>ICBHI 산식을 SPRSound 분포에 그대로 적용하면 Normal:Stridor 가중치가 <b>1:344</b> 가 된다. 15 run 을 돌린 결과 평균 손실은 −0.53 ~ −1.06 으로 작지만, <code>sprs-ast-sft-s4</code> <b>한 seed 가 Sp 81.35 / Se 90.75</b> 로 무너졌다.</p>
+      <p>ICBHI 산식을 SPRSound 분포에 적용하면 Normal:Stridor 가중치가 <b>1:344</b> 가 된다. 15 run 결과 평균 손실은 −0.53 ~ −1.06 으로 작지만, <code>sprs-ast-sft-s4</code> <b>한 seed 가 Sp 81.35 / Se 90.75</b> 로 무너졌다.</p>
       <p>드문 seed 단위 사건이라 clip·정규화 같은 개입은 하지 않는다(논문에 없는 산식이라 P0 위반). <b>가중을 주 결과로, 비가중을 민감도 대조로 병기</b>한다.</p></div>
+    <div class="card"><h3>SPRSound 확장에서 제외한 5편</h3>
+      <p><b>RespireNet·SG-SCL</b> — SPRSound 는 전 8,085 이벤트가 단일 청진기(Yunting2)라 장치별 BN 재보정·청진기 도메인 대조가 성립하지 않는다.</p>
+      <p><b>PC-MCL</b> — 3-시그모이드 다중라벨 헤드가 ICBHI 4-class = 2×2 속성 구조에 묶여 Rhonchi·Stridor 를 표현할 수 없다. <b>Gap-Aug·DDE-MAE</b> — ICBHI 에서 이미 학습이 붕괴해 확장이 무의미하다.</p></div>
   </div>
 
   <h2>운영</h2>
