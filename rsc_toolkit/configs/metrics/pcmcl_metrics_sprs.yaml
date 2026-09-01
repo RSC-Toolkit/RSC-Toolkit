@@ -1,0 +1,13 @@
+# PC-MCL SPRSound: 학습 배치 라벨이 6-속성 float 라 train 메트릭 없음.
+# 검증은 모델이 6-sigmoid → 복호 → 7-class one-hot (B,7) 을 돌려주므로 기존 ICBHIScore(argmax) 를 그대로 쓴다.
+train: []
+
+val:
+  - name: topk_accuracy
+    params:
+      topk: [1]
+  - name: icbhi_score
+    params:
+      num_classes: 7
+      normal_index: 0
+      topk: 1

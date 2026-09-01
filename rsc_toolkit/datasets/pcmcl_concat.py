@@ -110,6 +110,7 @@ class PCMCLConcatDataset(Dataset):
         output_kind: str = "waveform",          # waveform (BEATs) | fbank (AST: (n_mels, frames) freq_time)
         n_mels: int = 128,
         # ---- 원본 인자 ----
+        label_space: str = "icbhi4",            # icbhi4(저자 정의 3속성) | sprsound7(툴킷 정의 6속성)
         mode: str = "default",                  # default(concat+multi[+PM]) | concat_single | noconcat_multi
         mixing_prob: float = 1.0,               # 논문 '원본당 증강 1개' = 1.0 (argparse 기본 0.5)
         conditional_mixing: bool = False,       # 원본 --conditional_mixing (store_true; 켜면 random.random() 한 번 더 소비, 확률은 전부 1.0)
@@ -134,6 +135,13 @@ class PCMCLConcatDataset(Dataset):
             raise ValueError(f"hard_negative_mode must be dict_order|random_profile|basic, got {hard_negative_mode!r}")
         if output_kind not in {"waveform", "fbank"}:
             raise ValueError(f"output_kind must be waveform|fbank, got {output_kind!r}")
+        from rsc_toolkit.methods.pcmcl_labelspace import get_label_space
+
+        self.ls = get_label_space(label_space)
+        if mode == "concat_single" and self.ls.name != "icbhi4":
+            raise NotImplementedError(
+                "concat_single 은 4-class dominant 라벨을 쓰는 저자 ablation 이라 icbhi4 에서만 정의된다"
+            )
         if ssl_method != "coherence":
             raise NotImplementedError("ssl_method 는 논문이 쓰는 'coherence'(PM) 만 이식했다 (concat_single SSL 은 범위 밖)")
 
@@ -169,7 +177,7 @@ class PCMCLConcatDataset(Dataset):
         if self.mode == "concat_single":
             self.mixing_combinations = single_label_mixing_combinations()
         else:
-            self.mixing_combinations = multilabel_mixing_combinations(self.mixing_label_strategy)
+            self.mixing_combinations = self.ls.mixing_combinations(self.mixing_label_strategy)
 
         n = len(self.all_cycles)
         if self.train_flag:
@@ -180,8 +188,8 @@ class PCMCLConcatDataset(Dataset):
             self.n_mixed, self.n_ssl = 0, 0
             self.dataset_size = n
         logger.info(
-            "PCMCLConcatDataset(%s, mode=%s): cycles=%d short(<T/2)=%d patients(%s)=%d mixed=%d ssl=%d size=%d",
-            split, mode, n, sum(1 for c in self.all_cycles if c["length"] < self.half_target_samples),
+            "PCMCLConcatDataset(%s, mode=%s, label_space=%s): cycles=%d short(<T/2)=%d patients(%s)=%d mixed=%d ssl=%d size=%d",
+            split, mode, self.ls.name, n, sum(1 for c in self.all_cycles if c["length"] < self.half_target_samples),
             patient_id_mode, len(self.patient_cycles), self.n_mixed, self.n_ssl, self.dataset_size,
         )
 
@@ -244,14 +252,15 @@ class PCMCLConcatDataset(Dataset):
             if self.mode == "concat_single":
                 c["label"] = c["original_label"]                      # 4-class single label
             else:
-                c["label"] = convert_to_multilabel(c["original_label"])
+                c["label"] = self.ls.to_multilabel(c["original_label"])
             # 원본 dataset_pcmcl.py:112 — 공식 모드: filename.split('.')[0] == 파일명 전체(녹음 단위)
             c["patient_id"] = c["filename"].split("_")[0] if self.patient_id_mode == "patient" else c["filename"]
         return cycles
 
     def _build_lists(self) -> None:
-        self.classwise_cycle_list: List[List[Dict[str, Any]]] = [[] for _ in range(4)]
-        self.short_classwise_cycle_list: List[List[Dict[str, Any]]] = [[] for _ in range(4)]
+        n_buckets = self.ls.n_classes
+        self.classwise_cycle_list: List[List[Dict[str, Any]]] = [[] for _ in range(n_buckets)]
+        self.short_classwise_cycle_list: List[List[Dict[str, Any]]] = [[] for _ in range(n_buckets)]
         self.patient_cycles: Dict[str, List[Dict[str, Any]]] = {}
         for c in self.all_cycles:
             self.patient_cycles.setdefault(c["patient_id"], []).append(c)
@@ -262,16 +271,12 @@ class PCMCLConcatDataset(Dataset):
                 if short:
                     self.short_classwise_cycle_list[c["original_label"]].append(c)
                 continue
-            ml = c["label"]
-            for k in range(3):
-                if ml[k] > 0:
-                    self.classwise_cycle_list[k].append(c)
-                    if short:
-                        self.short_classwise_cycle_list[k].append(c)
-            if c["original_label"] == 3:
-                self.classwise_cycle_list[3].append(c)
+            # 포함(⊇) 규칙 — ICBHI 에서는 원본의 "0·1·2 는 비트, 3 은 original_label==3" 과 비트 단위로 같다
+            # (both `[0,1,1]` 만이 class 3 의 `[0,1,1]` 을 포함한다). pcmcl_labelspace 모듈 docstring 참조.
+            for k in self.ls.buckets_for(c["label"]):
+                self.classwise_cycle_list[k].append(c)
                 if short:
-                    self.short_classwise_cycle_list[3].append(c)
+                    self.short_classwise_cycle_list[k].append(c)
 
     # ------------------------------------------------------------------ 난수
     @property
@@ -301,29 +306,31 @@ class PCMCLConcatDataset(Dataset):
         if not self._should_apply_mixing(combination):
             return rng.choice(self.all_cycles)
         short = self.short_classwise_cycle_list
-        if len(combination) == 6:
-            c1, c2, rn, rc, rw, _ = combination
+        n_src = self.ls.sources_in(combination)
+        result_label = self.ls.label_in(combination)
+        if n_src == 2:
+            c1, c2 = combination[0], combination[1]
             if c1 == c2:
                 if len(short[c1]) >= 2:
                     a, b = rng.sample(short[c1], 2)
                     audio = _cat(a["audio"], b["audio"])
-                    return {"audio": audio, "label": [rn, rc, rw], "is_mixed": True, "mix_info": f"concat_self_{c1}",
+                    return {"audio": audio, "label": result_label, "is_mixed": True, "mix_info": f"concat_self_{c1}",
                             "concat_classes": [c1, c1], "concat_ids": [a["sample_id"], b["sample_id"]], "length": audio.shape[-1]}
                 return rng.choice(self.all_cycles)
             if len(short[c1]) > 0 and len(short[c2]) > 0:
                 a = rng.choice(short[c1])
                 b = rng.choice(short[c2])
                 audio = _cat(a["audio"], b["audio"])
-                return {"audio": audio, "label": [rn, rc, rw], "is_mixed": True, "mix_info": f"concat_{c1}+{c2}",
+                return {"audio": audio, "label": result_label, "is_mixed": True, "mix_info": f"concat_{c1}+{c2}",
                         "concat_classes": [c1, c2], "concat_ids": [a["sample_id"], b["sample_id"]], "length": audio.shape[-1]}
-        elif len(combination) == 7:
-            c1, c2, c3, rn, rc, rw, _ = combination
+        elif n_src == 3:
+            c1, c2, c3 = combination[0], combination[1], combination[2]
             if len(short[c1]) > 0 and len(short[c2]) > 0 and len(short[c3]) > 0:
                 a = rng.choice(short[c1])
                 b = rng.choice(short[c2])
                 c = rng.choice(short[c3])
                 audio = _cat(a["audio"], b["audio"], c["audio"])
-                return {"audio": audio, "label": [rn, rc, rw], "is_mixed": True, "mix_info": f"concat_{c1}+{c2}+{c3}",
+                return {"audio": audio, "label": result_label, "is_mixed": True, "mix_info": f"concat_{c1}+{c2}+{c3}",
                         "concat_classes": [c1, c2, c3], "concat_ids": [a["sample_id"], b["sample_id"], c["sample_id"]], "length": audio.shape[-1]}
         return rng.choice(self.all_cycles)
 
@@ -348,9 +355,8 @@ class PCMCLConcatDataset(Dataset):
         return rng.choice(self.all_cycles)
 
     # ------------------------------------------------------------------ PM
-    @staticmethod
-    def _or_label(a: Dict[str, Any], b: Dict[str, Any]) -> List[int]:
-        return [max(a["label"][k], b["label"][k]) for k in range(3)]
+    def _or_label(self, a: Dict[str, Any], b: Dict[str, Any]) -> List[int]:
+        return [max(a["label"][k], b["label"][k]) for k in range(self.ls.n_attrs)]
 
     def _generate_ssl_sample(self) -> Optional[Dict[str, Any]]:
         if not self.enable_ssl:

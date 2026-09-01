@@ -19,12 +19,8 @@ from typing import Optional
 import torch
 import torch.nn as nn
 
-from rsc_toolkit.methods.pcmcl import (
-    PMHead,
-    label4_to_multilabel,
-    multilabel_logits_to_onehot4,
-    pcmcl_training_loss,
-)
+from rsc_toolkit.methods.pcmcl import PMHead, pcmcl_training_loss
+from rsc_toolkit.methods.pcmcl_labelspace import get_label_space
 
 from .ast_patchmix import PatchMixAST
 from .base import BaseRSCModel
@@ -39,6 +35,7 @@ class ASTPCMCL(BaseRSCModel, nn.Module):
         self,
         n_cls: int = 3,
         label_mode: str = "multilabel",
+        label_space: str = "icbhi4",           # icbhi4(3속성) | sprsound7(6속성)
         input_fdim: int = 998,                 # desired_length 10 s → 998 (뒤집힌 quirk 값 그대로)
         input_tdim: int = 128,
         imagenet_pretrain: bool = True,
@@ -59,8 +56,12 @@ class ASTPCMCL(BaseRSCModel, nn.Module):
         super().__init__()
         if label_mode not in {"multilabel", "single"}:
             raise ValueError(f"label_mode must be multilabel|single, got {label_mode!r}")
-        if label_mode == "multilabel" and n_cls != 3:
-            raise ValueError("multilabel 은 n_cls=3 (normal, crackle, wheeze)")
+        self.ls = get_label_space(label_space)
+        if label_mode == "multilabel" and n_cls != self.ls.n_attrs:
+            raise ValueError(
+                f"multilabel 의 n_cls 는 라벨 공간의 속성 수와 같아야 한다 — "
+                f"{self.ls.name} 는 n_cls={self.ls.n_attrs} ({', '.join(self.ls.attr_names)}), 받은 값 {n_cls}"
+            )
         self.ast = PatchMixAST(
             n_cls=n_cls, fstride=10, tstride=10, input_fdim=input_fdim, input_tdim=input_tdim,
             imagenet_pretrain=imagenet_pretrain, audioset_pretrain=audioset_pretrain,
@@ -105,5 +106,5 @@ class ASTPCMCL(BaseRSCModel, nn.Module):
             loss, _, _ = pcmcl_training_loss(logits, features, labels, loss_func, self.pm_head,
                                              meta_labels, self.ssl_weight, self.loss_combine)
             return logits, loss
-        loss = loss_func(logits, label4_to_multilabel(labels))
-        return multilabel_logits_to_onehot4(logits, self.threshold), loss
+        loss = loss_func(logits, self.ls.encode(labels))
+        return self.ls.logits_to_onehot(logits, self.threshold), loss

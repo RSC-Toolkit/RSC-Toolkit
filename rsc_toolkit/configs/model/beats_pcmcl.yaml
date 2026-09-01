@@ -4,8 +4,9 @@
 #   Table 3 'Concat only'         : model.params.label_mode=single model.params.n_cls=4 loss=cross_entropy metrics=icbhi_metrics data.params.pcmcl.mode=concat_single
 name: beats_pcmcl
 params:
-  n_cls: 3
+  n_cls: 3                       # = 라벨 공간의 **속성 수**(클래스 수가 아니다). icbhi4 → 3, sprsound7 → 6
   label_mode: multilabel
+  label_space: icbhi4            # icbhi4(저자 정의) | sprsound7(툴킷 확장 — methods/pcmcl_labelspace.py)
   pretrained_path: null          # pretrained_models/upstream/BEATs_iter3_plus_AS2M.pt
   enable_ssl: true
   ssl_weight: 0.1                # 논문 α=0.1 ↔ --ssl_weight — 가정(저자 확인 전; argparse 기본 0.5)

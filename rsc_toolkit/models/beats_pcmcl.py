@@ -23,12 +23,8 @@ from typing import Optional
 import torch
 import torch.nn as nn
 
-from rsc_toolkit.methods.pcmcl import (
-    PMHead,
-    label4_to_multilabel,
-    multilabel_logits_to_onehot4,
-    pcmcl_training_loss,
-)
+from rsc_toolkit.methods.pcmcl import PMHead, pcmcl_training_loss
+from rsc_toolkit.methods.pcmcl_labelspace import get_label_space
 
 from .base import BaseRSCModel
 from .beats_pafa import BEATsTransferLearningModel
@@ -57,6 +53,7 @@ class BEATsPCMCL(BaseRSCModel, nn.Module):
         self,
         n_cls: int = 3,                        # 3-label (default/noconcat_multi) | 4 (ablation concat_single, CE)
         label_mode: str = "multilabel",        # multilabel | single
+        label_space: str = "icbhi4",           # icbhi4(3속성) | sprsound7(6속성) — n_cls 는 속성 수와 같아야 한다
         pretrained_path: Optional[str] = None,
         enable_ssl: bool = True,               # PM 헤드 (Table 3 'Concat+Multi' ablation 은 false)
         ssl_weight: float = 0.1,               # 논문 α=0.1 ↔ 코드 --ssl_weight (argparse 기본 0.5) — 가정
@@ -71,8 +68,12 @@ class BEATsPCMCL(BaseRSCModel, nn.Module):
         super().__init__()
         if label_mode not in {"multilabel", "single"}:
             raise ValueError(f"label_mode must be multilabel|single, got {label_mode!r}")
-        if label_mode == "multilabel" and n_cls != 3:
-            raise ValueError("multilabel 은 n_cls=3 (normal, crackle, wheeze)")
+        self.ls = get_label_space(label_space)
+        if label_mode == "multilabel" and n_cls != self.ls.n_attrs:
+            raise ValueError(
+                f"multilabel 의 n_cls 는 라벨 공간의 속성 수와 같아야 한다 — "
+                f"{self.ls.name} 는 n_cls={self.ls.n_attrs} ({', '.join(self.ls.attr_names)}), 받은 값 {n_cls}"
+            )
         spec_transform = _BEATsFbankSpecAugment(specaug_policy, specaug_mask) if specaug else None
         self.backbone = BEATsTransferLearningModel(num_target_classes=n_cls, model_path=pretrained_path, spec_transform=spec_transform)
         self.final_feat_dim = self.backbone.final_feat_dim
@@ -103,5 +104,5 @@ class BEATsPCMCL(BaseRSCModel, nn.Module):
                                              meta_labels, self.ssl_weight, self.loss_combine)
             return logits, loss
         # 검증 배치: 4-class long → 3-label BCE(원본 validate 의 criterion(output, labels)) + 4-class one-hot 예측
-        loss = loss_func(logits, label4_to_multilabel(labels))
-        return multilabel_logits_to_onehot4(logits, self.threshold), loss
+        loss = loss_func(logits, self.ls.encode(labels))
+        return self.ls.logits_to_onehot(logits, self.threshold), loss
