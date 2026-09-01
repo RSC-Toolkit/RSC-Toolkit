@@ -37,6 +37,15 @@ models = [
     # RespireNet 특징 파이프라인 (cv2 resize/컬러 변환, librosa kaiser_best 리샘플)
     "opencv-python-headless",
     "resampy",
+    # Prototype(protonet) 의 log-mel 프런트엔드. models/protonet.py:43 에서 모듈 최상단 import 라
+    # 없으면 모델 등록 자체가 조용히 건너뛰어진다(ModelFactory.register_models 가 ImportError 를 경고로 삼킨다).
+    "torchlibrosa",
+]
+# ResNet50 SimCLR(SSL) 가중치를 쓸 때만 필요하다.
+# models/backbone/resnet.py:129-133 이 함수 안에서 지연 import 하고 없으면 RuntimeError 로 안내하므로
+# 다른 경로에는 영향이 없다 — 그래서 models 가 아니라 별도 extra 로 둔다.
+ssl-weights = [
+    "lightning-bolts",
 ]
 dev = [
     "pytest",
