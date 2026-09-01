@@ -37,11 +37,24 @@ needs_golden = pytest.mark.skipif(not GOLDEN.exists(), reason="골든 없음")
 needs_ckpt = pytest.mark.skipif(not CKPT.exists(), reason="DASS ckpt 없음")
 needs_kernel = pytest.mark.skipif(not (cuda_kernel_available() and torch.cuda.is_available()), reason="selective_scan CUDA 커널 없음")
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-torch.set_num_threads(int(os.environ.get("RSC_TEST_THREADS", "16")))  # 48M 모델 CPU 폴백: 스레드 과다 점유(서버 load 300) 방지
 torch.backends.cudnn.allow_tf32 = False      # 골든과 같은 fp32 정확 경로 (dump 스크립트와 동일 설정)
 torch.backends.cuda.matmul.allow_tf32 = False
 torch.backends.cudnn.deterministic = True
 torch.backends.cudnn.benchmark = False
+
+
+# 48M 모델 CPU 폴백은 스레드를 과다 점유해 서버 load 를 300 까지 올린다 — 이 파일이 도는 동안만 제한한다.
+# **모듈 최상단에서 걸면 안 된다**: pytest 는 모든 모듈을 먼저 수집하므로 그 시점의 set_num_threads 가
+# 전체 실행 내내 남고, torchaudio 의 T.Resample 이 스레드 수에 따라 비트 단위로 다른 값을 낸다
+# (실측: tests/unit/datasets/test_sprsound_sclmeta.py 의 파형 비트 대조가 16 스레드에서만 실패한다).
+
+
+@pytest.fixture(autouse=True, scope="module")
+def _limit_threads():
+    prev = torch.get_num_threads()
+    torch.set_num_threads(int(os.environ.get("RSC_TEST_THREADS", "16")))
+    yield
+    torch.set_num_threads(prev)
 
 
 def _det_fill(t):
