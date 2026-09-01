@@ -412,7 +412,7 @@ class PatchMixAST(BaseRSCModel, nn.Module):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return self.classifier(self.forward_features(self._to_paper_layout(x)))
 
-    def training_forward(self, audio_batch, labels, loss_func):
+    def training_forward(self, audio_batch, labels, loss_func, **kwargs):  # kwargs: base.py 계약 — meta 를 붙이는 데이터 config 와도 조합되게 열어 둔다
         """
         원본 main.py train() 의 method 분기와 동일. 평가 모드(validate)는 원본처럼
         항상 ce 경로다 (원본 validate 는 features→classifier→criterion[0]).

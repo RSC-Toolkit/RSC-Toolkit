@@ -46,6 +46,6 @@ class ASTClassifier(BaseRSCModel, nn.Module):
             feats = self.dropout(feats)
         return self.classifier_head(feats)
 
-    def training_forward(self, audio_batch, labels, loss_func):
+    def training_forward(self, audio_batch, labels, loss_func, **kwargs):  # kwargs: base.py 계약 — meta 를 붙이는 데이터 config 와도 조합되게 열어 둔다
         logits = self.forward(audio_batch)
         return logits, loss_func(logits, labels)

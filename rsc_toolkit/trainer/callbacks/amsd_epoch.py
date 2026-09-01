@@ -24,6 +24,10 @@ class AMSDEpochCallback(L.Callback):
 
     def on_fit_start(self, trainer, pl_module):
         model = self._model(pl_module)
+        # 모델이 "epoch 콜백이 붙어 있다"를 알 수 있게 표식을 남긴다 — 콜백 없이
+        # model=ast_amsd 만 조합하면 epoch 이 영원히 0 이라 조용히 퇴화 학습이 되는데,
+        # 모델 쪽 training_forward 가 이 표식의 부재를 보고 경고한다.
+        model._epoch_callback_attached = True
         dm = trainer.datamodule
         n = getattr(dm, "num_train_samples", None)
         if n is None and getattr(dm, "train_ds", None) is not None:

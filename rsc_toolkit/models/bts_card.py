@@ -54,11 +54,6 @@ import torch.nn.functional as F
 from .bts import BTSModel, _as_4d
 from .factory import ModelFactory
 from .grl import ReverseLayerF
-from rsc_toolkit.datasets.icbhi.meta_description import (
-    generate_meta_description,
-    meta_fields_from_meta7,
-    select_meta_fields,
-)
 
 logger = logging.getLogger(__name__)
 
@@ -314,7 +309,12 @@ class BTSCARDModel(BTSModel):
                                               o_text.detach(), self.fusion_mode)
                 terms["kl"] = kl_loss_function(o1, o2_detached)
             else:
-                terms["kl"] = kl_loss_function(o1, o2)  # 논문형(그래디언트 흐름): 방향은 원본 kl_loss_function 그대로 KL(softmax(o2) ‖ softmax(o1)) — 논문 Eq.8 표기 KL(Y_{t,m*} ‖ Y_{t,m}) 와 방향이 다를 수 있음(저자 확인)
+                # 논문형(그래디언트 흐름). 실제 계산 방향: kl_loss_function(o1, o2) 는
+                # F.kl_div(input=log_softmax(o2), target=log_softmax(o1).detach(), log_target=True)
+                # = KL(softmax(o1) ‖ softmax(o2)) 다 (원본 util/misc.py:139-143 과 동일).
+                # 논문 Eq.8 표기 KL(Y_{t,m*} ‖ Y_{t,m}) 와 방향이 다를 수 있음(저자 확인 대기).
+                # ※ 이전 주석은 방향을 반대로 적었었다 — Eq.8 비교 판정 시 이 정정 기준으로 볼 것.
+                terms["kl"] = kl_loss_function(o1, o2)
         terms["nde"] = criterion(o_text, labels)
         if self.use_adversarial:
             terms["loc"] = criterion(out["loc_logits"], loc)
@@ -343,6 +343,9 @@ class BTSCARDModel(BTSModel):
         training = self.training
         bert_texts = self.describe_bert(meta7, masking=training and self.use_meta_aug)
         out = self.forward_all(audio_batch, clap_texts, bert_texts, fp32_tail=training)
+        # 학습 분기의 반환 로짓은 tie(o1,o2) 융합값이다. 원본 train() 의 학습 정확도는
+        # 융합 전 o_multimodel 로 계산되므로 train top-1 로그의 의미가 원본과 다르다
+        # (손실·그래디언트·검증 지표는 동일). 원본 학습 곡선과 직접 대조할 때 주의.
         output = self.tie(out["o1"], out["o2"])
         if training:
             loc = meta7[:, 5].long()

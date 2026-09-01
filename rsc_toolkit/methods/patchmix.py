@@ -57,7 +57,10 @@ class PatchMixConLoss(nn.Module):
         if self.negative_pair == "diff_label":
             labels_a = labels_a.contiguous().view(-1, 1)
             logits_mask = torch.ne(labels_a, labels_a.T).to(device) + (mask_a.bool() + mask_b.bool())
-            exp_logits *= logits_mask.float()
+            # 원본(method/patchmix_cl.py)은 여기가 in-place(`exp_logits *= ...`)인데, exp 의
+            # backward 가 자기 출력을 저장하므로 원본은 이 경로에서 backward 가 반드시
+            # RuntimeError 로 죽는다 (원본과의 유일한 의도적 차이 — 수치는 동일하다).
+            exp_logits = exp_logits * logits_mask.float()
 
         log_prob = logits - torch.log(exp_logits.sum(1, keepdim=True))
 

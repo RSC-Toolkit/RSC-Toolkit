@@ -37,7 +37,6 @@ def split_odd_even(n: int, device=None) -> Tuple[torch.Tensor, torch.Tensor]:
 
 def mixup_pairs(
     xa: torch.Tensor, xb: torch.Tensor, ya: torch.Tensor, yb: torch.Tensor, n_cls: int, alpha: float = 1.0,
-    gen: Optional[torch.Generator] = None,
 ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     """쌍별 λ~Beta(α,α) (alpha<=0 이면 λ=1 → 혼합 없음). 반환 (x_mix, y_mix(soft, (n, n_cls)), lam(n,))."""
     n = xa.shape[0]

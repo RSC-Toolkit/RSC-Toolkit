@@ -69,6 +69,9 @@ class LabelSpace:
         self.decode_rules = tuple((tuple(req), int(cls)) for req, cls in decode_rules)
         self._combination_builder = combination_builder
         self._table_t = torch.tensor(self.table, dtype=torch.float32)
+        # encode 가 검증 매 스텝 불리므로 디바이스별로 한 번만 옮겨 캐시한다
+        # (LabelSpace 는 nn.Module 이 아니라 buffer 등록이 안 된다).
+        self._table_by_device: dict = {self._table_t.device: self._table_t}
 
     # ------------------------------------------------------------------ 기본
     @property
@@ -97,7 +100,11 @@ class LabelSpace:
 
     def encode(self, labels: torch.Tensor) -> torch.Tensor:
         """(B,) long → (B, n_attrs) float."""
-        return self._table_t.to(labels.device)[labels.long()]
+        table = self._table_by_device.get(labels.device)
+        if table is None:
+            table = self._table_t.to(labels.device)
+            self._table_by_device[labels.device] = table
+        return table[labels.long()]
 
     # ------------------------------------------------------------------ 복호
     def decode_binary(self, bits: torch.Tensor) -> torch.Tensor:

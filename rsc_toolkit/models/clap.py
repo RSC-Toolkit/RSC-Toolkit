@@ -4,7 +4,8 @@ Audio-CLAP — BTS 논문(kaen2891/bts)의 오디오 전용 기준선. 공식 �
 원본 main.py set_model(--model_type ClapAudioModelWithProjection):
   model = PretrainedCLAPWithProjection('laion/clap-htsat-unfused', 512)  (models/clap.py:6-16)
   classifier = nn.Linear(512, n_cls)
-forward 는 ClapAudioModelWithProjection(input_features).audio_embeds (512-d, L2 정규화).
+forward 는 ClapAudioModelWithProjection(input_features).audio_embeds (512-d, 정규화 안 됨 —
+audio_projection(pooler_output) 로 끝난다. L2 정규화는 ClapModel.get_audio_features 경로에만 있다).
 
 transformers 5.x 는 input_features 를 (B, 1, T, F) 4D 로만 받는다 — 3D 면 채널 축을 붙인다.
 """

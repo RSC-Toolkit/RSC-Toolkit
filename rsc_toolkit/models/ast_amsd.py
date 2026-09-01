@@ -391,6 +391,18 @@ class AMSDAST(BaseRSCModel, nn.Module):
             return logits, loss_func(logits, labels)
 
         epoch = int(self.current_epoch)
+        if not getattr(self, "_epoch_callback_attached", False) and not getattr(self, "_epoch_warned", False):
+            # AMSDEpochCallback(callbacks=amsd_paper*) 없이 학습하면 epoch 이 영원히 0:
+            # attentive 마스킹·noise/roll 이 영구 비활성이고 teacher 가 매 스텝 one-hot 으로
+            # 재기록되어 self-distillation 이 CE+KL(one-hot) 로 퇴화한다 — 에러 없이.
+            # (meta_labels 누락은 위에서 raise 로 막지만 epoch 정체는 결과만 조용히 다르다.)
+            # 테스트처럼 콜백 없이 직접 구동하는 경로가 있어 예외 대신 1회 경고로 남긴다.
+            logger.warning(
+                "ast_amsd 가 AMSDEpochCallback 없이 학습 중이다 — epoch 인식이 0 에 고정되어 "
+                "마스킹·noise 가 켜지지 않고 distillation 이 퇴화한다. callbacks=amsd_paper 계열 "
+                "config 를 함께 써라 (직접 구동이면 model.current_epoch 버퍼를 갱신하라)."
+            )
+            self._epoch_warned = True
         idx = meta_labels.long()
         if self.noise_enabled and epoch >= self.noise_start_epoch:
             x = self._noise_roll(x, epoch, idx)

@@ -52,7 +52,7 @@ class CNN6SCLMeta(BaseRSCModel, nn.Module):
         lam: float = 0.75,                 # mscl: class-SCL 비중 (meta 는 1-λ)
         freq_mask: int = 20, time_mask: int = 40, freq_stripes: int = 2, time_stripes: int = 2, specaug_p: float = 1.0,
         std_mean: float = STANDARDIZE_MEAN, std_std: float = STANDARDIZE_STD,
-        encoder_ckpt: Optional[str] = None,  # linear: 사전학습 run 의 final_state (models 키) 경로
+        encoder_ckpt: Optional[str] = None,  # linear: 사전학습 run 의 final_state ("model" 키 — final_state.py) 경로
     ):
         super().__init__()
         if method not in METHODS:
@@ -77,7 +77,7 @@ class CNN6SCLMeta(BaseRSCModel, nn.Module):
             state = torch.load(encoder_ckpt, map_location="cpu", weights_only=False)
             state = state.get("model", state)
             enc = {k[len("encoder."):]: v for k, v in state.items() if k.startswith("encoder.")}
-            missing, unexpected = self.encoder.load_state_dict(enc, strict=True), None
+            self.encoder.load_state_dict(enc, strict=True)  # strict 라 불일치는 예외로 드러난다
             for p in self.encoder.parameters():
                 p.requires_grad = False
             logger.info("선형 평가용 인코더 로드·동결: %s", encoder_ckpt)
