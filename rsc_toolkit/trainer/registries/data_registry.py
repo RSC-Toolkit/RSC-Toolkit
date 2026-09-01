@@ -12,6 +12,7 @@ from rsc_toolkit.datasets.lungmix_data import LungmixDataModule
 from rsc_toolkit.datasets.protonet_data import ProtoNetDataModule
 from rsc_toolkit.datasets.domaintransfer_data import DomainTransferDataModule
 from rsc_toolkit.datasets.qlung_data import QLungDataModule
+from rsc_toolkit.datasets.btscard_sprs import BTSCARDSprsDataModule
 
 DATAMODULES: Dict[str, Type[L.LightningDataModule]] = {
     "index": IndexDataModule,
@@ -23,5 +24,7 @@ DATAMODULES: Dict[str, Type[L.LightningDataModule]] = {
     "lungmix": LungmixDataModule,
     "protonet": ProtoNetDataModule,
     "domaintransfer": DomainTransferDataModule,   # Domain Transfer(ICASSP 2022) 8 kHz·circular padding·splice·파형 증강               # Prototype(ICASSP 2022) 4 kHz 밴드패스·4 s 랜덤/센터 크롭 + balanced class weight                 # Lungmix 밴드패스·SPRSound 7→4 파생 라벨 (Tigerdwgth/ICASSP-2025-Lungmix, 논문 명세 재구현)
-    "qlung": QLungDataModule,                     # QLung AQS float 를 배치 3번째 원소로 (RSC-Toolkit/QLung 46408dd)
+    "qlung": QLungDataModule,
+    # BTS 계열 SPR→SPR 학습: meta7 모양 벡터를 train·val 양쪽 배치에 붙인다 (index 경로는 val 에 meta 를 안 붙인다)
+    "btscard_sprs": BTSCARDSprsDataModule,                     # QLung AQS float 를 배치 3번째 원소로 (RSC-Toolkit/QLung 46408dd)
 }

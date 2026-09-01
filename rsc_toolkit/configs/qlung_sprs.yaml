@@ -1,0 +1,42 @@
+# QLung 을 **SPRSound 표준 태스크(2022 inter-patient, 7-class)로 직접 학습·검증** (SPR→SPR).
+#
+# 왜 따로 있나 — §1 표 22행의 SPRSound 칸은 지금까지 **ICBHI 학습 → SPRSound 제로샷 OOD**(7→4 병합) 값뿐이라
+# "SPRSound 학습 → SPRSound 검증" 이라는 데이터 원칙에 해당하는 값이 없었다. 이 config 가 그 칸을 만든다.
+# OOD 값(sprsound_qlung_ood.yaml + eval_qlung_ood.py)은 논문 앵커가 있으므로 **그대로 보존**하고 병기한다.
+#
+# 논문 앵커: 없음. QLung 논문은 SPRSound 를 OOD 로만 썼고 in-domain 학습 결과를 싣지 않았다.
+#            → 재현 판정 대상이 아니라 **툴킷 확장 관찰값**이다.
+#
+# 레시피: QLung 의 ICBHI 레시피 그대로 (50 ep, bs 8, adam 5e-5/wd 1e-6, cosine, MA 0.6, AMP, 비가중 CE).
+#         바뀌는 것은 클래스 수(4→7)와 그에 따른 π_y 용 class_nums 뿐이다.
+#
+#   rsctk-train --config-name qlung_sprs seed=N run.name=sprs-qlung-sN
+defaults:
+  - model: ast_qlung
+  - data_defaults@data: base
+  - data: sprsound_qlung
+  - loss: cross_entropy        # ICBHI QLung 이 비가중 CE(criterion[0], --weighted_loss 미사용) → SPRS 도 비가중 유지
+  - metrics: sprsound_metrics  # 7-class Se/Sp/Score (icbhi_score 키 그대로 → qlung_paper 콜백의 best 선정과 호환)
+  - optimizer: adam            # lr 5e-5, wd 1e-6
+  - trainer: default           # max_epochs 50
+  - callbacks: qlung_paper     # MA 0.6(dfam 제외) · PaperCosineLR · best-on-test(Se>5) · 재개용 last.ckpt
+  - _self_
+
+seed: 1
+
+trainer:
+  params:
+    precision: 16-mixed        # 원본 AMP(GradScaler+autocast)
+
+run:
+  name: sprs-qlung
+  group: qlung
+  tags: [qlung, sprsound, extension]
+
+model:
+  params:
+    n_cls: 7
+    # π_y (AngularClassifier 의 클래스 사전확률) — SPRSound 2022 inter-patient **train** 분포 7-class, 합 6,656.
+    # Normal 5159 / Fine Crackle 912 / Wheeze 452 / Coarse Crackle 49 / Wheeze+Crackle 30 / Rhonchi 39 / Stridor 15
+    # (서버 실데이터 집계. loss/cross_entropy_weighted_sprsound.yaml 의 값과 동일 출처)
+    class_nums: [5159, 912, 452, 49, 30, 39, 15]

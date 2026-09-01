@@ -94,6 +94,24 @@ def describe_meta3_sprsound(meta3) -> str:
     return generate_meta_description_sprsound(age_str, sex_str, LOC_ID_TO_STR[loc])
 
 
+def meta_fields_from_meta7_sprsound(meta7):
+    """
+    SPRSound 방언: BTS 계열의 7필드 벡터에서 age/sex/loc 만 읽어 문장 필드로 만든다.
+
+    ICBHI 판(`meta_fields_from_meta7`)과 두 가지가 다르다:
+      · loc 어휘가 SPRSound 의 p1~p4(LOC_ID_TO_STR) 다 — ICBHI 흉부 위치 7종을 쓰면 없는 위치를 지어내게 된다.
+      · dev 를 쓰지 않는다(None). SPRSound 는 전 8,085 이벤트가 단일 청진기(Yunting2) 라 구분 정보가 없다.
+    나머지 세 자리(BMI·체중·신장)는 -1(결측)이고 여기서도 읽지 않는다.
+    """
+    age, sex, loc = int(meta7[0]), int(meta7[1]), int(meta7[5])
+    return {
+        "age": "adult" if age >= 19 else "pediatric",
+        "sex": "male" if sex == 0 else "female",
+        "loc": LOC_ID_TO_STR[loc],
+        "dev": None,
+    }
+
+
 def meta3_from_index_meta(meta: Dict[str, Any]) -> List[float]:
     """툴킷 SPRSound 인덱스 meta dict → 노트북 cell 7 의 [age, gender, loc_id]."""
     loc = meta.get("location_id")

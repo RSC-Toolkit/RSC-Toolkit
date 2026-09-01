@@ -33,7 +33,12 @@ import torch.nn as nn
 
 from .base import BaseRSCModel
 from .factory import ModelFactory
-from rsc_toolkit.datasets.icbhi.meta_description import describe_meta7
+from rsc_toolkit.datasets.icbhi.meta_description import (
+    describe_meta7,
+    generate_meta_description,
+    meta_fields_from_meta7,
+    select_meta_fields,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +58,10 @@ class BTSModel(BaseRSCModel, nn.Module):
         te_alpha: float = 0.5,          # add 일 때 텍스트 가중 (원본 기본값)
         meta_mode: str = "all",
         text_max_length: int = 64,      # 원본 icbhi_dataset.py:189
+        # 메타 문장 어휘. "icbhi" = 원본(흉부 위치 7종 + 청진기 4종).
+        # "sprsound" = 저자 util/sprsound_util.py 의 SPRSound 판(위치 p1~p4, 청진기 없음) —
+        # SPRSound 로 직접 학습할 때만 쓴다. 어휘를 안 바꾸면 없는 청진 위치를 지어내게 된다.
+        meta_dialect: str = "icbhi",
     ):
         super().__init__()
         from transformers import ClapModel, ClapProcessor
@@ -64,6 +73,9 @@ class BTSModel(BaseRSCModel, nn.Module):
         self.clap_final = clap_final
         self.te_alpha = te_alpha
         self.meta_mode = meta_mode
+        if meta_dialect not in {"icbhi", "sprsound"}:
+            raise ValueError(f"meta_dialect must be icbhi|sprsound, got {meta_dialect!r}")
+        self.meta_dialect = meta_dialect
         self.text_max_length = int(text_max_length)
         head_dim = final_feat_dim * 2 if clap_final == "concat" else final_feat_dim
         self.classifier = nn.Linear(head_dim, n_cls)  # 원본 main.py:191
@@ -71,7 +83,29 @@ class BTSModel(BaseRSCModel, nn.Module):
         self.tokenizer = ClapProcessor.from_pretrained(pretrained_name).tokenizer
 
     # ----------------------------------------------------------------- 텍스트
+    def meta_field_dicts(self, meta7_batch: torch.Tensor) -> list:
+        """meta7 → 문장 필드 dict. 방언에 따라 어휘와 문장 틀이 갈린다."""
+        if self.meta_dialect == "sprsound":
+            from rsc_toolkit.datasets.sprsound_ood import meta_fields_from_meta7_sprsound
+
+            return [meta_fields_from_meta7_sprsound(m.tolist()) for m in meta7_batch]
+        return [select_meta_fields(meta_fields_from_meta7(m.tolist()), self.meta_mode) for m in meta7_batch]
+
+    def render_meta_sentence(self, fields: dict) -> str:
+        """문장 생성기. SPRSound 는 저자의 util/sprsound_util.py 판을 쓴다(청진기 항이 없다)."""
+        if self.meta_dialect == "sprsound":
+            from rsc_toolkit.datasets.sprsound_ood import generate_meta_description_sprsound
+
+            return generate_meta_description_sprsound(
+                age=fields["age"] if fields["age"] is not None else "unknown",
+                sex=fields["sex"] if fields["sex"] is not None else "unknown",
+                loc=fields["loc"] if fields["loc"] is not None else "unknown",
+            )
+        return generate_meta_description(**fields)
+
     def describe(self, meta7_batch: torch.Tensor) -> list:
+        if self.meta_dialect == "sprsound":
+            return [self.render_meta_sentence(d) for d in self.meta_field_dicts(meta7_batch)]
         return [describe_meta7(m.tolist(), self.meta_mode) for m in meta7_batch]
 
     def encode_meta(self, meta7_batch: torch.Tensor, device) -> Tuple[torch.Tensor, torch.Tensor]:

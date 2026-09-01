@@ -179,6 +179,7 @@ class BTSCARDModel(BTSModel):
         te_alpha: float = 0.5,
         meta_mode: str = "all",
         text_max_length: int = 64,
+        meta_dialect: str = "icbhi",    # "sprsound" = SPRSound 로 직접 학습할 때 (bts.py 참고)
         nde_pretrained_name: str = DEFAULT_NDE_LOCAL,
         alpha: float = 0.0,             # 추론 TIE 계수 (논문 §3.2.4 권장 0)
         lambda_loc: float = 0.01,
@@ -197,7 +198,7 @@ class BTSCARDModel(BTSModel):
     ):
         super().__init__(n_cls=n_cls, pretrained_name=pretrained_name, final_feat_dim=final_feat_dim,
                          clap_final=clap_final, te_alpha=te_alpha, meta_mode=meta_mode,
-                         text_max_length=text_max_length)
+                         text_max_length=text_max_length, meta_dialect=meta_dialect)
         from transformers import AutoTokenizer
 
         if mask_mode not in {"omit", "unknown"}:
@@ -234,16 +235,22 @@ class BTSCARDModel(BTSModel):
         return self._mask_gen
 
     def meta_dicts(self, meta7_batch: torch.Tensor) -> List[Dict[str, Optional[str]]]:
-        return [select_meta_fields(meta_fields_from_meta7(m.tolist()), self.meta_mode) for m in meta7_batch]
+        return self.meta_field_dicts(meta7_batch)
 
     def describe_bert(self, meta7_batch: torch.Tensor, masking: bool) -> List[str]:
         """tiny-bert 문장: 학습(masking=True)이면 속성별 p_mask 마스킹 (icbhi_util.py:259-261)."""
         out = []
-        mask_value = "unknown" if self.mask_mode == "unknown" else None
+        # SPRSound 방언은 마스킹 값이 반드시 "unknown" 이어야 한다 — 저자의 SPRSound 문장 생성기가
+        # "unknown" 을 명시적으로 처리하는 반면(util/sprsound_util.py:1-24), None 은 처리 분기가 없어
+        # "a None patient" 같은 문장이 나온다. ICBHI 는 원본대로 mask_mode 를 따른다.
+        if self.meta_dialect == "sprsound":
+            mask_value = "unknown"
+        else:
+            mask_value = "unknown" if self.mask_mode == "unknown" else None
         for d in self.meta_dicts(meta7_batch):
             if masking and self.p_mask > 0:
                 d = randomly_mask_metadata(d, self.p_mask, self.mask_generator, mask_value)
-            out.append(generate_meta_description(**d))
+            out.append(self.render_meta_sentence(d))
         return out
 
     def encode_bert(self, texts: Sequence[str], device) -> Tuple[torch.Tensor, torch.Tensor]:

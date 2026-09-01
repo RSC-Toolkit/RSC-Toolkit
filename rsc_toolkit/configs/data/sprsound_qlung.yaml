@@ -1,0 +1,72 @@
+# QLung 을 **SPRSound 표준 태스크(2022 inter-patient, 7-class)로 직접 학습**할 때 쓰는 데이터 설정 (SPR→SPR).
+#
+# 기존 sprsound_qlung_ood.yaml 과의 차이 — 그쪽은 ICBHI 로 학습한 ckpt 를 SPRSound 에 제로샷으로 얹는
+# **평가 전용 뷰**라 label_map(7→4 병합)을 걸고 train 셔플도 끄지만, 이 config 는 SPRSound 로 **학습**하므로
+#   · label_map 없음 → 7-class 원 라벨 그대로 (SPRSound 를 주 태스크로 쓴 논문들의 공식 정의)
+#   · shuffle_train/drop_last_train 켜짐 (ICBHI QLung 의 train loader 와 동일)
+#
+# 레시피 원칙(2026-08-30 사용자 결정): 각 논문이 ICBHI 에서 쓴 레시피를 그대로 옮긴다.
+# 따라서 오디오·특징 체인은 icbhi_qlung.yaml 과 동일하다 — 16 kHz, 8 s, repeat_fade, fbank 128×798, AQS 부착.
+#
+# time_unit: SPRSound 인덱스의 t0/t1 은 ms 정밀도(소수 3자리)라 's' 와 'ms_int' 가 같은 샘플 오프셋을 낸다
+#   ('s' → int(t*sr), 'ms_int' → int(round(t*1000))*int(sr/1000); t=1.079·sr=16000 이면 둘 다 17264).
+#   QLung 자신의 ICBHI 체인이 's'(기본)이므로 그대로 두어 OOD 뷰와도 동일한 파형을 쓴다.
+name: sprsound_qlung
+params:
+  datamodule_name: qlung
+
+  dataset_name: sprsound
+  index_dataset_cls: rsc_toolkit.datasets.qlung_data.QLungAQSIndexDataset
+  project_root: ${hydra:runtime.cwd}
+  data_dir: .datasets/sprsound
+  raw_data_subdir: Classification   # recording_path 는 Classification/ 기준 상대경로
+  index_filename: index_cycle.csv
+  # label_map 없음 — 7-class 원 라벨 (OOD 뷰의 sprsound_7to4 와 다른 지점)
+
+  sampling_rate: 16000
+  sample_level: cycle
+  desired_length_sec: 8.0
+  pad_type: repeat_fade          # ICBHI QLung 과 동일 (녹음 fade in/out + 8 s repeat + fade_out)
+  fade: true
+  resample_after_slice: false    # 녹음 전체를 16 kHz 로 리샘플한 뒤 구간 절단 (ICBHI 체인)
+  time_unit: s
+
+  train_splits: [train]
+  val_splits: [test]             # 논문 프로토콜: 매 epoch test 평가 (best-on-test) — 다른 30행과 동일
+  test_splits: [test]
+
+  batch_size: 8
+  num_workers: 8
+  shuffle_train: true
+  drop_last_train: true          # 원본 train loader drop_last=True
+  pin_memory: true
+
+  features:
+    enabled: true
+    kind: fbank
+    # OOD 뷰와 파형 체인은 같지만 캐시는 나눈다 — 캐시 키에 오디오 체인이 안 들어가므로
+    # 이름으로 용도를 분리해 두는 편이 사고를 막는다(피처 캐시 충돌은 실제로 한 번 났다).
+    cache_dir: downloaded_datasets/features_cache_qlung_sprs
+    n_mels: 128
+    target_frames: 798
+    frame_shift: 10
+    window_type: hanning
+    dither: 0.0
+    normalize: true
+
+  feature_precompute: true
+  feature_precompute_batch_size: 8
+  feature_precompute_num_workers: 0
+
+  specaugment:
+    enabled: false               # 모델(ast_qlung)이 배치 단위로 적용한다
+
+  qlung:
+    alpha: 0.7                   # --quality_alpha
+    beta: 0.3                    # --quality_beta
+    entropy_source: rms          # 주 결과 = 코드 그대로(icbhi_dataset.py:177 의 rms 중복 전달 버그 포함)
+    formula: code
+    cache_dir: downloaded_datasets/aqs_cache_sprs   # AQS 는 파형에서 계산 — 데이터셋별로 분리
+    precompute: true
+    precompute_num_workers: 8
+    attach_val: true             # 검증 배치에도 AQS 부착 (ICBHI 와 동일)
