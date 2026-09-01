@@ -42,8 +42,12 @@ class AMSDBestScoreCheckpoint(ICBHIBestScoreCheckpoint):
             return
         metrics = trainer.callback_metrics
         if self.score_key not in metrics:
-            logger.warning("메트릭 %s 가 없어 best 선정을 건너뛴다 (metrics=%s)", self.score_key, list(metrics))
-            return
+            # 부모(ICBHIBestScoreCheckpoint)와 같은 이유의 fail-fast — 침묵 무산출 완주 방지.
+            raise RuntimeError(
+                f"best 선정 메트릭 '{self.score_key}' 가 로그에 없다 (있는 키: {sorted(map(str, metrics))}). "
+                f"metrics config 의 val 목록에 해당 메트릭이 있는지 확인하라 — "
+                f"이대로 완주하면 best.pth/best.json 없이 끝난다."
+            )
         score = float(metrics[self.score_key])
         se = float(metrics.get(self.se_key, float("nan")))
         if not (score > self.best_score and se > self.min_se):

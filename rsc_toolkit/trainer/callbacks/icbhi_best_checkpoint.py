@@ -54,8 +54,15 @@ class ICBHIBestScoreCheckpoint(L.Callback):
             return
         metrics = trainer.callback_metrics
         if self.score_key not in metrics:
-            logger.warning("메트릭 %s 가 없어 best 선정을 건너뛴다 (metrics=%s)", self.score_key, list(metrics))
-            return
+            # 예전에는 경고만 남기고 건너뛰었다 — metrics config 에서 icbhi_score 가 빠지면
+            # 전 학습이 exit 0 으로 완주하되 best.pth/best.json 이 하나도 없었고, 무인
+            # 스케줄러는 성공으로 오인했으며 aggregate 는 그 시드를 말없이 빼고 평균했다.
+            # 첫 검증에서 즉시 실패시켜 GPU 시간 낭비와 표본 수 침묵 감소를 막는다.
+            raise RuntimeError(
+                f"best 선정 메트릭 '{self.score_key}' 가 로그에 없다 (있는 키: {sorted(map(str, metrics))}). "
+                f"metrics config 의 val 목록에 해당 메트릭이 있는지 확인하라 — "
+                f"이대로 완주하면 best.pth/best.json 없이 끝난다."
+            )
         score = float(metrics[self.score_key])
         se = float(metrics.get(self.se_key, float("nan")))
         sp = float(metrics.get(self.sp_key, float("nan")))
@@ -74,3 +81,14 @@ class ICBHIBestScoreCheckpoint(L.Callback):
         json.dump(self.best_info, open(path.with_suffix(".json"), "w"), indent=1)
         logger.info("Best 갱신: epoch %d, Score %.2f (Sp %.2f / Se %.2f) -> %s",
                     self.best_info["epoch"], score, sp, se, path)
+
+    def on_fit_end(self, trainer, pl_module):
+        # 게이트(Se > min_se)를 한 번도 못 넘은 채 완주한 경우 — 프로토콜상 가능한 결과라
+        # 예외는 아니지만, best.json 이 없으면 aggregate 가 이 시드를 말없이 뺀다.
+        # 로그만 보는 운영에서도 눈에 띄게 남긴다.
+        if self.best_info is None:
+            logger.warning(
+                "학습이 끝났지만 best 가 한 번도 갱신되지 않았다 (게이트: %s > %.2f 미충족) — "
+                "%s/best.json 이 없다. aggregate 에서 이 run 은 표본에서 빠진다.",
+                self.se_key, self.min_se, self.dirpath,
+            )

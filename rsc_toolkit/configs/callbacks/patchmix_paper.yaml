@@ -9,8 +9,8 @@ trainer:
       - _target_: rsc_toolkit.trainer.callbacks.ma_update.LiveWeightAveraging
         beta: 0.5
       - _target_: rsc_toolkit.trainer.callbacks.paper_cosine_lr.PaperCosineLR
-        learning_rate: 5e-5
-        epochs: 50
+        learning_rate: ${optimizer.params.lr}        # 단일 출처 — optimizer 그룹. 하드코딩 복사본이 CLI 스윕을 침묵 무효화했다
+        epochs: ${trainer.params.max_epochs}
       - _target_: rsc_toolkit.trainer.callbacks.icbhi_best_checkpoint.ICBHIBestScoreCheckpoint
         dirpath: outputs/patchmix/${run.name}
         min_se: 5.0

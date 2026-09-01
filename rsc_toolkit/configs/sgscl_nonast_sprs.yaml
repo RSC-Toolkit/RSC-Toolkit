@@ -21,6 +21,13 @@ trainer:
     max_epochs: 400
     precision: 16-mixed
 
+optimizer:
+  params:
+    lr: 1e-3                   # 스크립트 --learning_rate 1e-3 — icbhi 변형과 동일.
+                               # 이전에는 이 override 가 빠져 optimizer 그룹은 5e-5 를 말하는데
+                               # PaperCosineLR 콜백이 1e-3 으로 덮어써 실효 lr 은 1e-3 이었다
+                               # (기존 run 의 수치는 그대로 유효 — 메타데이터만 거짓이었다).
+
 run:
   name: sprs-nonast-sft
   group: sgscl

@@ -70,6 +70,16 @@ class DomainTransferStages(L.Callback):
 
     def on_train_epoch_start(self, trainer, pl_module):
         epoch = trainer.current_epoch
+        if epoch == 0:
+            # PaperCosineLR 와 같은 이유: 이 콜백이 매 epoch lr 을 덮어쓰므로
+            # optimizer 그룹과 어긋나면 CLI 스윕이 침묵 무효화된다 (fresh run 만 검사).
+            base_lr = float(trainer.optimizers[0].param_groups[0]["lr"])
+            if not math.isclose(base_lr, self.lr, rel_tol=1e-9):
+                logger.warning(
+                    "DomainTransferStages.learning_rate=%.3g 가 optimizer 의 lr=%.3g 와 다르다 — "
+                    "실효 lr 은 %.3g 다. callbacks yaml 의 ${optimizer.params.lr} 보간을 확인하라.",
+                    self.lr, base_lr, self.lr,
+                )
         if epoch >= self.stage1_epochs and not self._switched:
             self._enter_stage2(trainer, pl_module)
         new_lr = self.lr_at(epoch)

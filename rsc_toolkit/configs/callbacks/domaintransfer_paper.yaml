@@ -7,7 +7,7 @@ trainer:
   params:
     callbacks:
       - _target_: rsc_toolkit.trainer.callbacks.domaintransfer_stages.DomainTransferStages
-        learning_rate: 6.0e-4
+        learning_rate: ${optimizer.params.lr}   # 단일 출처 — optimizer 그룹(adam_domaintransfer, 6e-4)
         stage1_epochs: 50
         warmup_epochs: 5
         stage2_lr_scale: 0.1
