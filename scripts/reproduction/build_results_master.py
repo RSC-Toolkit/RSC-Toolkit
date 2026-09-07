@@ -8,9 +8,8 @@
 성립 근거: hydra 가 `config.yaml` 에 `run.name`/`run.group` 을 그대로 남기고,
 그것이 `outputs/<group>/<run.name>/` 디렉터리명과 같다(전수 확인).
 
-같은 `run.name` 으로 여러 스냅샷이 있으면(재실행) **경로 사전순 마지막**을 쓴다 —
-스냅샷 디렉터리가 `outputs/YYYY-MM-DD/HH-MM-SS/` 라 사전순 = 시간순이고,
-살아남은 `best.json` 은 마지막 실행의 것이기 때문이다.
+같은 `run.name` 으로 여러 스냅샷이 있으면(재실행) **best.pth 가 저장되기 직전 것**을 쓴다
+(`pick_snapshot` 참조 — 폐기된 재실행의 스냅샷이 붙던 오매칭을 막는다). `smoke-*` run 은 제외한다.
 
 사용:
     python scripts/reproduction/build_results_master.py                 # docs/results_master.csv
@@ -21,6 +20,7 @@ from __future__ import annotations
 import argparse
 import collections
 import csv
+import datetime
 import json
 import pathlib
 import re
@@ -48,6 +48,8 @@ def iter_run_dirs():
     for best in sorted(OUTPUTS.glob("**/best.json")):
         rel = best.relative_to(OUTPUTS)
         if DATE_DIR.match(rel.parts[0]):
+            continue
+        if best.parent.name.startswith("smoke-"):   # 스모크(limit_batches·1 epoch)는 논문 표의 원천이 아니다
             continue
         yield best.parent, rel
 
@@ -89,8 +91,33 @@ def index_hydra_snapshots():
             except Exception:
                 overrides = []
         dupes[name] = dupes.get(name, 0) + 1
-        index[name] = {"cfg": cfg, "hydra": hyd, "dir": cfg_path.parent.parent, "overrides": overrides}
+        index.setdefault(name, []).append({"cfg": cfg, "hydra": hyd, "dir": cfg_path.parent.parent, "overrides": overrides})
     return index, {k: v for k, v in dupes.items() if v > 1}
+
+
+def pick_snapshot(snaps, best_pth: pathlib.Path):
+    """같은 run.name 의 스냅샷이 여럿이면 **best.pth 가 저장되기 직전** 것을 고른다.
+
+    예전 규칙("경로 사전순 마지막")은 폐기된 재실행의 스냅샷을 붙였다 — sprs-addrsc-s1 은 09:01 run 의
+    best.pth 가 살아남았는데 13:24 에 시작해 폐기(-m2dproto-discarded)된 run 의 설정이 표에 실렸다.
+    스냅샷 디렉터리명(outputs/YYYY-MM-DD/HH-MM-SS)이 시작 시각이므로 best.pth mtime 이전 것 중 마지막이 그 run 이다.
+    이전 것이 없으면(시계 불일치 등) 마지막 것을 쓴다."""
+    if not snaps:
+        return None
+    try:
+        saved = datetime.datetime.fromtimestamp(best_pth.stat().st_mtime)
+    except OSError:
+        return snaps[-1]
+    before = []
+    for s in snaps:
+        rel = s["dir"].relative_to(OUTPUTS)
+        try:
+            started = datetime.datetime.strptime(f"{rel.parts[0]} {rel.parts[1]}", "%Y-%m-%d %H-%M-%S")
+        except ValueError:
+            continue
+        if started <= saved:
+            before.append(s)
+    return before[-1] if before else snaps[-1]
 
 
 def index_done_markers():
@@ -220,11 +247,11 @@ def main() -> int:
 
     index, dupes = index_hydra_snapshots()
     marks = index_done_markers()
-    print(f"hydra 스냅샷 {len(index)} 개 (중복 run.name {len(dupes)} 건 — 마지막 실행 채택)", file=sys.stderr)
+    print(f"hydra 스냅샷 {sum(len(v) for v in index.values())} 개 / run.name {len(index)} (중복 {len(dupes)} 건 — best.pth 직전 스냅샷 채택)", file=sys.stderr)
 
     rows, unmatched = [], []
     for run_dir, rel in iter_run_dirs():
-        snap = index.get(run_dir.name)
+        snap = pick_snapshot(index.get(run_dir.name), run_dir / "best.pth")
         if snap is None:
             unmatched.append(str(run_dir.relative_to(ROOT)))
         rows.append(row_for(run_dir, rel, snap, marks))
