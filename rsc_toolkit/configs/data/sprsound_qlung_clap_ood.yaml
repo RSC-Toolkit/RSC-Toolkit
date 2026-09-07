@@ -1,0 +1,53 @@
+# QLung **Audio-CLAP 판** 의 SPRSound OOD 평가 뷰(학습 미사용): 7→4 병합 파생 라벨, ICBHI CLAP 판(icbhi_qlung_clap.yaml)과 같은
+# 오디오 체인(48 kHz → 녹음 fade → 구간 절단 → 8 s repeat_fade → ClapProcessor log-mel). 평가 범위·라벨 병합은 AST 판 OOD 뷰
+# (sprsound_qlung_ood.yaml)와 동일 — 2026-09-07 사용자 결정으로 CLAP 판 OOD 를 채운다.
+name: sprsound_qlung_clap_ood
+params:
+  datamodule_name: qlung
+  dataset_name: sprsound
+  index_dataset_cls: rsc_toolkit.datasets.qlung_data.QLungAQSIndexDataset
+  project_root: ${hydra:runtime.cwd}
+  data_dir: .datasets/sprsound
+  raw_data_subdir: Classification
+  index_filename: index_cycle.csv
+  label_map: sprsound_7to4
+
+  sampling_rate: 48000           # CLAP 경로 (AST 판 OOD 뷰는 16000)
+  sample_level: cycle
+  desired_length_sec: 8.0
+  pad_type: repeat_fade          # 가정: ICBHI 와 동일 (녹음 fade in/out + 8 s repeat + fade_out)
+  fade: true
+  resample_after_slice: false    # 가정: 녹음 전체를 48 kHz 로 리샘플 후 초 단위 절단 (ICBHI CLAP 판과 동일 체인)
+  time_unit: s
+
+  train_splits: [train]
+  val_splits: [test]
+  test_splits: [test]
+
+  batch_size: 8
+  num_workers: 8
+  shuffle_train: false
+  drop_last_train: false
+  pin_memory: true
+
+  features:
+    enabled: true
+    kind: clap
+    cache_dir: downloaded_datasets/features_cache_qlung_clap_ood   # 별도 캐시 (체인이 캐시 키에 안 들어가므로 AST 판·ICBHI CLAP 과 분리)
+    clap_model_name: laion/clap-htsat-unfused
+  feature_precompute: true
+  feature_precompute_batch_size: 8
+  feature_precompute_num_workers: 0
+
+  specaugment:
+    enabled: false
+
+  qlung:
+    alpha: 0.7
+    beta: 0.3
+    entropy_source: rms
+    formula: code
+    cache_dir: downloaded_datasets/aqs_cache_clap48k   # 48 kHz 파형 기준 (ICBHI CLAP 판과 동일 디렉터리; 파일명에 dataset 포함)
+    precompute: true
+    precompute_num_workers: 8
+    attach_val: true

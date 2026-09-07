@@ -3,6 +3,7 @@ QLung SPRSound OOD 평가 — ICBHI 학습 best.pth 를 ast_qlung 에 로드해 
 
   .venv/bin/python scripts/reproduction/eval_qlung_ood.py --run icbhi-qlung-s1            # outputs/qlung/<run>/best.pth → ood.json
   .venv/bin/python scripts/reproduction/eval_qlung_ood.py --ckpt <best.pth> --out <json>
+  .venv/bin/python scripts/reproduction/eval_qlung_ood.py --run icbhi-qlung-clap-s1 --backbone clap   # Audio-CLAP 판 (48 kHz CLAP OOD 뷰)
 
 평가 범위가 논문에 없어 둘 다 집계한다: "inter" = 2022 inter-patient test 1,429, "all" = train + inter-test 8,085 (논문 3.1 분포).
 전처리는 configs/data/sprsound_qlung_ood.yaml (ICBHI 와 같은 체인 가정). 지표 Sp/Se/Score = metrics/icbhi/score.py 산식.
@@ -37,6 +38,8 @@ def main():
     ap.add_argument("--out", default=None)
     ap.add_argument("--scopes", default="inter,all")
     ap.add_argument("--method", default="aqm")
+    ap.add_argument("--backbone", default="ast", choices=["ast", "clap"],
+                    help="ast = ast_qlung + 16 kHz fbank OOD 뷰 | clap = clap_qlung(Audio-CLAP 판) + 48 kHz CLAP OOD 뷰 (2026-09-07)")
     ap.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
     ap.add_argument("--no-amp", action="store_true")
     ap.add_argument("--limit-batches", type=int, default=0, help="스모크용")
@@ -52,17 +55,22 @@ def main():
         raise SystemExit("--run 또는 --ckpt 필요")
 
     ck = torch.load(args.ckpt, map_location="cpu", weights_only=False)
-    m = ModelFactory.get_model_class("ast_qlung")(n_cls=4, method=args.method, input_layout="freq_time")
+    if args.backbone == "clap":
+        m = ModelFactory.get_model_class("clap_qlung")(n_cls=4, method=args.method)
+        data_config = "rsc_toolkit/configs/data/sprsound_qlung_clap_ood.yaml"
+    else:
+        m = ModelFactory.get_model_class("ast_qlung")(n_cls=4, method=args.method, input_layout="freq_time")
+        data_config = "rsc_toolkit/configs/data/sprsound_qlung_ood.yaml"
     missing, unexpected = m.load_state_dict(ck["model"], strict=False)
     real_missing = [k for k in missing if not k.startswith("dfam.class_margin")]
     assert not real_missing and not unexpected, (real_missing, unexpected)
     m.to(args.device).eval()
     amp = not args.no_amp and args.device.startswith("cuda")
 
-    results = {"ckpt": args.ckpt, "icbhi_best": {k: ck.get(k) for k in ("epoch", "S_p", "S_e", "icbhi_score")}}
+    results = {"ckpt": args.ckpt, "backbone": args.backbone, "icbhi_best": {k: ck.get(k) for k in ("epoch", "S_p", "S_e", "icbhi_score")}}
     for scope in args.scopes.split(","):
         splits = SCOPES[scope]
-        dm = build_sprsound_ood_datamodule(splits, overrides={"qlung": {"precompute": False},
+        dm = build_sprsound_ood_datamodule(splits, data_config=data_config, overrides={"qlung": {"precompute": False},
                                                              "feature_precompute_num_workers": args.workers})
         dm.setup("test")
         counts = class_counts_4(dm._build_index_dataset(splits=splits))

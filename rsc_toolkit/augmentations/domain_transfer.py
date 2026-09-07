@@ -16,10 +16,11 @@ ICASSP 2022 pp.9017–9020, DOI 10.1109/ICASSP43922.2022.9746941 (§2.1).
   밖의 외부 코퍼스를 끌어오지 않기 위함(사용자 결정 2026-08-30: "가장 단순한 형태로"). 표에 '환경잡음 미적용' 병기.
 - time stretch / pitch shift 의 배율 범위 미기재 → 흔한 값(0.9–1.1 배속, ±2 semitone)을 기본값으로 두고 플래그화.
 - splice 대상 "짧은 샘플" 기준·최대 개수 미기재 → 목표 길이 미만인 사이클을 목표 길이까지 이어붙이는 것으로 해석.
-- **리샘플 해석(2026-09-01 리뷰 지적)**: 본 구현의 time_stretch 는 선형보간 리샘플이라 길이와
-  피치가 함께 변한다. 관례적 의미(phase vocoder 의 피치 보존 스트레치)와 다르고, pitch_shift 도
+- **리샘플 해석(2026-09-01 리뷰 지적 → 2026-09-07 `impl` 플래그로 분기)**: 기본 `linear` 는 선형보간 리샘플이라 길이와
+  피치가 함께 변한다(기존 run 의 동작). 관례적 의미(phase vocoder 의 피치 보존 스트레치)와 다르고, pitch_shift 도
   같은 리샘플 위에 길이 복원만 얹은 것이라 **두 증강이 배율 범위만 다른 거의 동일한 연산**이 된다 —
-  논문이 별개로 나열한 두 증강의 독립 효과는 이 해석 아래서 재현되지 않는다. AUTHOR_QUESTIONS 대상.
+  논문이 별개로 나열한 두 증강의 독립 효과는 이 해석 아래서 재현되지 않는다. `impl="phase_vocoder"`(data.params.stretch_impl)
+  가 관례적 해석(피치 보존 stretch·길이 보존 pitch shift)이며 재실행 run(`*-dt-paper-pv-*`)이 이를 쓴다. AUTHOR_QUESTIONS 대상.
 """
 from __future__ import annotations
 
@@ -95,24 +96,55 @@ def mixup_batch(
     return lam * x + (1.0 - lam) * x[idx], lam * y_onehot + (1.0 - lam) * y_onehot[idx]
 
 
-def time_stretch(x: torch.Tensor, rate: float) -> torch.Tensor:
+def _stft_params(n: int):
+    """phase vocoder 용 STFT 설정 — 8 kHz 파형 기준 64 ms 창(n_fft 512)/16 ms hop. 짧은 파형은 창을 줄인다."""
+    n_fft = min(512, max(32, 1 << (max(1, n).bit_length() - 1)))
+    return n_fft, n_fft // 4
+
+
+def time_stretch(x: torch.Tensor, rate: float, impl: str = "linear") -> torch.Tensor:
     """
-    time stretching — 배율 rate 로 길이를 바꾼다(선형 보간 리샘플; 피치도 함께 변한다).
-    논문은 배율 범위를 적지 않았다(가정: 0.9–1.1).
+    time stretching — 배율 rate 로 길이를 바꾼다 (rate > 1 이면 짧아진다). 논문은 배율 범위를 적지 않았다(가정: 0.9–1.1).
+
+    impl="linear"        : 선형 보간 리샘플 — **피치도 함께 변한다** (2026-08-30 최초 구현; 기존 run 의 동작).
+    impl="phase_vocoder" : STFT phase vocoder — **피치를 보존**하는 관례적 time stretching (2026-09-07 사용자 결정으로 추가, 재실행용).
     """
     n = int(x.shape[-1])
     new_n = max(1, int(round(n / rate)))
-    return torch.nn.functional.interpolate(
-        x.reshape(1, 1, n).float(), size=new_n, mode="linear", align_corners=False
-    ).reshape(1, new_n).to(x.dtype)
+    if impl == "linear":
+        return torch.nn.functional.interpolate(
+            x.reshape(1, 1, n).float(), size=new_n, mode="linear", align_corners=False
+        ).reshape(1, new_n).to(x.dtype)
+    if impl != "phase_vocoder":
+        raise ValueError(f"impl must be linear|phase_vocoder, got {impl!r}")
+    import torchaudio
+
+    n_fft, hop = _stft_params(n)
+    win = torch.hann_window(n_fft, device=x.device)
+    spec = torch.stft(x.reshape(-1).float(), n_fft, hop, window=win, return_complex=True)   # (F, T)
+    phase_advance = torch.linspace(0, math.pi * hop, spec.shape[0], device=x.device)[..., None]
+    stretched = torchaudio.functional.phase_vocoder(spec, float(rate), phase_advance)
+    y = torch.istft(stretched, n_fft, hop, window=win, length=new_n)
+    return y.reshape(1, new_n).to(x.dtype)
 
 
-def pitch_shift(x: torch.Tensor, n_steps: float, sample_rate: int) -> torch.Tensor:
+def pitch_shift(x: torch.Tensor, n_steps: float, sample_rate: int, impl: str = "linear") -> torch.Tensor:
     """
-    pitch shifting — 리샘플로 피치를 옮긴 뒤 원 길이로 되돌린다(길이 보존).
-    논문은 반음 범위를 적지 않았다(가정: ±2 semitone).
+    pitch shifting — 길이를 보존하며 피치를 n_steps 반음 옮긴다. 논문은 반음 범위를 적지 않았다(가정: ±2 semitone).
+
+    impl="linear"        : 리샘플로 피치를 옮긴 뒤 원 길이로 되돌린다(circular pad/절단) — time_stretch(linear) 와 같은 연산 위에 얹힌 것 (기존 동작).
+    impl="phase_vocoder" : torchaudio.functional.pitch_shift — phase vocoder 로 늘리고 리샘플로 되돌리는 관례적 pitch shift (2026-09-07 추가).
     """
     n = int(x.shape[-1])
+    if impl == "phase_vocoder":
+        import torchaudio
+
+        n_fft, hop = _stft_params(n)
+        y = torchaudio.functional.pitch_shift(x.reshape(1, n).float(), int(sample_rate), float(n_steps),
+                                              n_fft=n_fft, hop_length=hop)
+        return y.reshape(1, n).to(x.dtype)
+    if impl != "linear":
+        raise ValueError(f"impl must be linear|phase_vocoder, got {impl!r}")
     factor = 2.0 ** (n_steps / 12.0)
     stretched = time_stretch(x, 1.0 / factor)  # 길이 변경(피치 변화)
     return circular_pad(stretched, n) if stretched.shape[-1] < n else stretched[..., :n]

@@ -51,7 +51,7 @@ class DTIndexDataset(IndexDataset):
     def __init__(self, *args, target_len: int = 64000, is_train: bool = False,
                  aug_prob: float = 0.5, use_noise: bool = True, use_stretch: bool = True,
                  use_pitch: bool = True, snr_low: float = 1.0, snr_high: float = 10.0,
-                 stretch_range=(0.9, 1.1), pitch_semitones: float = 2.0, **kwargs):
+                 stretch_range=(0.9, 1.1), pitch_semitones: float = 2.0, stretch_impl: str = "linear", **kwargs):
         super().__init__(*args, **kwargs)
         self.target_len = int(target_len)
         self.is_train = bool(is_train)
@@ -60,6 +60,7 @@ class DTIndexDataset(IndexDataset):
         self.snr_low, self.snr_high = float(snr_low), float(snr_high)
         self.stretch_range = tuple(stretch_range)
         self.pitch_semitones = float(pitch_semitones)
+        self.stretch_impl = str(stretch_impl)   # linear(기존) | phase_vocoder (2026-09-07 재실행 변형)
         self.extra: List[Dict[str, Any]] = []   # splice 로 만든 추가 학습 샘플 (label, source row 목록)
 
     # ------------------------------------------------------------ 원 사이클 로드
@@ -71,9 +72,9 @@ class DTIndexDataset(IndexDataset):
     def _augment(self, audio: torch.Tensor) -> torch.Tensor:
         """학습 시 파형 증강 — 논문 §2.1 의 traditional augmentation (환경잡음은 미적용)."""
         if self.use_stretch and random.random() < self.aug_prob:
-            audio = time_stretch(audio, random.uniform(*self.stretch_range))
+            audio = time_stretch(audio, random.uniform(*self.stretch_range), impl=self.stretch_impl)
         if self.use_pitch and random.random() < self.aug_prob:
-            audio = pitch_shift(audio, random.uniform(-self.pitch_semitones, self.pitch_semitones), self.sampling_rate)
+            audio = pitch_shift(audio, random.uniform(-self.pitch_semitones, self.pitch_semitones), self.sampling_rate, impl=self.stretch_impl)
         if self.use_noise and random.random() < self.aug_prob:
             audio = add_white_noise(audio, sample_snr_db(self.snr_low, self.snr_high))
         return audio
@@ -138,10 +139,11 @@ class DomainTransferDataModule(IndexDataModule):
 
     def __init__(self, *args, target_len: int = 64000, splice_per_class: int = 500,
                  aug_prob: float = 0.5, use_noise: bool = True, use_stretch: bool = True,
-                 use_pitch: bool = True, **kwargs):
+                 use_pitch: bool = True, stretch_impl: str = "linear", **kwargs):
         self.target_len = int(target_len)
         self.splice_per_class = int(splice_per_class)
-        self.aug_kwargs = dict(aug_prob=aug_prob, use_noise=use_noise, use_stretch=use_stretch, use_pitch=use_pitch)
+        self.aug_kwargs = dict(aug_prob=aug_prob, use_noise=use_noise, use_stretch=use_stretch, use_pitch=use_pitch,
+                               stretch_impl=stretch_impl)
         self.train_class_weight: Optional[list] = None
         super().__init__(*args, **kwargs)
 

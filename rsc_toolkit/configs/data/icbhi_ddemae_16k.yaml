@@ -1,0 +1,46 @@
+# DDE-MAE ICBHI 데이터 — **16 kHz 변형** (2026-09-07 사용자 결정: 4 kHz 가정 런이 기준선부터 붕괴(Se<10%)해 재시도).
+# 원 config(icbhi_ddemae.yaml, 논문 §3.1 명시 4 kHz)와의 유일한 차이는 sampling_rate 16000 이다 — Audio-MAE 사전학습(AS-2M, 16 kHz,
+# 128 mel, 10 ms hop)과 같은 특징 기하가 되어, 4 kHz 에서 128 mel 중 21 행이 빈 필터가 되던 대역·해상도 불일치가 사라진다.
+# 나머지(10.24 s 0-패딩, kaldi fbank 128/10 ms, Audio-MAE 정규화 상수, 공식 60/40, 증강 없음)는 그대로다.
+# 캐시 키가 바뀌므로(sampling_rate 가 프로세서 설정에 포함) 큐 투입 전 feature_precompute_num_workers 를 올려 한 번 채운다.
+name: index
+params:
+  datamodule_name: index
+  dataset_name: icbhi
+  index_dataset_cls: rsc_toolkit.datasets.index_dataset.IndexDataset
+  project_root: ${hydra:runtime.cwd}
+  split_file: rsc_toolkit/datasets/icbhi/data/official_split.txt   # 가정: 공식 고정 60/40 (논문 문구 'randomly selected' 모호)
+  data_dir: .datasets/icbhi
+
+  sampling_rate: 16000             # **변형**: 논문 §3.1 은 4 kHz — 사전학습 대역 정합을 위해 16 kHz (2026-09-07)
+  sample_level: cycle
+  desired_length_sec: 10.24        # 가정: Audio-MAE 1024 프레임 × 10 ms (실제 1022 + 2 프레임 0.0)
+  pad_type: zero                   # 가정: 파형 0-패딩 → 특징값 −1.2776 (Audio-MAE 특징 단위 ZeroPad2d 의 +0.467 과 다름; 대안 repeat_fade)
+
+  train_splits: [train]
+  val_splits: [test]               # 매 epoch 공식 test 평가 → best-on-test (논문 검증셋 미기재)
+  test_splits: [test]
+
+  batch_size: 8                    # 1단계 논문 명시 8; 2단계 미기재 → 8 가정
+  num_workers: 4
+  shuffle_train: true
+  drop_last_train: false
+
+  features:
+    enabled: true
+    kind: fbank
+    cache_dir: downloaded_datasets/features_cache
+    n_mels: 128
+    target_frames: 1024
+    frame_shift: 10
+    window_type: hanning
+    dither: 0.0
+    normalize: true                # (x - (-4.2677393)) / (4.5689974 * 2) — Audio-MAE AudioSet 상수 가정
+    per_sample_stats: false
+
+  feature_precompute: true
+  feature_precompute_batch_size: 8
+  feature_precompute_num_workers: 0
+
+  specaugment:
+    enabled: false                 # 논문 증강 언급 없음

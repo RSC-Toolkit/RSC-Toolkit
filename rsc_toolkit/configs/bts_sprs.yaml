@@ -4,7 +4,7 @@
 defaults:
   - model: bts
   - data_defaults@data: base
-  - data: sprsound_bts
+  - data: sprsound_btscard_train   # SPR→SPR 배선: meta7 을 train·val 양쪽에 붙인다 (index 경로는 val 에 안 붙여 EXIT=1)
   - loss: cross_entropy
   - metrics: sprsound_metrics
   - optimizer: adam
@@ -17,11 +17,12 @@ seed: 1
 run:
   name: sprs-bts
   group: bts
-  tags: [bts, sprsound, extension]
+  tags: [bts, sprsound, extension, variant]
 
 model:
   params:
     n_cls: 7
+    meta_dialect: sprsound     # **변형**: SPRSound 가 가진 4필드(age·gender·location·device)만으로 메타 문장 — adult_BMI·child_weight·child_height 부재 (2026-09-07 사용자 결정)
 
 trainer:
   params:
