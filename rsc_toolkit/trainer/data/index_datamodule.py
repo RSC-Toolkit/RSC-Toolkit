@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field, asdict
 from pathlib import Path
 from typing import Optional, Dict, Any, List, Tuple, Sequence, Union
 import importlib
@@ -16,7 +16,6 @@ from rsc_toolkit.datasets.feature_cache import FeatureCache
 from rsc_toolkit.datasets.index_dataset import IndexFeatureDataset
 from rsc_toolkit.datasets.paths import default_dataset_dir
 from rsc_toolkit.processors.audio import AudioPreprocessConfig, AudioPreprocessor
-from rsc_toolkit.augmentations.specaugment import SpecAugment
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +24,7 @@ logger = logging.getLogger(__name__)
 class FeatureConfig:
     enabled: bool = False
     cache_dir: Optional[str] = None
-    kind: str = "clap"  # "clap" or "mel"
+    kind: str = "clap"  # registries.PROCESSORS 의 이름: clap | mel | fbank | sclmeta_mel | waveform | (플러그인)
     # clap params
     clap_model_name: str = "laion/clap-htsat-unfused"
     # mel params
@@ -42,6 +41,9 @@ class FeatureConfig:
     hop_length: int = 512
     f_min: float = 50.0
     f_max: float = 2000.0
+    # 새 kind(플러그인) 전용 파라미터 — 위 flat 필드는 내장 kind 하위호환용이고 더 늘리지 않는다.
+    # from_options 에는 flat 필드와 params 를 합친 dict 가 들어간다 (params 가 우선).
+    params: Dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -297,38 +299,29 @@ class IndexDataModule(L.LightningDataModule):
         datasets = [self._build_index_dataset_single(split=s) for s in splits]
         return ConcatDataset(datasets)
 
+    def _feature_options(self) -> Dict[str, Any]:
+        """from_options 에 넘길 dict: FeatureConfig 의 flat 필드 + params (params 가 우선)."""
+        opts = asdict(self.features_cfg)
+        params = opts.pop("params", None) or {}
+        opts.update(params)
+        return opts
+
+    def _feature_processor_cls(self):
+        """features.kind → 프로세서 클래스 (registries.PROCESSORS). 미지 kind 는 가용 목록과 함께 KeyError."""
+        from rsc_toolkit.registries import PROCESSORS
+
+        try:
+            return PROCESSORS.get(self.features_cfg.kind)
+        except KeyError:
+            raise KeyError(
+                f"Unknown features.kind '{self.features_cfg.kind}' (data.params.features.kind). "
+                f"Available: {sorted(PROCESSORS)}"
+            ) from None
+
     def _build_feature_processor(self, feature_cache: FeatureCache):
-        if self.features_cfg.kind == "clap":    # TODO no construction here, either DI or factory
-            from rsc_toolkit.processors.clap import CLAPProcessor
-            return CLAPProcessor(
-                sampling_rate=self.sampling_rate,
-                model_name=self.features_cfg.clap_model_name,
-                feature_cache=feature_cache,
-            )
-        if self.features_cfg.kind in {"mel", "fbank"}:
-            from rsc_toolkit.processors.mel import MelBankAudioProcessor
-            return MelBankAudioProcessor(
-                sampling_rate=self.sampling_rate,
-                n_mels=self.features_cfg.n_mels,
-                target_frames=self.features_cfg.target_frames,
-                frame_shift=self.features_cfg.frame_shift,
-                window_type=self.features_cfg.window_type,
-                dither=self.features_cfg.dither,
-                normalize=self.features_cfg.normalize,
-                per_sample_stats=self.features_cfg.per_sample_stats,
-                feature_cache=feature_cache,
-            )
-        if self.features_cfg.kind == "sclmeta_mel":
-            from rsc_toolkit.processors.sclmeta_mel import SCLMetaMelProcessor
-            fc = self.features_cfg
-            return SCLMetaMelProcessor(sampling_rate=self.sampling_rate, n_mels=fc.n_mels, n_fft=fc.n_fft,
-                                       win_length=fc.win_length or fc.n_fft, hop_length=fc.hop_length,
-                                       f_min=fc.f_min, f_max=fc.f_max, feature_cache=feature_cache)
-        if self.features_cfg.kind == "waveform":
-            # 모델 내부에서 fbank 를 만드는 백본(BEATs 등): 파형 그대로, 캐시 없음
-            from rsc_toolkit.processors.waveform import WaveformProcessor
-            return WaveformProcessor(sampling_rate=self.sampling_rate, feature_cache=None)
-        raise ValueError(f"Unknown features.kind: {self.features_cfg.kind}")
+        # 예전의 kind 별 if-elif 는 각 프로세서의 from_options 로 옮겼다 (생성 인자 동일 → 캐시 키 동일).
+        cls = self._feature_processor_cls()
+        return cls.from_options(self._feature_options(), sampling_rate=self.sampling_rate, feature_cache=feature_cache)
 
     def _wrap_with_features(self, base_ds, *, feature_transform=None, meta_label_fn=None):
         cache_dir = (
@@ -384,9 +377,13 @@ class IndexDataModule(L.LightningDataModule):
             return None
         if not self.specaugment_cfg.enabled:
             return None
-        if self.features_cfg.kind not in {"mel", "fbank"}:
+        # 스펙트로그램 kind 에만 건다 — 예전 {"mel","fbank"} 화이트리스트와 같은 진리표이지만
+        # 이제 플러그인 kind 도 is_spectrogram=True 선언만으로 통과한다.
+        if not getattr(self._feature_processor_cls(), "is_spectrogram", False):
             return None
-        return SpecAugment(policy=self.specaugment_cfg.policy, mask=self.specaugment_cfg.mask)
+        from rsc_toolkit.registries import AUGMENTATIONS
+
+        return AUGMENTATIONS.get("specaugment")(policy=self.specaugment_cfg.policy, mask=self.specaugment_cfg.mask)
 
     @staticmethod
     def _collect_sample_ids(index_ds: Any) -> List[str]:

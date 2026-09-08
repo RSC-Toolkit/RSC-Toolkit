@@ -50,6 +50,22 @@ def generate_fbank(
 
 
 class MelBankAudioProcessor(BaseAudioProcessor):
+    is_spectrogram = True  # kind mel/fbank — 학습 배치에 SpecAugment 허용
+
+    @classmethod
+    def from_options(cls, opts, *, sampling_rate, feature_cache):
+        # 예전 IndexDataModule._build_feature_processor 의 kind in {"mel","fbank"} 분기와 같은 생성 인자
+        return cls(
+            sampling_rate=sampling_rate,
+            n_mels=opts["n_mels"],
+            target_frames=opts["target_frames"],
+            frame_shift=opts["frame_shift"],
+            window_type=opts["window_type"],
+            dither=opts["dither"],
+            normalize=opts["normalize"],
+            per_sample_stats=opts["per_sample_stats"],
+            feature_cache=feature_cache,
+        )
 
     def __init__(
         self,

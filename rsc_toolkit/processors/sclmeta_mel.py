@@ -36,6 +36,15 @@ class SCLMetaMelProcessor(BaseAudioProcessor):
         self.power_to_db = T.AmplitudeToDB()
         super().__init__(**kwargs)
 
+    @classmethod
+    def from_options(cls, opts, *, sampling_rate, feature_cache):
+        # 예전 IndexDataModule._build_feature_processor 의 kind=="sclmeta_mel" 분기와 같은 생성 인자
+        return cls(
+            sampling_rate=sampling_rate, n_mels=opts["n_mels"], n_fft=opts["n_fft"],
+            win_length=opts["win_length"] or opts["n_fft"], hop_length=opts["hop_length"],
+            f_min=opts["f_min"], f_max=opts["f_max"], feature_cache=feature_cache,
+        )
+
     def get_processor_config(self) -> Dict[str, Any]:
         return {"kind": "sclmeta_mel", "sampling_rate": self.sampling_rate, **self.cfg}
 

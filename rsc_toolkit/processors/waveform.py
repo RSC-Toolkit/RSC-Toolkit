@@ -16,6 +16,11 @@ class WaveformProcessor(BaseAudioProcessor):
         self.sampling_rate = int(sampling_rate)
         super().__init__(**kwargs)
 
+    @classmethod
+    def from_options(cls, opts, *, sampling_rate, feature_cache):
+        # 모델 내부에서 fbank 를 만드는 백본(BEATs 등): 파형 그대로, 캐시 없음 — feature_cache 는 무시한다
+        return cls(sampling_rate=sampling_rate, feature_cache=None)
+
     def get_processor_config(self) -> Dict[str, Any]:
         return {"kind": "waveform", "sampling_rate": self.sampling_rate}
 

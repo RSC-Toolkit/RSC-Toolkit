@@ -33,7 +33,12 @@ class CLAPProcessor(BaseAudioProcessor):
             sampling_rate=self.sampling_rate
         )
         super().__init__(**kwargs)
-    
+
+    @classmethod
+    def from_options(cls, opts, *, sampling_rate, feature_cache):
+        # 예전 IndexDataModule._build_feature_processor 의 kind=="clap" 분기와 같은 생성 인자
+        return cls(sampling_rate=sampling_rate, model_name=opts["clap_model_name"], feature_cache=feature_cache)
+
     def get_processor_config(self) -> Dict[str, Any]:
         return {
             "model_name": self.model_name,

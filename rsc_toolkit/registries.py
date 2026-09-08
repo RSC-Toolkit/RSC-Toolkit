@@ -73,6 +73,18 @@ ADAPTERS.register_lazy("pl", "rsc_toolkit.trainer.adapters.pl_adapter:PLAdapter"
 # M2D 미세조정 quirk: 배치를 K 분할해 forward·backward 누적 (nttcslab/m2d ce.py)
 ADAPTERS.register_lazy("split_iter", "rsc_toolkit.trainer.adapters.split_iter_adapter:SplitIterAdapter")
 
+# ── processor (구 IndexDataModule._build_feature_processor 의 if-elif) — features.kind ─────────
+# 조회된 클래스의 from_options(opts, sampling_rate=, feature_cache=) 로 만든다. get_processor_config()
+# (= 캐시 키)는 생성 경로와 무관하므로 기존 캐시가 그대로 적중한다.
+PROCESSORS.register_lazy("clap", "rsc_toolkit.processors.clap:CLAPProcessor")
+PROCESSORS.register_lazy("mel", "rsc_toolkit.processors.mel:MelBankAudioProcessor")
+PROCESSORS.register_lazy("fbank", "rsc_toolkit.processors.mel:MelBankAudioProcessor")  # 별칭 (AST 계열 표기)
+PROCESSORS.register_lazy("sclmeta_mel", "rsc_toolkit.processors.sclmeta_mel:SCLMetaMelProcessor")
+PROCESSORS.register_lazy("waveform", "rsc_toolkit.processors.waveform:WaveformProcessor")  # 캐시 없음
+
+# ── augmentation (피처 공간 transform; 구 IndexDataModule._build_feature_transform 하드코딩) ──
+AUGMENTATIONS.register_lazy("specaugment", "rsc_toolkit.augmentations.specaugment:SpecAugment")
+
 ALL_REGISTRIES = {
     r.kind: r
     for r in (MODELS, DATASETS, DATAMODULES, LOSSES, METRICS, OPTIMIZERS, ADAPTERS, PROCESSORS, AUGMENTATIONS, META_LABELS)
