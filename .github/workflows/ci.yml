@@ -1,0 +1,40 @@
+name: ci
+
+on:
+  push:
+    branches: ["main", "refactor/**", "chore/**"]
+  pull_request:
+
+jobs:
+  wheel-smoke:
+    # 휠 빌드 → 빈 venv 설치 → 저장소 밖 cwd 에서 import·registry·번들 데이터·config 합성·콘솔 스크립트 (P2-1)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install (CPU torch)
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install --index-url https://download.pytorch.org/whl/cpu torch==2.7.0 torchaudio==2.7.0 torchvision==0.22.0
+          python -m pip install -e ".[trainer,models,dev]"
+      - name: Wheel smoke
+        run: PY=python scripts/packaging/smoke_installed_wheel.sh
+
+  unit-tests:
+    # 골든 텐서 회귀 포함 단위 테스트 (CPU). 스레드 캡 env 는 걸지 않는다 — 비트 단위 비교가 깨진다.
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install (CPU torch)
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install --index-url https://download.pytorch.org/whl/cpu torch==2.7.0 torchaudio==2.7.0 torchvision==0.22.0
+          python -m pip install -e ".[trainer,models,dev]"
+      - name: Unit tests
+        run: python -m pytest tests/unit -q -m "not slow" -p no:cacheprovider
