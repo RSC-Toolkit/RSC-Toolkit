@@ -40,7 +40,9 @@ class ToyDatasetProcessor(ICBHIDatasetProcessor):
                 p,
             )
 
-        project_root = pathlib.Path(__file__).resolve().parents[2]
+        from rsc_toolkit.paths import project_root_from
+
+        project_root = project_root_from(None)  # 개발 checkout 이면 저장소 루트 (sample_data 는 휠에 동봉되지 않는다)
         sample_data_path = project_root / "sample_data" / "toy_dataset" / "files"
         if not sample_data_path.exists():
             raise ValueError(f"Toy dataset not found at {sample_data_path}. Set raw_data_directory explicitly.")

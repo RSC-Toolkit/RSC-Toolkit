@@ -258,7 +258,9 @@ class Cnn14GaPAug(BaseRSCModel, nn.Module):
                 logger.warning("PANNs Cnn14 %s ckpt 는 %d Hz / fmax %.0f 로 학습됐는데 모델은 %d Hz / fmax %.0f — "
                                "데이터 config(sampling_rate)·fmax 를 함께 맞춰야 한다",
                                variant, spec["sample_rate"], spec["fmax"], self.sample_rate, self.fmax)
-            ckpt = pathlib.Path(spec["path"])
+            from rsc_toolkit.paths import download_target, resolve_pretrained
+
+            ckpt = resolve_pretrained([spec["path"]]) or download_target(spec["path"])  # RSCTK_PRETRAINED_ROOT → cwd 순
             if not ckpt.exists():
                 from rsc_toolkit.datasets.download_utils import download_file, record_download_provenance
 

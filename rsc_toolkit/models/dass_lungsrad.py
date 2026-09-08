@@ -131,7 +131,9 @@ class DASSLungSRAD(BaseRSCModel, nn.Module):
 
     # ----------------------------------------------------------------- 구성
     def load_dass(self, path: Optional[str]) -> dict:
-        p = pathlib.Path(path) if path else next((pathlib.Path(c) for c in DASS_CKPT_CANDIDATES if pathlib.Path(c).exists()), None)
+        from rsc_toolkit.paths import resolve_pretrained
+
+        p = resolve_pretrained(DASS_CKPT_CANDIDATES, explicit=path)  # RSCTK_PRETRAINED_ROOT → cwd 순
         if p is None or not p.exists():
             raise FileNotFoundError(f"DASS ckpt 가 없다: {path or DASS_CKPT_CANDIDATES}")
         info = load_dass_checkpoint(self.v, str(p))

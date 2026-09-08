@@ -47,6 +47,18 @@ rsc-toolkit-train --config-name patchmix_icbhi \
 
 결과는 `outputs/<계열>/<run.name>/` 에 쌓이고, `best.json` 이 최종 지표를 담는다
 (`{"epoch", "S_p", "S_e", "icbhi_score"}` — `icbhi_score = (S_e + S_p) / 2`).
+셸에서는 `scripts/train.sh <config> [overrides]` 가 같은 일을 한다(`GPU=` 로 카드 선택, 스레드 캡 기본).
+
+## 평가 (학습된 weight 재평가)
+
+```bash
+rsc-toolkit-eval outputs/patchmix/icbhi-patchmix-ce-s1                 # 스냅샷 자동 탐색 → strict 로드 → test → best.json 대조
+rsc-toolkit-eval outputs/qlung/icbhi-qlung-s1 --override data.params.batch_size=16 --out eval.json
+scripts/eval.sh outputs/bts/icbhi-bts-s1                               # 셸 래퍼 (GPU=, 샌드박스)
+```
+
+run 디렉터리의 hydra 스냅샷으로 학습 때와 같은 팩토리에서 모델·데이터를 다시 세운다. 학습 산출물은 읽기만 하고
+(쓰기는 샌드박스), `best.json` 이 있으면 PASS/MISMATCH 를 판정한다. 여러 run 전수 검증은 `scripts/verify_paper_weights.sh`.
 
 ## 자기 모델 붙이기
 
@@ -160,9 +172,11 @@ pytest                    # 골든 텐서 포함 전체
 
 - 배포용 휠은 `scripts/packaging/smoke_installed_wheel.sh` 로 검증한다(빈 venv 설치 → 저장소 밖 cwd 에서
   import·등록소·번들 데이터·config 합성·콘솔 스크립트). config 의 상대 경로(`.datasets/…`, `outputs/…`,
-  `pretrained_models/…`)는 **실행한 작업 디렉터리** 기준이다.
-- 평가 전용 엔트리포인트가 없다. 학습은 `rsc-toolkit-train` 하나로 되지만,
-  체크포인트 재평가·집계는 아직 `scripts/reproduction/` 의 스크립트가 담당한다.
+  `pretrained_models/…`)는 **실행한 작업 디렉터리** 기준이다. 사전학습 가중치는 `RSCTK_PRETRAINED_ROOT=/path/to/weights` 로
+  한 디렉터리에 모아 둘 수 있고(후보 경로의 `pretrained_models/` 접두사를 뗀 상대 경로 또는 파일명으로 찾는다), 피처 캐시는
+  `RSCTK_FEATURE_CACHE_ROOT`, 저장소 루트 추정은 `RSCTK_PROJECT_ROOT` 로 바꾼다.
+- 논문별 **집계**(seed 평균·표) 는 아직 `scripts/reproduction/aggregate_*.py` 와 `scripts/paper/` 가 담당한다
+  (재평가 자체는 `rsc-toolkit-eval`).
 - CI 는 `.github/workflows/ci.yml`(휠 스모크 + CPU 단위 테스트) — GPU 가 필요한 골든 테스트는 로컬에서 돈다.
 
 ## 라이선스

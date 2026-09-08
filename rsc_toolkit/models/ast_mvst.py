@@ -100,7 +100,9 @@ class MVSTViewAST(BaseRSCModel, nn.Module):
 
     def load_audioset_matching_keys(self, path: Optional[str]) -> dict:
         """원본 ast.py:130-137: 이름·모양이 같은 키만 복사 (module.v.* → v.*). 결과 요약을 돌려준다."""
-        p = pathlib.Path(path) if path else next((pathlib.Path(c) for c in AUDIOSET_16_16_CANDIDATES if pathlib.Path(c).exists()), None)
+        from rsc_toolkit.paths import resolve_pretrained
+
+        p = resolve_pretrained(AUDIOSET_16_16_CANDIDATES, explicit=path)  # RSCTK_PRETRAINED_ROOT → cwd 순
         if p is None or not p.exists():
             raise FileNotFoundError(f"audioset_16_16_0.4422.pth 가 없다 (scripts/reproduction/convert_hf_ast_to_yuangong.py 로 생성): {AUDIOSET_16_16_CANDIDATES}")
         weights = torch.load(p, map_location="cpu", weights_only=True)

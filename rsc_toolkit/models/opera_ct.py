@@ -98,7 +98,9 @@ class OperaCT(BaseRSCModel, nn.Module):
         super().__init__()
         self.htsat = HTSATSwin(drop_path_rate=drop_path_rate)
         if pretrained_path is not None:
-            dropped = load_opera_ct_checkpoint(self.htsat, pretrained_path)
+            from rsc_toolkit.paths import resolve_pretrained
+
+            dropped = load_opera_ct_checkpoint(self.htsat, str(resolve_pretrained(explicit=pretrained_path)))  # RSCTK_PRETRAINED_ROOT 인정
             logger.info("OPERA-CT ckpt 로드 %s (버린 키 %d개: torchlibrosa 프론트엔드·COLA 프로젝터)", pretrained_path, len(dropped))
         self.freeze_body = bool(freeze_body)
         if self.freeze_body:

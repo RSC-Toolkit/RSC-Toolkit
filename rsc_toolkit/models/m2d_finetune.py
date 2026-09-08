@@ -40,7 +40,9 @@ class M2DFinetune(BaseRSCModel, nn.Module):
         super().__init__()
         self.encoder = M2DEncoder(img_size=tuple(input_size), patch_size=tuple(patch_size))
         if pretrained_path is not None:
-            load_m2d_checkpoint(self.encoder, pretrained_path)
+            from rsc_toolkit.paths import resolve_pretrained
+
+            load_m2d_checkpoint(self.encoder, resolve_pretrained(explicit=pretrained_path))  # RSCTK_PRETRAINED_ROOT 인정
         if freeze_embed:
             for p in self.encoder.patch_embed.parameters():
                 p.requires_grad = False

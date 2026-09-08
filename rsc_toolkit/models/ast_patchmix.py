@@ -107,16 +107,17 @@ def _create_deit_skeleton(model_size: str, pretrained: bool):
 
 
 def _resolve_audioset_ckpt(pretrained_path: Optional[str]) -> pathlib.Path:
+    from rsc_toolkit.paths import download_target, resolve_pretrained
+
     if pretrained_path is not None:
-        return pathlib.Path(pretrained_path).expanduser()
-    for cand in AUDIOSET_CKPT_CANDIDATES:
-        p = pathlib.Path(cand)
-        if p.exists():
-            return p
+        return resolve_pretrained(explicit=pretrained_path)
+    found = resolve_pretrained(AUDIOSET_CKPT_CANDIDATES)  # RSCTK_PRETRAINED_ROOT → cwd 순
+    if found is not None:
+        return found
     # 없으면 원 출처에서 받는다 (다운로드 출처 기록 포함)
     from rsc_toolkit.datasets.download_utils import download_file, record_download_provenance
 
-    target = pathlib.Path(AUDIOSET_CKPT_CANDIDATES[0])
+    target = download_target(AUDIOSET_CKPT_CANDIDATES[0])
     target.parent.mkdir(parents=True, exist_ok=True)
     logger.info("AudioSet AST ckpt 가 없어 내려받는다: %s", AUDIOSET_CKPT_URL)
     download_file(AUDIOSET_CKPT_URL, target)

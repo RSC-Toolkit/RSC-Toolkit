@@ -38,7 +38,9 @@ def build_sprsound_ood_datamodule(splits: Sequence[str], data_config: str = DATA
     configs/data/sprsound_qlung_ood.yaml 의 params 로 QLungDataModule 을 만들되 val/test split 을 `splits` 로 바꾼다
     (예: ["test"] = inter-test 1,429, ["train", "test"] = 8,085). setup("test") 후 test_dataloader() 로 (x, y4, aqs) 배치.
     """
-    root = pathlib.Path(project_root or pathlib.Path(__file__).resolve().parents[2])
+    from rsc_toolkit.paths import project_root_from
+
+    root = project_root_from(project_root)  # 인자 → RSCTK_PROJECT_ROOT → cwd(저장소 표지) → 개발 checkout
     cfg = OmegaConf.to_container(OmegaConf.load(root / data_config), resolve=False)["params"]
     cfg = dict(cfg)
     cfg.pop("datamodule_name", None)

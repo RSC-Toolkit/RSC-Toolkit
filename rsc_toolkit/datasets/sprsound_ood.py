@@ -277,7 +277,9 @@ def build_toolkit_ood_dataset(data_config: str = DATA_CONFIG_DEFAULT, rhonchi_st
     from rsc_toolkit.datasets.index_dataset import IndexDataset
     from rsc_toolkit.processors.audio import AudioPreprocessConfig, AudioPreprocessor
 
-    root = pathlib.Path(project_root or pathlib.Path(__file__).resolve().parents[2])
+    from rsc_toolkit.paths import project_root_from
+
+    root = project_root_from(project_root)  # 인자 → RSCTK_PROJECT_ROOT → cwd(저장소 표지) → 개발 checkout (설치본의 parents[2] 추정 대체)
     cfg = OmegaConf.to_container(OmegaConf.load(root / data_config), resolve=False)["params"]
     data_dir = root / cfg["data_dir"]
     sr = int(cfg["sampling_rate"])

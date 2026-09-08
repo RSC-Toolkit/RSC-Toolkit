@@ -40,11 +40,13 @@ BEATS_CKPT_CANDIDATES = (
 
 
 def _resolve_beats_ckpt(path: Optional[str]) -> pathlib.Path:
+    from rsc_toolkit.paths import resolve_pretrained
+
     if path is not None:
-        return pathlib.Path(path).expanduser()
-    for cand in BEATS_CKPT_CANDIDATES:
-        if pathlib.Path(cand).exists():
-            return pathlib.Path(cand)
+        return resolve_pretrained(explicit=path)
+    found = resolve_pretrained(BEATS_CKPT_CANDIDATES)  # RSCTK_PRETRAINED_ROOT → cwd 순
+    if found is not None:
+        return found
     raise FileNotFoundError(
         "BEATs_iter3_plus_AS2M.pt 가 없다. microsoft/unilm/beats 의 'BEATs_iter3+ (AS2M)' 를 받아 "
         f"{BEATS_CKPT_CANDIDATES[0]} 에 둘 것"

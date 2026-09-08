@@ -180,15 +180,13 @@ class CNN6SFT(nn.Module):
 
     def load_sl_official_weights(self):
         """AudioSet 사전학습 PANN CNN6 (https://zenodo.org/record/3960586) — 겹치는 키만 로드 (원본 동작)."""
-        ckpt = None
-        for cand in PANN_CNN6_CANDIDATES:
-            if pathlib.Path(cand).exists():
-                ckpt = pathlib.Path(cand)
-                break
+        from rsc_toolkit.paths import download_target, resolve_pretrained
+
+        ckpt = resolve_pretrained(PANN_CNN6_CANDIDATES)  # RSCTK_PRETRAINED_ROOT → cwd 순
         if ckpt is None:
             from rsc_toolkit.datasets.download_utils import download_file, record_download_provenance
 
-            ckpt = pathlib.Path(PANN_CNN6_CANDIDATES[0])
+            ckpt = download_target(PANN_CNN6_CANDIDATES[0])
             ckpt.parent.mkdir(parents=True, exist_ok=True)
             download_file(PANN_CNN6_URL, ckpt)
             record_download_provenance(ckpt, url=PANN_CNN6_URL)

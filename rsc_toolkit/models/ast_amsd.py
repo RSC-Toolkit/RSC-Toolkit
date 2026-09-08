@@ -88,14 +88,16 @@ class TokenWeights(nn.Module):
 
 
 def _resolve_ckpt(pretrained_path: Optional[str]) -> pathlib.Path:
+    from rsc_toolkit.paths import resolve_pretrained
+
     if pretrained_path is not None:
-        p = pathlib.Path(pretrained_path).expanduser()
+        p = resolve_pretrained(explicit=pretrained_path)
         if not p.exists():
             raise FileNotFoundError(p)
         return p
-    for c in AUDIOSET_16_16_CANDIDATES:
-        if pathlib.Path(c).exists():
-            return pathlib.Path(c)
+    found = resolve_pretrained(AUDIOSET_16_16_CANDIDATES)
+    if found is not None:
+        return found
     raise FileNotFoundError(
         f"audioset_16_16_0.4422.pth 가 없다 (scripts/reproduction/convert_hf_ast_to_yuangong.py 로 생성): {AUDIOSET_16_16_CANDIDATES}"
     )

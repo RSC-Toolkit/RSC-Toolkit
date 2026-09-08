@@ -408,7 +408,9 @@ class AudioMAEClassifier(BaseRSCModel, nn.Module):
         if encoder_ckpt is not None:
             self.load_info = self.load_stage1_encoder(encoder_ckpt, encoder_key)
         elif pretrained_path is not None:
-            self.load_info = load_audiomae_checkpoint(self.encoder, pretrained_path)
+            from rsc_toolkit.paths import resolve_pretrained
+
+            self.load_info = load_audiomae_checkpoint(self.encoder, resolve_pretrained(explicit=pretrained_path))  # RSCTK_PRETRAINED_ROOT 인정
         self.head = nn.Linear(self.encoder.embed_dim, n_cls)
         nn.init.trunc_normal_(self.head.weight, std=head_init_std)  # main_finetune_as.py:  trunc_normal_(head.weight, std=2e-5) 는 AS 용; 가정 0.02
         nn.init.zeros_(self.head.bias)
