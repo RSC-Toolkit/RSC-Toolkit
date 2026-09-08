@@ -236,6 +236,26 @@ def _ours_pm(m, s, kind=None, pm=True):
     return core + (r"{\scriptsize\,$\pm$" + f"{s:.2f}" + "}" if pm and s is not None else "")
 
 
+DELTA_COLORS = r"\definecolor{dpos}{RGB}{0,110,60}\definecolor{dneg}{RGB}{190,30,30}"  # 표 파일 상단에 삽입 (xcolor 필요)
+
+
+def delta_color_tex(d):
+    """Δ(우리 − 논문) 을 색으로: ≥0 초록(dpos), <0 빨강(dneg). None → --"""
+    if d is None:
+        return "--"
+    return (r"\textcolor{dpos}{" if d >= 0 else r"\textcolor{dneg}{") + delta_str(d) + "}"
+
+
+def deltas_of(a, agg):
+    """세 지표 Δ. 같은 프로토콜(anchors.delta == 'score')이고 논문값이 있는 지표만."""
+    if a["delta"] != "score" or not agg["n"]:
+        return (None, None, None)
+    out = []
+    for k, col in (("sp", "paper_sp"), ("se", "paper_se"), ("score", "paper_score")):
+        out.append((agg[k][0] - float(a[col])) if a[col] else None)
+    return tuple(out)
+
+
 def build_patchmix(anchors, fam, table, meta, mode, footnotes):
     """Patch-Mix(Bae et al., INTERSPEECH'23) Table 2 형식 — 2026-09-08 사용자 행 목록 기준의 평면 표.
     mode 'A': 우리 결과만 (Sp/Se/Score, 5-seed mean±std)
@@ -260,16 +280,17 @@ def build_patchmix(anchors, fam, table, meta, mode, footnotes):
                r"with five seeds (mean\,$\pm$\,std) under one protocol; model selection is best-on-test as in the original papers "
                r"(Prototype: final iterate). \textbf{Best} and \underline{second best} among directly comparable rows.")
     else:
-        colspec = "llcl" + "ccc" + "ccc" + "c"
+        colspec = "llcl" + "ccc" + "ccc" + "ccc"
         head = [r"\multirow{2}{*}{method} & \multirow{2}{*}{architecture} & \multirow{2}{*}{pretrain} & \multirow{2}{*}{venue} & "
-                r"\multicolumn{3}{c}{reported in paper} & \multicolumn{3}{c}{ours (5 seeds)} & \multirow{2}{*}{$\Delta$Score} \\",
-                r"\cmidrule(lr){5-7}\cmidrule(lr){8-10}",
-                r"& & & & $S_p$ & $S_e$ & Score & $S_p$ & $S_e$ & \textbf{Score} & \\"]
+                r"\multicolumn{3}{c}{reported in paper} & \multicolumn{3}{c}{ours (5 seeds)} & \multicolumn{3}{c}{$\Delta$ = ours $-$ reported} \\",
+                r"\cmidrule(lr){5-7}\cmidrule(lr){8-10}\cmidrule(lr){11-13}",
+                r"& & & & $S_p$ & $S_e$ & Score & $S_p$ & $S_e$ & \textbf{Score} & $\Delta S_p$ & $\Delta S_e$ & $\Delta$\textbf{Score} \\"]
         cap = (f"Reported vs.\\ reproduced results on the {ds[0]} dataset ({ds[1]}). "
                r"``Reported'' copies the numbers from each paper (single run or mean over the paper's seeds); ``ours'' is the toolkit "
-               r"re-implementation with five seeds (mean\,$\pm$\,std) under one protocol. $\Delta$Score = ours $-$ reported, shown only "
-               r"where the two are measured under the same protocol. \textbf{Best} and \underline{second best} (ours) among directly comparable rows.")
-    L = [r"\begin{table*}[!t]", r"\centering", r"\caption{" + cap + "}",
+               r"re-implementation with five seeds (mean\,$\pm$\,std) under one protocol. $\Delta$ = ours $-$ reported for each metric "
+               r"(\textcolor{dpos}{green}: at or above the reported value, \textcolor{dneg}{red}: below), shown only where the two are measured "
+               r"under the same protocol. \textbf{Best} and \underline{second best} (ours) among directly comparable rows.")
+    L = ([DELTA_COLORS] if mode == "B" else []) + [r"\begin{table*}[!t]", r"\centering", r"\caption{" + cap + "}",
          r"\label{tab:" + tag + "_" + mode.lower() + "}",
          r"\renewcommand{\arraystretch}{1}", r"\addtolength{\tabcolsep}{2pt}",
          r"\resizebox{\linewidth}{!}{", r"\begin{tabular}{" + colspec + "}", r"\toprule", *head, r"\hline \midrule"]
@@ -287,8 +308,7 @@ def build_patchmix(anchors, fam, table, meta, mode, footnotes):
         cells += [_ours_pm(*agg["sp"], marks["sp"].get(i)), _ours_pm(*agg["se"], marks["se"].get(i)),
                   _ours_pm(*agg["score"], marks["score"].get(i))]
         if mode == "B":
-            d = (agg["score"][0] - float(a["paper_score"])) if (a["delta"] == "score" and a["paper_score"] and agg["n"]) else None
-            cells.append(delta_str(d))
+            cells += [delta_color_tex(d) for d in deltas_of(a, agg)]
         L.append(" & ".join(cells) + r" \\")
     L += [r"\bottomrule", r"\end{tabular}}"]
     notes = [r"\textsuperscript{" + k + "} " + footnotes[k] for k in sorted((x for x in used_fn if x.isdigit()), key=int)]
@@ -329,8 +349,8 @@ def patchmix_html(anchors, fam, meta, footnotes):
             if mode == "A":
                 L.append("<tr><th>method</th><th>architecture</th><th>pretrain</th><th>venue</th><th>Sp (%)</th><th>Se (%)</th><th>Score (%)</th></tr>")
             else:
-                L.append('<tr class="grp"><th colspan="4"></th><th colspan="3">reported in paper</th><th colspan="3">ours (5 seeds)</th><th></th></tr>'
-                         "<tr><th>method</th><th>architecture</th><th>pretrain</th><th>venue</th><th>Sp</th><th>Se</th><th>Score</th><th>Sp</th><th>Se</th><th>Score</th><th>ΔScore</th></tr>")
+                L.append('<tr class="grp"><th colspan="4"></th><th colspan="3">reported in paper</th><th colspan="3">ours (5 seeds)</th><th colspan="3">Δ = ours − reported</th></tr>'
+                         "<tr><th>method</th><th>architecture</th><th>pretrain</th><th>venue</th><th>Sp</th><th>Se</th><th>Score</th><th>Sp</th><th>Se</th><th>Score</th><th>ΔSp</th><th>ΔSe</th><th>ΔScore</th></tr>")
             L.append("</thead><tbody>")
             for i, a in enumerate(rows):
                 m = meta[a["family"]]; agg = aggs[a["family"]]
@@ -347,8 +367,9 @@ def patchmix_html(anchors, fam, meta, footnotes):
                 cells += [f'<td class="m">{_ours_html(*agg["sp"], marks["sp"].get(i))}</td>', f'<td class="m">{_ours_html(*agg["se"], marks["se"].get(i))}</td>',
                           f'<td class="m">{_ours_html(*agg["score"], marks["score"].get(i))}</td>']
                 if mode == "B":
-                    dd = (agg["score"][0] - float(a["paper_score"])) if (a["delta"] == "score" and a["paper_score"] and agg["n"]) else None
-                    cells.append(f'<td class="m">{delta_str(dd, tex=False)}</td>')
+                    for dd in deltas_of(a, agg):
+                        cls = "z" if dd is None else ("p" if dd >= 0 else ("nn" if dd <= -2.5 else "n"))
+                        cells.append(f'<td class="m"><span class="d {cls}">{delta_str(dd, tex=False)}</span></td>')
                 L.append("<tr>" + "".join(cells) + "</tr>")
             L.append("</tbody></table></div>")
             notes = [f"<sup>{k}</sup> " + _html_esc(tex2html(footnotes[k])) for k in sorted((x for x in used if x.isdigit()), key=int)]
@@ -431,7 +452,7 @@ def main():
                 aggs_by_table[table] = aggs
                 (out / "tables" / f"{name}_patchmix_{mode}.tex").write_text(
                     f"% generated by scripts/paper/build_paper_tables.py (option {mode}, git {sha}); do not edit\n"
-                    "% requires: booktabs, multirow, graphicx (\\resizebox); cite keys = user's bib (docs/paper/model_meta.csv `cite`)\n" + tex)
+                    "% requires: booktabs, multirow, graphicx (\\resizebox)" + (", xcolor (\\textcolor for Δ)" if mode == "B" else "") + "; cite keys = user's bib (docs/paper/model_meta.csv `cite`)\n" + tex)
         tex, aggs = build_table(anchors, fam, "C", "family", "all", footnotes)
         aggs_by_table["C"] = aggs
         (out / "tables" / "table_ood.tex").write_text(f"% generated by scripts/paper/build_paper_tables.py (OOD, git {sha}); do not edit\n" + tex)
