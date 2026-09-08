@@ -107,28 +107,20 @@ class ProtoNetDataModule(IndexDataModule):
         self.cycle_len = int(cycle_len)
         self.train_class_weight: Optional[list] = None
         super().__init__(*args, **kwargs)
+        # P2-8: 예전엔 super().setup() 이 만든 IndexDataset 을 `ProtoIndexDataset.__new__` + `__dict__.update` 로 바꿔치기했다.
+        # 이제 생성 시점에 ProtoIndexDataset 을 쓰고 전용 인자는 `_index_dataset_kwargs` 훅으로 넘긴다
+        # (config 의 index_dataset_cls 가 IndexDataset 이어도 동작 — 옛 config 무수정).
+        if not (isinstance(self.index_dataset_cls, type) and issubclass(self.index_dataset_cls, ProtoIndexDataset)):
+            self.index_dataset_cls = ProtoIndexDataset
+
+    def _index_dataset_kwargs(self, *, split: str, role: Optional[str] = None):
+        kwargs = super()._index_dataset_kwargs(split=split, role=role)
+        kwargs.update(cycle_len=self.cycle_len, bandpass=self.bandpass, is_train=(role == "train"))
+        return kwargs
 
     def setup(self, stage: Optional[str] = None) -> None:
         super().setup(stage)
-        self._swap_datasets()
         self._compute_class_weight()
-
-    def _swap_datasets(self) -> None:
-        """super().setup 이 만든 IndexDataset 을 ProtoIndexDataset 으로 교체(설정은 그대로 승계)."""
-        for attr, is_train in (("train_ds", True), ("val_ds", False), ("test_ds", False)):
-            ds = getattr(self, attr, None)
-            base = getattr(ds, "index_ds", ds)  # IndexFeatureDataset 로 감싸였을 수 있다
-            if base is None or isinstance(base, ProtoIndexDataset):
-                continue
-            new = ProtoIndexDataset.__new__(ProtoIndexDataset)
-            new.__dict__.update(base.__dict__)
-            new.cycle_len = self.cycle_len
-            new.is_train = is_train
-            new.bandpass = ButterBandpass(fs=base.sampling_rate) if self.bandpass else None
-            if ds is base:
-                setattr(self, attr, new)
-            else:
-                ds.index_ds = new
 
     def _compute_class_weight(self) -> None:
         ds = getattr(self, "train_ds", None)

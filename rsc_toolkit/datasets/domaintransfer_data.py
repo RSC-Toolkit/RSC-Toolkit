@@ -146,28 +146,25 @@ class DomainTransferDataModule(IndexDataModule):
                                stretch_impl=stretch_impl)
         self.train_class_weight: Optional[list] = None
         super().__init__(*args, **kwargs)
+        # P2-8: 예전엔 super().setup() 뒤 `DTIndexDataset.__new__` + `__dict__.update` 로 바꿔치기했다. 이제 생성 시점에
+        # DTIndexDataset 을 쓰고 전용 인자는 `_index_dataset_kwargs` 훅으로, splice 는 학습용 데이터셋 생성 직후에 만든다.
+        # (snr 1–10 dB · stretch 0.9–1.1 · pitch ±2 반음은 DTIndexDataset 기본값 — 바꿔치기가 넣던 값과 같다.)
+        if not (isinstance(self.index_dataset_cls, type) and issubclass(self.index_dataset_cls, DTIndexDataset)):
+            self.index_dataset_cls = DTIndexDataset
+
+    def _index_dataset_kwargs(self, *, split: str, role: Optional[str] = None):
+        kwargs = super()._index_dataset_kwargs(split=split, role=role)
+        kwargs.update(target_len=self.target_len, is_train=(role == "train"), **self.aug_kwargs)
+        return kwargs
+
+    def _build_index_dataset_single(self, *, split: str, role: Optional[str] = None):
+        ds = super()._build_index_dataset_single(split=split, role=role)
+        if role == "train" and self.splice_per_class > 0:
+            ds.build_splices(self.splice_per_class, seed=0)
+        return ds
 
     def setup(self, stage: Optional[str] = None) -> None:
         super().setup(stage)
-        for attr, is_train in (("train_ds", True), ("val_ds", False), ("test_ds", False)):
-            ds = getattr(self, attr, None)
-            base = getattr(ds, "index_ds", ds)
-            if base is None or isinstance(base, DTIndexDataset):
-                continue
-            new = DTIndexDataset.__new__(DTIndexDataset)
-            new.__dict__.update(base.__dict__)
-            new.target_len, new.is_train = self.target_len, is_train
-            new.snr_low, new.snr_high = 1.0, 10.0
-            new.stretch_range, new.pitch_semitones = (0.9, 1.1), 2.0
-            new.extra = []
-            for k, v in self.aug_kwargs.items():
-                setattr(new, k, v)
-            if is_train and self.splice_per_class > 0:
-                new.build_splices(self.splice_per_class, seed=0)
-            if ds is base:
-                setattr(self, attr, new)
-            else:
-                ds.index_ds = new
         self._compute_class_weight()
 
     def _compute_class_weight(self) -> None:

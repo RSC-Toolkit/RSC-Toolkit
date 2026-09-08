@@ -26,25 +26,39 @@ from .index_dataset import IndexDataset
 
 
 class LoRARSCNoisyIndexDataset(IndexDataset):
-    """IndexDataset + 샘플별 가우시안 파형 잡음(std=noise_std, 결정적). 클래스 속성으로 조절(index_dataset_cls 는 인자를 못 받음)."""
+    """IndexDataset + 샘플별 가우시안 파형 잡음(std=noise_std, 결정적).
+
+    생성자 인자 `noise_std`/`noise_seed` 로 조절한다 — config 에서는 `data.params.index_dataset_params: {noise_std: 0.3, noise_seed: 10}`
+    (P2-8; 예전엔 IndexDataModule 이 커스텀 클래스에 인자를 못 넘겨 클래스 속성으로만 바꿀 수 있었다). 클래스 속성은 기본값이다.
+    """
 
     noise_std: float = 0.3      # dataset/icbhi.py:243 `0.3 * noise`
     noise_seed: int = 10        # 원본 --seed 기본값 10 (np.random.seed(10)); per-sample 파생 시드의 기저
 
+    def __init__(self, *args, noise_std: float | None = None, noise_seed: int | None = None, **kwargs):
+        super().__init__(*args, **kwargs)
+        if noise_std is not None:
+            self.noise_std = float(noise_std)
+        if noise_seed is not None:
+            self.noise_seed = int(noise_seed)
+
     @classmethod
-    def sample_rng(cls, sample_id: str) -> np.random.Generator:
-        h = hashlib.md5(f"{cls.noise_seed}:{sample_id}".encode()).digest()
+    def sample_rng(cls, sample_id: str, noise_seed: int | None = None) -> np.random.Generator:
+        seed = cls.noise_seed if noise_seed is None else int(noise_seed)
+        h = hashlib.md5(f"{seed}:{sample_id}".encode()).digest()
         return np.random.default_rng(int.from_bytes(h[:8], "little"))
 
     @classmethod
-    def add_noise(cls, audio: torch.Tensor, sample_id: str) -> torch.Tensor:
-        if cls.noise_std <= 0:
+    def add_noise(cls, audio: torch.Tensor, sample_id: str, noise_std: float | None = None,
+                  noise_seed: int | None = None) -> torch.Tensor:
+        std = cls.noise_std if noise_std is None else float(noise_std)
+        if std <= 0:
             return audio
         x = audio.detach().cpu().numpy().astype(np.float64)
-        noise = cls.sample_rng(sample_id).standard_normal(size=x.shape)  # 1D 해석: 샘플마다 독립 N(0,1)
-        return torch.from_numpy((x + cls.noise_std * noise).astype(np.float32))
+        noise = cls.sample_rng(sample_id, noise_seed).standard_normal(size=x.shape)  # 1D 해석: 샘플마다 독립 N(0,1)
+        return torch.from_numpy((x + std * noise).astype(np.float32))
 
     def __getitem__(self, idx: int) -> Dict[str, Any]:
         out = super().__getitem__(idx)
-        out["audio"] = self.add_noise(out["audio"], out["sample_id"])
+        out["audio"] = self.add_noise(out["audio"], out["sample_id"], self.noise_std, self.noise_seed)
         return out

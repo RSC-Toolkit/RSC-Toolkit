@@ -1,0 +1,348 @@
+{
+ "icbhi_protonet": {
+  "config": "icbhi_protonet",
+  "class": "ProtoNetDataModule",
+  "class_weight": [
+   0.501938923897237,
+   0.8522633744855967,
+   2.0668662674650697,
+   2.852617079889807
+  ],
+  "train_ds": {
+   "wrapper": "IndexFeatureDataset",
+   "base": "ProtoIndexDataset",
+   "len": 4142,
+   "attrs": {
+    "sampling_rate": 4000,
+    "fade": false,
+    "cycle_len": 16000,
+    "is_train": true,
+    "bandpass": "ButterBandpass"
+   },
+   "n_extra": 0,
+   "items_eval": [
+    {
+     "sample_id": "103_2b2_Ar_mc_LittC2SE_cycle_0.364_3.250",
+     "label": 2,
+     "shape": [
+      1,
+      16000
+     ],
+     "sum": -0.0829,
+     "abs_sum": 62.6135,
+     "n": 16000
+    },
+    {
+     "sample_id": "103_2b2_Ar_mc_LittC2SE_cycle_3.250_6.636",
+     "label": 0,
+     "shape": [
+      1,
+      16000
+     ],
+     "sum": 0.0693,
+     "abs_sum": 48.4397,
+     "n": 16000
+    },
+    {
+     "sample_id": "103_2b2_Ar_mc_LittC2SE_cycle_6.636_11.179",
+     "label": 2,
+     "shape": [
+      1,
+      16000
+     ],
+     "sum": 0.0026,
+     "abs_sum": 43.2584,
+     "n": 16000
+    }
+   ]
+  },
+  "val_ds": {
+   "wrapper": "IndexFeatureDataset",
+   "base": "ProtoIndexDataset",
+   "len": 2756,
+   "attrs": {
+    "sampling_rate": 4000,
+    "fade": false,
+    "cycle_len": 16000,
+    "is_train": false,
+    "bandpass": "ButterBandpass"
+   },
+   "n_extra": 0,
+   "items_eval": [
+    {
+     "sample_id": "101_1b1_Al_sc_Meditron_cycle_0.036_0.579",
+     "label": 0,
+     "shape": [
+      1,
+      16000
+     ],
+     "sum": -0.0935,
+     "abs_sum": 76.1003,
+     "n": 16000
+    },
+    {
+     "sample_id": "101_1b1_Al_sc_Meditron_cycle_0.579_2.450",
+     "label": 0,
+     "shape": [
+      1,
+      16000
+     ],
+     "sum": -0.011,
+     "abs_sum": 77.5773,
+     "n": 16000
+    },
+    {
+     "sample_id": "101_1b1_Al_sc_Meditron_cycle_2.450_3.893",
+     "label": 0,
+     "shape": [
+      1,
+      16000
+     ],
+     "sum": -0.1145,
+     "abs_sum": 73.91,
+     "n": 16000
+    }
+   ]
+  },
+  "test_ds": {
+   "wrapper": "IndexFeatureDataset",
+   "base": "ProtoIndexDataset",
+   "len": 2756,
+   "attrs": {
+    "sampling_rate": 4000,
+    "fade": false,
+    "cycle_len": 16000,
+    "is_train": false,
+    "bandpass": "ButterBandpass"
+   },
+   "n_extra": 0,
+   "items_eval": [
+    {
+     "sample_id": "101_1b1_Al_sc_Meditron_cycle_0.036_0.579",
+     "label": 0,
+     "shape": [
+      1,
+      16000
+     ],
+     "sum": -0.0935,
+     "abs_sum": 76.1003,
+     "n": 16000
+    },
+    {
+     "sample_id": "101_1b1_Al_sc_Meditron_cycle_0.579_2.450",
+     "label": 0,
+     "shape": [
+      1,
+      16000
+     ],
+     "sum": -0.011,
+     "abs_sum": 77.5773,
+     "n": 16000
+    },
+    {
+     "sample_id": "101_1b1_Al_sc_Meditron_cycle_2.450_3.893",
+     "label": 0,
+     "shape": [
+      1,
+      16000
+     ],
+     "sum": -0.1145,
+     "abs_sum": 73.91,
+     "n": 16000
+    }
+   ]
+  },
+  "seconds": 0.4
+ },
+ "icbhi_domaintransfer": {
+  "config": "icbhi_domaintransfer",
+  "class": "DomainTransferDataModule",
+  "class_weight": [
+   0.5991026141240734,
+   0.89533527696793,
+   1.533966033966034,
+   1.779258400926999
+  ],
+  "train_ds": {
+   "wrapper": "IndexFeatureDataset",
+   "base": "DTIndexDataset",
+   "len": 6142,
+   "attrs": {
+    "sampling_rate": 8000,
+    "fade": false,
+    "target_len": 64000,
+    "is_train": true,
+    "snr_low": 1.0,
+    "snr_high": 10.0,
+    "stretch_range": "tuple",
+    "pitch_semitones": 2.0,
+    "aug_prob": 0.5,
+    "use_noise": true,
+    "use_stretch": true,
+    "use_pitch": true,
+    "stretch_impl": "linear"
+   },
+   "n_extra": 2000,
+   "items_eval": [
+    {
+     "sample_id": "103_2b2_Ar_mc_LittC2SE_cycle_0.364_3.250",
+     "label": 2,
+     "shape": [
+      1,
+      64000
+     ],
+     "sum": -183.0445,
+     "abs_sum": 15650.3184,
+     "n": 64000
+    },
+    {
+     "sample_id": "103_2b2_Ar_mc_LittC2SE_cycle_3.250_6.636",
+     "label": 0,
+     "shape": [
+      1,
+      64000
+     ],
+     "sum": -54.7544,
+     "abs_sum": 15339.3672,
+     "n": 64000
+    },
+    {
+     "sample_id": "103_2b2_Ar_mc_LittC2SE_cycle_6.636_11.179",
+     "label": 2,
+     "shape": [
+      1,
+      64000
+     ],
+     "sum": -68.6991,
+     "abs_sum": 16148.1523,
+     "n": 64000
+    }
+   ],
+   "extra0": {
+    "label": 0,
+    "keys": [
+     "label",
+     "rows"
+    ]
+   },
+   "splice_last": {
+    "label": 3,
+    "n": 64000,
+    "sum": -373.8524
+   }
+  },
+  "val_ds": {
+   "wrapper": "IndexFeatureDataset",
+   "base": "DTIndexDataset",
+   "len": 2756,
+   "attrs": {
+    "sampling_rate": 8000,
+    "fade": false,
+    "target_len": 64000,
+    "is_train": false,
+    "snr_low": 1.0,
+    "snr_high": 10.0,
+    "stretch_range": "tuple",
+    "pitch_semitones": 2.0,
+    "aug_prob": 0.5,
+    "use_noise": true,
+    "use_stretch": true,
+    "use_pitch": true,
+    "stretch_impl": "linear"
+   },
+   "n_extra": 0,
+   "items_eval": [
+    {
+     "sample_id": "101_1b1_Al_sc_Meditron_cycle_0.036_0.579",
+     "label": 0,
+     "shape": [
+      1,
+      64000
+     ],
+     "sum": -186.7341,
+     "abs_sum": 3966.6709,
+     "n": 64000
+    },
+    {
+     "sample_id": "101_1b1_Al_sc_Meditron_cycle_0.579_2.450",
+     "label": 0,
+     "shape": [
+      1,
+      64000
+     ],
+     "sum": -46.2386,
+     "abs_sum": 3480.9717,
+     "n": 64000
+    },
+    {
+     "sample_id": "101_1b1_Al_sc_Meditron_cycle_2.450_3.893",
+     "label": 0,
+     "shape": [
+      1,
+      64000
+     ],
+     "sum": 67.3138,
+     "abs_sum": 3153.1477,
+     "n": 64000
+    }
+   ]
+  },
+  "test_ds": {
+   "wrapper": "IndexFeatureDataset",
+   "base": "DTIndexDataset",
+   "len": 2756,
+   "attrs": {
+    "sampling_rate": 8000,
+    "fade": false,
+    "target_len": 64000,
+    "is_train": false,
+    "snr_low": 1.0,
+    "snr_high": 10.0,
+    "stretch_range": "tuple",
+    "pitch_semitones": 2.0,
+    "aug_prob": 0.5,
+    "use_noise": true,
+    "use_stretch": true,
+    "use_pitch": true,
+    "stretch_impl": "linear"
+   },
+   "n_extra": 0,
+   "items_eval": [
+    {
+     "sample_id": "101_1b1_Al_sc_Meditron_cycle_0.036_0.579",
+     "label": 0,
+     "shape": [
+      1,
+      64000
+     ],
+     "sum": -186.7341,
+     "abs_sum": 3966.6709,
+     "n": 64000
+    },
+    {
+     "sample_id": "101_1b1_Al_sc_Meditron_cycle_0.579_2.450",
+     "label": 0,
+     "shape": [
+      1,
+      64000
+     ],
+     "sum": -46.2386,
+     "abs_sum": 3480.9717,
+     "n": 64000
+    },
+    {
+     "sample_id": "101_1b1_Al_sc_Meditron_cycle_2.450_3.893",
+     "label": 0,
+     "shape": [
+      1,
+      64000
+     ],
+     "sum": 67.3138,
+     "abs_sum": 3153.1477,
+     "n": 64000
+    }
+   ]
+  },
+  "seconds": 0.6
+ }
+}
