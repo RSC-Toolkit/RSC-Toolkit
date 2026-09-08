@@ -19,6 +19,9 @@ CSV_COLUMNS = [
     "meta",
 ]
 
+# 학습 쪽(IndexDataset)·프로세서 기반 클래스(BaseRSCDatasetProcessor)가 인덱스 CSV 에 요구하는 열 — split 은 선택(파생 파일로 대체 가능).
+REQUIRED_INDEX_COLUMNS = tuple(c for c in CSV_COLUMNS if c != "split")
+
 
 class SampleRecord(BaseModel):
     sample_id: str

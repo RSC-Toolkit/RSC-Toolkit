@@ -10,6 +10,8 @@ import torch
 
 import torchaudio
 
+from rsc_toolkit.datasets.sample_index import REQUIRED_INDEX_COLUMNS as _REQUIRED_INDEX_COLUMNS
+
 
 logger = logging.getLogger(__name__)
 
@@ -109,9 +111,8 @@ class BaseRSCDatasetProcessor(ABC, BaseModel):
 
     # 인덱스 CSV 가 반드시 갖춰야 하는 컬럼 (IndexDataset 이 요구하는 것과 같다).
     # Miika 가 추가한 `split` 컬럼은 옛 인덱스에 없을 수 있어 필수로 두지 않는다.
-    REQUIRED_INDEX_COLUMNS: ClassVar[Tuple[str, ...]] = (
-        "sample_id", "recording_path", "sample_level", "t0", "t1", "label", "meta",
-    )
+    # 단일 출처: rsc_toolkit.datasets.sample_index.REQUIRED_INDEX_COLUMNS (CSV_COLUMNS 에서 split 을 뺀 것)
+    REQUIRED_INDEX_COLUMNS: ClassVar[Tuple[str, ...]] = _REQUIRED_INDEX_COLUMNS
 
     def processed_extra_files(self) -> List[str]:
         """

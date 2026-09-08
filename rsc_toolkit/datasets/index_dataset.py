@@ -81,8 +81,9 @@ class IndexDataset(Dataset):
         self.split: str = split
 
         # Basic schema expectations
-        required = {"sample_id", "recording_path", "sample_level", "t0", "t1", "label", "meta"}
-        missing = required - set(self.df.columns)
+        from rsc_toolkit.datasets.sample_index import REQUIRED_INDEX_COLUMNS
+
+        missing = set(REQUIRED_INDEX_COLUMNS) - set(self.df.columns)
         if missing:
             raise ValueError(f"Index CSV missing columns: {sorted(missing)}")
 
@@ -151,24 +152,10 @@ class IndexDataset(Dataset):
     def _load_official_split_map(
         self, split_file: Union[str, pathlib.Path]
     ) -> Mapping[str, str]:
-        """
-        Returns mapping: recording_id -> split ("train" or "test").
-        """
-        path = pathlib.Path(split_file).expanduser().resolve()
-        if not path.exists():
-            raise FileNotFoundError(f"Split file not found: {path}")
+        """recording_id -> split ("train" or "test"). 파서는 rsc_toolkit.datasets.splits.read_split_file 한 곳."""
+        from rsc_toolkit.datasets.splits import read_split_file
 
-        mapping: Dict[str, str] = {}
-        for raw_line in path.read_text().splitlines():
-            line = raw_line.strip()
-            if not line or line.startswith("#"):
-                continue
-            parts = line.split()
-            if len(parts) < 2:
-                continue
-            recording_id, split = parts[0], parts[1].lower()
-            mapping[recording_id] = split
-        return mapping
+        return read_split_file(split_file)
 
     def _filter_df_by_split(self, split_map: Mapping[str, str], split: str) -> None:
         def get_recording_id(recording_path: str) -> str:

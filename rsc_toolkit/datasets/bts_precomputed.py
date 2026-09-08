@@ -40,11 +40,10 @@ class BTSPrecomputedDataset(Dataset):
         return feat, int(label), meta.float()
 
 
-def bts_collate(batch: List[Tuple[torch.Tensor, int, torch.Tensor]]):
-    x = torch.stack([b[0] for b in batch], dim=0)
-    y = torch.as_tensor([b[1] for b in batch], dtype=torch.long)
-    meta = torch.stack([b[2] for b in batch], dim=0)
-    return x, y, meta
+from rsc_toolkit.datasets import collate as _collate  # P2-6: collate 단일 구현
+
+# (x, y, meta7 stack)
+bts_collate = _collate.stack_meta_collate
 
 
 class BTSPrecomputedDataModule(L.LightningDataModule):

@@ -145,13 +145,10 @@ class _QLungFeatureDataset(IndexFeatureDataset):
         return feats, item["label"], item["sample_id"]
 
 
-def qlung_collate(batch: List[Tuple]) -> Tuple[torch.Tensor, ...]:
-    x = torch.stack([b[0] for b in batch], dim=0)
-    y = torch.as_tensor([b[1] for b in batch], dtype=torch.long)
-    if len(batch[0]) >= 4:
-        aqs = torch.as_tensor([b[3] for b in batch], dtype=torch.float64)  # 공식: python float → default_collate float64 (loss.py:60 부터 float64)
-        return x, y, aqs
-    return x, y
+from rsc_toolkit.datasets import collate as _collate  # P2-6: collate 단일 구현
+
+# (x, y, aqs float64) — 공식: python float → default_collate float64 (loss.py:60 부터 float64 로 흐른다)
+qlung_collate = _collate.qlung_collate
 
 
 class _AcousticJob(Dataset):
@@ -214,9 +211,9 @@ class QLungDataModule(IndexDataModule):
         return (f"sr{self.sampling_rate}_len{self.desired_length_sec:g}_{self.pad_type}_fade{int(self.fade)}"
                 f"_ras{int(self.resample_after_slice)}_{self.time_unit}")
 
-    def _index_dataset_kwargs(self, *, split: str) -> Dict[str, Any]:
+    def _index_dataset_kwargs(self, *, split: str, role: Optional[str] = None) -> Dict[str, Any]:
         # 부모의 조립(fade/resample_after_slice/time_unit/split_file 규칙 포함)에 QLung 전용 인자만 더한다
-        kwargs = super()._index_dataset_kwargs(split=split)
+        kwargs = super()._index_dataset_kwargs(split=split, role=role)
         kwargs.update(aqs=self.aqs_cfg, acoustic_cache=self.acoustic_cache, label_map=self.label_map)
         return kwargs
 

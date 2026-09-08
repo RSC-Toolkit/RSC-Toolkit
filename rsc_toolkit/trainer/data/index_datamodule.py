@@ -53,16 +53,10 @@ class SpecAugmentOptions:
     mask: str = "mean"
 
 
-def _tuple_collate(batch: List[Dict[str, Any]]) -> Tuple[torch.Tensor, ...]:
-    xs = [b[0] for b in batch]
-    ys = [b[1] for b in batch]
-    x = torch.stack(xs, dim=0)
-    y = torch.as_tensor(ys, dtype=torch.long)
-    # 4번째 원소 = meta 라벨 (IndexFeatureDataset 에 meta_label_fn 을 준 경우 — sgscl 계열)
-    if len(batch[0]) >= 4:
-        meta = torch.as_tensor([b[3] for b in batch], dtype=torch.long)
-        return x, y, meta
-    return x, y
+from rsc_toolkit.datasets import collate as _collate  # P2-6: collate 단일 구현
+
+# IndexDataModule 기본 collate: (x, y[, meta long]) — 4번째 원소가 있을 때만 meta (sgscl 계열)
+_tuple_collate = _collate.tuple_collate
 
 
 def _import_from_path(dotted_path: str) -> Any:
@@ -296,10 +290,11 @@ class IndexDataModule(L.LightningDataModule):
         filename = self.index_filename or f"index_{self.sample_level}.csv"
         return (self.outputs_directory / "index" / filename).resolve()
 
-    def _index_dataset_kwargs(self, *, split: str) -> Dict[str, Any]:
+    def _index_dataset_kwargs(self, *, split: str, role: Optional[str] = None) -> Dict[str, Any]:
         """
         `index_dataset_cls(**kwargs)` 의 인자 조립 — 서브클래스는 이것을 override 해 dict 에 더하기만 하면 된다
         (예전엔 이 블록을 통째로 복붙했다). config 의 `index_dataset_params` 가 마지막에 덮어쓴다.
+        `role` ∈ {"train","val","test"} 은 setup 이 넘긴다 — 학습용 데이터셋만 다르게 만들 때(ProtoNet 크롭, DT 증강·splice) 쓴다.
         """
         kwargs: Dict[str, Any] = dict(
             index_csv=self.index_csv,
@@ -321,18 +316,18 @@ class IndexDataModule(L.LightningDataModule):
         kwargs.update(self.index_dataset_params)
         return kwargs
 
-    def _build_index_dataset_single(self, *, split: str):
+    def _build_index_dataset_single(self, *, split: str, role: Optional[str] = None):
         if self.index_csv is None:
             self.index_csv = self._default_index_path()
         if not self.index_csv.exists():
             raise FileNotFoundError(f"Index csv not found: {self.index_csv}")
-        return self.index_dataset_cls(**self._index_dataset_kwargs(split=split))
+        return self.index_dataset_cls(**self._index_dataset_kwargs(split=split, role=role))
 
-    def _build_index_dataset(self, *, splits: Sequence[str]):
+    def _build_index_dataset(self, *, splits: Sequence[str], role: Optional[str] = None):
         splits = list(splits)
         if len(splits) == 1:
-            return self._build_index_dataset_single(split=splits[0])
-        datasets = [self._build_index_dataset_single(split=s) for s in splits]
+            return self._build_index_dataset_single(split=splits[0], role=role)
+        datasets = [self._build_index_dataset_single(split=s, role=role) for s in splits]
         return ConcatDataset(datasets)
 
     def _feature_options(self) -> Dict[str, Any]:
@@ -552,8 +547,8 @@ class IndexDataModule(L.LightningDataModule):
             self.index_csv = self._default_index_path()
 
         if stage in (None, "fit"):
-            self.train_ds = self._build_index_dataset(splits=self.train_splits)
-            self.val_ds = self._build_index_dataset(splits=self.val_splits)
+            self.train_ds = self._build_index_dataset(splits=self.train_splits, role="train")
+            self.val_ds = self._build_index_dataset(splits=self.val_splits, role="val")
 
             if self.features_cfg.enabled:
                 train_transform = self._build_feature_transform(training=True)
@@ -575,7 +570,7 @@ class IndexDataModule(L.LightningDataModule):
                     self._warmup_feature_cache(self.val_ds, split_name="val")  # type: ignore[arg-type]
 
         if stage in (None, "test"):
-            self.test_ds = self._build_index_dataset(splits=self.test_splits)
+            self.test_ds = self._build_index_dataset(splits=self.test_splits, role="test")
             if self.features_cfg.enabled:
                 self.test_ds = self._wrap_with_features(self.test_ds, split_role="test")
             if self.features_cfg.enabled and self.feature_precompute:

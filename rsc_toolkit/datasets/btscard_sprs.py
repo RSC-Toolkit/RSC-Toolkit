@@ -75,12 +75,10 @@ class _BTSCARDSprsFeatureDataset(IndexFeatureDataset):
         return feats, item["label"], item["sample_id"], meta7_from_sprsound_meta(item["meta"])
 
 
-def btscard_sprs_collate(batch: List[Tuple]) -> Tuple[torch.Tensor, ...]:
-    """meta 를 long 으로 접는 _tuple_collate 대신 (B, 7) float 텐서로 쌓는다."""
-    x = torch.stack([b[0] for b in batch], dim=0)
-    y = torch.as_tensor([b[1] for b in batch], dtype=torch.long)
-    meta = torch.as_tensor([b[3] for b in batch], dtype=torch.float32)
-    return x, y, meta
+from rsc_toolkit.datasets import collate as _collate  # P2-6: collate 단일 구현
+
+# meta 를 long 으로 접는 tuple_collate 대신 (B, 7) float32 텐서로 쌓는다
+btscard_sprs_collate = _collate.btscard_sprs_collate
 
 
 class BTSCARDSprsDataModule(IndexDataModule):

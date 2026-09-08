@@ -142,13 +142,7 @@ def read_patient_folds(folds_file) -> dict:
     return out
 
 
-def read_official_split(split_file) -> dict:
-    out = {}
-    for line in pathlib.Path(split_file).read_text().splitlines():
-        parts = line.split()
-        if len(parts) >= 2:
-            out[parts[0]] = parts[1].lower()
-    return out
+from rsc_toolkit.datasets.splits import read_split_file as read_official_split  # noqa: E402  P2-6: 파서 단일 출처
 
 
 # ---------------------------------------------------------------- 데이터셋
@@ -264,11 +258,10 @@ class RespireNetChunkDataset(Dataset):
         return self.processor.make_features(audio), int(self.audio_data[index][1]), index
 
 
-def respirenet_collate(batch):
-    x = torch.stack([b[0] for b in batch], dim=0)
-    y = torch.as_tensor([b[1] for b in batch], dtype=torch.long)
-    idx = torch.as_tensor([b[2] for b in batch], dtype=torch.long)
-    return x, y, idx
+from rsc_toolkit.datasets import collate as _collate  # P2-6: collate 단일 구현
+
+# (x, y, 청크 인덱스 long)
+respirenet_collate = _collate.index_meta_collate
 
 
 class RespireNetDataModule(L.LightningDataModule):

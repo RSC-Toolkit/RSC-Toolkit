@@ -511,12 +511,10 @@ class PCMCLConcatDataset(Dataset):
         return self.dataset_size
 
 
-def pcmcl_train_collate(batch: Sequence[Tuple[torch.Tensor, torch.Tensor, torch.Tensor]]):
-    """(x, y(3-label float | 4-class long), ssl_label long -1/0/1). PLAdapter 는 batch[2] 를 meta_labels 로 넘긴다."""
-    x = torch.stack([b[0] for b in batch], dim=0)
-    y = torch.stack([b[1] for b in batch], dim=0)
-    ssl = torch.stack([b[2] for b in batch], dim=0)
-    return x, y, ssl
+from rsc_toolkit.datasets import collate as _collate  # P2-6: collate 단일 구현
+
+# (x, y(3-label float | 4-class long) stack, ssl_label long -1/0/1 stack). PLAdapter 는 batch[2] 를 meta_labels 로 넘긴다.
+pcmcl_train_collate = _collate.pcmcl_train_collate
 
 
 # ====================================================================== datamodule

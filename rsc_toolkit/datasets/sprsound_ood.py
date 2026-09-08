@@ -120,11 +120,10 @@ def meta3_from_index_meta(meta: Dict[str, Any]) -> List[float]:
     return [float(meta["age"]), float(int(float(meta["gender"]))), float(int(loc))]
 
 
-def sprsound_ood_collate(batch: List[Tuple[torch.Tensor, int, torch.Tensor]]):
-    x = torch.stack([b[0] for b in batch], dim=0)
-    y = torch.as_tensor([b[1] for b in batch], dtype=torch.long)
-    meta = torch.stack([b[2] for b in batch], dim=0)
-    return x, y, meta
+from rsc_toolkit.datasets import collate as _collate  # P2-6: collate 단일 구현
+
+# (x, y, meta7 stack)
+sprsound_ood_collate = _collate.stack_meta_collate
 
 
 # --------------------------------------------------------------------------- (A) 저자 배포
