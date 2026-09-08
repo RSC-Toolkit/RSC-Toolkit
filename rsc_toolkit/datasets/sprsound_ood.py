@@ -243,7 +243,7 @@ class _CLAPFeatureDataset(Dataset):
     (transformers 5.15.1 의 ClapFeatureExtractor 는 torch 1-D 텐서를 2-D 로 취급해 MemoryError 를 낸다 — 공용 파일 미수정).
     """
 
-    def __init__(self, index_ds, sampling_rate: int, model_name: str, cache_dir: pathlib.Path):
+    def __init__(self, index_ds, sampling_rate: int, model_name: str, cache_dir: pathlib.Path, audio_chain=None):
         from transformers import ClapProcessor
 
         from rsc_toolkit.datasets.feature_cache import FeatureCache
@@ -251,7 +251,10 @@ class _CLAPFeatureDataset(Dataset):
         self.index_ds = index_ds
         self.processor = ClapProcessor.from_pretrained(model_name, sampling_rate=sampling_rate)
         self.cache = FeatureCache(cache_dir)
-        self.cache.configure({"model_name": model_name, "sampling_rate": sampling_rate}, processor_name="CLAPProcessor")
+        # audio_chain: 이 경로의 앞단 전처리(48 kHz·fade·repeat_fade 8 s·노트북식 ms 반올림 절단)를 체인 대장에 남긴다
+        # (dataset_name="sprsound_ood" — 툴킷 sprsound_bts 경로와는 캐시 dir 도, 대장 키도 다르다).
+        self.cache.configure({"model_name": model_name, "sampling_rate": sampling_rate}, processor_name="CLAPProcessor",
+                             audio_chain=audio_chain)
 
     def __len__(self):
         return len(self.index_ds)
@@ -289,7 +292,12 @@ def build_toolkit_ood_dataset(data_config: str = DATA_CONFIG_DEFAULT, rhonchi_st
     )
     feats = cfg["features"]
     sliced = _NotebookSliceIndexDataset(index_ds, sr, pre)
-    feature_ds = _CLAPFeatureDataset(sliced, sr, feats["clap_model_name"], root / feats["cache_dir"])
+    audio_chain = {
+        "dataset_name": "sprsound_ood", "sampling_rate": sr, "sample_level": str(cfg["sample_level"]),
+        "desired_length_sec": float(cfg["desired_length_sec"]), "pad_type": str(cfg["pad_type"]),
+        "fade": bool(cfg.get("fade", True)), "time_unit": "ood_ms_round",  # _NotebookSliceIndexDataset 의 절단 규칙
+    }
+    feature_ds = _CLAPFeatureDataset(sliced, sr, feats["clap_model_name"], root / feats["cache_dir"], audio_chain=audio_chain)
     return SPRSoundOOD4ClassDataset(feature_ds, rhonchi_stridor=rhonchi_stridor)
 
 

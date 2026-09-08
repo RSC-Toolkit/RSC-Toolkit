@@ -107,8 +107,12 @@ class PLAdapter(L.LightningModule):
         self.rsc_model.train()
 
     def on_train_epoch_end(self):
+        # 학습 메트릭은 `train/` 접두사 — 검증 키(acc@1·icbhi_score·S_p·S_e)는 그대로 둔다.
+        # 예전엔 같은 키가 callback_metrics·TensorBoard 한 시리즈에 섞였고, train 목록에 icbhi_score 를
+        # 넣으면 best-checkpoint 콜백이 train 값을 읽을 수 있었다. 검증 키를 안 바꾸므로 best.json 스키마·
+        # 검증 스크립트·기존 run 과의 호환은 그대로다.
         for metric in self.train_metrics:
-            self.log_dict(metric.compute(), prog_bar=True)
+            self.log_dict({f"train/{k}": v for k, v in metric.compute().items()}, prog_bar=True)
             metric.reset()
 
     def on_validation_epoch_end(self):

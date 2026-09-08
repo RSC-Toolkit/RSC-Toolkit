@@ -33,6 +33,15 @@ class FeatureCache:
         self.features_dir.mkdir(parents=True, exist_ok=True)
         if audio_chain:
             self._check_audio_chain(dict(audio_chain))
+        else:
+            # P1-10: 체인 없는 configure 는 다음 릴리스에 필수 인자로 올린다. 지금은 경고만 —
+            # 체인 대장이 없으면 같은 캐시 키를 다른 전처리로 써도 아무도 막지 못한다.
+            logger.warning(
+                "FeatureCache.configure(%s, %s) 가 audio_chain 없이 불렸다 — 체인 대장이 없으면 다른 전처리의 피처를 "
+                "조용히 읽을 수 있다. 호출부에 audio_chain(dataset_name·sampling_rate·pad_type·fade… dict) 을 넘겨라 "
+                "(다음 릴리스부터 필수).",
+                processor_name, self.features_dir,
+            )
 
     # ------------------------------------------------------------------ 체인 대장
     def _check_audio_chain(self, chain: Dict) -> None:
