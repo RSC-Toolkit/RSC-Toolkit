@@ -14,8 +14,23 @@ from .pl_adapter import PLAdapter
 
 
 class SplitIterAdapter(PLAdapter):
-    def __init__(self, *args, split_iter: int = 4, **kwargs):
-        super().__init__(*args, **kwargs)
+    # BaseRSCModel 계약(training_forward) 밖의 M2D 계열 전용 프로토콜. 생성 시점에 검사해
+    # 다른 모델과 잘못 조합했을 때 학습 도중 AttributeError 로 발견되는 일을 막는다.
+    REQUIRED_MODEL_ATTRS = ("train_transform", "val_transform")
+
+    def __init__(self, *args, rsc_model=None, split_iter: int = 4, **kwargs):
+        if rsc_model is None and args:
+            rsc_model, args = args[0], args[1:]
+        missing = [a for a in self.REQUIRED_MODEL_ATTRS if not callable(getattr(rsc_model, a, None))]
+        if missing:
+            raise TypeError(
+                f"adapter=split_iter 는 모델에 {missing} 메서드를 요구한다 (M2D 계열 전용 프로토콜). "
+                f"{type(rsc_model).__name__} 은 BaseRSCModel 계약(training_forward)만 구현했다 — "
+                "adapter=pl 을 쓰거나 해당 메서드를 구현하라."
+            )
+        if int(split_iter) < 1:
+            raise ValueError(f"split_iter 는 1 이상이어야 한다: {split_iter!r}")
+        super().__init__(*args, rsc_model=rsc_model, **kwargs)
         self.K = int(split_iter)
         self.automatic_optimization = False
 

@@ -7,7 +7,7 @@ import hydra
 import lightning as L
 from omegaconf import DictConfig, OmegaConf
 
-from rsc_toolkit.trainer.adapters.pl_adapter import PLAdapter
+from rsc_toolkit.trainer.factories.build_adapter import build_adapter
 from rsc_toolkit.trainer.factories.build_model import build_model
 from rsc_toolkit.trainer.factories.build_loss import build_loss
 from rsc_toolkit.trainer.factories.build_metrics import build_train_val_metric_factories
@@ -108,20 +108,15 @@ def main(cfg: DictConfig) -> None:
     trainer = build_trainer(cfg_dict["trainer"])
 
     # --- LightningModule ---
-    # adapter: {name: split_iter, params: {split_iter: 4}} 면 분할 배치 어댑터 (M2D 미세조정 quirk)
-    adapter_cfg = cfg_dict.get("adapter") or {}
-    if adapter_cfg.get("name") == "split_iter":
-        from rsc_toolkit.trainer.adapters.split_iter_adapter import SplitIterAdapter
-
-        adapter_cls = lambda **kw: SplitIterAdapter(**kw, **adapter_cfg.get("params", {}))  # noqa: E731
-    else:
-        adapter_cls = PLAdapter
-    pl_module = adapter_cls(
+    # adapter: 기본 pl. {name: split_iter, params: {split_iter: 4}} 면 분할 배치 어댑터 (M2D 미세조정 quirk).
+    # 이름은 ADAPTERS registry 에서 찾고, 미지 이름은 침묵 폴백 없이 KeyError.
+    pl_module = build_adapter(
+        cfg_dict.get("adapter"),
         rsc_model=model,
         loss_func=loss_func,
         train_metric_fns=train_metric_fns,
         val_metric_fns=val_metric_fns,
-        optimizer_cfg=cfg_dict["optimizer"],  # see PLAdapter tweak below
+        optimizer_cfg=cfg_dict["optimizer"],
     )
 
     _log_run_metadata(trainer, cfg_dict)
