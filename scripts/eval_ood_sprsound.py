@@ -31,8 +31,10 @@ vw = importlib.util.module_from_spec(_spec); _spec.loader.exec_module(vw)  # typ
 
 import torch  # noqa: E402
 
+# 파생 인덱스: index_cycle.csv 의 label 을 7→4 로 병합해 둔 사본(.datasets/sprsound/index/index_cycle_icbhi4.csv).
+# 데이터모듈이 생성 시점에 라벨 수를 세는 경우(PC-MCL·Prototype·Domain Transfer)까지 한 경로로 처리하기 위해 CSV 단계에서 병합한다.
 SPRS = {"dataset_name": "sprsound", "data_dir": str(ROOT / ".datasets" / "sprsound"), "raw_data_subdir": "Classification",
-        "index_filename": "index_cycle.csv"}
+        "index_filename": "index_cycle_icbhi4.csv"}
 EXPECTED_COUNTS = [1040, 83, 305, 1]
 CACHE_ROOT = ROOT / "downloaded_datasets" / "features_cache_ood"
 # 기본 대상: 표 1 의 ICBHI family 중 OOD 가 정의되는 것 (QLung·BTS-CARD 는 기존 ood.json, RespireNet·GaP-Aug·DDE-MAE·MVST 제외)
@@ -43,6 +45,18 @@ DEFAULT_FAMILIES = [
     "icbhi-effb0-ce", "icbhi-cnn6-sgscl", "icbhi-resnet18-sgscl", "icbhi-effb0-sgscl", "icbhi-sclmeta-mscl", "icbhi-protonet",
     "icbhi-dt-paper", "icbhi-amsd", "icbhi-lorarsc", "icbhi-audioclap", "icbhi-bts",
 ]
+
+
+def ensure_merged_index() -> pathlib.Path:
+    """.datasets/sprsound/index/index_cycle_icbhi4.csv — index_cycle.csv 의 label 을 7→4 병합한 파생 사본 (없으면 생성)."""
+    import pandas as pd
+    from rsc_toolkit.datasets.lungmix_data import SPRSOUND_7_TO_4
+    src = ROOT / ".datasets" / "sprsound" / "index" / "index_cycle.csv"
+    dst = src.with_name("index_cycle_icbhi4.csv")
+    if not dst.exists():
+        df = pd.read_csv(src); df["label"] = [SPRSOUND_7_TO_4[int(v)] for v in df["label"]]
+        df.to_csv(dst, index=False)
+    return dst
 
 
 def family_of(run: str) -> str:
@@ -79,9 +93,11 @@ def make_ood_data_cfg(data_cfg: dict, family: str) -> tuple[dict, str]:
     p["train_splits"] = ["test"]; p["val_splits"] = ["test"]; p["test_splits"] = ["test"]
     p["shuffle_train"] = False
     if dm == "lungmix":
-        p.setdefault("lungmix", {})["label_map"] = "sprsound_7to4"
+        p.setdefault("lungmix", {})["label_map"] = "none"      # CSV 가 이미 4-class
     if dm == "qlung":
-        p["label_map"] = "sprsound_7to4"
+        p["label_map"] = None
+    if dm == "amsd":
+        p["train_splits"] = ["train"]                           # AMSD 는 split 이름으로 train/val 을 구분한다
     target = str(CACHE_ROOT / str(cfg.get("name", dm)))
     if "features" in p and isinstance(p["features"], dict):
         p["features"]["cache_dir"] = target
@@ -182,11 +198,13 @@ def main() -> int:
     ap.add_argument("--out", required=True)
     ap.add_argument("--families", default=None, help="쉼표 구분 family 목록 (기본: DEFAULT_FAMILIES)")
     ap.add_argument("--seeds", default="1,2,3,4,5")
+    ap.add_argument("--runs", default=None, help="쉼표 구분 run 이름 목록 (family/seed 대신 명시)")
     ap.add_argument("--device", default="cuda")
     ap.add_argument("--no-write-run", action="store_true", help="outputs/<group>/<run>/ood.json 을 쓰지 않는다 (검증용)")
     ap.add_argument("--max-temp", type=int, default=80)
     args = ap.parse_args()
     out = pathlib.Path(args.out); out.mkdir(parents=True, exist_ok=True)
+    ensure_merged_index()
     sandbox = out / "sandbox"; vw.make_sandbox(sandbox)
     fams = [f for f in (args.families.split(",") if args.families else DEFAULT_FAMILIES) if f]
     seeds = [int(s) for s in args.seeds.split(",")]
@@ -194,9 +212,10 @@ def main() -> int:
     master = list(csv.DictReader(open(ROOT / "docs" / "results_master.csv")))
     by_run = {r["run_name"]: r for r in master}
     log = open(out / "results.jsonl", "a")
-    for fam in fams:
-        for s in seeds:
-            run = f"{fam}-s{s}"; row = by_run.get(run)
+    jobs = [(family_of(r), r) for r in args.runs.split(",") if r] if args.runs else [(f, f"{f}-s{s}") for f in fams for s in seeds]
+    for fam, run in jobs:
+        if True:
+            row = by_run.get(run)
             rec = {"family": fam, "run": run, "status": "ERROR", "ts": time.time()}
             t0 = time.time()
             try:
