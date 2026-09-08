@@ -319,3 +319,19 @@ def test_train_collate_and_adapter_contract(train_ds):
     assert x.shape == (3, 160000) and y.shape == (3, 3) and y.dtype == torch.float32 and ssl.dtype == torch.long
     assert x.squeeze(1).shape == x.shape                                       # PLAdapter batch[0].squeeze(1) 무해
     assert int(ssl[0]) == -1 and int(ssl[1]) == -1 and int(ssl[2]) in (0, 1)
+
+
+def test_multilabel_model_rejects_integer_labels_in_training_mode():
+    """P2-7: 학습 모드에서 정수 라벨(datamodule concat_single + label_mode=multilabel 오조합)은 조용히 검증 경로로
+    흐르지 않고 TypeError 로 멈춘다. 검증 모드의 정수 라벨(one-hot 경로)은 그대로다."""
+    import pytest
+    from rsc_toolkit.models.beats_pcmcl import BEATsPCMCL
+
+    m = BEATsPCMCL(n_cls=3, specaug=False, enable_ssl=False).train()
+    wav = torch.randn(2, 16000)
+    with pytest.raises(TypeError, match="label_mode=single"):
+        m.training_forward(wav, torch.tensor([0, 3]), nn.BCEWithLogitsLoss())
+    m.eval()
+    with torch.no_grad():
+        onehot, _ = m.training_forward(wav, torch.tensor([0, 3]), nn.BCEWithLogitsLoss())
+    assert onehot.shape == (2, 4)

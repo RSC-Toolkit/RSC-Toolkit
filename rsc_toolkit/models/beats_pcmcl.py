@@ -105,6 +105,11 @@ class BEATsPCMCL(BaseRSCModel, nn.Module):
             loss, _, _ = pcmcl_training_loss(logits, features, labels, loss_func, self.pm_head,
                                              meta_labels, self.ssl_weight, self.loss_combine)
             return logits, loss
+        if self.training:  # 계약(datasets/contract.py pcmcl_ssl_label) 위반 — 오조합을 조용히 학습하지 않는다
+            raise TypeError(
+                f"PC-MCL label_mode=multilabel 학습 배치는 float (B, 3) 멀티라벨이어야 하는데 {labels.dtype} 가 왔다 — "
+                "pcmcl datamodule 의 mode 가 concat_single 이면 model.params.label_mode=single 로 맞추라."
+            )
         # 검증 배치: 4-class long → 3-label BCE(원본 validate 의 criterion(output, labels)) + 4-class one-hot 예측
         loss = loss_func(logits, self.ls.encode(labels))
         return self.ls.logits_to_onehot(logits, self.threshold), loss

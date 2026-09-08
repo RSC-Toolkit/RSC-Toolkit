@@ -104,9 +104,18 @@ class ASTPCMCL(BaseRSCModel, nn.Module):
         logits = self.classifier(features)
         if self.label_mode == "single":
             return logits, loss_func(logits, labels)
+        # 배치 계약(datasets/contract.py META_KINDS["pcmcl_ssl_label"]): 학습 배치 y = float (B,3) 멀티라벨(+PM),
+        # 검증 배치 y = long 단일라벨 → 3-label BCE + 4/7-class one-hot 예측. dtype 로 경로를 고르되,
+        # 학습 모드에서 정수 라벨이 오면(datamodule mode=concat_single + label_mode=multilabel 오조합) 조용히
+        # 검증 경로로 흘러 잘못 학습되던 것을 막는다.
         if labels.dtype.is_floating_point:
             loss, _, _ = pcmcl_training_loss(logits, features, labels, loss_func, self.pm_head,
                                              meta_labels, self.ssl_weight, self.loss_combine)
             return logits, loss
+        if self.training:
+            raise TypeError(
+                f"PC-MCL label_mode=multilabel 학습 배치는 float (B, 3) 멀티라벨이어야 하는데 {labels.dtype} 가 왔다 — "
+                "pcmcl datamodule 의 mode 가 concat_single 이면 model.params.label_mode=single 로 맞추라."
+            )
         loss = loss_func(logits, self.ls.encode(labels))
         return self.ls.logits_to_onehot(logits, self.threshold), loss
