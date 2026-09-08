@@ -1,8 +1,4 @@
-from typing import Dict, Type
-import torch.optim as optim
+"""하위호환 창구. 등록의 원천은 rsc_toolkit.registries.OPTIMIZERS (내장은 lazy 선언, 외부는 데코레이터) 다."""
+from rsc_toolkit.registries import OPTIMIZERS
 
-OPTIMIZERS: Dict[str, Type[optim.Optimizer]] = {
-    "adam": optim.Adam,
-    "adamw": optim.AdamW,
-    "sgd": optim.SGD,
-}
+__all__ = ["OPTIMIZERS"]

@@ -1,11 +1,4 @@
-from typing import Dict, Type
-import torch.nn as nn
+"""하위호환 창구. 등록의 원천은 rsc_toolkit.registries.LOSSES (내장은 lazy 선언, 외부는 데코레이터) 다."""
+from rsc_toolkit.registries import LOSSES
 
-from rsc_toolkit.trainer.losses import WeightedCrossEntropyFromCounts, WeightedCrossEntropyFromPrior
-
-LOSSES: Dict[str, Type[nn.Module]] = {
-    "cross_entropy": nn.CrossEntropyLoss,
-    "cross_entropy_from_counts": WeightedCrossEntropyFromCounts,
-    "cross_entropy_from_prior": WeightedCrossEntropyFromPrior,
-    "bce_with_logits": nn.BCEWithLogitsLoss,      # PC-MCL 3-label 주 손실 (wa976/PC-MCL main.py:421)
-}
+__all__ = ["LOSSES"]
