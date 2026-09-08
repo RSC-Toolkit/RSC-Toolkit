@@ -10,6 +10,29 @@ from ..factories.build_optimizer import build_optimizer
 MetricFactory = Callable[[], Metric]
 
 
+def check_meta_contract(rsc_model: Any, datamodule: Any) -> None:
+    """
+    batch[2](meta) 사이드채널의 조합 검사 — 학습 시작 전에 1회.
+
+    datamodule 이 `meta_kind`(무엇을 보내는지) 를, 모델이 `accepts_meta`(무엇을 받는지) 를 선언한
+    경우에만 대조한다. 한쪽이라도 선언하지 않았으면 예전과 똑같이 통과한다(opt-in). 어긋나면
+    TypeError — AQS float 를 청진기 id 로 해석하는 식으로 **조용히 잘못 학습되는 조합**을 차단한다.
+    """
+    if datamodule is None:
+        return
+    kind = getattr(datamodule, "meta_kind", None)
+    accepts = getattr(rsc_model, "accepts_meta", None)
+    if kind is None or accepts is None:
+        return
+    accepts = (accepts,) if isinstance(accepts, str) else tuple(accepts)
+    if kind not in accepts:
+        raise TypeError(
+            f"datamodule {type(datamodule).__name__} 은 batch[2] 로 meta_kind={kind!r} 를 보내는데 "
+            f"모델 {type(rsc_model).__name__} 의 accepts_meta={accepts} 에 없다 — 데이터/모델 조합 오류. "
+            "(meta 를 쓰지 않는 모델이면 accepts_meta 선언을 빼거나 그 kind 를 추가하라.)"
+        )
+
+
 class PLAdapter(L.LightningModule):
     def __init__(
         self,
@@ -27,6 +50,13 @@ class PLAdapter(L.LightningModule):
         # Must instantiate inside to avoid shared state and ensure ownership
         self.train_metrics = nn.ModuleList([fn() for fn in (train_metric_fns or [])])
         self.val_metrics = nn.ModuleList([fn() for fn in (val_metric_fns or [])])
+
+    def setup(self, stage: Optional[str] = None) -> None:
+        # trainer 에 datamodule 이 붙어 있으면 meta 사이드채널 조합을 1회 검사한다.
+        # (trainer 미부착·dataloader 직접 전달 경로에서는 조용히 건너뛴다.)
+        trainer = getattr(self, "_trainer", None)
+        datamodule = getattr(trainer, "datamodule", None) if trainer is not None else None
+        check_meta_contract(self.rsc_model, datamodule)
 
     def training_step(self, batch, batch_idx):
         audio_batch = batch[0].squeeze(1)

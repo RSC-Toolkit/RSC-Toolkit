@@ -31,6 +31,8 @@ logger = logging.getLogger(__name__)
 
 @ModelFactory.register_model_class("ast_pcmcl")
 class ASTPCMCL(BaseRSCModel, nn.Module):
+    accepts_meta = ("pcmcl_ssl_label",)  # 학습 batch[2] = ssl_label long -1/0/1 (PCMCLDataModule)
+
     def __init__(
         self,
         n_cls: int = 3,

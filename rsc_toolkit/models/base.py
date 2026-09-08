@@ -72,6 +72,10 @@ class BaseRSCModel(ABC):
             (SG-SCL·DAT 는 학습에서, BTS 계열은 검증에서도 받는다).
             **쓰지 않는 모델도 `**kwargs` 를 열어 두어야 한다** — 그래야 메타를 붙이는
             데이터 config 와 붙이지 않는 config 양쪽에서 같은 모델이 돌아간다.
+            `meta_labels` 의 의미는 datamodule 마다 다르다(청진기 id·환자 번호·AQS float·
+            ssl_label·meta7 벡터…). 받는 모델은 클래스 속성 `accepts_meta = ("dev", ...)` 로
+            어떤 datamodule 의 `meta_kind` 를 이해하는지 선언하는 것을 권장한다 — 어댑터가
+            학습 시작 전에 조합을 대조해 조용한 오학습을 막는다(미선언이면 검사하지 않는다).
 
         반환
         ----

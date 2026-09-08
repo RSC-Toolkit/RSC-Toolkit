@@ -40,6 +40,8 @@ from rsc_toolkit.methods.sgscl import MetaCL, sgscl_training_losses
 class SGSCLAST(PatchMixAST):
     """원본 sgscl ASTModel + set_model 구성 (method: ce | dat | sgscl)."""
 
+    accepts_meta = ("dev",)  # batch[2] = ICBHI 청진기 id (data.params.meta_label_mode=dev)
+
     def __init__(
         self,
         n_cls: int = 4,

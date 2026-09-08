@@ -122,6 +122,8 @@ def valid_len_meta(item: Dict[str, Any]) -> int:
 class LungmixDataModule(IndexDataModule):
     """IndexDataModule + lungmix 블록(bandpass·label_map) 을 LungmixIndexDataset 에 전달."""
 
+    meta_kind = "lungmix_valid_len"  # 학습 batch[2] = 원 구간 길이 (emit_valid_len) — ast_lungmix mix_stage=raw 용
+
     def __init__(self, *args, lungmix: Optional[dict] = None, **kwargs):
         super().__init__(*args, **kwargs)
         cfg = dict(lungmix or {})

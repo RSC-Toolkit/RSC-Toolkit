@@ -44,6 +44,8 @@ from rsc_toolkit.methods.sgscl import apply_specaug_paper
 class QLungAST(PatchMixAST):
     """원본 ASTModel + set_model(method aqm|ce) 구성."""
 
+    accepts_meta = ("qlung_aqs",)  # batch[2] = AQS float (QLungDataModule)
+
     # MA(live weight averaging) 에서 제외할 state_dict 접두어 — 원본은 criterion[1](DFAM) 을 MA 하지 않는다.
     ma_exclude_prefixes = ("dfam.",)
 

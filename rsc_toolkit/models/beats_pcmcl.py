@@ -49,6 +49,8 @@ class _BEATsFbankSpecAugment(nn.Module):
 
 @ModelFactory.register_model_class("beats_pcmcl")
 class BEATsPCMCL(BaseRSCModel, nn.Module):
+    accepts_meta = ("pcmcl_ssl_label",)  # 학습 batch[2] = ssl_label long -1/0/1 (PCMCLDataModule)
+
     def __init__(
         self,
         n_cls: int = 3,                        # 3-label (default/noconcat_multi) | 4 (ablation concat_single, CE)

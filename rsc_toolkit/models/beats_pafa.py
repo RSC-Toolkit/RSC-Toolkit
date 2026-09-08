@@ -82,6 +82,8 @@ class BEATsTransferLearningModel(nn.Module):
 class BEATsClassifier(BaseRSCModel, nn.Module):
     """원본 set_model 의 beats 구성: 백본 + 토큰별 Linear(mean 풀링) [+ PAFA ProjectionHead]."""
 
+    accepts_meta = ("patient",)  # batch[2] = 환자 번호 (meta_label_mode=patient; method=pafa 에 필수)
+
     def __init__(
         self,
         n_cls: int = 4,

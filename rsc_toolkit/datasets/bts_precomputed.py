@@ -48,6 +48,8 @@ def bts_collate(batch: List[Tuple[torch.Tensor, int, torch.Tensor]]):
 
 
 class BTSPrecomputedDataModule(L.LightningDataModule):
+    meta_kind = "bts_meta7"  # batch[2] = meta7 모양 float 벡터 (train·val 양쪽) — bts/bts_card/audioclap
+
     def __init__(
         self,
         train_path: str = "pretrained_models/upstream/bts/training.pt",

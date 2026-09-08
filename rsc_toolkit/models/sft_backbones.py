@@ -225,6 +225,7 @@ class CNN6SFT(nn.Module):
 
 # ------------------------------------------------------------- 등록 래퍼 (set_model 상당)
 class _SFTClassifierModel(BaseRSCModel, nn.Module):
+    accepts_meta = ("dev",)  # batch[2] = ICBHI 청진기 id (sgscl_nonast 데이터; method=ce 는 받되 무시)
     """
     backbone + nn.Linear 분류기 (원본 set_model 의 비-AST 구성).
 

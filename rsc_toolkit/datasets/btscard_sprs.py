@@ -84,6 +84,7 @@ def btscard_sprs_collate(batch: List[Tuple]) -> Tuple[torch.Tensor, ...]:
 
 
 class BTSCARDSprsDataModule(IndexDataModule):
+    meta_kind = "bts_meta7"  # batch[2] = meta7 float 벡터 (train·val 양쪽) — bts/bts_card/audioclap
     """IndexDataModule + meta7 를 **train·val 양쪽** 배치에 붙인다 (BTS 계열 SPR→SPR 학습용)."""
 
     def _wrap_with_features(self, base_ds, *, feature_transform=None, meta_label_fn=None):

@@ -41,6 +41,7 @@ from rsc_toolkit.methods.qlung import (
 class QLungCLAP(BaseRSCModel, nn.Module):
     # MA(live weight averaging) 제외 접두어 — 원본이 DFAM 을 MA 하지 않는 것과 같다.
     ma_exclude_prefixes = ("dfam.",)
+    accepts_meta = ("qlung_aqs",)  # batch[2] = AQS float (QLungDataModule)
 
     def __init__(
         self,

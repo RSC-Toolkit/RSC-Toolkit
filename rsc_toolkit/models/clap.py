@@ -18,6 +18,8 @@ from .backbone.clap import PretrainedCLAPWithProjection
 
 @ModelFactory.register_model_class("audioclap")
 class AudioCLAP(BaseRSCModel, nn.Module):
+    accepts_meta = ("bts_meta7",)  # bts_precomputed 가 meta7 을 붙여 보내지만 오디오 전용 기준선은 무시한다
+
     def __init__(
         self,
         n_cls: int,

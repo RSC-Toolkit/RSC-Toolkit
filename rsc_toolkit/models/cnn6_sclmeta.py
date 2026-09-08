@@ -41,6 +41,8 @@ METHODS = ("ce", "hybrid", "scl", "mscl", "linear")
 
 @ModelFactory.register_model_class("cnn6_sclmeta")
 class CNN6SCLMeta(BaseRSCModel, nn.Module):
+    accepts_meta = ("sa", "sa_sprs")  # batch[2] = 성별×연령군 클래스 (SCL-metadata; method=mscl 에 필수)
+
     def __init__(
         self,
         n_cls: int = 4,

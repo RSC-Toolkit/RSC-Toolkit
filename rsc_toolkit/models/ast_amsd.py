@@ -103,6 +103,8 @@ def _resolve_ckpt(pretrained_path: Optional[str]) -> pathlib.Path:
 
 @ModelFactory.register_model_class("ast_amsd")
 class AMSDAST(BaseRSCModel, nn.Module):
+    accepts_meta = ("amsd_sample_index",)  # 학습 batch[2] = 샘플 인덱스 (AMSDDataModule amsd_return_index)
+
     def __init__(
         self,
         n_cls: int = 4,

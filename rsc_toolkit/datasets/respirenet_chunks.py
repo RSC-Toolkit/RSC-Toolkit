@@ -272,6 +272,8 @@ def respirenet_collate(batch):
 
 
 class RespireNetDataModule(L.LightningDataModule):
+    meta_kind = "respirenet_chunk_index"  # batch[2] = 청크 인덱스 (사이클 투표 콜백용) — respirenet 모델은 무시
+
     def __init__(self, data_dir: str = ".datasets/icbhi", split_mode: str = "fold",
                  folds_file: str = "rsc_toolkit/datasets/icbhi/data/patient_list_foldwise.txt", test_fold: int = 4,
                  official_split_file: str = "rsc_toolkit/datasets/icbhi/data/official_split.txt",

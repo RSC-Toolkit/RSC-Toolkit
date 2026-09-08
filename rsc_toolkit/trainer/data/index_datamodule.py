@@ -79,7 +79,15 @@ class IndexDataModule(L.LightningDataModule):
 
     Provide an `index_dataset_cls` (dotted import path) that builds samples from an index CSV
     and returns dicts containing at least: {"audio": Tensor, "label": Optional[int], "sample_id": str}.
+
+    batch[2](meta) 사이드채널 선언: `meta_kind` 는 이 datamodule 이 배치 3번째 원소로 무엇을 보내는지
+    이름 붙인 것이다 (범용 경로는 `meta_label_mode` 그대로; 서브클래스는 클래스 속성으로 덮어쓴다 —
+    예: "qlung_aqs", "pcmcl_ssl_label", "bts_meta7"). 모델 쪽 `accepts_meta` 와 어댑터 setup 에서 대조된다.
     """
+
+    @property
+    def meta_kind(self) -> Optional[str]:
+        return self.meta_label_mode or None
 
     def __init__(
         self,

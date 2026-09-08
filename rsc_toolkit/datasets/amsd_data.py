@@ -91,6 +91,7 @@ def _splits_of(ds) -> List[str]:
 
 
 class AMSDDataModule(IndexDataModule):
+    meta_kind = "amsd_sample_index"  # 학습 batch[2] = 샘플 인덱스 (amsd_return_index) — ast_amsd 전용
     """IndexDataModule + AMS-D 샘플별 마스킹/정규화 래퍼 + train 배치 샘플 인덱스(meta) 부착 + 패딩 설정별 캐시 분리."""
 
     def __init__(self, *args, amsd_freqm: int = 48, amsd_timem: int = 192, amsd_mean: float = -4.2677393,

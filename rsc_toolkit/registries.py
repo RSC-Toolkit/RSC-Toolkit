@@ -85,6 +85,13 @@ PROCESSORS.register_lazy("waveform", "rsc_toolkit.processors.waveform:WaveformPr
 # ── augmentation (피처 공간 transform; 구 IndexDataModule._build_feature_transform 하드코딩) ──
 AUGMENTATIONS.register_lazy("specaugment", "rsc_toolkit.augmentations.specaugment:SpecAugment")
 
+# ── meta label (data.params.meta_label_mode; 구 datasets/meta_labels.build_meta_label_fn 의 if 체인) ──
+# 등록 객체는 팩토리: 인자 없이 불러 `item -> int` 함수를 돌려준다.
+META_LABELS.register_lazy("dev", "rsc_toolkit.datasets.meta_labels:build_dev")          # ICBHI 청진기 4종 (sgscl 계열)
+META_LABELS.register_lazy("patient", "rsc_toolkit.datasets.meta_labels:build_patient")  # 환자 번호 (PAFA)
+META_LABELS.register_lazy("sa", "rsc_toolkit.datasets.meta_labels:build_sa")            # 성별×연령군 (SCL-metadata ICBHI)
+META_LABELS.register_lazy("sa_sprs", "rsc_toolkit.datasets.meta_labels:build_sa_sprs")  # gender×age_group (SCL-metadata SPRS)
+
 ALL_REGISTRIES = {
     r.kind: r
     for r in (MODELS, DATASETS, DATAMODULES, LOSSES, METRICS, OPTIMIZERS, ADAPTERS, PROCESSORS, AUGMENTATIONS, META_LABELS)

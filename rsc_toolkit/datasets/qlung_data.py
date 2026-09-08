@@ -192,6 +192,8 @@ def precompute_acoustic_features(ds: QLungAQSIndexDataset, cache: AcousticFeatur
 class QLungDataModule(IndexDataModule):
     """IndexDataModule + qlung 블록(AQS 설정) — 배치 (x, y, aqs float64)."""
 
+    meta_kind = "qlung_aqs"  # batch[2] = AQS float (B,) — ast_qlung/clap_qlung 의 accepts_meta 와 대조
+
     def __init__(self, *args, qlung: Optional[dict] = None, label_map: Optional[str] = None, **kwargs):
         super().__init__(*args, **kwargs)
         cfg = dict(qlung or {})

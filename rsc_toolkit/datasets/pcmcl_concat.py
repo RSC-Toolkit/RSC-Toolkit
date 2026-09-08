@@ -524,6 +524,7 @@ from rsc_toolkit.trainer.data.index_datamodule import IndexDataModule  # noqa: E
 
 
 class PCMCLDataModule(IndexDataModule):
+    meta_kind = "pcmcl_ssl_label"  # 학습 batch[2] = ssl_label long ∈ {-1,0,1} — ast_pcmcl/beats_pcmcl 전용
     """
     train = PCMCLConcatDataset(동적 연결·PM), val/test = 부모(IndexDataModule) 의 IndexDataset 경로
     (desired_length_sec·pad_type=repeat_fade → 테스트 사이클 단독 cut_pad, features.kind 로 waveform/fbank).

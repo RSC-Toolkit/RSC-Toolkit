@@ -49,6 +49,8 @@ def _as_4d(input_features: torch.Tensor) -> torch.Tensor:
 
 @ModelFactory.register_model_class("bts")
 class BTSModel(BaseRSCModel, nn.Module):
+    accepts_meta = ("bts_meta7",)  # batch[2] = meta7 float 벡터 (bts_precomputed · btscard_sprs), 검증에도 필요
+
     def __init__(
         self,
         n_cls: int = 4,

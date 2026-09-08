@@ -28,6 +28,8 @@ logger = logging.getLogger(__name__)
 
 @ModelFactory.register_model_class("respirenet")
 class RespireNetCNN(BaseRSCModel, nn.Module):
+    accepts_meta = ("respirenet_chunk_index",)  # RespireNetDataModule 이 청크 인덱스를 붙인다 (모델은 무시)
+
     def __init__(self, n_cls: int = 4, drop_prob: float = 0.5, imagenet_pretrain: bool = True):
         super().__init__()
         weights = torchvision.models.ResNet34_Weights.IMAGENET1K_V1 if imagenet_pretrain else None

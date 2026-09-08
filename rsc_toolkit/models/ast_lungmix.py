@@ -53,6 +53,8 @@ AUDIOSET_MEAN, AUDIOSET_STD = -4.2677393, 4.5689974
 
 @ModelFactory.register_model_class("ast_lungmix")
 class ASTLungmix(PatchMixAST):
+    accepts_meta = ("lungmix_valid_len",)  # 학습 batch[2] = 원 구간 길이 (LungmixDataModule emit_valid_len)
+
     def __init__(
         self,
         n_cls: int = 4,
