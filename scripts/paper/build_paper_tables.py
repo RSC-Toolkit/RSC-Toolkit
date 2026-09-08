@@ -256,12 +256,22 @@ def deltas_of(a, agg):
     return tuple(out)
 
 
-def build_patchmix(anchors, fam, table, meta, mode, footnotes):
-    """Patch-Mix(Bae et al., INTERSPEECH'23) Table 2 형식 — 2026-09-08 사용자 행 목록 기준의 평면 표.
-    mode 'A': 우리 결과만 (Sp/Se/Score, 5-seed mean±std)
-    mode 'B': 논문 보고값 + 우리 결과 + Δ(Score)
-    행 = anchors.pm_order 가 있는 행, 그 순서. 각주는 숫자만(팀/가정 기호 없음). best/second 는 comparable=1 행끼리, 우리 값 기준.
-    반환 aggs 는 표의 전 행(pm_order 없는 행 포함) — numbers.md 가 쓴다."""
+PM_TABLES = {  # table → (file stem, caption 앞부분, label)
+    "A": ("table1_ICHBI_Diff", "ICBHI 2017 (official 60/40 split, 4-class cycle classification)", "icbhi_diff"),
+    "B": ("table2_SPRSound_Diff", "SPRSound 2022 (inter-patient test set, 7-class cycle classification)", "sprsound_diff"),
+    "C": ("table3_OOD", "zero-shot transfer: ICBHI-trained checkpoints evaluated on the SPRSound inter-patient test set (7$\\to$4 merged labels)", "ood"),
+}
+
+
+def _rep(x):
+    """논문 보고값 셀: 없으면 빈칸(사용자 지시), 있으면 소수 2자리"""
+    return "" if x in ("", None) else num2(x)
+
+
+def build_patchmix(anchors, fam, table, meta, footnotes):
+    """사용자 형식(2026-09-08): method · architecture · pretrain · venue | reported Sp/Se/Sc | ours Sp/Se/Sc (5-seed mean±std) | ΔSc(색).
+    행 = anchors.pm_order 가 있는 행, 그 순서. 논문값이 없는 행은 reported·ΔSc 를 비운다. 같은 프로토콜이 아니면 ΔSc = --.
+    best/second 는 comparable=1 행끼리, 우리 값 기준. 반환 aggs 는 표의 전 행(numbers.md 용)."""
     all_rows = [a for a in anchors if a["table"] == table]
     aggs = {a["family"] + "|" + a["metric_source"]: aggregate(a, fam) for a in all_rows}
     rows = sorted((a for a in all_rows if a.get("pm_order")), key=lambda a: int(a["pm_order"]))
@@ -269,46 +279,39 @@ def build_patchmix(anchors, fam, table, meta, mode, footnotes):
     def comp(a): return meta[a["family"]]["comparable"] == "1"
     marks = {k: _rank_marks([agg_of(a)[k][0] if (comp(a) and agg_of(a)["n"]) else None for a in rows])
              for k in ("sp", "se", "score")}
-
-    ds = {"A": ("ICBHI 2017", "official 60/40 split, 4-class cycle classification"),
-          "B": ("SPRSound 2022", "inter-patient test set, 7-class cycle classification")}[table]
-    tag = {"A": "icbhi", "B": "sprsound"}[table]
-    if mode == "A":
-        colspec = "llcl" + "ccc"
-        head = [r"method & architecture & pretrain & venue & $S_p$\,(\%) & $S_e$\,(\%) & \textbf{Score}\,(\%) \\"]
-        cap = (f"Reproduction results on the {ds[0]} dataset ({ds[1]}). Every row is trained and evaluated inside the toolkit "
-               r"with five seeds (mean\,$\pm$\,std) under one protocol; model selection is best-on-test as in the original papers "
-               r"(Prototype: final iterate). \textbf{Best} and \underline{second best} among directly comparable rows.")
-    else:
-        colspec = "llcl" + "ccc" + "ccc" + "ccc"
-        head = [r"\multirow{2}{*}{method} & \multirow{2}{*}{architecture} & \multirow{2}{*}{pretrain} & \multirow{2}{*}{venue} & "
-                r"\multicolumn{3}{c}{reported in paper} & \multicolumn{3}{c}{ours (5 seeds)} & \multicolumn{3}{c}{$\Delta$ = ours $-$ reported} \\",
-                r"\cmidrule(lr){5-7}\cmidrule(lr){8-10}\cmidrule(lr){11-13}",
-                r"& & & & $S_p$ & $S_e$ & Score & $S_p$ & $S_e$ & \textbf{Score} & $\Delta S_p$ & $\Delta S_e$ & $\Delta$\textbf{Score} \\"]
-        cap = (f"Reported vs.\\ reproduced results on the {ds[0]} dataset ({ds[1]}). "
-               r"``Reported'' copies the numbers from each paper (single run or mean over the paper's seeds); ``ours'' is the toolkit "
-               r"re-implementation with five seeds (mean\,$\pm$\,std) under one protocol. $\Delta$ = ours $-$ reported for each metric "
-               r"(\textcolor{dpos}{green}: at or above the reported value, \textcolor{dneg}{red}: below), shown only where the two are measured "
-               r"under the same protocol. \textbf{Best} and \underline{second best} (ours) among directly comparable rows.")
-    L = ([DELTA_COLORS] if mode == "B" else []) + [r"\begin{table*}[!t]", r"\centering", r"\caption{" + cap + "}",
-         r"\label{tab:" + tag + "_" + mode.lower() + "}",
+    stem, dsdesc, label = PM_TABLES[table]
+    colspec = "llcl" + "ccc" + "ccc" + "c"
+    head = [r"\multirow{2}{*}{method} & \multirow{2}{*}{architecture} & \multirow{2}{*}{pretrain} & \multirow{2}{*}{venue} & "
+            r"\multicolumn{3}{c}{reported in paper} & \multicolumn{3}{c}{ours (5 seeds)} & \multirow{2}{*}{$\Delta$Sc} \\",
+            r"\cmidrule(lr){5-7}\cmidrule(lr){8-10}",
+            r"& & & & $S_p$ & $S_e$ & Sc & $S_p$ & $S_e$ & \textbf{Sc} & \\"]
+    common = (r" ``Reported'' copies the numbers from each paper (single run or mean over the paper's seeds; blank where the paper reports "
+              r"nothing for this setting); ``ours'' is the toolkit re-implementation with five seeds (mean\,$\pm$\,std) under one protocol. "
+              r"$\Delta$Sc = ours $-$ reported Score (\textcolor{dpos}{green}: at or above, \textcolor{dneg}{red}: below), shown only where the "
+              r"two are measured under the same protocol. \textbf{Best} and \underline{second best} (ours) among directly comparable rows.")
+    cap = {"A": "Reported vs.\\ reproduced results on " + dsdesc + ".",
+           "B": "Reported vs.\\ reproduced results on " + dsdesc + ".",
+           "C": "Reported vs.\\ reproduced " + dsdesc + "."}[table] + common
+    L = [DELTA_COLORS, r"\begin{table*}[!t]", r"\centering", r"\caption{" + cap + "}", r"\label{tab:" + label + "}",
          r"\renewcommand{\arraystretch}{1}", r"\addtolength{\tabcolsep}{2pt}",
          r"\resizebox{\linewidth}{!}{", r"\begin{tabular}{" + colspec + "}", r"\toprule", *head, r"\hline \midrule"]
     used_fn = set()
     for i, a in enumerate(rows):
         agg = agg_of(a); m = meta[a["family"]]
-        for x in a["fn"].split(";"):
-            if x: used_fn.add(x)
         fns = [x for x in a["fn"].split(";") if x]
+        used_fn.update(fns)
         fn = (r"\textsuperscript{" + ",".join(fns) + "}") if fns else ""
         name = tex_escape(m["method"]) + r"~\cite{" + m["cite"].replace(" ", "") + "}" + fn
-        cells = [name, m["arch"], tex_escape(m["pretrain"]).replace("+", r"\,+\,"), r"\textit{" + m["venue"] + "}"]
-        if mode == "B":
-            cells += [num2(a["paper_sp"]), num2(a["paper_se"]), num2(a["paper_score"])]
-        cells += [_ours_pm(*agg["sp"], marks["sp"].get(i)), _ours_pm(*agg["se"], marks["se"].get(i)),
-                  _ours_pm(*agg["score"], marks["score"].get(i))]
-        if mode == "B":
-            cells += [delta_color_tex(d) for d in deltas_of(a, agg)]
+        cells = [name, m["arch"], tex_escape(m["pretrain"]).replace("+", r"\,+\,"), r"\textit{" + m["venue"] + "}",
+                 _rep(a["paper_sp"]), _rep(a["paper_se"]), _rep(a["paper_score"]),
+                 _ours_pm(*agg["sp"], marks["sp"].get(i)), _ours_pm(*agg["se"], marks["se"].get(i)),
+                 _ours_pm(*agg["score"], marks["score"].get(i))]
+        if not a["paper_score"]:
+            cells.append("")
+        elif a["delta"] != "score" or not agg["n"]:
+            cells.append("--")
+        else:
+            cells.append(delta_color_tex(agg["score"][0] - float(a["paper_score"])))
         L.append(" & ".join(cells) + r" \\")
     L += [r"\bottomrule", r"\end{tabular}}"]
     notes = [r"\textsuperscript{" + k + "} " + footnotes[k] for k in sorted((x for x in used_fn if x.isdigit()), key=int)]
@@ -330,52 +333,48 @@ def _ours_html(m, s, kind=None):
 
 
 def patchmix_html(anchors, fam, meta, footnotes):
-    """종합 대장(아티팩트) 미리보기용 HTML 조각: ICBHI/SPRSound × 옵션 A/B 표 4개 (build_patchmix 와 같은 행·수치)."""
+    """종합 대장(아티팩트) 미리보기: table1/2/3 과 같은 행·수치."""
     out = []
     tex2html = lambda t: (t.replace(r"$\pm$", "±").replace(r"$\Delta$", "Δ").replace(r"$-$", "−").replace(r"$\to$", "→").replace(r"$\ge$", "≥")
                           .replace(r"$\alpha$", "α").replace(r"\ ", " ").replace("$\\times$", "×"))
-    for table, tag, title in (("A", "icbhi", "ICBHI 2017 · 공식 60/40 · 4-class"), ("B", "sprsound", "SPRSound 2022 · inter-patient test · 7-class")):
+    titles = {"A": "table1_ICHBI_Diff · ICBHI 2017 공식 60/40 · 4-class", "B": "table2_SPRSound_Diff · SPRSound 2022 inter-patient · 7-class",
+              "C": "table3_OOD · ICBHI 학습 → SPRSound inter-patient 제로샷 (7→4 병합)"}
+    for table in ("A", "B", "C"):
         all_rows = [a for a in anchors if a["table"] == table]
-        aggs = {a["family"]: aggregate(a, fam) for a in all_rows}
+        aggs = {a["family"] + "|" + a["metric_source"]: aggregate(a, fam) for a in all_rows}
         rows = sorted((a for a in all_rows if a.get("pm_order")), key=lambda a: int(a["pm_order"]))
+        key = lambda a: a["family"] + "|" + a["metric_source"]
         comp = lambda a: meta[a["family"]]["comparable"] == "1"
-        marks = {k: _rank_marks([aggs[a["family"]][k][0] if (comp(a) and aggs[a["family"]]["n"]) else None for a in rows])
+        marks = {k: _rank_marks([aggs[key(a)][k][0] if (comp(a) and aggs[key(a)]["n"]) else None for a in rows])
                  for k in ("sp", "se", "score")}
-        for mode in ("A", "B"):
-            used = set()
-            L = [f'<div class="pm pm-{mode} pm-{tag}"{"" if mode == "A" else " hidden"}>',
-                 f'<p class="pm-title"><b>{title}</b> · 옵션 {mode} — ' + ("우리 결과만 (5 seed 평균±std)" if mode == "A" else "논문 보고값 + 우리 결과 + ΔScore") + f" · {len(rows)} 행</p>",
-                 '<div class="tbl"><table class="pmt"><thead>']
-            if mode == "A":
-                L.append("<tr><th>method</th><th>architecture</th><th>pretrain</th><th>venue</th><th>Sp (%)</th><th>Se (%)</th><th>Score (%)</th></tr>")
+        used = set()
+        L = [f'<div class="pm pm-{table}">', f'<p class="pm-title"><b>{titles[table]}</b> · {len(rows)} 행</p>', '<div class="tbl"><table class="pmt"><thead>',
+             '<tr class="grp"><th colspan="4"></th><th colspan="3">reported in paper</th><th colspan="3">ours (5 seeds)</th><th></th></tr>',
+             "<tr><th>method</th><th>architecture</th><th>pretrain</th><th>venue</th><th>Sp</th><th>Se</th><th>Sc</th><th>Sp</th><th>Se</th><th>Sc</th><th>ΔSc</th></tr>",
+             "</thead><tbody>"]
+        for i, a in enumerate(rows):
+            m = meta[a["family"]]; agg = aggs[key(a)]
+            fns = [x for x in a["fn"].split(";") if x]; used.update(fns)
+            fn = f"<sup>{','.join(fns)}</sup>" if fns else ""
+            cite = f'<span class="run">\\cite{{{m["cite"].replace(" ", "")}}} · {a["family"]}{" · " + a["metric_source"] if table == "C" else ""}</span>'
+            cells = [f'<td class="name">{_html_esc(m["method"])}{fn}{cite}</td>', f"<td>{_html_esc(tex2html(m['arch']))}</td>",
+                     f"<td>{_html_esc(m['pretrain'])}</td>", f"<td><i>{_html_esc(m['venue'].replace(chr(96), chr(8217)))}</i></td>",
+                     f'<td class="m">{_rep(a["paper_sp"])}</td>', f'<td class="m">{_rep(a["paper_se"])}</td>', f'<td class="m">{_rep(a["paper_score"])}</td>',
+                     f'<td class="m">{_ours_html(*agg["sp"], marks["sp"].get(i))}</td>', f'<td class="m">{_ours_html(*agg["se"], marks["se"].get(i))}</td>',
+                     f'<td class="m">{_ours_html(*agg["score"], marks["score"].get(i))}</td>']
+            if not a["paper_score"]:
+                cells.append('<td class="m"></td>')
+            elif a["delta"] != "score" or not agg["n"]:
+                cells.append('<td class="m"><span class="d z">—</span></td>')
             else:
-                L.append('<tr class="grp"><th colspan="4"></th><th colspan="3">reported in paper</th><th colspan="3">ours (5 seeds)</th><th colspan="3">Δ = ours − reported</th></tr>'
-                         "<tr><th>method</th><th>architecture</th><th>pretrain</th><th>venue</th><th>Sp</th><th>Se</th><th>Score</th><th>Sp</th><th>Se</th><th>Score</th><th>ΔSp</th><th>ΔSe</th><th>ΔScore</th></tr>")
-            L.append("</thead><tbody>")
-            for i, a in enumerate(rows):
-                m = meta[a["family"]]; agg = aggs[a["family"]]
-                for x in a["fn"].split(";"):
-                    if x: used.add(x)
-                fns = [x for x in a["fn"].split(";") if x]
-                fn = f"<sup>{','.join(fns)}</sup>" if fns else ""
-                cite = f'<span class="run">\\cite{{{m["cite"].replace(" ", "")}}} · {a["family"]}</span>'
-                cells = [f'<td class="name">{_html_esc(m["method"])}{fn}{cite}</td>', f"<td>{_html_esc(tex2html(m['arch']))}</td>",
-                         f"<td>{_html_esc(m['pretrain'])}</td>", f"<td><i>{_html_esc(m['venue'].replace(chr(96), chr(8217)))}</i></td>"]
-                if mode == "B":
-                    cells += [f'<td class="m">{num2(a["paper_sp"]).replace("--", "—")}</td>', f'<td class="m">{num2(a["paper_se"]).replace("--", "—")}</td>',
-                              f'<td class="m">{num2(a["paper_score"]).replace("--", "—")}</td>']
-                cells += [f'<td class="m">{_ours_html(*agg["sp"], marks["sp"].get(i))}</td>', f'<td class="m">{_ours_html(*agg["se"], marks["se"].get(i))}</td>',
-                          f'<td class="m">{_ours_html(*agg["score"], marks["score"].get(i))}</td>']
-                if mode == "B":
-                    for dd in deltas_of(a, agg):
-                        cls = "z" if dd is None else ("p" if dd >= 0 else ("nn" if dd <= -2.5 else "n"))
-                        cells.append(f'<td class="m"><span class="d {cls}">{delta_str(dd, tex=False)}</span></td>')
-                L.append("<tr>" + "".join(cells) + "</tr>")
-            L.append("</tbody></table></div>")
-            notes = [f"<sup>{k}</sup> " + _html_esc(tex2html(footnotes[k])) for k in sorted((x for x in used if x.isdigit()), key=int)]
-            L.append('<p class="pm-notes">' + " ".join(notes) + "</p>")
-            L.append("</div>")
-            out.append("\n".join(L))
+                dd = agg["score"][0] - float(a["paper_score"])
+                cls = "p" if dd >= 0 else ("nn" if dd <= -2.5 else "n")
+                cells.append(f'<td class="m"><span class="d {cls}">{delta_str(dd, tex=False)}</span></td>')
+            L.append("<tr>" + "".join(cells) + "</tr>")
+        L.append("</tbody></table></div>")
+        notes = [f"<sup>{k}</sup> " + _html_esc(tex2html(footnotes[k])) for k in sorted((x for x in used if x.isdigit()), key=int)]
+        L.append('<p class="pm-notes">' + " ".join(notes) + "</p></div>")
+        out.append("\n".join(L))
     return "\n".join(out) + "\n"
 
 def numbers_md(anchors, fam, aggs_by_table, git_sha):
@@ -423,7 +422,7 @@ def numbers_md(anchors, fam, aggs_by_table, git_sha):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--style", choices=["patchmix", "bands"], default="patchmix",
-                    help="patchmix(기본): Bae et al. Table 2 형식 옵션 A(우리만)·B(논문+우리) + OOD 표 + numbers.md + HTML 미리보기. "
+                    help="patchmix(기본): table1_ICHBI_Diff · table2_SPRSound_Diff · table3_OOD (reported | ours | ΔSc) + numbers.md + HTML 미리보기. "
                          "bands: 옛 Method/Paper/Ours/Δ 밴드 표(--band/--metrics 변형) — 파일은 저장소에 두지 않는다")
     ap.add_argument("--band", choices=["family", "disclosure"], default="family")
     ap.add_argument("--metrics", choices=["score", "all"], default="all")
@@ -446,20 +445,16 @@ def main():
                 f"% generated by scripts/paper/build_paper_tables.py --style bands --band {args.band} --metrics {args.metrics} (git {sha}); do not edit\n" + tex)
     else:
         meta = load_meta()
-        for table, name in (("A", "table_icbhi"), ("B", "table_sprsound")):
-            for mode in ("A", "B"):
-                tex, aggs = build_patchmix(anchors, fam, table, meta, mode, footnotes)
-                aggs_by_table[table] = aggs
-                (out / "tables" / f"{name}_patchmix_{mode}.tex").write_text(
-                    f"% generated by scripts/paper/build_paper_tables.py (option {mode}, git {sha}); do not edit\n"
-                    "% requires: booktabs, multirow, graphicx (\\resizebox)" + (", xcolor (\\textcolor for Δ)" if mode == "B" else "") + "; cite keys = user's bib (docs/paper/model_meta.csv `cite`)\n" + tex)
-        tex, aggs = build_table(anchors, fam, "C", "family", "all", footnotes)
-        aggs_by_table["C"] = aggs
-        (out / "tables" / "table_ood.tex").write_text(f"% generated by scripts/paper/build_paper_tables.py (OOD, git {sha}); do not edit\n" + tex)
+        for table in ("A", "B", "C"):
+            tex, aggs = build_patchmix(anchors, fam, table, meta, footnotes)
+            aggs_by_table[table] = aggs
+            (out / "tables" / f"{PM_TABLES[table][0]}.tex").write_text(
+                f"% generated by scripts/paper/build_paper_tables.py (git {sha}); do not edit\n"
+                "% requires: booktabs, multirow, graphicx (\\resizebox), xcolor (\\textcolor for ΔSc); cite keys = user's bib (docs/paper/model_meta.csv `cite`)\n" + tex)
         (out / "tables" / "preview_patchmix.html").write_text(patchmix_html(anchors, fam, meta, footnotes))
     md, mism = numbers_md(anchors, fam, aggs_by_table, sha)
     (out / "numbers.md").write_text(md)
-    print(f"style={args.style} → {out/'tables'} · numbers → {out/'numbers.md'} · mismatches {len(mism)}")
+    print(f"style={args.style} → {out/'tables'} ({', '.join(v[0] for v in PM_TABLES.values()) if args.style == 'patchmix' else 'bands'}) · numbers → {out/'numbers.md'} · mismatches {len(mism)}")
     for m in mism:
         print("  MISMATCH", m)
     sys.exit(1 if mism else 0)
