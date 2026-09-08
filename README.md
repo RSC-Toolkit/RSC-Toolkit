@@ -71,24 +71,70 @@ class MyModel(BaseRSCModel, nn.Module):
 
 계약 전문은 [`rsc_toolkit/models/base.py`](rsc_toolkit/models/base.py) 에 있다.
 학습 스텝과 검증 스텝이 같은 메서드를 부르므로, 둘을 나눠야 하면 `self.training` 으로 분기한다.
+배치 3번째 원소(meta)를 받는 모델은 `accepts_meta = ("dev", ...)` 를 선언하면 어댑터가 datamodule 의
+`meta_kind` 와 학습 시작 전에 대조해 준다(미선언이면 검사하지 않는다).
+
+### 모델만이 아니다 — 등록소 10종
+
+모델·손실·지표·옵티마이저·datamodule·raw 데이터셋·어댑터·피처 프로세서·피처 증강·meta 라벨이
+전부 같은 방식의 등록소([`rsc_toolkit/registries.py`](rsc_toolkit/registries.py))다.
+`ModelFactory.register_model_class` 는 `MODELS.register` 의 별칭이다.
+
+```python
+from torch import nn
+from rsc_toolkit.registries import LOSSES, METRICS, PROCESSORS, META_LABELS
+
+@LOSSES.register("focal")                 # configs 의 loss.name=focal
+class FocalLoss(nn.Module): ...
+
+@METRICS.register("hflung_jaccard")       # metrics 의 val: [{name: hflung_jaccard}]
+class HFLungJaccard(Metric): ...
+
+@PROCESSORS.register("hs_embed")          # data.params.features.kind=hs_embed
+class HeartSoundSSLProcessor(BaseAudioProcessor):
+    is_spectrogram = False                # True 면 학습 배치에 SpecAugment 를 걸 수 있다
+    @classmethod
+    def from_options(cls, opts, *, sampling_rate, feature_cache):   # features 블록(+ features.params)
+        return cls(ckpt=opts["params"]["ckpt"], sampling_rate=sampling_rate, feature_cache=feature_cache)
+    def get_processor_config(self):       # = 피처 캐시 키. 계산에 영향 주는 설정을 전부 넣는다
+        return {"kind": "hs_embed", "ckpt": self.ckpt, "sr": self.sampling_rate}
+
+@META_LABELS.register("hospital")         # data.params.meta_label_mode=hospital (팩토리 → item -> int)
+def build_hospital():
+    return lambda item: int(item["meta"]["hospital"])
+```
+
+커스텀 인덱스 데이터셋은 `IndexDataset` 을 상속하고 config 로 주입한다 — datamodule 을 서브클래싱할 필요가 없다:
+
+```yaml
+data:
+  params:
+    datamodule_name: index
+    index_dataset_cls: my_pkg.data.HeartSoundIndexDataset
+    index_dataset_params: { bandpass_hz: [25, 400], fade: false }   # 생성자 인자가 그대로 전달된다
+    collate_fn: my_pkg.data.my_collate                               # (선택) dotted path
+    features: { enabled: true, kind: hs_embed, params: { ckpt: /path/to/ssl.pt } }
+```
 
 등록 경로는 셋이다:
 
-1. **패키지 내부** — `rsc_toolkit/models/` 에 모듈을 두면 자동 스캔된다.
-2. **엔트리포인트** — 외부 패키지는 설치만으로 등록된다:
+1. **패키지 내부** — `rsc_toolkit/models/` 에 모듈을 두면 자동 스캔된다 (모델). 다른 종류는 허브에 lazy 로 선언한다.
+2. **엔트리포인트** — 외부 패키지는 설치만으로 등록된다. 그룹 하나로 모든 종류를 등록한다:
 
    ```toml
-   [project.entry-points."rsc_toolkit.models"]
-   my_models = "my_pkg.models"
+   [project.entry-points."rsc_toolkit.plugins"]
+   my_plugin = "my_pkg"          # import 되면 데코레이터가 전부 실행되는 모듈
    ```
 
+   (예전 그룹 `rsc_toolkit.models` 도 계속 읽는다.)
 3. **환경변수** — 아직 패키징하지 않은 로컬 모듈용:
 
    ```bash
-   RSC_TOOLKIT_PLUGINS=my_models rsc-toolkit-train --config-name ... model.name=my_model
+   RSC_TOOLKIT_PLUGINS=my_pkg rsc-toolkit-train --config-name ... model.name=my_model
    ```
 
-등록한 이름을 `model.name` 으로 넘기면 된다.
+자기 config 는 `--config-dir` 로 얹는다(학습), `rsctk datasets preprocess … --config_dir` 로 얹는다(피처 사전계산).
+등록한 이름을 `model.name` / `loss.name` / `features.kind` 등으로 넘기면 된다. 미지 이름은 가용 목록과 함께 즉시 실패한다.
 
 ## 학습·검증 루프 바꾸기
 
@@ -112,11 +158,12 @@ pytest                    # 골든 텐서 포함 전체
 
 ## 알려진 제약
 
-- 배포용 휠은 아직 검증되지 않았다 — 현재는 **editable 설치**(`pip install -e`)를 전제로 하고,
-  일부 config 가 리포 작업 디렉터리 기준 경로를 쓴다.
+- 배포용 휠은 `scripts/packaging/smoke_installed_wheel.sh` 로 검증한다(빈 venv 설치 → 저장소 밖 cwd 에서
+  import·등록소·번들 데이터·config 합성·콘솔 스크립트). config 의 상대 경로(`.datasets/…`, `outputs/…`,
+  `pretrained_models/…`)는 **실행한 작업 디렉터리** 기준이다.
 - 평가 전용 엔트리포인트가 없다. 학습은 `rsc-toolkit-train` 하나로 되지만,
   체크포인트 재평가·집계는 아직 `scripts/reproduction/` 의 스크립트가 담당한다.
-- CI 가 없다.
+- CI 는 `.github/workflows/ci.yml`(휠 스모크 + CPU 단위 테스트) — GPU 가 필요한 골든 테스트는 로컬에서 돈다.
 
 ## 라이선스
 
