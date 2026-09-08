@@ -9,7 +9,7 @@ import pathlib
 
 import pytest
 
-import rsc_toolkit.datasets as datasets_cli
+from rsc_toolkit.datasets import cli as datasets_cli  # monkeypatch 대상은 CLI 모듈 (P1-8 분리)
 
 
 class _Downloader:

@@ -92,6 +92,12 @@ META_LABELS.register_lazy("patient", "rsc_toolkit.datasets.meta_labels:build_pat
 META_LABELS.register_lazy("sa", "rsc_toolkit.datasets.meta_labels:build_sa")            # 성별×연령군 (SCL-metadata ICBHI)
 META_LABELS.register_lazy("sa_sprs", "rsc_toolkit.datasets.meta_labels:build_sa_sprs")  # gender×age_group (SCL-metadata SPRS)
 
+# ── dataset (raw 데이터셋: 다운로드·인덱스·CLI; 구 DatasetFactory 의 '_dataset' 파일명 스캔) ────────
+DATASETS.register_lazy("icbhi", "rsc_toolkit.datasets.icbhi.icbhi_dataset:ICBHIDataset")
+DATASETS.register_lazy("sprsound", "rsc_toolkit.datasets.sprsound.sprsound_dataset:SPRSoundDataset")
+DATASETS.register_lazy("hflungv1", "rsc_toolkit.datasets.hflungv1.hflungv1_dataset:HFLungV1Dataset")
+DATASETS.register_lazy("toy", "rsc_toolkit.datasets.toy_dataset:ToyDataset")  # 번들 fixture (sample_data)
+
 ALL_REGISTRIES = {
     r.kind: r
     for r in (MODELS, DATASETS, DATAMODULES, LOSSES, METRICS, OPTIMIZERS, ADAPTERS, PROCESSORS, AUGMENTATIONS, META_LABELS)

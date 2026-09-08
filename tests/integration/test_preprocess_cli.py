@@ -15,7 +15,7 @@ import pathlib
 import pandas as pd
 import pytest
 
-import rsc_toolkit.datasets as datasets_cli
+from rsc_toolkit.datasets import cli as datasets_cli  # monkeypatch 대상은 CLI 모듈 (P1-8 분리)
 from rsc_toolkit.datasets.toy_dataset import ToyDataset
 
 
