@@ -1,30 +1,10 @@
-from typing import Dict, Type
+"""하위호환 창구. 등록의 원천은 rsc_toolkit.registries.DATAMODULES 다.
 
-import lightning as L
+예전에는 여기서 논문별 datamodule 10개를 모두 최상단 import 해 수동 dict 에 적었다 — 한 모듈의
+선택 의존성(librosa 등)이 빠지면 이 파일 import 자체가 죽어 전체 학습이 막혔다. 이제 내장 항목은
+허브에 lazy 로 선언되고 첫 조회 때만 import 된다. 새 datamodule 은 허브 선언이나
+`@DATAMODULES.register("name")` 데코레이터로 등록한다.
+"""
+from rsc_toolkit.registries import DATAMODULES
 
-from ..data.index_datamodule import IndexDataModule
-from rsc_toolkit.datasets.bts_precomputed import BTSPrecomputedDataModule
-from rsc_toolkit.datasets.respirenet_chunks import RespireNetDataModule
-from rsc_toolkit.datasets.pcmcl_concat import PCMCLDataModule
-from rsc_toolkit.datasets.amsd_data import AMSDDataModule
-from rsc_toolkit.datasets.gapaug_data import GaPAugDataModule
-from rsc_toolkit.datasets.lungmix_data import LungmixDataModule
-from rsc_toolkit.datasets.protonet_data import ProtoNetDataModule
-from rsc_toolkit.datasets.domaintransfer_data import DomainTransferDataModule
-from rsc_toolkit.datasets.qlung_data import QLungDataModule
-from rsc_toolkit.datasets.btscard_sprs import BTSCARDSprsDataModule
-
-DATAMODULES: Dict[str, Type[L.LightningDataModule]] = {
-    "index": IndexDataModule,
-    "bts_precomputed": BTSPrecomputedDataModule,  # 저자 배포 training.pt/test.pt (BTS·Audio-CLAP·BTS-CARD)
-    "respirenet": RespireNetDataModule,           # RespireNet 8초 청킹 + magma 이미지 (microsoft/RespireNet)
-    "pcmcl": PCMCLDataModule,                     # PC-MCL 동적 연결·PM 쌍 학습셋 + IndexDataset 평가 (wa976/PC-MCL)
-    "amsd": AMSDDataModule,                       # AMS-D raw fbank 캐시 + 샘플별 torchaudio 마스킹/정규화 + 샘플 인덱스 meta (CcnNnn/AMS-D)
-    "gapaug": GaPAugDataModule,                   # GaP-Aug 클래스 균형 배치 샘플러(4/클래스, 500 step epoch) — 논문 명세 재구현
-    "lungmix": LungmixDataModule,
-    "protonet": ProtoNetDataModule,
-    "domaintransfer": DomainTransferDataModule,   # Domain Transfer(ICASSP 2022) 8 kHz·circular padding·splice·파형 증강               # Prototype(ICASSP 2022) 4 kHz 밴드패스·4 s 랜덤/센터 크롭 + balanced class weight                 # Lungmix 밴드패스·SPRSound 7→4 파생 라벨 (Tigerdwgth/ICASSP-2025-Lungmix, 논문 명세 재구현)
-    "qlung": QLungDataModule,
-    # BTS 계열 SPR→SPR 학습: meta7 모양 벡터를 train·val 양쪽 배치에 붙인다 (index 경로는 val 에 meta 를 안 붙인다)
-    "btscard_sprs": BTSCARDSprsDataModule,                     # QLung AQS float 를 배치 3번째 원소로 (RSC-Toolkit/QLung 46408dd)
-}
+__all__ = ["DATAMODULES"]
