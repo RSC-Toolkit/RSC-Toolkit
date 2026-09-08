@@ -173,6 +173,7 @@ def test_dfam_margin_composition_gamma_kappa():
 
 # ------------------------------------------------------------------ SpecAugment 게이트
 @needs_golden
+@pytest.mark.exact_golden  # 비트 단위 비교 — 개발 머신 전용 (CPU/BLAS/스레드 수가 다르면 마지막 자리에서 어긋난다)
 def test_specaug_batch_gate_and_masks_match_reference():
     from rsc_toolkit.augmentations.specaugment import SpecAugment
     from rsc_toolkit.methods.sgscl import apply_specaug_paper

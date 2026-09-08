@@ -37,6 +37,7 @@ def _det_fill(t):
 
 # ------------------------------------------------------------ 손실/헤드
 @needs_golden
+@pytest.mark.exact_golden  # 비트 단위 비교 — 개발 머신 전용 (CPU/BLAS/스레드 수가 다르면 마지막 자리에서 어긋난다)
 def test_projection_head_and_pafa_loss_match_reference():
     g = torch.load(GOLDEN / "pafa_head_loss.pt")
     head = ProjectionHead(768, None, 768, attention=True, norm_type="ln", proj_type="end2end")

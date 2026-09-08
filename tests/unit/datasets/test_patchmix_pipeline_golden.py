@@ -79,6 +79,7 @@ def test_cycle_to_fbank_chain_matches_reference():
 
 
 @needs_golden
+@pytest.mark.exact_golden  # 비트 단위 비교 — 개발 머신 전용 (CPU/BLAS/스레드 수가 다르면 마지막 자리에서 어긋난다)
 def test_specaugment_matches_reference_with_same_seeds():
     """
     같은 seed 에서 저자 SpecAugment([c, time, freq] 입력, 내부 transpose)와

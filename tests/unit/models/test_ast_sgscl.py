@@ -86,6 +86,7 @@ def test_sgscl_projections_unknown_target_type_raises():
 
 # ------------------------------------------------------------- 두 뷰 SpecAugment
 @needs_golden
+@pytest.mark.exact_golden  # 비트 단위 비교 — 개발 머신 전용 (CPU/BLAS/스레드 수가 다르면 마지막 자리에서 어긋난다)
 def test_two_view_specaugment_compounds_like_reference():
     """
     원본 train() 은 in-place SpecAugment 를 같은 배치에 2회 호출한다 — 두 번째

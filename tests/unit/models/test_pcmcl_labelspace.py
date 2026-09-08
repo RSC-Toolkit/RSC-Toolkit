@@ -4,6 +4,7 @@ PC-MCL 라벨 공간 테스트 — ICBHI 는 **저자 동작과 같음을 고정
 가장 중요한 것은 `test_icbhi_*` 다: 라벨 공간 추상화를 넣으면서 ICBHI 경로가 한 비트도 안 바뀌었음을 여기서 못 박는다.
 (런 단위 대조는 `test_pcmcl.py` 의 골든 테스트가 맡는다.)
 """
+import pathlib
 import pytest
 import torch
 
@@ -158,6 +159,7 @@ def test_model_requires_matching_n_cls():
         BEATsPCMCL(n_cls=7, label_space="sprsound7")     # 7 은 클래스 수이지 속성 수가 아니다
 
 
+@pytest.mark.skipif(not pathlib.Path("pretrained_models/upstream/BEATs_iter3_plus_AS2M.pt").exists(), reason="BEATs 체크포인트 없음")  # needs_beats_ckpt
 def test_pm_head_survives_in_sprsound_multilabel():
     """C 안의 핵심 — 다중라벨 경로를 유지하므로 PM(환자 일관) 헤드가 그대로 살아 있다."""
     from rsc_toolkit.models.beats_pcmcl import BEATsPCMCL

@@ -37,4 +37,6 @@ jobs:
           python -m pip install --index-url https://download.pytorch.org/whl/cpu torch==2.7.0 torchaudio==2.7.0 torchvision==0.22.0
           python -m pip install -e ".[trainer,models,dev]"
       - name: Unit tests
-        run: python -m pytest tests/unit -q -m "not slow" -p no:cacheprovider
+        # exact_golden: 비트 단위 골든 비교(SpecAugment·PAFA head 등)는 CPU/BLAS 가 다른 러너에서 마지막 자리에서 어긋난다 —
+        # 개발 머신(GPU 서버)에서 돈다. 사전학습 체크포인트·실데이터가 필요한 테스트는 각자 skipif 로 건너뛴다.
+        run: python -m pytest tests/unit -q -m "not slow and not exact_golden" -p no:cacheprovider
