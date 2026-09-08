@@ -365,6 +365,12 @@ class IndexDataModule(L.LightningDataModule):
 
         feature_cache = FeatureCache(cache_dir=cache_dir)
         fp = self._build_feature_processor(feature_cache)
+        if getattr(fp, "feature_cache", None) is None:
+            # 캐시를 쓰지 않는 프로세서(waveform 등 — from_options 가 feature_cache=None 으로 만든다)는 캐시 키도 체인 대장도
+            # 필요 없다. 예전엔 여기서 무조건 configure 해 공용 캐시 디렉터리의 대장과 대조했고, 다른 waveform config
+            # (다른 길이·리샘플 규칙)가 남긴 대장과 어긋나면 **캐시를 읽지도 않는 학습**이 "체인 불일치"로 죽었다(09-01 리뷰 F, GaP-Aug 재발).
+            logger.debug("features.kind=%s 는 캐시를 쓰지 않는다 — 캐시 키·체인 대장 생략", self.features_cfg.kind)
+            return fp
         feature_cache.configure(fp.get_processor_config(), processor_name=fp.__class__.__name__,
                                 audio_chain=self._audio_chain())
         return fp

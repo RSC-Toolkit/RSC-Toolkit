@@ -60,6 +60,53 @@ scripts/eval.sh outputs/bts/icbhi-bts-s1                               # 셸 래
 run 디렉터리의 hydra 스냅샷으로 학습 때와 같은 팩토리에서 모델·데이터를 다시 세운다. 학습 산출물은 읽기만 하고
 (쓰기는 샌드박스), `best.json` 이 있으면 PASS/MISMATCH 를 판정한다. 여러 run 전수 검증은 `scripts/verify_paper_weights.sh`.
 
+## 논문 재현 레시피 — 모델·데이터별 실행법
+
+모든 재현은 `scripts/train.sh <config> [override…]` 한 줄이다. `<config>` 가 논문(모델 계열)과 데이터셋을 정하고,
+같은 config 안의 변형(백본·method·뷰)은 override 로 고른다. 결과는 `outputs/<계열>/<run.name>/best.pth·best.json`,
+재평가는 `scripts/eval.sh outputs/<계열>/<run.name>`. 아래 표의 run.name 은 논문 표(`docs/results_master.csv`)가 쓰는
+이름이며 `-s<seed>` 로 끝난다(seed 1–5). `GPU=<n>` 으로 카드를 고른다.
+
+```bash
+# 예: Patch-Mix CL 을 ICBHI 에서 seed 1 로 학습하고, 끝나면 그 weight 를 다시 평가
+GPU=0 scripts/train.sh patchmix_icbhi model.params.method=patchmix_cl loss=cross_entropy seed=1 run.name=icbhi-patchmix-cl-s1
+GPU=0 scripts/eval.sh  outputs/patchmix/icbhi-patchmix-cl-s1
+```
+
+| 모델 (등록 이름) | ICBHI 2017 (공식 60/40, 4-class) | SPRSound 2022 (inter-patient, 7-class) |
+|---|---|---|
+| AST fine-tuning (`ast_patchmix`) | `patchmix_icbhi model.params.method=ce` | `patchmix_sprs` (기본 ce) |
+| Patch-Mix CE / CL (`ast_patchmix`) | `patchmix_icbhi model.params.method=patchmix` / `…=patchmix_cl` (+`loss=cross_entropy`) | `patchmix_sprs model.params.method=patchmix_cl` |
+| SG-SCL / DAT (`ast_sgscl`) | `sgscl_icbhi` (기본 sgscl; `model.params.con_feat=feat1` 이 표의 행) / `model.params.method=dat` | `sgscl_sprs` |
+| ResNet18/34·EfficientNet-B0·CNN6 SFT (`resnet18_sft` 등) | `sgscl_nonast_icbhi model.name=resnet18_sft` (`resnet34_sft`, `efficientnet_b0_sft`, `cnn6_sft`) | `sgscl_nonast_sprs model.name=…` |
+| SG-SCL on non-AST (`*_sft`) | `sgscl_nonast_icbhi model.name=cnn6_sft model.params.method=sgscl loss=cross_entropy` | — |
+| SCL w/ metadata: CE / Hybrid / M-SCL (`cnn6_sclmeta`) | `sclmeta_icbhi model.params.method=ce` / `…=hybrid` / 2단계: `sclmeta_icbhi_pretrain` → `sclmeta_icbhi_linear model.params.encoder_ckpt=<pretrain 의 final_state.pth>` | `sclmeta_sprs …` / `sclmeta_sprs_pretrain` → `sclmeta_sprs_linear` |
+| Audio-CLAP fine-tuning (`audioclap`) | `bts_icbhi model=audioclap` | `bts_sprs model=audioclap` |
+| BTS (`bts`) | `bts_icbhi` | `bts_sprs` |
+| BTS-CARD (`bts_card`) | `btscard_icbhi trainer.params.max_epochs=30 optimizer.name=adamw` (논문 설정) / `btscard_icbhi` (스크립트 설정) | `btscard_sprs` |
+| BEATs fine-tuning / PAFA (`beats`) | `pafa_icbhi model.params.method=ce` / `pafa_icbhi` (pafa) | `pafa_sprs model.params.method=ce` / `pafa_sprs` |
+| PC-MCL (`beats_pcmcl`, `ast_pcmcl`) | `pcmcl_icbhi` / `pcmcl_ast_icbhi` | `pcmcl_sprs` |
+| Lung-SRAD: FT / SAR / dual-axis (`dass_lungsrad`) | `lungsrad_icbhi model.params.method=ce` / `…=ce_blur` / `…=patchmix_cl model.params.cl_mode=dual model.params.mix_layout=as_paper` | `lungsrad_sprs …` |
+| QLung AST / Audio-CLAP (`ast_qlung`, `clap_qlung`) | `qlung_icbhi` / `qlung_clap_icbhi` | `qlung_sprs` |
+| AMS-D (`ast_amsd`) | `amsd_icbhi` (기준선 `model.params.method=baseline`) | `amsd_sprs` |
+| ADD-RSC (`ast_addrsc`) | `addrsc_icbhi` (저자 스플릿 재현: `data.params.split_file=rsc_toolkit/datasets/icbhi/data/addrsc_random1_split.txt`) | `addrsc_sprs` |
+| LungAdapter (`ast_lungadapter`) | `lungadapter_icbhi` (ablation `model.params.use_res_adapter=false` 등) | `lungadapter_sprs` |
+| LoRA-RSC (`ast_lora_rsc`) | `lorarsc_icbhi` | `lorarsc_sprs` |
+| LungMix non-linear / none (`ast_lungmix`) | `lungmix_icbhi` / `model.params.variant=none` | `lungmix_sprs` |
+| GaP-Aug — CNN14 (`cnn14_gapaug`) | `gapaug_icbhi` (naive 기준선 `model.params.method=naive`) | — |
+| Domain Transfer — ResNeSt (`resnest_ibn_dt`) | `domaintransfer_icbhi` (기준선 `model.params.baseline=true model.params.mixup_alpha=0 data.params.splice_per_class=0 …`) | `domaintransfer_sprs` |
+| Prototype — CNN8-Pt (`protonet`) | `protonet_icbhi` (`model.params.method=cnn8` 기준선) | `protonet_sprs` |
+| RespireNet — CNN / +CBA (`respirenet`) | `respirenet_icbhi data.params.split_mode=official data.params.pad_seed=1 data.params.aug_seed=1` / `+ data.params.aug_scale=1 data.params.cba_seed=1` (저자 fold-4: `split_mode` 생략) | — |
+| MVST — 뷰 5개 + 융합 (`ast_mvst`) | `mvst_icbhi model.params.view=16` (16·32·64·128·256 각각) → `scripts/reproduction/aggregate_mvst_results.py` 로 융합 | `mvst_sprs model.params.view=…` |
+| M2D base / M2D-X / M2D-Resp (`m2d`) | `m2d_icbhi` / `model.params.pretrained_path=pretrained_models/upstream/m2d/<ckpt>` (M2D-Resp 는 `model.params.input_size=[80,608]` 추가) | `m2d_sprs …` |
+| OPERA-CT frozen / fine-tune (`opera_ct`) | `opera_embc_icbhi` / `opera_ft_icbhi` | `opera_embc_sprs` / `opera_ft_sprs` |
+| DDE-MAE (`audiomae_dde_cls`; 논문 표 제외) | `dde_icbhi_b2` / `dde_icbhi_stage1` → `dde_icbhi_stage2 model.params.encoder_ckpt=<stage1 final_state.pth>` | — |
+
+`seed=N run.name=<표의 이름>-sN` 을 항상 붙인다. 위 config 들이 쓰는 데이터 설정은 `rsc_toolkit/configs/data/`(ICBHI `icbhi_*`,
+SPRSound `sprsound_*`)에 있고, 사전학습 가중치는 `pretrained_models/upstream/` 또는 `RSCTK_PRETRAINED_ROOT` 아래에 둔다
+(없으면 AST·PANNs 는 자동 다운로드, BEATs·DASS·M2D·OPERA·AudioMAE 는 안내 메시지로 멈춘다).
+스모크(1 epoch·2 배치)는 `scripts/train.sh <config> trainer.params.max_epochs=1 ++trainer.params.limit_train_batches=2 ++trainer.params.limit_val_batches=2 run.name=smoke-…`.
+
 ## 자기 모델 붙이기
 
 **툴킷을 포크할 필요가 없다.** `BaseRSCModel` 을 상속하고 `training_forward` 하나만
