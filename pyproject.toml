@@ -1,5 +1,7 @@
 [build-system]
-requires = ["setuptools>=61"]
+# `license = "MIT"`(PEP 639 SPDX 문자열)·`license-files` 는 setuptools 77 부터 인정된다 —
+# 그 아래 버전으로 --no-build-isolation 빌드하면 "project.license must be valid exactly by one definition" 로 실패한다.
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
