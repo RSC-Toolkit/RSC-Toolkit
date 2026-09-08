@@ -321,6 +321,7 @@ def test_train_collate_and_adapter_contract(train_ds):
     assert int(ssl[0]) == -1 and int(ssl[1]) == -1 and int(ssl[2]) in (0, 1)
 
 
+@pytest.mark.skipif(not pathlib.Path("pretrained_models/upstream/BEATs_iter3_plus_AS2M.pt").exists(), reason="BEATs 체크포인트 없음")
 def test_multilabel_model_rejects_integer_labels_in_training_mode():
     """P2-7: 학습 모드에서 정수 라벨(datamodule concat_single + label_mode=multilabel 오조합)은 조용히 검증 경로로
     흐르지 않고 TypeError 로 멈춘다. 검증 모드의 정수 라벨(one-hot 경로)은 그대로다."""
