@@ -131,30 +131,19 @@ class LungmixDataModule(IndexDataModule):
         self.lungmix_label_map = str(cfg.get("label_map", "none"))
         self.emit_valid_len = bool(cfg.get("emit_valid_len", True))    # train 배치 meta_labels = 원 구간 길이 (mix_stage raw 기본 경로)
 
-    def _wrap_with_features(self, base_ds, *, feature_transform=None, meta_label_fn=None):
-        if self.emit_valid_len and meta_label_fn is None and base_ds is getattr(self, "train_ds", None):
+    def _wrap_with_features(self, base_ds, *, feature_transform=None, meta_label_fn=None, split_role=None):
+        if split_role is None:  # 직접 호출(setup 밖) 하위호환 — 예전 identity 비교
+            split_role = "train" if base_ds is getattr(self, "train_ds", None) else "val"
+        if self.emit_valid_len and meta_label_fn is None and split_role == "train":
             meta_label_fn = valid_len_meta
-        return super()._wrap_with_features(base_ds, feature_transform=feature_transform, meta_label_fn=meta_label_fn)
+        return super()._wrap_with_features(base_ds, feature_transform=feature_transform, meta_label_fn=meta_label_fn,
+                                           split_role=split_role)
 
-    def _build_index_dataset_single(self, *, split: str):
-        if self.index_csv is None:
-            self.index_csv = self._default_index_path()
-        if not self.index_csv.exists():
-            raise FileNotFoundError(f"Index csv not found: {self.index_csv}")
-        kwargs: Dict[str, Any] = dict(
-            index_csv=self.index_csv, data_root=self.raw_data_directory, sampling_rate=self.sampling_rate,
-            sample_level=self.sample_level, split=split, audio_preprocessor=self.audio_preprocessor,
-            bandpass=self.lungmix_bandpass, label_map=self.lungmix_label_map,
-        )
-        if not self.fade:
-            kwargs["fade"] = False
-        if self.resample_after_slice:
-            kwargs["resample_after_slice"] = True
-        if self.time_unit != "s":
-            kwargs["time_unit"] = self.time_unit
-        if self.split_file is not None:
-            kwargs["split_file"] = self.split_file
-        return self.index_dataset_cls(**kwargs)
+    def _index_dataset_kwargs(self, *, split: str) -> Dict[str, Any]:
+        # 부모의 조립(fade/resample_after_slice/time_unit/split_file 규칙 포함)에 lungmix 전용 인자만 더한다
+        kwargs = super()._index_dataset_kwargs(split=split)
+        kwargs.update(bandpass=self.lungmix_bandpass, label_map=self.lungmix_label_map)
+        return kwargs
 
 
 def sprsound_4class_counts(metadata_csv) -> Dict[str, Dict[int, int]]:

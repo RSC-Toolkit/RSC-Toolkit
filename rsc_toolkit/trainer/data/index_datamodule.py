@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field, asdict
 from pathlib import Path
-from typing import Optional, Dict, Any, List, Tuple, Sequence, Union
+from typing import Optional, Dict, Any, Callable, List, Tuple, Sequence, Union
 import importlib
 import logging
 import time
@@ -83,6 +83,15 @@ class IndexDataModule(L.LightningDataModule):
     batch[2](meta) 사이드채널 선언: `meta_kind` 는 이 datamodule 이 배치 3번째 원소로 무엇을 보내는지
     이름 붙인 것이다 (범용 경로는 `meta_label_mode` 그대로; 서브클래스는 클래스 속성으로 덮어쓴다 —
     예: "qlung_aqs", "pcmcl_ssl_label", "bts_meta7"). 모델 쪽 `accepts_meta` 와 어댑터 setup 에서 대조된다.
+
+    확장 통로 (전부 additive — 기본값이면 예전 코드 경로와 동일):
+    - `index_dataset_params`: 커스텀 `index_dataset_cls` 생성자에 그대로 넘길 추가 인자 dict
+      (예전에는 클래스 속성 주입·메서드 복붙·`__new__` 바꿔치기로 우회했다).
+    - `collate_fn`: dotted path 또는 callable — 세 dataloader 의 collate 를 바꾼다 (기본 `_tuple_collate`).
+    - `dataset_wrapper_cls`: dotted path 또는 클래스 — 피처 래퍼(`IndexFeatureDataset`) 교체.
+      `(index_ds, feature_processor, feature_transform=, meta_label_fn=)` 시그니처를 따라야 한다.
+    서브클래스용 훅: `_index_dataset_kwargs(split)` 로 생성 인자를 더하고, `_wrap_with_features(..., split_role=)`
+    로 train/val/test 역할을 명시적으로 받는다 (`base_ds is self.train_ds` identity 비교 불필요).
     """
 
     @property
@@ -126,6 +135,10 @@ class IndexDataModule(L.LightningDataModule):
         resample_after_slice: bool = False,
         time_unit: str = "s",
         raw_data_subdir: Optional[str] = None,   # 원음이 data_dir 하위 폴더에 있을 때 (예: SPRSound 'Classification')
+        # 확장 통로 (P1-9, additive)
+        index_dataset_params: Optional[dict] = None,
+        collate_fn: Optional[Union[str, Callable]] = None,
+        dataset_wrapper_cls: Optional[Union[str, type]] = None,
     ):
         super().__init__()
 
@@ -185,6 +198,14 @@ class IndexDataModule(L.LightningDataModule):
         self.fade = bool(fade)
         self.resample_after_slice = bool(resample_after_slice)
         self.time_unit = str(time_unit)
+
+        self.index_dataset_params: Dict[str, Any] = dict(index_dataset_params or {})
+        self.collate_fn: Callable = (
+            _import_from_path(collate_fn) if isinstance(collate_fn, str) else (collate_fn or _tuple_collate)
+        )
+        self.dataset_wrapper_cls = (
+            _import_from_path(dataset_wrapper_cls) if isinstance(dataset_wrapper_cls, str) else dataset_wrapper_cls
+        )
 
         # set later
         self.index_csv: Optional[Path] = None
@@ -275,12 +296,11 @@ class IndexDataModule(L.LightningDataModule):
         filename = self.index_filename or f"index_{self.sample_level}.csv"
         return (self.outputs_directory / "index" / filename).resolve()
 
-    def _build_index_dataset_single(self, *, split: str):
-        if self.index_csv is None:
-            self.index_csv = self._default_index_path()
-        if not self.index_csv.exists():
-            raise FileNotFoundError(f"Index csv not found: {self.index_csv}")
-
+    def _index_dataset_kwargs(self, *, split: str) -> Dict[str, Any]:
+        """
+        `index_dataset_cls(**kwargs)` 의 인자 조립 — 서브클래스는 이것을 override 해 dict 에 더하기만 하면 된다
+        (예전엔 이 블록을 통째로 복붙했다). config 의 `index_dataset_params` 가 마지막에 덮어쓴다.
+        """
         kwargs: Dict[str, Any] = dict(
             index_csv=self.index_csv,
             data_root=self.raw_data_directory,
@@ -298,7 +318,15 @@ class IndexDataModule(L.LightningDataModule):
             kwargs["time_unit"] = self.time_unit
         if self.split_file is not None:
             kwargs["split_file"] = self.split_file
-        return self.index_dataset_cls(**kwargs)
+        kwargs.update(self.index_dataset_params)
+        return kwargs
+
+    def _build_index_dataset_single(self, *, split: str):
+        if self.index_csv is None:
+            self.index_csv = self._default_index_path()
+        if not self.index_csv.exists():
+            raise FileNotFoundError(f"Index csv not found: {self.index_csv}")
+        return self.index_dataset_cls(**self._index_dataset_kwargs(split=split))
 
     def _build_index_dataset(self, *, splits: Sequence[str]):
         splits = list(splits)
@@ -331,7 +359,8 @@ class IndexDataModule(L.LightningDataModule):
         cls = self._feature_processor_cls()
         return cls.from_options(self._feature_options(), sampling_rate=self.sampling_rate, feature_cache=feature_cache)
 
-    def _wrap_with_features(self, base_ds, *, feature_transform=None, meta_label_fn=None):
+    def _make_feature_processor_with_cache(self):
+        """피처 캐시(디렉터리·키·체인 대장)를 구성한 프로세서 — 래퍼 종류와 무관한 공통 부분."""
         cache_dir = (
             Path(self.features_cfg.cache_dir)
             if self.features_cfg.cache_dir
@@ -343,8 +372,16 @@ class IndexDataModule(L.LightningDataModule):
         fp = self._build_feature_processor(feature_cache)
         feature_cache.configure(fp.get_processor_config(), processor_name=fp.__class__.__name__,
                                 audio_chain=self._audio_chain())
+        return fp
 
-        return IndexFeatureDataset(base_ds, fp, feature_transform=feature_transform, meta_label_fn=meta_label_fn)
+    def _wrap_with_features(self, base_ds, *, feature_transform=None, meta_label_fn=None, split_role: Optional[str] = None):
+        """
+        인덱스 데이터셋을 피처 래퍼로 감싼다. `split_role` ∈ {"train","val","test"} 는 setup 이 넘긴다 —
+        서브클래스는 `base_ds is self.train_ds` 같은 identity 비교 대신 이것을 보라.
+        """
+        fp = self._make_feature_processor_with_cache()
+        wrapper = self.dataset_wrapper_cls or IndexFeatureDataset
+        return wrapper(base_ds, fp, feature_transform=feature_transform, meta_label_fn=meta_label_fn)
 
     def _resolve_feature_cache_dir(self, cache_dir: str) -> "Path":
         """
@@ -526,9 +563,9 @@ class IndexDataModule(L.LightningDataModule):
 
                     meta_label_fn = build_meta_label_fn(self.meta_label_mode)
                 self.train_ds = self._wrap_with_features(
-                    self.train_ds, feature_transform=train_transform, meta_label_fn=meta_label_fn
+                    self.train_ds, feature_transform=train_transform, meta_label_fn=meta_label_fn, split_role="train"
                 )
-                self.val_ds = self._wrap_with_features(self.val_ds, feature_transform=None)
+                self.val_ds = self._wrap_with_features(self.val_ds, feature_transform=None, split_role="val")
 
             if self.features_cfg.enabled and self.feature_precompute:
                 if not self._is_global_zero():
@@ -540,7 +577,7 @@ class IndexDataModule(L.LightningDataModule):
         if stage in (None, "test"):
             self.test_ds = self._build_index_dataset(splits=self.test_splits)
             if self.features_cfg.enabled:
-                self.test_ds = self._wrap_with_features(self.test_ds)
+                self.test_ds = self._wrap_with_features(self.test_ds, split_role="test")
             if self.features_cfg.enabled and self.feature_precompute:
                 if not self._is_global_zero():
                     logger.info("Skipping feature cache warmup on non-global-zero rank")
@@ -556,7 +593,7 @@ class IndexDataModule(L.LightningDataModule):
             shuffle=self.shuffle_train,
             drop_last=self.drop_last_train,
             num_workers=self.num_workers,
-            collate_fn=_tuple_collate,
+            collate_fn=self.collate_fn,
             pin_memory=self.pin_memory,
             persistent_workers=self.persistent_workers and self.num_workers > 0,
         )
@@ -569,7 +606,7 @@ class IndexDataModule(L.LightningDataModule):
             batch_size=self.batch_size,
             shuffle=False,
             num_workers=self.num_workers,
-            collate_fn=_tuple_collate,
+            collate_fn=self.collate_fn,
             pin_memory=self.pin_memory,
             persistent_workers=self.persistent_workers and self.num_workers > 0,
         )
@@ -582,7 +619,7 @@ class IndexDataModule(L.LightningDataModule):
             batch_size=self.batch_size,
             shuffle=False,
             num_workers=self.num_workers,
-            collate_fn=_tuple_collate,
+            collate_fn=self.collate_fn,
             pin_memory=self.pin_memory,
             persistent_workers=self.persistent_workers and self.num_workers > 0,
         )

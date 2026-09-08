@@ -195,6 +195,7 @@ class QLungDataModule(IndexDataModule):
     meta_kind = "qlung_aqs"  # batch[2] = AQS float (B,) — ast_qlung/clap_qlung 의 accepts_meta 와 대조
 
     def __init__(self, *args, qlung: Optional[dict] = None, label_map: Optional[str] = None, **kwargs):
+        kwargs.setdefault("collate_fn", qlung_collate)  # AQS float64 를 batch[2] 로 (예전엔 loader 3종을 복붙 override)
         super().__init__(*args, **kwargs)
         cfg = dict(qlung or {})
         self.aqs_cfg = AQSConfig(**cfg)
@@ -213,40 +214,17 @@ class QLungDataModule(IndexDataModule):
         return (f"sr{self.sampling_rate}_len{self.desired_length_sec:g}_{self.pad_type}_fade{int(self.fade)}"
                 f"_ras{int(self.resample_after_slice)}_{self.time_unit}")
 
-    def _build_index_dataset_single(self, *, split: str):
-        if self.index_csv is None:
-            self.index_csv = self._default_index_path()
-        if not self.index_csv.exists():
-            raise FileNotFoundError(f"Index csv not found: {self.index_csv}")
-        kwargs: Dict[str, Any] = dict(
-            index_csv=self.index_csv, data_root=self.raw_data_directory, sampling_rate=self.sampling_rate,
-            sample_level=self.sample_level, split=split, audio_preprocessor=self.audio_preprocessor,
-            aqs=self.aqs_cfg, acoustic_cache=self.acoustic_cache, label_map=self.label_map,
-        )
-        if not self.fade:
-            kwargs["fade"] = False
-        if self.resample_after_slice:
-            kwargs["resample_after_slice"] = True
-        if self.time_unit != "s":
-            kwargs["time_unit"] = self.time_unit
-        if self.split_file is not None:
-            kwargs["split_file"] = self.split_file
-        return self.index_dataset_cls(**kwargs)
+    def _index_dataset_kwargs(self, *, split: str) -> Dict[str, Any]:
+        # 부모의 조립(fade/resample_after_slice/time_unit/split_file 규칙 포함)에 QLung 전용 인자만 더한다
+        kwargs = super()._index_dataset_kwargs(split=split)
+        kwargs.update(aqs=self.aqs_cfg, acoustic_cache=self.acoustic_cache, label_map=self.label_map)
+        return kwargs
 
-    def _wrap_with_features(self, base_ds, *, feature_transform=None, meta_label_fn=None):
-        from torch.utils.data import ConcatDataset
-        from rsc_toolkit.datasets.feature_cache import FeatureCache
-
-        cache_dir = pathlib.Path(self.features_cfg.cache_dir) if self.features_cfg.cache_dir else (self.outputs_directory / "features_cache")
-        cache_dir.mkdir(parents=True, exist_ok=True)
-        feature_cache = FeatureCache(cache_dir=cache_dir)
-        fp = self._build_feature_processor(feature_cache)
-        feature_cache.configure(fp.get_processor_config(), processor_name=fp.__class__.__name__,
-                                audio_chain=self._audio_chain())
-        attach = True if base_ds is getattr(self, "train_ds", None) else self.aqs_cfg.attach_val
-        if isinstance(base_ds, ConcatDataset):
-            # 여러 split 결합(SPRSound train+test) — 캐시 웜업이 index_ds.df 를 못 보므로 IndexFeatureDataset 과 같은 fallback 사용
-            pass
+    def _wrap_with_features(self, base_ds, *, feature_transform=None, meta_label_fn=None, split_role=None):
+        fp = self._make_feature_processor_with_cache()  # 캐시 디렉터리·키·체인 대장은 부모와 동일
+        if split_role is None:  # 직접 호출(setup 밖) 하위호환 — 예전 identity 비교
+            split_role = "train" if base_ds is getattr(self, "train_ds", None) else "val"
+        attach = True if split_role == "train" else self.aqs_cfg.attach_val
         return _QLungFeatureDataset(base_ds, fp, feature_transform=feature_transform, attach_aqs=attach)
 
     def _each_index_ds(self, ds) -> List[QLungAQSIndexDataset]:
@@ -288,23 +266,4 @@ class QLungDataModule(IndexDataModule):
         if stage in (None, "test"):
             self._precompute_aqs(self._build_index_dataset(splits=self.test_splits), "test")
         super().setup(stage)
-
-    def _loader(self, ds, shuffle: bool, drop_last: bool) -> DataLoader:
-        return DataLoader(ds, batch_size=self.batch_size, shuffle=shuffle, drop_last=drop_last, num_workers=self.num_workers,
-                          collate_fn=qlung_collate, pin_memory=self.pin_memory,
-                          persistent_workers=self.persistent_workers and self.num_workers > 0)
-
-    def train_dataloader(self) -> DataLoader:
-        if self.train_ds is None:
-            raise RuntimeError("train_ds is None. Did you forget to call setup('fit')?")
-        return self._loader(self.train_ds, self.shuffle_train, self.drop_last_train)
-
-    def val_dataloader(self) -> DataLoader:
-        if self.val_ds is None:
-            raise RuntimeError("val_ds is None. Did you forget to call setup('fit')?")
-        return self._loader(self.val_ds, False, False)
-
-    def test_dataloader(self) -> DataLoader:
-        if self.test_ds is None:
-            raise RuntimeError("test_ds is None. Did you forget to call setup('test')?")
-        return self._loader(self.test_ds, False, False)
+    # dataloader 3종은 부모 그대로 (collate_fn=qlung_collate 는 __init__ 에서 주입)

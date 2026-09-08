@@ -117,8 +117,8 @@ class AMSDDataModule(IndexDataModule):
     def _is_train_base(self, base_ds) -> bool:
         return _splits_of(base_ds) == [str(s) for s in self.train_splits]
 
-    def _wrap_with_features(self, base_ds, *, feature_transform=None, meta_label_fn=None):
-        inner = super()._wrap_with_features(base_ds, feature_transform=None, meta_label_fn=None)
+    def _wrap_with_features(self, base_ds, *, feature_transform=None, meta_label_fn=None, split_role=None):
+        inner = super()._wrap_with_features(base_ds, feature_transform=None, meta_label_fn=None, split_role=split_role)
         training = self._is_train_base(base_ds)  # split 이름으로 명시 판정 (setup() 호출 순서에 의존하지 않음)
         return AMSDFeatureDataset(inner, training=training, freqm=self.amsd_freqm, timem=self.amsd_timem,
                                   mean=self.amsd_mean, std=self.amsd_std, return_index=training and self.amsd_return_index)
