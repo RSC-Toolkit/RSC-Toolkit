@@ -21,3 +21,5 @@ params:
   batch_size: 64
   num_workers: 8
   weighted_sampler: true       # WeightedRandomSampler(1/class_prob) — train.py:114-118
+  aug_scale: null              # CBA(원본 --aug_scale). null = 끔(배포 ckpt 조건). 1 = 비정상 3클래스를 normal 수까지 증식(가정, 2026-09-08)
+  cba_seed: null               # CBA 표본 seed (null → aug_seed)

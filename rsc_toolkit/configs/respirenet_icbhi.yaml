@@ -3,7 +3,9 @@
 #
 #   80/20 fold-4 (원본·ckpt 기준, 목표 66.2~67.1): rsctk-train --config-name respirenet_icbhi run.name=icbhi-respirenet-fold4-s1 seed=1
 #   공식 60/40 (툴킷 표준, 목표 55.2~55.7)      : ... data.params.split_mode=official run.name=icbhi-respirenet-official-s1
-# CBA(aug_scale)·장치별 FT 는 재현 범위 밖 (docs/REPRODUCTION_TARGETS.md).
+#   CNN+CBA+BRC 공식 60/40 (가정 런, 2026-09-08 사용자 결정; 목표 README 55.7):
+#       ... data.params.split_mode=official data.params.aug_scale=1 data.params.cba_seed=1 run.name=icbhi-respirenet-cba-s1
+# 장치별 FT 는 재현 범위 밖 (docs/REPRODUCTION_TARGETS.md).
 defaults:
   - model: respirenet
   - data: icbhi_respirenet

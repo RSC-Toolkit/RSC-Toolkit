@@ -10,7 +10,11 @@ identifier = f"{file}_{cycle_idx}_{label}" 로 청크→cycle 다수결 집계.
 - 패딩 방향 난수를 seed 있는 random.Random 으로 (원본은 무시드 전역 random → run 마다 특징이 달라짐).
 - 리샘플 res_type 을 인자로 (기본 kaiser_best = 저자 환경 librosa 0.8 기본값; librosa 0.11 기본은 soxr_hq).
 스플릿: 환자 fold 파일(80/20, test_fold) 또는 ICBHI 공식 60/40 (official_split.txt, 원본에는 없는 경로 — 툴킷 확장).
-CBA(concatenation augmentation)는 배포 코드에서 KeyError 로 실행 불가라 이식하지 않았다 (문서 참고).
+CBA(concatenation-based augmentation, 원본 new_augment) — 2026-09-08 사용자 결정으로 이식 (concat_augment).
+  배포 코드는 (a) range(float) TypeError, (b) 이어 붙인 파일명 "A-B" 의 장치 표 KeyError 로 실행 불가였다(이슈 #1).
+  (a) 는 int 강제, (b) 는 장치 표가 stage-1 학습에 쓰이지 않으므로(출력·stetho 필터 전용) 생략.
+  scale 값은 논문·README·스크립트 어디에도 없어 **가정**(scale=1: 비정상 3클래스를 normal 수까지 증식, normal 증식 0).
+  RNG 호출 순서(random()/randint)를 원본과 동일하게 유지 → tests/unit/datasets/test_respirenet_cba.py 에서 원본 함수와 동치 검증.
 """
 from __future__ import annotations
 
@@ -98,6 +102,35 @@ def rollAudio(audio: np.ndarray, np_rng: np.random.RandomState) -> np.ndarray:
     return np.roll(audio, pivot, axis=0)
 
 
+# ---------------------------------------------------------------- CBA (원본 image_dataloader.py:124-236 new_augment)
+_CBA_PAIRS = {  # 클래스별 (누적 확률 상한, (첫 사이클 클래스, 둘째 사이클 클래스)) — 원본 하드코딩 그대로
+    1: [(0.6, (1, 1)), (0.8, (1, 0)), (1.0, (0, 1))],
+    2: [(0.6, (2, 2)), (0.8, (2, 0)), (1.0, (0, 2))],
+    3: [(0.5, (3, 3)), (0.7, (1, 2)), (0.8, (2, 1)), (0.9, (3, 0)), (1.0, (0, 3))],
+}
+
+
+def concat_augment(classwise: Sequence[Sequence[tuple]], scale: int, rng: random.Random) -> List[tuple]:
+    """원본 new_augment(scale) 의 충실 이식. classwise[c] = [(audio, label, file_name, cycle_idx), ...].
+    클래스 c 를 scale*len(normal) 개까지 두 사이클 연결로 증식(부족분만; 음수면 0). 반환 [(audio, c, "A-B", idx), ...].
+    RNG 호출 순서를 원본(전역 random)과 동일하게: normal 은 randint×2, 나머지는 random() → randint(i) → randint(j)."""
+    scale = int(scale)
+    out: List[tuple] = []
+    n_normal = len(classwise[0])
+    for idx in range(scale * n_normal - n_normal):                       # normal_i + normal_j
+        i = rng.randint(0, n_normal - 1); j = rng.randint(0, n_normal - 1)
+        a, b = classwise[0][i], classwise[0][j]
+        out.append((np.concatenate([a[0], b[0]]), 0, a[2] + "-" + b[2], idx))
+    for c in (1, 2, 3):
+        for idx in range(scale * n_normal - len(classwise[c])):
+            p = rng.random()
+            ca, cb = next(pair for hi, pair in _CBA_PAIRS[c] if p < hi)
+            i = rng.randint(0, len(classwise[ca]) - 1); j = rng.randint(0, len(classwise[cb]) - 1)
+            a, b = classwise[ca][i], classwise[cb][j]
+            out.append((np.concatenate([a[0], b[0]]), c, a[2] + "-" + b[2], idx))
+    return out
+
+
 # ---------------------------------------------------------------- 스플릿
 def read_patient_folds(folds_file) -> dict:
     out = {}
@@ -137,6 +170,8 @@ class RespireNetChunkDataset(Dataset):
         mean: Optional[Sequence[float]] = DEFAULT_MEAN,
         std: Optional[Sequence[float]] = DEFAULT_STD,
         stetho_id: int = -1,
+        aug_scale: Optional[float] = None,     # CBA 배수 (원본 --aug_scale; None/0 = 끔). 학습셋에만.
+        cba_seed: Optional[int] = None,        # CBA 표본 RNG seed (None → aug_seed). 원본은 무시드 전역 random.
     ):
         self.data_dir = pathlib.Path(data_dir)
         self.train_flag = bool(train_flag)
@@ -161,10 +196,9 @@ class RespireNetChunkDataset(Dataset):
             raise ValueError(f"split_mode must be fold|official, got {split_mode!r}")
         self.filenames = [f for f in filenames if keep(f) and (stetho_id < 0 or self.file_to_device[f] == stetho_id)]
 
-        rng = random.Random(pad_seed)
-        self.audio_data: List[Tuple[np.ndarray, int, str, int, int, float]] = []  # chunk,label,file,cycle_idx,chunk_idx,pad_times
-        self.identifiers: List[str] = []
-        self.cycle_ids: List[str] = []       # cycle 단위 identifier (다수결 대상)
+        # 1) cycle 추출 (원본 cycle_list / classwise_cycle_list)
+        cycles: List[tuple] = []                       # (audio, label, file_name, cycle_idx)
+        classwise: List[List[tuple]] = [[], [], [], []]
         for file_name in self.filenames:
             ann = pd.read_csv(self.data_dir / f"{file_name}.txt", names=["Start", "End", "Crackles", "Wheezes"], delimiter="\t")
             data, _ = librosa.load(str(self.data_dir / f"{file_name}.wav"), sr=self.sample_rate, res_type=self.res_type)
@@ -172,18 +206,35 @@ class RespireNetChunkDataset(Dataset):
                 row = ann.loc[cycle_idx]
                 chunk = slice_data(row["Start"], row["End"], data, self.sample_rate)
                 label = get_label(row["Crackles"], row["Wheezes"])
-                cid = f"{file_name}_{cycle_idx}_{label}"
-                self.cycle_ids.append(cid)
-                for padded, chunk_idx, pad_times in split_and_pad(chunk, self.desired_length, self.sample_rate, rng):
-                    self.audio_data.append((padded, label, file_name, cycle_idx, chunk_idx, pad_times))
-                    self.identifiers.append(cid)
+                cycles.append((chunk, label, file_name, cycle_idx))
+                classwise[label].append(cycles[-1])
+        self.n_cycles_raw = len(cycles)
+        self.n_cycles_cba = 0
+        # 2) CBA — 원본과 같이 cycle 추출 직후·청킹 전, 학습셋만 (test 는 절대 안 함)
+        self.aug_scale = float(aug_scale) if (aug_scale and self.train_flag) else 0.0
+        if self.aug_scale:
+            cba = concat_augment(classwise, self.aug_scale, random.Random(aug_seed if cba_seed is None else cba_seed))
+            cycles.extend(cba)
+            self.n_cycles_cba = len(cba)
+        # 3) 8초 청킹 (원본 split_and_pad; 패딩 방향 RNG = pad_seed) — 원본 cycle 순서 그대로, CBA 사이클은 뒤에
+        rng = random.Random(pad_seed)
+        self.audio_data: List[Tuple[np.ndarray, int, str, int, int, float]] = []  # chunk,label,file,cycle_idx,chunk_idx,pad_times
+        self.identifiers: List[str] = []
+        self.cycle_ids: List[str] = []       # cycle 단위 identifier (다수결 대상)
+        for chunk, label, file_name, cycle_idx in cycles:
+            cid = f"{file_name}_{cycle_idx}_{label}"
+            self.cycle_ids.append(cid)
+            for padded, chunk_idx, pad_times in split_and_pad(chunk, self.desired_length, self.sample_rate, rng):
+                self.audio_data.append((padded, label, file_name, cycle_idx, chunk_idx, pad_times))
+                self.identifiers.append(cid)
         self.labels = [s[1] for s in self.audio_data]
         counts = np.bincount(self.labels, minlength=4).astype(np.float64)
         self.class_probs = counts / counts.sum()
         self._np_rng = np.random.RandomState(aug_seed)
         self._py_rng = random.Random(aug_seed + 1)
-        logger.info("RespireNet %s: 녹음 %d, cycle %d, 청크 %d, 클래스 %s", "train" if train_flag else "test",
-                    len(self.filenames), len(self.cycle_ids), len(self.audio_data), counts.astype(int).tolist())
+        logger.info("RespireNet %s: 녹음 %d, cycle %d (원본 %d + CBA %d, scale=%s), 청크 %d, 클래스 %s",
+                    "train" if train_flag else "test", len(self.filenames), len(self.cycle_ids), self.n_cycles_raw,
+                    self.n_cycles_cba, self.aug_scale or "off", len(self.audio_data), counts.astype(int).tolist())
 
     def __len__(self):
         return len(self.audio_data)
@@ -227,12 +278,13 @@ class RespireNetDataModule(L.LightningDataModule):
                  sample_rate: int = 4000, desired_length: float = 8.0, res_type: str = "kaiser_best",
                  pad_seed: int = 0, augment: bool = True, aug_seed: int = 0,
                  mean: Optional[Sequence[float]] = None, std: Optional[Sequence[float]] = None,
-                 batch_size: int = 64, num_workers: int = 4, weighted_sampler: bool = True, stetho_id: int = -1):
+                 batch_size: int = 64, num_workers: int = 4, weighted_sampler: bool = True, stetho_id: int = -1,
+                 aug_scale: Optional[float] = None, cba_seed: Optional[int] = None):
         super().__init__()
         self.kw = dict(data_dir=data_dir, split_mode=split_mode, folds_file=folds_file, test_fold=test_fold,
                        official_split_file=official_split_file, sample_rate=sample_rate, desired_length=desired_length,
                        res_type=res_type, pad_seed=pad_seed, aug_seed=aug_seed, mean=None, std=None,
-                       stetho_id=stetho_id)
+                       stetho_id=stetho_id, aug_scale=aug_scale, cba_seed=cba_seed)
         self.augment = bool(augment)
         self.batch_size, self.num_workers, self.weighted_sampler = int(batch_size), int(num_workers), bool(weighted_sampler)
         self.mean = tuple(mean) if mean is not None else None
