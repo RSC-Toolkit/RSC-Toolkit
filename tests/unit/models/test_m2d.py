@@ -47,6 +47,7 @@ def test_encoder_layout_and_pos_embed():
 
 
 @needs_golden
+@pytest.mark.exact_golden  # 비트 단위 비교 — 개발 머신 전용 (CI 러너마다 CPU 가 달라 마지막 자리에서 어긋난다)
 def test_feature_stages_match_reference():
     g = torch.load(GOLDEN / "features.pt")
     proc = SCLMetaMelProcessor(n_fft=400, win_length=400, hop_length=160, n_mels=80, f_min=50, f_max=8000)
