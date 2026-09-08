@@ -58,6 +58,7 @@ dev = [
 
 [project.scripts]
 rsc-toolkit-train = "rsc_toolkit.train:main"
+rsc-toolkit-eval = "rsc_toolkit.evaluate:main"
 rsc-toolkit = "rsc_toolkit.cli:main"
 rsctk = "rsc_toolkit.cli:main"
 

@@ -37,226 +37,43 @@ import warnings
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-# 입력으로만 쓰는 최상위 디렉터리 — 샌드박스에 심링크로 노출한다. outputs/ 는 일부러 뺀다.
-READ_ONLY_ROOTS = ("rsc_toolkit", ".datasets", "downloaded_datasets", "pretrained_models", "sample_data")
-# config 안의 상대 경로를 절대 경로로 바꿀 접두사 (outputs/ 는 encoder_ckpt 같은 **입력** 에만 등장한다 —
-# 콜백 dirpath 는 아래에서 따로 처리한다).
-ABS_PREFIXES = tuple(f"{r}/" for r in READ_ONLY_ROOTS) + ("outputs/",)
-# validate 에서 살려 두는 콜백 — 지표·손실 재현에 필요하거나 무해한 것만. 나머지(체크포인트·json 저장, MA/EMA,
-# LR 스케줄, 샘플러 epoch 등)는 전부 버린다.
-KEEP_CALLBACKS = {"AMSDEpochCallback", "DomainTransferStages", "ProtoNetClassWeight", "RespireNetVoteEval"}
-STD_KEYS = ("S_p", "S_e", "icbhi_score")
+# 설정 복구·정제·로드·평가·대조의 본체는 rsc_toolkit.evaluate 로 승격했다 (리팩토링 P2-3).
+# 이 스크립트는 논문 weight **전수** 검증의 드라이버(행 선택·샤딩·온도 게이트·MVST 융합·요약)만 남긴다.
+# 아래 이름들은 scripts/eval_ood_sprsound.py 가 `vw.<이름>` 으로 쓰므로 유지한다 (ROOT 를 묶은 얇은 창구).
+from rsc_toolkit import evaluate as ev  # noqa: E402
+from rsc_toolkit.evaluate import (  # noqa: E402,F401
+    ABS_PREFIXES, KEEP_CALLBACKS, READ_ONLY_ROOTS, STD_KEYS, VOTE_MAP,
+    adapt_buffer_shapes as _adapt_buffer_shapes, build_and_validate, compare, load_log_config,
+)
+
 PAPER_KEYS = ("paper_S_p", "paper_S_e", "paper_score", "paper_acc")
-VOTE_MAP = {"S_p": "vote/S_p", "S_e": "vote/S_e", "icbhi_score": "vote/icbhi_score", "cycle_acc": "vote/cycle_acc"}
 
 log = logging.getLogger("verify")
 
 
-# ----------------------------------------------------------------------------- 설정 복구
 def load_snapshot_config(hydra_dir: pathlib.Path) -> dict:
-    import yaml
-    from omegaconf import OmegaConf
-
-    text = (hydra_dir / ".hydra" / "config.yaml").read_text()
-    text = text.replace("${hydra:runtime.cwd}", str(ROOT))
-    cfg = OmegaConf.create(yaml.safe_load(text))
-    return OmegaConf.to_container(cfg, resolve=True)
+    return ev.load_snapshot_config(hydra_dir, ROOT)
 
 
 def find_run_log(run_name: str) -> pathlib.Path | None:
-    hits = sorted((ROOT / "outputs").glob(f"*/logs/{run_name}.log"))
-    return hits[-1] if hits else None
-
-
-def load_log_config(log_path: pathlib.Path) -> dict | None:
-    """train.py 가 시작 직후 찍는 `OmegaConf.to_yaml(cfg, resolve=True)` 블록을 파싱한다 (마지막 블록)."""
-    import yaml
-    from omegaconf import OmegaConf
-
-    lines = log_path.read_text(errors="replace").splitlines()
-    starts = [i for i, ln in enumerate(lines) if ln == "model:"]
-    if not starts:
-        return None
-    block = []
-    for ln in lines[starts[-1]:]:
-        # 최상위 키(소문자 key:) 또는 들여쓰기 줄만 YAML 블록에 속한다. 로그 줄·경고·Lightning 출력에서 멈춘다.
-        if ln.startswith((" ", "-")) or re.match(r"^[a-z_]+:( .*)?$", ln):
-            block.append(ln)
-        else:
-            break
-    cfg = yaml.safe_load("\n".join(block))
-    if not isinstance(cfg, dict) or "model" not in cfg or "data" not in cfg:
-        return None
-    return OmegaConf.to_container(OmegaConf.create(cfg), resolve=True)
+    return ev.find_run_log(run_name, ROOT)
 
 
 def _absolutize(obj, skip_path=()):
-    """상대 경로 문자열을 ROOT 기준 절대 경로로. 콜백(dirpath) 서브트리는 건너뛴다."""
-    if isinstance(obj, dict):
-        return {k: (v if k in skip_path else _absolutize(v)) for k, v in obj.items()}
-    if isinstance(obj, list):
-        return [_absolutize(v) for v in obj]
-    if isinstance(obj, str) and obj.startswith(ABS_PREFIXES):
-        return str(ROOT / obj)
-    return obj
+    return ev.absolutize(obj, ROOT, skip_path)
 
 
 def sanitize_config(cfg: dict, sandbox: pathlib.Path, run_name: str) -> tuple[dict, list[str]]:
-    cfg = copy.deepcopy(cfg)
-    cfg.pop("resume", None)
-    tp = cfg.setdefault("trainer", {}).setdefault("params", {})
-    callbacks = tp.get("callbacks") or []
-    tp_wo_cb = {k: v for k, v in tp.items() if k != "callbacks"}
-    cfg["trainer"]["params"] = tp_wo_cb
-    cfg = _absolutize(cfg)
-    tp = cfg["trainer"]["params"]
-
-    kept, dropped = [], []
-    for cb in callbacks:
-        name = str(cb.get("_target_", "")).rsplit(".", 1)[-1]
-        if name in KEEP_CALLBACKS:
-            cb = dict(cb)
-            if "dirpath" in cb:  # RespireNetVoteEval — best.pth/best.json 을 쓰므로 샌드박스로
-                cb["dirpath"] = str(sandbox / "callback_out" / run_name)
-            kept.append(cb)
-        else:
-            dropped.append(name)
-    tp["callbacks"] = kept
-    tp["logger"] = False
-    tp["enable_checkpointing"] = False
-    tp["enable_progress_bar"] = False
-    tp["enable_model_summary"] = False
-    tp["default_root_dir"] = str(sandbox / "lightning")
-    return cfg, dropped
-
-
-# ----------------------------------------------------------------------------- 평가
-def _adapt_buffer_shapes(model, sd: dict) -> list[str]:
-    """ckpt 의 버퍼 모양이 새 모델과 다르면(AMSD 의 per-sample 버퍼 등) 버퍼만 ckpt 모양으로 바꾼다."""
-    changed = []
-    buffers = dict(model.named_buffers())
-    for name, tensor in sd.items():
-        cur = buffers.get(name)
-        if cur is None or tuple(cur.shape) == tuple(tensor.shape):
-            continue
-        mod_name, _, attr = name.rpartition(".")
-        mod = model.get_submodule(mod_name) if mod_name else model
-        mod._buffers[attr] = torch.zeros_like(tensor, device=cur.device)
-        changed.append(f"{name}: {tuple(cur.shape)} -> {tuple(tensor.shape)}")
-    return changed
+    return ev.sanitize_config(cfg, sandbox, run_name, ROOT)
 
 
 CHAIN_NOTES: list = []
 
 
 def _install_readonly_chain_guard() -> None:
-    """FeatureCache._check_audio_chain 을 읽기 전용으로 바꾼다.
+    """캐시 체인 대장을 읽기 전용으로 (프로세스 전체). 어긋남은 CHAIN_NOTES 에 쌓인다."""
+    ev.install_readonly_chain_guard(CHAIN_NOTES)
 
-    원본은 대장(_chain.json)이 없으면 **실제 캐시 디렉터리에 새로 쓰고**, 어긋나면 예외를 던진다.
-    검증은 캐시를 읽기만 해야 하므로 쓰기를 없애고, 어긋남은 예외 대신 기록으로 남긴다
-    (waveform 종류는 캐시를 아예 안 쓰므로 어긋나도 평가에 영향이 없다 — 그 사실도 기록에 담는다)."""
-    import json as _json
-
-    from rsc_toolkit.datasets import feature_cache as fc_mod
-
-    def _readonly_check(self, chain):
-        dataset = str(chain.pop("dataset_name", "?"))
-        path = self.features_dir / "_chain.json"
-        if not path.exists():
-            return
-        try:
-            known = (_json.loads(path.read_text()) or {}).get(dataset)
-        except Exception:
-            return
-        if known is not None and known != chain:
-            n_files = sum(1 for p in self.features_dir.iterdir() if p.name != "_chain.json")
-            CHAIN_NOTES.append({"cache": str(self.features_dir), "dataset": dataset, "ledger": known,
-                                "requested": chain, "cached_files": n_files})
-
-    fc_mod.FeatureCache._check_audio_chain = _readonly_check
-
-
-def build_and_validate(cfg: dict, ckpt_path: pathlib.Path, sandbox: pathlib.Path, run_name: str) -> dict:
-    import lightning as L
-
-    from rsc_toolkit.trainer.adapters.pl_adapter import PLAdapter
-    from rsc_toolkit.trainer.factories.build_datamodule import build_datamodule
-    from rsc_toolkit.trainer.factories.build_loss import build_loss
-    from rsc_toolkit.trainer.factories.build_metrics import build_train_val_metric_factories
-    from rsc_toolkit.trainer.factories.build_model import build_model
-    from rsc_toolkit.trainer.factories.build_trainer import build_trainer
-
-    info: dict = {}
-    seed = cfg.get("seed")
-    if seed is not None:
-        L.seed_everything(int(seed), workers=True)
-
-    model = build_model(copy.deepcopy(cfg["model"]))
-    loss_func = build_loss(copy.deepcopy(cfg["loss"]))
-    train_fns, val_fns = build_train_val_metric_factories(copy.deepcopy(cfg.get("metrics", {})))
-    datamodule = build_datamodule(copy.deepcopy(cfg["data"]))
-    trainer = build_trainer(copy.deepcopy(cfg["trainer"]))
-
-    ckpt = torch.load(ckpt_path, map_location="cpu", weights_only=False)
-    sd = ckpt["model"] if isinstance(ckpt, dict) and "model" in ckpt else ckpt
-    info["buffer_adapted"] = _adapt_buffer_shapes(model, sd)
-    try:
-        model.load_state_dict(sd, strict=True)
-        info["load"] = "strict_ok"
-    except RuntimeError as exc:
-        res = model.load_state_dict(sd, strict=False)
-        info["load"] = "strict_fail"
-        info["load_missing"] = list(res.missing_keys)[:20]
-        info["load_unexpected"] = list(res.unexpected_keys)[:20]
-        info["load_error"] = str(exc)[:500]
-        return info
-
-    adapter_cfg = cfg.get("adapter") or {}
-    if adapter_cfg.get("name") == "split_iter":
-        from rsc_toolkit.trainer.adapters.split_iter_adapter import SplitIterAdapter
-
-        pl_module = SplitIterAdapter(rsc_model=model, loss_func=loss_func, train_metric_fns=train_fns,
-                                     val_metric_fns=val_fns, optimizer_cfg=cfg["optimizer"],
-                                     **(adapter_cfg.get("params") or {}))
-    else:
-        pl_module = PLAdapter(rsc_model=model, loss_func=loss_func, train_metric_fns=train_fns,
-                              val_metric_fns=val_fns, optimizer_cfg=cfg["optimizer"])
-
-    # Lightning 은 validate 에 setup("validate") 를 부르는데 툴킷 datamodule 들은 fit/test 만 안다 → None(전부) 로 매핑.
-    orig_setup = datamodule.setup
-    datamodule.setup = lambda stage=None: orig_setup(None if stage == "validate" else stage)  # type: ignore[assignment]
-
-    out = trainer.validate(pl_module, datamodule=datamodule, verbose=False)
-    metrics = {}
-    for d in out or []:
-        metrics.update({k: float(v) for k, v in d.items()})
-    metrics.update({k: float(v) for k, v in trainer.callback_metrics.items()})
-    info["metrics"] = metrics
-    return info
-
-
-def compare(expected: dict, metrics: dict, tol: float) -> tuple[str, dict, float | None]:
-    if "cycle_acc" in expected:  # RespireNet — 사이클 투표 지표
-        pairs = {k: (expected.get(k), metrics.get(v)) for k, v in VOTE_MAP.items()}
-    else:
-        keys = list(STD_KEYS) + [k for k in PAPER_KEYS if k in expected]
-        pairs = {k: (expected.get(k), metrics.get(k)) for k in keys}
-    diffs, missing, worst = {}, [], None
-    for k, (e, m) in pairs.items():
-        if e is None:
-            continue
-        if m is None:
-            missing.append(k)
-            continue
-        d = abs(float(e) - float(m))
-        diffs[k] = {"expected": float(e), "evaluated": float(m), "diff": d}
-        worst = d if worst is None else max(worst, d)
-    if not diffs:
-        return "ERROR", {"missing_eval_keys": missing}, None
-    status = "PASS" if worst <= tol else "MISMATCH"
-    if missing:
-        diffs["missing_eval_keys"] = missing
-    return status, diffs, worst
 
 
 # ----------------------------------------------------------------------------- MVST 융합 (provenance=self)
@@ -351,13 +168,8 @@ def resolve_config(row: dict, master_rows: list[dict] | None = None) -> tuple[di
 
 
 def make_sandbox(path: pathlib.Path) -> None:
-    path.mkdir(parents=True, exist_ok=True)
-    for name in READ_ONLY_ROOTS:
-        src, dst = ROOT / name, path / name
-        if src.exists() and not dst.exists():
-            dst.symlink_to(src, target_is_directory=True)
-    (path / "lightning").mkdir(exist_ok=True)
-    (path / "callback_out").mkdir(exist_ok=True)
+    ev.make_sandbox(path, ROOT)
+
 
 
 def _visible_gpu_index() -> str | None:
