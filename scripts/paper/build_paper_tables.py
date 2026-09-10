@@ -4,7 +4,7 @@
 
 입력: docs/results_master.csv (run 단위 수치) + docs/paper/anchors.csv (표 행 정의·논문값·기재 결정)
       + docs/paper/footnotes.csv (각주 문안) + outputs/<group>/<run>/ood.json (C 표)
-출력: docs/paper/tables/table_icbhi.tex · table_sprsound.tex · table_ood.tex (booktabs)
+출력: docs/paper/tables/table1_ICHBI_Diff.tex (reported | ours | ΔSc) · table2_SPRSound.tex (SPRSound→SPRSound | ICBHI→SPRSound 제로샷, 2026-09-10 통합)
       docs/paper/numbers.md (수치 팩: n·mean±std·Δ·Δ/SE·판정·run 이름·자체 검사)
 
     python scripts/paper/build_paper_tables.py [--band family|disclosure] [--metrics score|all] [--out docs/paper]
@@ -261,9 +261,7 @@ def deltas_of(a, agg):
 
 PM_TABLES = {  # table → (file stem, caption 앞부분, label)
     "A": ("table1_ICHBI_Diff", "ICBHI 2017 (official 60/40 split, 4-class cycle classification)", "icbhi_diff"),
-    "B": ("table2_SPRSound_Diff", "SPRSound 2022 (inter-patient test set, 7-class cycle classification)", "sprsound_diff"),
-    "C": ("table4_OOD", "zero-shot transfer: ICBHI-trained checkpoints evaluated on the SPRSound inter-patient test set (7$\\to$4 merged labels, 1,429 events)", "ood"),
-}
+}   # B(SPRSound→SPRSound)·C(ICBHI→SPRSound) 는 2026-09-10 부터 통합 표 MERGED(table2_SPRSound) 한 장으로 — build_merged
 
 
 def _rep(x):
@@ -333,6 +331,172 @@ def build_patchmix(anchors, fam, table, meta, footnotes):
     L.append(r"\end{table*}")
     return "\n".join(L) + "\n", aggs
 
+# ── 통합 표 2 (2026-09-10 사용자 지시): 표 2(SPRSound→SPRSound) 와 표 4(ICBHI→SPRSound 제로샷) 를 한 표로 합치고 논문 보고값 열은 없앤다 ──
+MERGED = ("table2_SPRSound", "sprsound")     # (파일 stem, \label)
+MERGE_KEY_OVERRIDES = {"icbhi-btscard-paper": "btscard", "icbhi-lungsrad-dualpaper": "lungsrad-dual",
+                       "icbhi-mvst-official-fusion": "mvst-fusion"}   # family 접두사(sprs-/icbhi-)만 떼서는 짝이 안 맞는 것
+MERGE_ORDER_HINT = {"m2d-base": 13.5}        # 표 1(A) 에 짝이 없는 행의 자리 — icbhi-m2dx-s5(A pm_order 14) 바로 앞
+METHOD_LEVEL_FN = {"1", "2", "12", "13"}     # 두 열 모두에 걸리는 각주(코드 없음·하이퍼파라미터·정의 불가) → 방법 이름에; 나머지는 해당 열의 Sc 셀에
+CAPTION_FN = {"8"}                           # OOD 프로토콜(7→4 병합·α=0) 은 캡션 문장으로 옮겼다
+
+
+def merge_key(family: str) -> str:
+    return MERGE_KEY_OVERRIDES.get(family, re.sub(r"^(sprs|icbhi)-", "", family))
+
+
+def merged_rows(anchors):
+    """B(SPR→SPR)·C(ICBHI→SPR) 행을 merge_key 로 짝지어 [(key, B행|None, C행|None)] 을 표 1 순서(밴드 → A pm_order)로 돌려준다."""
+    by = {t: {merge_key(a["family"]): a for a in anchors if a["table"] == t and a.get("pm_order")} for t in "ABC"}
+    out = []
+    for k in set(by["B"]) | set(by["C"]):
+        b, c = by["B"].get(k), by["C"].get(k)
+        ref = by["A"].get(k) or c or b
+        if k in by["A"]:
+            pos = float(by["A"][k]["pm_order"])
+        elif k in MERGE_ORDER_HINT:
+            pos = MERGE_ORDER_HINT[k]
+        else:
+            raise KeyError(f"merged table: no row order for '{k}' (add it to MERGE_ORDER_HINT)")
+        out.append((BAND_ORDER.index(ref["band"]), pos, k, b, c))
+    out.sort(key=lambda t: t[:3])
+    return [(k, b, c) for _, _, k, b, c in out]
+
+
+def _fns(a):
+    return {x for x in (a["fn"].split(";") if a else []) if x} - CAPTION_FN
+
+
+def _split_fns(b, c):
+    """방법 이름에 붙일 각주 / 열별(Sc 셀) 각주. 양쪽에 다 있거나 METHOD_LEVEL_FN 이면 이름에."""
+    fb, fc = _fns(b), _fns(c)
+    name = (fb & fc) | ((fb | fc) & METHOD_LEVEL_FN)
+    return name, {"B": fb - name, "C": fc - name}
+
+
+def _sup(fns, html=False):
+    s = ",".join(sorted(fns, key=int))
+    return "" if not s else (f"<sup>{s}</sup>" if html else r"\textsuperscript{" + s + "}")
+
+
+def build_merged(anchors, fam, meta, footnotes):
+    """통합 표 2: method · architecture · pretrain · venue | SPRSound→SPRSound ours Sp/Se/Sc | ICBHI→SPRSound(zero-shot) ours Sp/Se/Sc.
+    한쪽이 없는 행: na_fn 이 있으면 n/a + 각주(정의 불가·미학습 사유), 없으면 --(이번 연구에서 안 돌림). best/second 는 열별로 comparable=1 행끼리.
+    반환 (tex, aggs_B, aggs_C) — aggs 는 numbers.md 용 전 행."""
+    aggs = {t: {a["family"] + "|" + a["metric_source"]: aggregate(a, fam) for a in anchors if a["table"] == t} for t in "BC"}
+    rows = merged_rows(anchors)
+    def agg_of(a, t): return aggs[t][a["family"] + "|" + a["metric_source"]]
+    def comp(a): return meta[a["family"]]["comparable"] == "1"
+    marks = {}
+    for t, i in (("B", 1), ("C", 2)):
+        for k in ("sp", "se", "score"):
+            marks[t, k] = _rank_marks([agg_of(r[i], t)[k][0] if (r[i] is not None and comp(r[i]) and agg_of(r[i], t)["n"]) else None
+                                       for r in rows])
+    stem, label = MERGED
+    colspec = "p{2pt}llcl" + "ccc" + "ccc"
+    head = [r"& \multirow{2}{*}{method} & \multirow{2}{*}{architecture} & \multirow{2}{*}{pretrain} & \multirow{2}{*}{venue} & "
+            r"\multicolumn{3}{c}{SPRSound $\to$ SPRSound} & \multicolumn{3}{c}{ICBHI $\to$ SPRSound (zero-shot)} \\",
+            r"\cmidrule(lr){6-8}\cmidrule(lr){9-11}",
+            r"& & & & & $S_p$ & $S_e$ & \textbf{Sc} & $S_p$ & $S_e$ & \textbf{Sc} \\"]
+    cap = (r"Reproduced results on the SPRSound 2022 inter-patient test set (1,429 events), five seeds each (mean\,$\pm$\,std) under one protocol. "
+           r"SPRSound $\to$ SPRSound: trained on the SPRSound 2022 inter-patient training set (7-class cycle classification). "
+           r"ICBHI $\to$ SPRSound: the ICBHI-trained checkpoints of Table~\ref{tab:icbhi_diff} evaluated zero-shot with 7$\to$4 label merging "
+           r"(BTS-CARD with $\alpha=0$, where the paper reports its best $\alpha$). "
+           r"\textbf{Best} and \underline{second best} per column among directly comparable rows. "
+           r"``--'': not run in this study; n/a: the method is not defined for that setting (see footnotes). "
+           r"Rows are grouped by the type of contribution (rotated labels).")
+    L = [r"\begin{table*}[!t]", r"\centering", r"\caption{" + cap + "}", r"\label{tab:" + label + "}",
+         r"\renewcommand{\arraystretch}{1}", r"\addtolength{\tabcolsep}{2pt}",
+         r"\resizebox{\linewidth}{!}{", r"\begin{tabular}{" + colspec + "}", r"\toprule", *head, r"\hline \midrule"]
+    used_fn = set()
+    band_of = lambda r: (r[2] or r[1])["band"]
+    bands = [meta_band for meta_band in BAND_ORDER]
+    # 밴드는 표 1 과 같은 기준(A 행의 band) — merged_rows 가 그 순서로 정렬했으므로 여기서는 A 기준 band 를 다시 구한다
+    A = {merge_key(a["family"]): a for a in anchors if a["table"] == "A" and a.get("pm_order")}
+    row_band = [A[k]["band"] if k in A else band_of((k, b, c)) for k, b, c in rows]
+    band_sizes = {bd: row_band.count(bd) for bd in bands}
+    cur_band = None
+    for i, (k, b, c) in enumerate(rows):
+        ref = c or b
+        m = meta[ref["family"]]
+        name_fn, side_fn = _split_fns(b, c)
+        used_fn |= name_fn | side_fn["B"] | side_fn["C"]
+        name = tex_escape(m["method"]) + r"~\cite{" + m["cite"].replace(" ", "") + "}" + _sup(name_fn)
+        if row_band[i] != cur_band:
+            if cur_band is not None:
+                L.append(r"\midrule")
+            cur_band = row_band[i]
+            first = (r"\multirow{" + str(band_sizes[cur_band]) + r"}{*}{\rotatebox[origin=c]{90}{\scriptsize\textbf{" + BAND_SHORT[cur_band] + "}}}")
+        else:
+            first = ""
+        cells = [first, name, m["arch"], tex_escape(m["pretrain"]).replace("+", r"\,+\,"), r"\textit{" + m["venue"] + "}"]
+        for t, a, other in (("B", b, c), ("C", c, b)):
+            if a is None:
+                na = (other.get("na_fn") or "") if other else ""
+                if na:
+                    used_fn.add(na)
+                cells.append(r"\multicolumn{3}{c}{" + ("n/a" + _sup({na}) if na else "--") + "}")
+                continue
+            agg = agg_of(a, t)
+            cells += [_ours_pm(*agg["sp"], marks[t, "sp"].get(i)), _ours_pm(*agg["se"], marks[t, "se"].get(i)),
+                      _ours_pm(*agg["score"], marks[t, "score"].get(i)) + _sup(side_fn[t])]
+        L.append(" & ".join(cells) + r" \\")
+    L += [r"\bottomrule", r"\end{tabular}}"]
+    notes = [r"\textsuperscript{" + k + "} " + footnotes[k] for k in sorted((x for x in used_fn if x.isdigit()), key=int)]
+    if notes:
+        L += [r"\par\vspace{2pt}\begin{minipage}{\linewidth}\scriptsize", " ".join(notes), r"\end{minipage}"]
+    L.append(r"\end{table*}")
+    return "\n".join(L) + "\n", aggs["B"], aggs["C"]
+
+
+def merged_html(anchors, fam, meta, footnotes, tex2html):
+    """통합 표 2 의 HTML 미리보기(종합 대장) — build_merged 와 같은 행·수치·표시."""
+    aggs = {t: {a["family"] + "|" + a["metric_source"]: aggregate(a, fam) for a in anchors if a["table"] == t} for t in "BC"}
+    rows = merged_rows(anchors)
+    def agg_of(a, t): return aggs[t][a["family"] + "|" + a["metric_source"]]
+    def comp(a): return meta[a["family"]]["comparable"] == "1"
+    marks = {}
+    for t, i in (("B", 1), ("C", 2)):
+        for k in ("sp", "se", "score"):
+            marks[t, k] = _rank_marks([agg_of(r[i], t)[k][0] if (r[i] is not None and comp(r[i]) and agg_of(r[i], t)["n"]) else None
+                                       for r in rows])
+    A = {merge_key(a["family"]): a for a in anchors if a["table"] == "A" and a.get("pm_order")}
+    row_band = [A[k]["band"] if k in A else (c or b)["band"] for k, b, c in rows]
+    used = set()
+    L = ['<div class="pm pm-M">', f'<p class="pm-title"><b>table2_SPRSound · SPRSound→SPRSound (7-class) | ICBHI→SPRSound 제로샷 (7→4 병합, 1,429 event) · reported 열 없음</b> · {len(rows)} 행</p>',
+         '<div class="tbl"><table class="pmt"><thead>',
+         '<tr class="grp"><th colspan="5"></th><th colspan="3">SPRSound → SPRSound (ours, 5 seeds)</th><th colspan="3">ICBHI → SPRSound zero-shot (ours, 5 seeds)</th></tr>',
+         "<tr><th></th><th>method</th><th>architecture</th><th>pretrain</th><th>venue</th><th>Sp</th><th>Se</th><th>Sc</th><th>Sp</th><th>Se</th><th>Sc</th></tr>",
+         "</thead><tbody>"]
+    cur_band = None
+    for i, (k, b, c) in enumerate(rows):
+        ref = c or b; m = meta[ref["family"]]
+        name_fn, side_fn = _split_fns(b, c)
+        used |= name_fn | side_fn["B"] | side_fn["C"]
+        fams = " · ".join(x["family"] + ("" if x["metric_source"] in ("best", "final") else " · " + x["metric_source"]) for x in (b, c) if x)
+        cite = f'<span class="run">\\cite{{{m["cite"].replace(" ", "")}}} · {fams}</span>'
+        first = ""
+        if row_band[i] != cur_band:
+            cur_band = row_band[i]
+            first = f'<td class="pm-band" rowspan="{row_band.count(cur_band)}"><span>{BAND_SHORT[cur_band]}</span></td>'
+        cells = [first, f'<td class="name">{_html_esc(m["method"])}{_sup(name_fn, html=True)}{cite}</td>', f"<td>{_html_esc(tex2html(m['arch']))}</td>",
+                 f"<td>{_html_esc(m['pretrain'])}</td>", f"<td><i>{_html_esc(m['venue'].replace(chr(96), chr(8217)))}</i></td>"]
+        for t, a, other in (("B", b, c), ("C", c, b)):
+            if a is None:
+                na = (other.get("na_fn") or "") if other else ""
+                if na:
+                    used.add(na)
+                cells.append('<td class="m" colspan="3">' + ("n/a" + _sup({na}, html=True) if na else "—") + "</td>")
+                continue
+            agg = agg_of(a, t)
+            cells += [f'<td class="m">{_ours_html(*agg["sp"], marks[t, "sp"].get(i))}</td>', f'<td class="m">{_ours_html(*agg["se"], marks[t, "se"].get(i))}</td>',
+                      f'<td class="m">{_ours_html(*agg["score"], marks[t, "score"].get(i))}{_sup(side_fn[t], html=True)}</td>']
+        L.append("<tr>" + "".join(cells) + "</tr>")
+    L.append("</tbody></table></div>")
+    notes = [f"<sup>{k}</sup> " + _html_esc(tex2html(footnotes[k])) for k in sorted((x for x in used if x.isdigit()), key=int)]
+    L.append('<p class="pm-notes">' + " ".join(notes) + "</p></div>")
+    return "\n".join(L) + "\n"
+
+
 def _html_esc(x: str) -> str:
     return x.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
@@ -352,7 +516,7 @@ def patchmix_html(anchors, fam, meta, footnotes):
                           .replace(r"$\alpha$", "α").replace(r"\ ", " ").replace("$\\times$", "×"))
     titles = {"A": "table1_ICHBI_Diff · ICBHI 2017 공식 60/40 · 4-class", "B": "table2_SPRSound_Diff · SPRSound 2022 inter-patient · 7-class",
               "C": "table4_OOD · ICBHI 학습 → SPRSound inter-patient 제로샷 (7→4 병합, 1,429 event)"}
-    for table in ("A", "B", "C"):
+    for table in ("A",):
         all_rows = [a for a in anchors if a["table"] == table]
         aggs = {a["family"] + "|" + a["metric_source"]: aggregate(a, fam) for a in all_rows}
         rows = sorted((a for a in all_rows if a.get("pm_order")), key=lambda a: (BAND_ORDER.index(a["band"]), int(a["pm_order"])))
@@ -393,6 +557,7 @@ def patchmix_html(anchors, fam, meta, footnotes):
         notes = [f"<sup>{k}</sup> " + _html_esc(tex2html(footnotes[k])) for k in sorted((x for x in used if x.isdigit()), key=int)]
         L.append('<p class="pm-notes">' + " ".join(notes) + "</p></div>")
         out.append("\n".join(L))
+    out.append(merged_html(anchors, fam, meta, footnotes, tex2html))
     return "\n".join(out) + "\n"
 
 def numbers_md(anchors, fam, aggs_by_table, git_sha):
@@ -440,7 +605,7 @@ def numbers_md(anchors, fam, aggs_by_table, git_sha):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--style", choices=["patchmix", "bands"], default="patchmix",
-                    help="patchmix(기본): table1_ICHBI_Diff · table2_SPRSound_Diff · table3_OOD (reported | ours | ΔSc) + numbers.md + HTML 미리보기. "
+                    help="patchmix(기본): table1_ICHBI_Diff (reported | ours | ΔSc) + table2_SPRSound (SPR→SPR | ICBHI→SPR 제로샷, ours 만) + numbers.md + HTML 미리보기. "
                          "bands: 옛 Method/Paper/Ours/Δ 밴드 표(--band/--metrics 변형) — 파일은 저장소에 두지 않는다")
     ap.add_argument("--band", choices=["family", "disclosure"], default="family")
     ap.add_argument("--metrics", choices=["score", "all"], default="all")
@@ -463,16 +628,16 @@ def main():
                 f"% generated by scripts/paper/build_paper_tables.py --style bands --band {args.band} --metrics {args.metrics} (git {sha}); do not edit\n" + tex)
     else:
         meta = load_meta()
-        for table in ("A", "B", "C"):
-            tex, aggs = build_patchmix(anchors, fam, table, meta, footnotes)
-            aggs_by_table[table] = aggs
-            (out / "tables" / f"{PM_TABLES[table][0]}.tex").write_text(
-                f"% generated by scripts/paper/build_paper_tables.py (git {sha}); do not edit\n"
-                "% requires: booktabs, multirow, graphicx (\\resizebox), xcolor (\\textcolor for ΔSc); cite keys = user's bib (docs/paper/model_meta.csv `cite`)\n" + tex)
+        hdr = (f"% generated by scripts/paper/build_paper_tables.py (git {sha}); do not edit\n"
+               "% requires: booktabs, multirow, graphicx (\\resizebox), xcolor (\\textcolor for ΔSc); cite keys = user's bib (docs/paper/model_meta.csv `cite`)\n")
+        tex, aggs_by_table["A"] = build_patchmix(anchors, fam, "A", meta, footnotes)
+        (out / "tables" / f"{PM_TABLES['A'][0]}.tex").write_text(hdr + tex)
+        tex, aggs_by_table["B"], aggs_by_table["C"] = build_merged(anchors, fam, meta, footnotes)
+        (out / "tables" / f"{MERGED[0]}.tex").write_text(hdr + tex)
         (out / "tables" / "preview_patchmix.html").write_text(patchmix_html(anchors, fam, meta, footnotes))
     md, mism = numbers_md(anchors, fam, aggs_by_table, sha)
     (out / "numbers.md").write_text(md)
-    print(f"style={args.style} → {out/'tables'} ({', '.join(v[0] for v in PM_TABLES.values()) if args.style == 'patchmix' else 'bands'}) · numbers → {out/'numbers.md'} · mismatches {len(mism)}")
+    print(f"style={args.style} → {out/'tables'} ({', '.join([v[0] for v in PM_TABLES.values()] + [MERGED[0]]) if args.style == 'patchmix' else 'bands'}) · numbers → {out/'numbers.md'} · mismatches {len(mism)}")
     for m in mism:
         print("  MISMATCH", m)
     sys.exit(1 if mism else 0)

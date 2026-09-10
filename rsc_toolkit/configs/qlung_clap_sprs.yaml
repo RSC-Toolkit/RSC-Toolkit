@@ -1,0 +1,33 @@
+# QLung (Audio-CLAP) 을 **SPRSound 표준 태스크(2022 inter-patient, 7-class)로 직접 학습·검증** (SPR→SPR).
+#
+# qlung_sprs.yaml(AST 판 SPR→SPR)의 CLAP 백본 짝. 논문 앵커 없음 — QLung 논문은 CLAP 판을 ICBHI 와 ICBHI→SPRSound OOD 로만
+# 보고했다 → 재현 판정 대상이 아니라 **툴킷 확장 관찰값**(2026-09-10 사용자 요청; 통합 표 2 의 SPRSound→SPRSound 칸).
+# 등급 C(명세 재구현, models/clap_qlung.py 가정 3건)는 ICBHI CLAP 판과 같다.
+#
+# 레시피: qlung_clap_icbhi 그대로 (50 ep, bs 8, adam 5e-5/wd 1e-6, cosine, MA 0.6, AMP, 비가중 CE).
+#         바뀌는 것은 클래스 수(4→7)와 π_y 용 class_nums 뿐(qlung_sprs 와 동일 값).
+#
+#   scripts/train.sh qlung_clap_sprs seed=N run.name=sprs-qlung-clap-sN
+defaults:
+  - model: clap_qlung
+  - data_defaults@data: base
+  - data: sprsound_qlung_clap
+  - loss: cross_entropy        # 비가중 CE (criterion[0])
+  - metrics: sprsound_metrics  # 7-class Se/Sp/Score (icbhi_score 키 그대로 → qlung_paper 콜백의 best 선정과 호환)
+  - optimizer: adam            # lr 5e-5, wd 1e-6
+  - trainer: default           # max_epochs 50
+  - callbacks: qlung_paper     # MA 0.6(dfam 제외) · PaperCosineLR · best-on-test(Se>5) · 재개용 last.ckpt
+  - _self_
+seed: 1
+trainer:
+  params:
+    precision: 16-mixed        # 원본 AMP
+run:
+  name: sprs-qlung-clap
+  group: qlung
+  tags: [qlung, clap, sprsound, extension, grade-c]
+model:
+  params:
+    n_cls: 7
+    # π_y — SPRSound 2022 inter-patient train 분포 7-class (합 6,656; qlung_sprs.yaml 과 동일 출처)
+    class_nums: [5159, 912, 452, 49, 30, 39, 15]
