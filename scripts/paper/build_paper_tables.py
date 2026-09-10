@@ -373,6 +373,11 @@ def _split_fns(b, c):
     return name, {"B": fb - name, "C": fc - name}
 
 
+def _fallback_lookup(anchors):
+    """(표, family) → 그 표의 anchor 행. na_fallback 이 가리키는 family 의 값을 빠진 쪽 칸에 채울 때 쓴다."""
+    return {(a["table"], a["family"]): a for a in anchors if a["table"] in "BC" and a.get("pm_order")}
+
+
 def _sup(fns, html=False):
     s = ",".join(sorted(fns, key=int))
     return "" if not s else (f"<sup>{s}</sup>" if html else r"\textsuperscript{" + s + "}")
@@ -391,6 +396,7 @@ def build_merged(anchors, fam, meta, footnotes):
         for k in ("sp", "se", "score"):
             marks[t, k] = _rank_marks([agg_of(r[i], t)[k][0] if (r[i] is not None and comp(r[i]) and agg_of(r[i], t)["n"]) else None
                                        for r in rows])
+    fallback = _fallback_lookup(anchors)
     stem, label = MERGED
     colspec = "p{2pt}llcl" + "ccc" + "ccc"
     head = [r"& \multirow{2}{*}{method} & \multirow{2}{*}{architecture} & \multirow{2}{*}{pretrain} & \multirow{2}{*}{venue} & "
@@ -402,7 +408,7 @@ def build_merged(anchors, fam, meta, footnotes):
            r"ICBHI $\to$ SPRSound: the ICBHI-trained checkpoints of Table~\ref{tab:icbhi_diff} evaluated zero-shot with 7$\to$4 label merging "
            r"(BTS-CARD with $\alpha=0$, where the paper reports its best $\alpha$). "
            r"\textbf{Best} and \underline{second best} per column among directly comparable rows. "
-           r"``--'': not run in this study; n/a: the method is not defined for that setting (see footnotes). "
+           r"``--'': not run in this study; n/a: the method cannot be applied to that setting (see footnotes). "
            r"Rows are grouped by the type of contribution (rotated labels).")
     L = [r"\begin{table*}[!t]", r"\centering", r"\caption{" + cap + "}", r"\label{tab:" + label + "}",
          r"\renewcommand{\arraystretch}{1}", r"\addtolength{\tabcolsep}{2pt}",
@@ -432,8 +438,13 @@ def build_merged(anchors, fam, meta, footnotes):
         for t, a, other in (("B", b, c), ("C", c, b)):
             if a is None:
                 na = (other.get("na_fn") or "") if other else ""
+                fb = fallback.get((t, (other.get("na_fallback") or "") if other else ""))
                 if na:
                     used_fn.add(na)
+                if fb is not None:  # 빠진 쪽을 다른 family 값으로 채운다(SG-SCL → 같은 백본 fine-tuning); 순위 표시에서는 제외
+                    agg = aggregate(fb, fam)
+                    cells += [_ours_pm(*agg["sp"]), _ours_pm(*agg["se"]), _ours_pm(*agg["score"]) + _sup({na} if na else set())]
+                    continue
                 cells.append(r"\multicolumn{3}{c}{" + ("n/a" + _sup({na}) if na else "--") + "}")
                 continue
             agg = agg_of(a, t)
@@ -461,6 +472,7 @@ def merged_html(anchors, fam, meta, footnotes, tex2html):
                                        for r in rows])
     A = {merge_key(a["family"]): a for a in anchors if a["table"] == "A" and a.get("pm_order")}
     row_band = [A[k]["band"] if k in A else (c or b)["band"] for k, b, c in rows]
+    fallback = _fallback_lookup(anchors)
     used = set()
     L = ['<div class="pm pm-M">', f'<p class="pm-title"><b>table2_SPRSound · SPRSound→SPRSound (7-class) | ICBHI→SPRSound 제로샷 (7→4 병합, 1,429 event) · reported 열 없음</b> · {len(rows)} 행</p>',
          '<div class="tbl"><table class="pmt"><thead>',
@@ -483,8 +495,14 @@ def merged_html(anchors, fam, meta, footnotes, tex2html):
         for t, a, other in (("B", b, c), ("C", c, b)):
             if a is None:
                 na = (other.get("na_fn") or "") if other else ""
+                fb = fallback.get((t, (other.get("na_fallback") or "") if other else ""))
                 if na:
                     used.add(na)
+                if fb is not None:
+                    agg = aggregate(fb, fam)
+                    cells += [f'<td class="m">{_ours_html(*agg["sp"])}</td>', f'<td class="m">{_ours_html(*agg["se"])}</td>',
+                              f'<td class="m">{_ours_html(*agg["score"])}{_sup({na} if na else set(), html=True)}</td>']
+                    continue
                 cells.append('<td class="m" colspan="3">' + ("n/a" + _sup({na}, html=True) if na else "—") + "</td>")
                 continue
             agg = agg_of(a, t)
