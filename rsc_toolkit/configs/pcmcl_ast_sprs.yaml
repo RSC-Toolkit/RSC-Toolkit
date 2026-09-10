@@ -1,0 +1,35 @@
+# PC-MCL(AST) SPRSound 확장 — **재현 판정 대상 아님** (pcmcl_sprs 의 AST 짝; 2026-09-10 사용자 결정 "3번: BEATs + AST 10 run").
+#
+# 논문(arXiv 2601.17080)은 ICBHI 만 실험했다. 라벨 공간을 6속성으로 분해해(methods/pcmcl_labelspace.py, sprsound7)
+# 방법(MCL 속성 공유 + PM 환자 매칭)을 살린 채 확장한다 — 무엇이 저자 것이고 무엇이 우리 것인지는 pcmcl_sprs.yaml 머리말 참조.
+# 논문 표 2 에는 툴킷 변형(6속성 라벨 공간) 각주와 함께 싣는다.
+#
+# 레시피: pcmcl_ast_icbhi 그대로 (100 ep / bs 32 / Adam 5e-5 / cosine / MA 0.5 가정, SpecAugment on, AST fp16 autocast → trainer precision 32).
+#   실행: rsc-toolkit-train --config-name pcmcl_ast_sprs run.name=sprs-pcmcl-ast-s1 seed=1
+defaults:
+  - model: ast_pcmcl
+  - data_defaults@data: base
+  - data: sprsound_pcmcl_ast
+  - loss: bce_with_logits
+  - metrics: pcmcl_metrics_sprs
+  - optimizer: adam_pcmcl
+  - trainer: default
+  - callbacks: pcmcl_paper
+  - _self_
+
+seed: 1
+
+model:
+  params:
+    n_cls: 6                     # 속성 수 (클래스는 7)
+    label_space: sprsound7
+
+trainer:
+  params:
+    max_epochs: 100
+    precision: 32                # 원본에 GradScaler 없음 — ICBHI 런과 동일
+
+run:
+  name: sprs-pcmcl-ast
+  group: pcmcl
+  tags: [pcmcl, ast, sprsound, extension]

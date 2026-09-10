@@ -1,0 +1,54 @@
+# PC-MCL(AST) 를 SPRSound 표준 태스크(7-class)로 확장 — sprsound_pcmcl_beats 의 AST 짝 (2026-09-10 사용자 결정 "3번: BEATs + AST").
+# ICBHI 레시피(icbhi_pcmcl_ast) 그대로: kaldi fbank 128 mel(mean -4.2677393 / std 4.5689974), 10 s → 998 프레임,
+# 학습 = 동적 연결·PM 쌍, 평가 = 사이클 단독. 데이터셋 인자·라벨 공간·환자 단위는 sprsound_pcmcl_beats 와 동일
+# (16 kHz · 10 s repeat+fade · resample_after_slice · ms_int · label_space=sprsound7 · patient_id_mode=recording).
+# 피처 캐시는 전용 디렉터리 — 같은 SPRSound 라도 다른 config 의 체인(5 s, s 단위 절단 등)과 대장이 섞이면 체인 가드가 막는다(09-03 사고).
+name: sprsound_pcmcl_ast
+params:
+  datamodule_name: pcmcl
+  dataset_name: sprsound
+  index_dataset_cls: rsc_toolkit.datasets.index_dataset.IndexDataset
+  project_root: ${hydra:runtime.cwd}
+  data_dir: .datasets/sprsound
+  raw_data_subdir: Classification
+  index_filename: index_cycle.csv
+  sampling_rate: 16000
+  sample_level: cycle
+  desired_length_sec: 10.0
+  pad_type: repeat_fade
+  resample_after_slice: true
+  time_unit: ms_int
+  train_splits: [train]
+  val_splits: [test]
+  test_splits: [test]
+  batch_size: 32
+  num_workers: 8
+  shuffle_train: true
+  drop_last_train: true
+  pin_memory: true
+  features:
+    enabled: true
+    kind: fbank
+    cache_dir: downloaded_datasets/features_cache_pcmcl_ast_sprs   # 전용 (체인: 16 kHz · 10 s · repeat_fade · ras1 · ms_int)
+    n_mels: 128
+    target_frames: 998           # 10 s → h = 998 (main.py:257)
+    frame_shift: 10
+    window_type: hanning
+    dither: 0.0
+    normalize: true
+  feature_precompute: true       # 평가셋(test) fbank 캐시
+  feature_precompute_batch_size: 8
+  feature_precompute_num_workers: 0
+  specaugment:
+    enabled: false               # SpecAugment 는 모델(ast_pcmcl.specaug) 이 배치 단위로 적용 (원본 main.py:531)
+  pcmcl:
+    label_space: sprsound7       # 6속성 분해 — 이걸 안 주면 4-class 변환기가 라벨 4·5·6 을 조용히 소실시킨다
+    mode: default
+    mixing_prob: 1.0
+    conditional_mixing: false
+    mixing_label_strategy: additive
+    enable_ssl: true
+    ssl_prob: 0.3
+    patient_id_mode: recording
+    hard_negative_mode: dict_order
+    cache_dir: outputs/pcmcl/cache_sprs   # 사이클 캐시는 BEATs 판과 공유 가능(키가 sr·fade 로 정해진다)
