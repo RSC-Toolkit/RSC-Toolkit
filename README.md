@@ -85,7 +85,7 @@ GPU=0 scripts/eval.sh  outputs/patchmix/icbhi-patchmix-cl-s1
 | BTS (`bts`) | `bts_icbhi` | `bts_sprs` |
 | BTS-CARD (`bts_card`) | `btscard_icbhi trainer.params.max_epochs=30 optimizer.name=adamw` (논문 설정) / `btscard_icbhi` (스크립트 설정) | `btscard_sprs` |
 | BEATs fine-tuning / PAFA (`beats`) | `pafa_icbhi model.params.method=ce` / `pafa_icbhi` (pafa) | `pafa_sprs model.params.method=ce` / `pafa_sprs` |
-| PC-MCL (`beats_pcmcl`, `ast_pcmcl`) | `pcmcl_icbhi` / `pcmcl_ast_icbhi` | `pcmcl_sprs` (6-속성 라벨 공간 재정의 — 우리 확장, 논문 방법 아님; 2026-09-04 철회, 표 미수록) |
+| PC-MCL (`beats_pcmcl`, `ast_pcmcl`) | `pcmcl_icbhi` / `pcmcl_ast_icbhi` | `pcmcl_sprs` (BEATs) / `pcmcl_ast_sprs` (AST) — 6-속성 라벨 공간 재정의(우리 확장, 논문 방법 아님; 표 2 에 툴킷 변형으로 수록) |
 | Lung-SRAD: FT / SAR / dual-axis (`dass_lungsrad`) | `lungsrad_icbhi model.params.method=ce` / `…=ce_blur` / `…=patchmix_cl model.params.cl_mode=dual model.params.mix_layout=as_paper` | `lungsrad_sprs …` |
 | QLung AST / Audio-CLAP (`ast_qlung`, `clap_qlung`) | `qlung_icbhi` / `qlung_clap_icbhi` | `qlung_sprs` (AST) / `qlung_clap_sprs` (Audio-CLAP; 논문 앵커 없음, 툴킷 확장) |
 | AMS-D (`ast_amsd`) | `amsd_icbhi` (기준선 `model.params.method=baseline`) | `amsd_sprs` |
