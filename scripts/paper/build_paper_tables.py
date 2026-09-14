@@ -330,6 +330,8 @@ def build_patchmix(anchors, fam, table, meta, footnotes):
     L += [r"\bottomrule", r"\end{tabular}}"]
     key = (lambda k: FN_KEY["A"] + k) if table == "A" else (lambda k: k)
     notes = [r"\textsuperscript{" + k + "} " + footnotes[key(k)] for k in sorted((x for x in used_fn if x.isdigit()), key=int)]
+    if table == "A":
+        notes.append(ABBREV_LINE)   # 번호 없는 공통 범례 — 표 1 아래 한 번만 (표 2 캡션은 "Abbreviations as in Table 1")
     if notes:
         L += [r"\par\vspace{2pt}\begin{minipage}{\linewidth}\scriptsize", " ".join(notes), r"\end{minipage}"]
     L.append(r"\end{table*}")
@@ -350,19 +352,17 @@ FN_MAP = {"A": {"1": "1", "2": "1", "3": "2", "5": "3", "6": "4"},
 FN_KEY = {"A": "t1.", "M": "t2."}   # footnotes.csv 의 로컬 문안 id 접두사
 RANK_EXCLUDE = {"C": {"11"}}          # 각주 5(M2D 마지막 배치 탈락, 1,408/1,429) 인 OOD 행은 전체 테스트셋 순위(굵게/밑줄)에서 제외 (2026-09-14)
 # 2026-09-14 사용자 제공 캡션 문안(그대로 사용)
-CAPTION_A = (r"Toolkit results on ICBHI 2017 use the official 60/40 split and four-class cycle scoring. Reported values are transcribed as published; "
-             r"toolkit results are five-seed means\,$\pm$\,SD. $\Delta$Sc is toolkit minus reported Score where available (\textcolor{dpos}{green}: $\geq 0$; "
-             r"\textcolor{dneg}{red}: $<0$), omitted for the split, metric, or selection differences discussed in the text and notes. "
-             r"Bold and underlined values mark the highest and second-highest comparable toolkit means per column. "
-             r"Abbreviations: IN = ImageNet; AS = AudioSet; LA = LAION-Audio-630K audio--text pairs; Resp = respiratory audio "
-             r"(OPERA-CT: the OPERA pre-training set of COVID-19 Sounds, UK COVID-19, COUGHVID, ICBHI and HF Lung, 136K samples with downstream test data held out; "
-             r"M2D-Resp: COUGHVID, HF Lung and ICBHI 2017 training recordings mixed with AudioSet); FM = foundation model; PEFT = parameter-efficient fine-tuning; IS = Interspeech.")
-CAPTION_M = (r"Toolkit results on the SPRSound 2022 inter-patient test set (five seeds; mean\,$\pm$\,SD). SPRSound $\to$ SPRSound uses the official training set "
-             r"and seven classes, except LungMix (four). ICBHI $\to$ SPRSound evaluates checkpoints from the ICBHI training runs in Table~\ref{tab:icbhi_diff}, "
-             r"selected on ICBHI test data without SPRSound fine-tuning or checkpoint selection, using four merged classes. Evaluation uses 1,429 events unless noted. "
-             r"Bold and underlined values mark the two highest means per column among results using the same label space and evaluation samples. "
-             r"SG-SCL~\cite{kim2024stethoscope} was not trained on SPRSound (n/a); its backbone baselines appear in the Fine-tuning group. \mbox{--}: not run. "
-             r"Implementation and protocol details are given in Section~2 and the notes. FM = foundation model; PEFT = parameter-efficient fine-tuning.")
+CAPTION_A = (r"Reported and toolkit results on ICBHI 2017. Toolkit results use the official 60/40 split and four-class scoring (five seeds; "
+             r"mean\,$\pm$\,SD). $\Delta$Sc = toolkit $-$ reported Score, shown only for comparable splits, metrics, and checkpoint selection. "
+             r"Bold and underlined values mark the highest and second-highest comparable toolkit means per column.")
+CAPTION_M = (r"Toolkit results on the SPRSound 2022 inter-patient test set (1,429 events unless noted; five seeds; mean\,$\pm$\,SD). "
+             r"SPRSound $\to$ SPRSound uses seven classes (LungMix: four). ICBHI $\to$ SPRSound is zero-shot, using four merged classes and "
+             r"checkpoints selected only on ICBHI test data. Bold and underlined values mark the two highest means per column among results with "
+             r"matching label spaces and test samples. n/a: SG-SCL in the single-stethoscope setting (see fine-tuning rows); \mbox{--}: not run. "
+             r"Abbreviations as in Table~\ref{tab:icbhi_diff}.")
+# 2026-09-14 사용자 축약안. 표 1 아래 번호 없는 범례 한 줄(ABBREV_LINE); 자세한 정의는 본문(docs/paper/body_text_moved_from_footnotes.md).
+ABBREV_LINE = (r"\textit{Abbreviations:} IN, ImageNet; AS, AudioSet; LA, LAION-Audio-630K; Resp, respiratory audio; FM, foundation model; "
+               r"PEFT, parameter-efficient fine-tuning; IS, Interspeech.")
 
 
 def _local(ids, table):
