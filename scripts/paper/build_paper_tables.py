@@ -362,8 +362,7 @@ CAPTION_A = (r"Reported and toolkit results on ICBHI 2017. Toolkit results use t
 CAPTION_M = (r"Toolkit results on the SPRSound 2022 inter-patient test set (1,429 events unless noted; five seeds; mean\,$\pm$\,SD). "
              r"SPRSound $\to$ SPRSound uses seven classes. ICBHI $\to$ SPRSound is zero-shot, using four merged classes and "
              r"checkpoints selected only on ICBHI test data. Bold and underlined values mark the two highest means per column among results with "
-             r"matching label spaces and test samples. \#Param: parameters of the inference model in millions, frozen backbones included. "
-             r"n/a: not available (see notes); \mbox{--}: not run. "
+             r"matching label spaces and test samples. n/a: not available (see notes); \mbox{--}: not run. "
              r"Abbreviations as in Table~\ref{tab:icbhi_diff}.")
 # 2026-09-14 사용자 축약안. 표 1 아래 번호 없는 범례 한 줄(ABBREV_LINE); 자세한 정의는 본문(docs/paper/body_text_moved_from_footnotes.md).
 ABBREV_LINE = (r"\textit{Abbreviations:} IN, ImageNet; AS, AudioSet; LA, LAION-Audio-630K; Resp, respiratory audio; FM, foundation model; "
@@ -392,7 +391,8 @@ def load_params():
 
 
 def _param_value(b, c, params):
-    """통합 행의 #Param: SPRSound 쪽(B) 모델, 없으면 ICBHI 쪽(C). 두 쪽은 분류 헤드(7 vs 4 class)만 달라 0.1 M 해상도에서 같다(count_params 가 기록)."""
+    """정의(2026-09-15 사용자 결정) = 체크포인트의 전체 파라미터(동결 백본·대조 projection head 포함); 캡션에 정의 문장은 넣지 않는다.
+    통합 행의 #Param: SPRSound 쪽(B) 모델, 없으면 ICBHI 쪽(C). 두 쪽은 분류 헤드(7 vs 4 class)만 달라 0.1 M 해상도에서 같다(count_params 가 기록)."""
     for a in (b, c):
         if a is not None and a["family"] in params:
             return params[a["family"]] / 1e6
