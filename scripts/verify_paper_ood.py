@@ -1,12 +1,12 @@
 # -*- coding: utf-8 -*-
 """
-논문 OOD 수치(outputs/<group>/<run>/ood.json) 재검증 — QLung·BTS-CARD.
+논문 OOD 수치(outputs/<group>/<run>/ood.json) 재검증 — QLung·BTS-CARD + 표 4/표 2 제로샷 스윕의 일반 family.
 
-ood.json 은 같은 best.pth 를 SPRSound OOD 프로토콜로 평가한 산출물이라(scripts/reproduction/eval_qlung_ood.py,
-eval_btscard_checkpoint.py), 그 스크립트를 **출력만 샌드박스로 돌려** 다시 실행하고 기존 ood.json 과
-(S_p, S_e, icbhi_score) 를 경로별로 대조한다. outputs/ 는 읽기만 한다.
+ood.json 은 같은 best.pth 를 SPRSound OOD 프로토콜로 평가한 산출물이라, 그것을 만든 스크립트(QLung: scripts/reproduction/eval_qlung_ood.py,
+BTS-CARD: eval_btscard_checkpoint.py, 그 밖의 family: scripts/eval_ood_sprsound.py --no-write-run)를 **출력만 샌드박스로 돌려**
+다시 실행하고 기존 ood.json 과 (S_p, S_e, icbhi_score) 를 경로별로 대조한다. outputs/ 는 읽기만 한다.
 
-  .venv/bin/python scripts/verify_paper_ood.py --out DIR [--group qlung|btscard] [--run NAME ...] [--dry-run] [--tol 0.05]
+  .venv/bin/python scripts/verify_paper_ood.py --out DIR [--group qlung|btscard|generic] [--run NAME ...] [--shard i/n] [--dry-run] [--tol 0.05]
 """
 from __future__ import annotations
 
@@ -47,8 +47,11 @@ def command_for(row: dict, run_dir: pathlib.Path, old: dict, out_json: pathlib.P
     ckpt = str(run_dir / "best.pth")
     if row["paper_group"] == "qlung":
         scopes = ",".join(k for k in ("inter", "all") if k in old)
-        return [PY, "scripts/reproduction/eval_qlung_ood.py", "--ckpt", ckpt, "--out", str(out_json),
-                "--scopes", scopes or "inter,all", "--device", device]
+        cmd = [PY, "scripts/reproduction/eval_qlung_ood.py", "--ckpt", ckpt, "--out", str(out_json),
+               "--scopes", scopes or "inter,all", "--device", device]
+        if old.get("backbone"):            # Audio-CLAP 판(icbhi-qlung-clap-*): ood.json 이 backbone 을 기록한다 (2026-09-07 추가분)
+            cmd += ["--backbone", str(old["backbone"])]
+        return cmd
     if row["paper_group"] == "btscard":
         srcs = [k[len("sprsound_"):] for k in old if k.startswith("sprsound_")]
         cmd = [PY, "scripts/reproduction/eval_btscard_checkpoint.py", "--ckpt", ckpt, "--ckpt_format",
@@ -59,7 +62,30 @@ def command_for(row: dict, run_dir: pathlib.Path, old: dict, out_json: pathlib.P
         if "icbhi" not in old:
             cmd.append("--no_icbhi")
         return cmd
-    raise ValueError(f"OOD 프로토콜을 모르는 그룹: {row['paper_group']}")
+    if old.get("generated_by") == "scripts/eval_ood_sprsound.py" or ("inter" in old and "protocol" in old):
+        # 표 4/표 2 제로샷 스윕(2026-09-08): 같은 스크립트를 --no-write-run 으로 돌려 results.jsonl 만 받는다
+        return [PY, "scripts/eval_ood_sprsound.py", "--out", str(out_json.parent / "generic"), "--runs", row["run_name"],
+                "--no-write-run", "--device", device, "--max-temp", "0"]
+    raise ValueError(f"OOD 프로토콜을 모르는 그룹/형식: {row['paper_group']} ({run_dir / 'ood.json'})")
+
+
+def is_generic(cmd: list[str]) -> bool:
+    return any(c.endswith("scripts/eval_ood_sprsound.py") for c in cmd)
+
+
+def collect_generic(cmd: list[str], run_name: str, out_json: pathlib.Path) -> str | None:
+    """eval_ood_sprsound.py 의 results.jsonl 에서 이 run 의 마지막 기록을 ood.json 모양({"inter": {...}})으로 out_json 에 쓴다. 실패 사유를 돌려준다."""
+    gen_dir = pathlib.Path(cmd[cmd.index("--out") + 1])
+    recs = [json.loads(l) for l in (gen_dir / "results.jsonl").read_text().splitlines() if l.strip()] if (gen_dir / "results.jsonl").exists() else []
+    recs = [r for r in recs if r.get("run") == run_name]
+    if not recs:
+        return "results.jsonl 에 기록 없음"
+    rec = recs[-1]
+    if rec.get("status") != "OK":
+        return f"{rec.get('status')}: {rec.get('error') or rec.get('note', '')}"[:1500]
+    out_json.parent.mkdir(parents=True, exist_ok=True)
+    out_json.write_text(json.dumps({"inter": rec["metrics"], "chain": rec.get("chain"), "load": rec.get("load")}, indent=1))
+    return None
 
 
 def walk_metrics(obj, path=()):
@@ -85,8 +111,9 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--master", default=str(ROOT / "docs" / "results_master.csv"))
     ap.add_argument("--out", required=True)
-    ap.add_argument("--group", choices=["qlung", "btscard"])
+    ap.add_argument("--group", choices=["qlung", "btscard", "generic"], help="generic = QLung·BTS-CARD 를 뺀 나머지(표 4/표 2 제로샷 스윕)")
     ap.add_argument("--run", action="append")
+    ap.add_argument("--shard", default=None, help="i/n — 행을 i::n 으로 나눠 맡는다 (GPU 병렬용; out 은 샤드별로 따로 주는 편이 안전)")
     ap.add_argument("--tol", type=float, default=0.05)
     ap.add_argument("--device", default="cuda")
     ap.add_argument("--dry-run", action="store_true")
@@ -96,10 +123,15 @@ def main() -> int:
     out_dir = pathlib.Path(args.out).resolve()
     out_dir.mkdir(parents=True, exist_ok=True)
     rows = [r for r in csv.DictReader(open(args.master)) if r["has_ood"] == "1"]
-    if args.group:
+    if args.group == "generic":
+        rows = [r for r in rows if r["paper_group"] not in ("qlung", "btscard")]
+    elif args.group:
         rows = [r for r in rows if r["paper_group"] == args.group]
     if args.run:
         rows = [r for r in rows if r["run_name"] in set(args.run)]
+    if args.shard:
+        i, n = (int(x) for x in args.shard.split("/"))
+        rows = rows[i::n]
 
     results = []
     for i, row in enumerate(rows, 1):
@@ -115,9 +147,10 @@ def main() -> int:
         t0 = time.time()
         proc = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True)
         rec["seconds"] = round(time.time() - t0, 1)
-        if proc.returncode != 0 or not out_json.exists():
+        gen_err = collect_generic(cmd, row["run_name"], out_json) if (is_generic(cmd) and proc.returncode == 0) else None
+        if proc.returncode != 0 or not out_json.exists() or gen_err:
             rec["status"] = "ERROR"
-            rec["error"] = (proc.stderr or proc.stdout)[-1500:]
+            rec["error"] = (gen_err or (proc.stderr or proc.stdout))[-1500:]
         else:
             new = json.loads(out_json.read_text())
             diffs, worst, missing = {}, 0.0, []
