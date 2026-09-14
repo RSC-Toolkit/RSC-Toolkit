@@ -348,8 +348,10 @@ CAPTION_FN = {"8"}                           # OOD 프로토콜(7→4 병합·α
 #   표 1: 1·2(코드 부재/부분 재구성/추정 설정)→1, 3(파일 단위 분할)→2, 5(AMS-D 이진 지표)→3, 6(Prototype final iterate)→4; 4(CLAP 사전계산 피처)는 본문으로.
 #   표 2: 7(BTS 4필드)→1, 13(PC-MCL 6속성)→2, 14(QLung log4)→3, 6+10(Prototype final/best)→4, 11(M2D 마지막 배치)→5; 1·2·9·12 는 캡션으로.
 #   2026-09-14 추가: 15(OPERA-CT 전체 미세조정 = 툴킷 정의 레시피)→표 1 로컬 5·표 2 로컬 6, 16(M2D-X ICBHI 특화 ckpt 의 SPRSound 미세조정)→표 2 로컬 7.
-FN_MAP = {"A": {"1": "1", "2": "1", "3": "2", "5": "3", "6": "4", "15": "5"},
-          "M": {"7": "1", "13": "2", "14": "3", "6": "4", "10": "4", "11": "5", "15": "6", "16": "7"}}
+#   2026-09-14 저녁(사용자): 표 1 각주 1(코드 부재/재구성; 전역 1·2) 제거 → 본문. Prototype·LungMix 표에서 제거(전역 6·10·9 미사용).
+#   n/a 사유는 캡션 대신 각주로: 12(SG-SCL 단일 청진기) → t2.7, 17(RespireNet 장치별 설계·SPRSound 로더 없음) → t2.8.
+FN_MAP = {"A": {"3": "1", "5": "2", "15": "3"},
+          "M": {"7": "1", "13": "2", "14": "3", "11": "4", "15": "5", "16": "6", "12": "7", "17": "8"}}
 FN_KEY = {"A": "t1.", "M": "t2."}   # footnotes.csv 의 로컬 문안 id 접두사
 RANK_EXCLUDE = {"C": {"11"}}          # 각주 5(M2D 마지막 배치 탈락, 1,408/1,429) 인 OOD 행은 전체 테스트셋 순위(굵게/밑줄)에서 제외 (2026-09-14)
 # 2026-09-14 사용자 제공 캡션 문안(그대로 사용)
@@ -357,13 +359,15 @@ CAPTION_A = (r"Reported and toolkit results on ICBHI 2017. Toolkit results use t
              r"mean\,$\pm$\,SD). $\Delta$Sc = toolkit $-$ reported Score, shown only for comparable splits, metrics, and checkpoint selection. "
              r"Bold and underlined values mark the highest and second-highest comparable toolkit means per column.")
 CAPTION_M = (r"Toolkit results on the SPRSound 2022 inter-patient test set (1,429 events unless noted; five seeds; mean\,$\pm$\,SD). "
-             r"SPRSound $\to$ SPRSound uses seven classes (LungMix: four). ICBHI $\to$ SPRSound is zero-shot, using four merged classes and "
+             r"SPRSound $\to$ SPRSound uses seven classes. ICBHI $\to$ SPRSound is zero-shot, using four merged classes and "
              r"checkpoints selected only on ICBHI test data. Bold and underlined values mark the two highest means per column among results with "
-             r"matching label spaces and test samples. n/a: SG-SCL in the single-stethoscope setting (see fine-tuning rows); \mbox{--}: not run. "
+             r"matching label spaces and test samples. n/a: not available (see notes); \mbox{--}: not run. "
              r"Abbreviations as in Table~\ref{tab:icbhi_diff}.")
 # 2026-09-14 사용자 축약안. 표 1 아래 번호 없는 범례 한 줄(ABBREV_LINE); 자세한 정의는 본문(docs/paper/body_text_moved_from_footnotes.md).
 ABBREV_LINE = (r"\textit{Abbreviations:} IN, ImageNet; AS, AudioSet; LA, LAION-Audio-630K; Resp, respiratory audio; FM, foundation model; "
-               r"PEFT, parameter-efficient fine-tuning; IS, Interspeech.")
+               r"PEFT, parameter-efficient fine-tuning; IS, Interspeech. \textit{Row groups:} Fine-tuning, plain fine-tuning of a pre-trained backbone; "
+               r"Aug., data augmentation; Contrastive, contrastive or auxiliary training objectives; FM / PEFT, foundation models and parameter-efficient "
+               r"fine-tuning; Arch., architecture or training protocol.")
 
 
 def _local(ids, table):
@@ -461,15 +465,21 @@ def build_merged(anchors, fam, meta, footnotes):
         cells = [first, name, m["arch"]]
         for t, a, other in (("B", b, c), ("C", c, b)):
             if a is None:
-                na = (other.get("na_fn") or "") if other else ""   # 사유는 캡션에; 셀에는 표식 없이 n/a
+                na = (other.get("na_fn") or "") if other else ""   # 사유는 각주(FN_MAP M)로; 캡션은 "n/a: not available" 만
                 fb = fallback.get((t, (other.get("na_fallback") or "") if other else ""))
                 if fb is not None:  # 빠진 쪽을 다른 family 값으로 채운다; 순위 표시에서는 제외
                     agg = aggregate(fb, fam)
                     cells += [_ours_pm(*agg["sp"]), _ours_pm(*agg["se"]), _ours_pm(*agg["score"])]
                     continue
-                cells.append(r"\multicolumn{3}{c}{" + ("n/a" if na else "--") + "}")
+                loc = _local({na}, "M") if na else set(); used_fn |= loc
+                cells.append(r"\multicolumn{3}{c}{" + ("n/a" if na else "--") + _sup(loc) + "}")
                 continue
             agg = agg_of(a, t)
+            if not agg["n"]:                                    # 행은 있으나 run 이 없다(RespireNet·Gap-Aug: 표 1 과 목록을 맞추기 위한 자리) → n/a(각주) 또는 --
+                na = a.get("na_fn") or ""
+                loc = _local({na}, "M") if na else set(); used_fn |= loc
+                cells.append(r"\multicolumn{3}{c}{" + ("n/a" if na else "--") + _sup(loc) + "}")
+                continue
             cells += [_ours_pm(*agg["sp"], marks[t, "sp"].get(i)), _ours_pm(*agg["se"], marks[t, "se"].get(i)),
                       _ours_pm(*agg["score"], marks[t, "score"].get(i)) + _sup(side_fn[t])]
         L.append(" & ".join(cells) + r" \\")
