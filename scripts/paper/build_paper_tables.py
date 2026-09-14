@@ -275,7 +275,7 @@ def build_patchmix(anchors, fam, table, meta, footnotes):
     best/second 는 comparable=1 행끼리, 우리 값 기준. 반환 aggs 는 표의 전 행(numbers.md 용)."""
     all_rows = [a for a in anchors if a["table"] == table]
     aggs = {a["family"] + "|" + a["metric_source"]: aggregate(a, fam) for a in all_rows}
-    rows = sorted((a for a in all_rows if a.get("pm_order")), key=lambda a: (BAND_ORDER.index(a["band"]), int(a["pm_order"])))
+    rows = sorted((a for a in all_rows if a.get("pm_order")), key=lambda a: (BAND_ORDER.index(a["band"]), float(a["pm_order"])))
     def agg_of(a): return aggs[a["family"] + "|" + a["metric_source"]]
     def comp(a): return meta[a["family"]]["comparable"] == "1"
     marks = {k: _rank_marks([agg_of(a)[k][0] if (comp(a) and agg_of(a)["n"]) else None for a in rows])
@@ -347,8 +347,9 @@ CAPTION_FN = {"8"}                           # OOD 프로토콜(7→4 병합·α
 # 2026-09-14 사용자 지시 — 표마다 각주를 다시 번호 매긴다. anchors.fn 의 전역 id → 표 로컬 번호; 맵에 없는 전역 id 는 캡션/본문으로 옮겨져 표식이 없다.
 #   표 1: 1·2(코드 부재/부분 재구성/추정 설정)→1, 3(파일 단위 분할)→2, 5(AMS-D 이진 지표)→3, 6(Prototype final iterate)→4; 4(CLAP 사전계산 피처)는 본문으로.
 #   표 2: 7(BTS 4필드)→1, 13(PC-MCL 6속성)→2, 14(QLung log4)→3, 6+10(Prototype final/best)→4, 11(M2D 마지막 배치)→5; 1·2·9·12 는 캡션으로.
-FN_MAP = {"A": {"1": "1", "2": "1", "3": "2", "5": "3", "6": "4"},
-          "M": {"7": "1", "13": "2", "14": "3", "6": "4", "10": "4", "11": "5"}}
+#   2026-09-14 추가: 15(OPERA-CT 전체 미세조정 = 툴킷 정의 레시피)→표 1 로컬 5·표 2 로컬 6, 16(M2D-X ICBHI 특화 ckpt 의 SPRSound 미세조정)→표 2 로컬 7.
+FN_MAP = {"A": {"1": "1", "2": "1", "3": "2", "5": "3", "6": "4", "15": "5"},
+          "M": {"7": "1", "13": "2", "14": "3", "6": "4", "10": "4", "11": "5", "15": "6", "16": "7"}}
 FN_KEY = {"A": "t1.", "M": "t2."}   # footnotes.csv 의 로컬 문안 id 접두사
 RANK_EXCLUDE = {"C": {"11"}}          # 각주 5(M2D 마지막 배치 탈락, 1,408/1,429) 인 OOD 행은 전체 테스트셋 순위(굵게/밑줄)에서 제외 (2026-09-14)
 # 2026-09-14 사용자 제공 캡션 문안(그대로 사용)
@@ -556,7 +557,7 @@ def patchmix_html(anchors, fam, meta, footnotes):
     for table in ("A",):
         all_rows = [a for a in anchors if a["table"] == table]
         aggs = {a["family"] + "|" + a["metric_source"]: aggregate(a, fam) for a in all_rows}
-        rows = sorted((a for a in all_rows if a.get("pm_order")), key=lambda a: (BAND_ORDER.index(a["band"]), int(a["pm_order"])))
+        rows = sorted((a for a in all_rows if a.get("pm_order")), key=lambda a: (BAND_ORDER.index(a["band"]), float(a["pm_order"])))
         key = lambda a: a["family"] + "|" + a["metric_source"]
         comp = lambda a: meta[a["family"]]["comparable"] == "1"
         marks = {k: _rank_marks([aggs[key(a)][k][0] if (comp(a) and aggs[key(a)]["n"]) else None for a in rows])

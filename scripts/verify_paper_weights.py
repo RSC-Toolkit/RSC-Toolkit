@@ -164,6 +164,17 @@ def resolve_config(row: dict, master_rows: list[dict] | None = None) -> tuple[di
                 for r in master_rows:
                     if r["run_name"] == cand and r["provenance"] == "hydra" and r.get("hydra_dir"):
                         return load_snapshot_config(ROOT / r["hydra_dir"]), f"sibling:{cand}"
+    # 스냅샷·로그가 모두 없는 정규 seed run(예: icbhi-m2d-base-s1, sprs-operact-ft-s1 — 초기 배치의 hydra 디렉터리 유실):
+    # seed·run.name 외의 설정은 시리즈 안에서 같으므로 다른 seed 의 스냅샷으로 재구성한다. 출처(sibling:…)를 남긴다.
+    m = re.match(r"^(.*)-s(\d+)$", row["run_name"])
+    if m and master_rows is not None:
+        for k in range(1, 6):
+            cand = f"{m.group(1)}-s{k}"
+            if cand == row["run_name"]:
+                continue
+            for r in master_rows:
+                if r["run_name"] == cand and r["provenance"] == "hydra" and r.get("hydra_dir"):
+                    return load_snapshot_config(ROOT / r["hydra_dir"]), f"sibling:{cand}"
     return None, "none"
 
 

@@ -104,7 +104,7 @@ GPU=0 scripts/eval.sh  outputs/patchmix/icbhi-patchmix-cl-s1
 | Prototype — CNN8-Pt (`protonet`) | `protonet_icbhi` (`model.params.method=cnn8` 기준선) | `protonet_sprs` |
 | RespireNet — CNN / +CBA (`respirenet`) | `respirenet_icbhi data.params.split_mode=official data.params.pad_seed=1 data.params.aug_seed=1` / `+ data.params.aug_scale=1 data.params.cba_seed=1` (저자 fold-4: `split_mode` 생략) | — |
 | MVST — 뷰 5개 + 융합 (`ast_mvst`) | `mvst_icbhi model.params.view=16` (16·32·64·128·256 각각) → `scripts/reproduction/aggregate_mvst_results.py` 로 융합 | `mvst_sprs model.params.view=…` |
-| M2D base / M2D-X / M2D-Resp (`m2d`) | `m2d_icbhi` / `model.params.pretrained_path=pretrained_models/upstream/m2d/<ckpt>` (M2D-Resp 는 `model.params.input_size=[80,608]` 추가) | `m2d_sprs …` |
+| M2D base / M2D-X / M2D-Resp (`m2d`) | `m2d_icbhi` / `model.params.pretrained_path=pretrained_models/upstream/m2d/<ckpt>` (M2D-Resp 는 `model.params.input_size=[80,608]` 추가) | `m2d_sprs …` (M2D-X 는 ICBHI 특화 공개 ckpt 를 그대로 미세조정 — 툴킷 관찰값, 논문 대응값 없음) |
 | OPERA-CT frozen / fine-tune (`opera_ct`) | `opera_embc_icbhi` / `opera_ft_icbhi` | `opera_embc_sprs` / `opera_ft_sprs` |
 | DDE-MAE (`audiomae_dde_cls`; 논문 표 제외) | `dde_icbhi_b2` / `dde_icbhi_stage1` → `dde_icbhi_stage2 model.params.encoder_ckpt=<stage1 final_state.pth>` | — |
 
