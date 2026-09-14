@@ -287,9 +287,10 @@ def build_patchmix(anchors, fam, table, meta, footnotes):
             r"\cmidrule(lr){6-8}\cmidrule(lr){9-11}",
             r"& & & & & $S_p$ & $S_e$ & Sc & $S_p$ & $S_e$ & \textbf{Sc} & \\"]
     common = (r" ``Reported'' copies the numbers from each paper (single run or mean over the paper's seeds; blank where the paper reports "
-              r"nothing for this setting); ``ours'' is the toolkit re-implementation with five seeds (mean\,$\pm$\,std) under one protocol. "
+              r"nothing for this setting); ``ours'' is the toolkit re-implementation with five seeds (mean\,$\pm$\,std). "
               r"$\Delta$Sc = ours $-$ reported Score (\textcolor{dpos}{green}: at or above, \textcolor{dneg}{red}: below), shown only where the "
-              r"two are measured under the same protocol. \textbf{Best} and \underline{second best} (ours) among directly comparable rows.")
+              r"two are measured on the same split with the same metric. \textbf{Bold} and \underline{underline} mark the highest and second-highest "
+              r"``ours'' value per column among directly comparable rows.")
     common = common + r" Rows are grouped by the type of contribution (rotated labels)."
     cap = {"A": "Reported vs.\\ reproduced results on " + dsdesc + ".",
            "B": "Reported vs.\\ reproduced results on " + dsdesc + ".",
@@ -303,6 +304,8 @@ def build_patchmix(anchors, fam, table, meta, footnotes):
     for i, a in enumerate(rows):
         agg = agg_of(a); m = meta[a["family"]]
         fns = [x for x in a["fn"].split(";") if x]
+        if table == "A":
+            fns = sorted(_local(fns, "A"), key=int)
         used_fn.update(fns)
         fn = (r"\textsuperscript{" + ",".join(fns) + "}") if fns else ""
         name = tex_escape(m["method"]) + r"~\cite{" + m["cite"].replace(" ", "") + "}" + fn
@@ -325,7 +328,8 @@ def build_patchmix(anchors, fam, table, meta, footnotes):
             cells.append(delta_color_tex(agg["score"][0] - float(a["paper_score"])))
         L.append(" & ".join(cells) + r" \\")
     L += [r"\bottomrule", r"\end{tabular}}"]
-    notes = [r"\textsuperscript{" + k + "} " + footnotes[k] for k in sorted((x for x in used_fn if x.isdigit()), key=int)]
+    key = (lambda k: FN_KEY["A"] + k) if table == "A" else (lambda k: k)
+    notes = [r"\textsuperscript{" + k + "} " + footnotes[key(k)] for k in sorted((x for x in used_fn if x.isdigit()), key=int)]
     if notes:
         L += [r"\par\vspace{2pt}\begin{minipage}{\linewidth}\scriptsize", " ".join(notes), r"\end{minipage}"]
     L.append(r"\end{table*}")
@@ -338,6 +342,16 @@ MERGE_KEY_OVERRIDES = {"icbhi-btscard-paper": "btscard", "icbhi-lungsrad-dualpap
 MERGE_ORDER_HINT = {"m2d-base": 13.5}        # 표 1(A) 에 짝이 없는 행의 자리 — icbhi-m2dx-s5(A pm_order 14) 바로 앞
 METHOD_LEVEL_FN = {"1", "2", "12", "13"}     # 두 열 모두에 걸리는 각주(코드 없음·하이퍼파라미터·정의 불가) → 방법 이름에; 나머지는 해당 열의 Sc 셀에
 CAPTION_FN = {"8"}                           # OOD 프로토콜(7→4 병합·α=0) 은 캡션 문장으로 옮겼다
+# 2026-09-14 사용자 지시 — 표마다 각주를 다시 번호 매긴다. anchors.fn 의 전역 id → 표 로컬 번호; 맵에 없는 전역 id 는 캡션/본문으로 옮겨져 표식이 없다.
+#   표 1: 1·2(코드 부재/부분 재구성/추정 설정)→1, 3(파일 단위 분할)→2, 5(AMS-D 이진 지표)→3, 6(Prototype final iterate)→4; 4(CLAP 사전계산 피처)는 본문으로.
+#   표 2: 7(BTS 4필드)→1, 13(PC-MCL 6속성)→2, 14(QLung log4)→3, 6+10(Prototype final/best)→4, 11(M2D 마지막 배치)→5; 1·2·9·12 는 캡션으로.
+FN_MAP = {"A": {"1": "1", "2": "1", "3": "2", "5": "3", "6": "4"},
+          "M": {"7": "1", "13": "2", "14": "3", "6": "4", "10": "4", "11": "5"}}
+FN_KEY = {"A": "t1.", "M": "t2."}   # footnotes.csv 의 로컬 문안 id 접두사
+
+
+def _local(ids, table):
+    return {FN_MAP[table][x] for x in ids if x in FN_MAP[table]}
 
 
 def merge_key(family: str) -> str:
@@ -367,10 +381,9 @@ def _fns(a):
 
 
 def _split_fns(b, c):
-    """방법 이름에 붙일 각주 / 열별(Sc 셀) 각주. 양쪽에 다 있거나 METHOD_LEVEL_FN 이면 이름에."""
-    fb, fc = _fns(b), _fns(c)
-    name = (fb & fc) | ((fb | fc) & METHOD_LEVEL_FN)
-    return name, {"B": fb - name, "C": fc - name}
+    """표 2 각주는 전부 해당 열의 Sc 셀에(로컬 번호 FN_MAP['M']). 맵에 없는 전역 각주(1·2·9·12)는 캡션으로 옮겨져 표식이 없다.
+    반환: (이름 각주 = 항상 빈 집합, {"B": …, "C": …})"""
+    return set(), {"B": _local(_fns(b), "M"), "C": _local(_fns(c), "M")}
 
 
 def _fallback_lookup(anchors):
@@ -403,13 +416,17 @@ def build_merged(anchors, fam, meta, footnotes):
             r"\multicolumn{3}{c}{SPRSound $\to$ SPRSound} & \multicolumn{3}{c}{ICBHI $\to$ SPRSound (zero-shot)} \\",
             r"\cmidrule(lr){6-8}\cmidrule(lr){9-11}",
             r"& & & & & $S_p$ & $S_e$ & \textbf{Sc} & $S_p$ & $S_e$ & \textbf{Sc} \\"]
-    cap = (r"Reproduced results on the SPRSound 2022 inter-patient test set (1,429 events), five seeds each (mean\,$\pm$\,std) under one protocol. "
-           r"SPRSound $\to$ SPRSound: trained on the SPRSound 2022 inter-patient training set (7-class cycle classification). "
-           r"ICBHI $\to$ SPRSound: the ICBHI-trained checkpoints of Table~\ref{tab:icbhi_diff} evaluated zero-shot with 7$\to$4 label merging "
-           r"(BTS-CARD with $\alpha=0$, where the paper reports its best $\alpha$). "
-           r"\textbf{Best} and \underline{second best} per column among directly comparable rows. "
-           r"``--'': not run in this study; n/a: the method cannot be applied to that setting (see footnotes). "
-           r"Rows are grouped by the type of contribution (rotated labels).")
+    cap = (r"Reproduced results on the SPRSound 2022 inter-patient test set (1,429 events; five seeds, mean\,$\pm$\,std). "
+           r"SPRSound $\to$ SPRSound: trained on the SPRSound 2022 inter-patient training set with the 7-class label space; the LungMix entry follows "
+           r"its paper's 4-class merged labels and is not directly comparable with the 7-class entries. "
+           r"ICBHI $\to$ SPRSound: the ICBHI-trained checkpoints of Table~\ref{tab:icbhi_diff}, selected on the ICBHI test split without any use of SPRSound, "
+           r"evaluated zero-shot after merging the seven SPRSound labels into the four ICBHI classes (BTS-CARD with $\alpha=0$, whereas its paper reports the best $\alpha$). "
+           r"Methods whose released code does not cover the full method use re-implemented components or inferred settings recorded in the toolkit configurations. "
+           r"SPRSound is recorded with a single stethoscope~\cite{kim2024stethoscope}; SG-SCL, whose contrastive term is defined over stethoscope domains, "
+           r"was not trained on SPRSound in this study (n/a): the SPRSound baselines of its backbones are the fine-tuning rows, and its ICBHI $\to$ SPRSound entries "
+           r"evaluate the ICBHI-trained SG-SCL checkpoints. ``--'': not run in this study. "
+           r"\textbf{Bold} and \underline{underline} mark the highest and second-highest mean per column among rows sharing the label space. "
+           r"Exceptions in the evaluated samples or label space are marked by footnotes. Rows are grouped by the type of contribution (rotated labels).")
     L = [r"\begin{table*}[!t]", r"\centering", r"\caption{" + cap + "}", r"\label{tab:" + label + "}",
          r"\renewcommand{\arraystretch}{1}", r"\addtolength{\tabcolsep}{2pt}",
          r"\resizebox{\linewidth}{!}{", r"\begin{tabular}{" + colspec + "}", r"\toprule", *head, r"\hline \midrule"]
@@ -437,22 +454,20 @@ def build_merged(anchors, fam, meta, footnotes):
         cells = [first, name, m["arch"], tex_escape(m["pretrain"]).replace("+", r"\,+\,"), r"\textit{" + m["venue"] + "}"]
         for t, a, other in (("B", b, c), ("C", c, b)):
             if a is None:
-                na = (other.get("na_fn") or "") if other else ""
+                na = (other.get("na_fn") or "") if other else ""   # 사유는 캡션에; 셀에는 표식 없이 n/a
                 fb = fallback.get((t, (other.get("na_fallback") or "") if other else ""))
-                if na:
-                    used_fn.add(na)
-                if fb is not None:  # 빠진 쪽을 다른 family 값으로 채운다(SG-SCL → 같은 백본 fine-tuning); 순위 표시에서는 제외
+                if fb is not None:  # 빠진 쪽을 다른 family 값으로 채운다; 순위 표시에서는 제외
                     agg = aggregate(fb, fam)
-                    cells += [_ours_pm(*agg["sp"]), _ours_pm(*agg["se"]), _ours_pm(*agg["score"]) + _sup({na} if na else set())]
+                    cells += [_ours_pm(*agg["sp"]), _ours_pm(*agg["se"]), _ours_pm(*agg["score"])]
                     continue
-                cells.append(r"\multicolumn{3}{c}{" + ("n/a" + _sup({na}) if na else "--") + "}")
+                cells.append(r"\multicolumn{3}{c}{" + ("n/a" if na else "--") + "}")
                 continue
             agg = agg_of(a, t)
             cells += [_ours_pm(*agg["sp"], marks[t, "sp"].get(i)), _ours_pm(*agg["se"], marks[t, "se"].get(i)),
                       _ours_pm(*agg["score"], marks[t, "score"].get(i)) + _sup(side_fn[t])]
         L.append(" & ".join(cells) + r" \\")
     L += [r"\bottomrule", r"\end{tabular}}"]
-    notes = [r"\textsuperscript{" + k + "} " + footnotes[k] for k in sorted((x for x in used_fn if x.isdigit()), key=int)]
+    notes = [r"\textsuperscript{" + k + "} " + footnotes[FN_KEY["M"] + k] for k in sorted((x for x in used_fn if x.isdigit()), key=int)]
     if notes:
         L += [r"\par\vspace{2pt}\begin{minipage}{\linewidth}\scriptsize", " ".join(notes), r"\end{minipage}"]
     L.append(r"\end{table*}")
@@ -496,21 +511,19 @@ def merged_html(anchors, fam, meta, footnotes, tex2html):
             if a is None:
                 na = (other.get("na_fn") or "") if other else ""
                 fb = fallback.get((t, (other.get("na_fallback") or "") if other else ""))
-                if na:
-                    used.add(na)
                 if fb is not None:
                     agg = aggregate(fb, fam)
                     cells += [f'<td class="m">{_ours_html(*agg["sp"])}</td>', f'<td class="m">{_ours_html(*agg["se"])}</td>',
-                              f'<td class="m">{_ours_html(*agg["score"])}{_sup({na} if na else set(), html=True)}</td>']
+                              f'<td class="m">{_ours_html(*agg["score"])}</td>']
                     continue
-                cells.append('<td class="m" colspan="3">' + ("n/a" + _sup({na}, html=True) if na else "—") + "</td>")
+                cells.append('<td class="m" colspan="3">' + ("n/a" if na else "—") + "</td>")
                 continue
             agg = agg_of(a, t)
             cells += [f'<td class="m">{_ours_html(*agg["sp"], marks[t, "sp"].get(i))}</td>', f'<td class="m">{_ours_html(*agg["se"], marks[t, "se"].get(i))}</td>',
                       f'<td class="m">{_ours_html(*agg["score"], marks[t, "score"].get(i))}{_sup(side_fn[t], html=True)}</td>']
         L.append("<tr>" + "".join(cells) + "</tr>")
     L.append("</tbody></table></div>")
-    notes = [f"<sup>{k}</sup> " + _html_esc(tex2html(footnotes[k])) for k in sorted((x for x in used if x.isdigit()), key=int)]
+    notes = [f"<sup>{k}</sup> " + _html_esc(tex2html(footnotes[FN_KEY["M"] + k])) for k in sorted((x for x in used if x.isdigit()), key=int)]
     L.append('<p class="pm-notes">' + " ".join(notes) + "</p></div>")
     return "\n".join(L) + "\n"
 
@@ -550,7 +563,10 @@ def patchmix_html(anchors, fam, meta, footnotes):
         cur_band = None
         for i, a in enumerate(rows):
             m = meta[a["family"]]; agg = aggs[key(a)]
-            fns = [x for x in a["fn"].split(";") if x]; used.update(fns)
+            fns = [x for x in a["fn"].split(";") if x]
+            if table == "A":
+                fns = sorted(_local(fns, "A"), key=int)
+            used.update(fns)
             fn = f"<sup>{','.join(fns)}</sup>" if fns else ""
             cite = f'<span class="run">\\cite{{{m["cite"].replace(" ", "")}}} · {a["family"]}{" · " + a["metric_source"] if table == "C" else ""}</span>'
             first = ""
@@ -572,7 +588,8 @@ def patchmix_html(anchors, fam, meta, footnotes):
                 cells.append(f'<td class="m"><span class="d {cls}">{delta_str(dd, tex=False)}</span></td>')
             L.append("<tr>" + "".join(cells) + "</tr>")
         L.append("</tbody></table></div>")
-        notes = [f"<sup>{k}</sup> " + _html_esc(tex2html(footnotes[k])) for k in sorted((x for x in used if x.isdigit()), key=int)]
+        key = (lambda k: FN_KEY["A"] + k) if table == "A" else (lambda k: k)
+        notes = [f"<sup>{k}</sup> " + _html_esc(tex2html(footnotes[key(k)])) for k in sorted((x for x in used if x.isdigit()), key=int)]
         L.append('<p class="pm-notes">' + " ".join(notes) + "</p></div>")
         out.append("\n".join(L))
     out.append(merged_html(anchors, fam, meta, footnotes, tex2html))
@@ -616,7 +633,7 @@ def numbers_md(anchors, fam, aggs_by_table, git_sha):
         out += [f"❌ 불일치 {len(mismatches)}건:"] + [f"- {t} {m} `{f}`: 계산 {c:.2f} vs 원장 {l:.2f}" for t, m, f, c, l in mismatches]
     else:
         out.append(f"✅ 전 행 일치 (|Δ| ≤ 0.01) — A {sum(1 for a in anchors if a['table']=='A')} · B {sum(1 for a in anchors if a['table']=='B')} · C {sum(1 for a in anchors if a['table']=='C')} 행")
-    out += ["", "## 기호", "", "† 팀 논문 · ‡ 툴킷 변형 · 숫자 각주는 docs/paper/footnotes.csv (1 코드 없음 · 2 하이퍼파라미터 미제공 · 3 스플릿 상이 …)"]
+    out += ["", "## 기호", "", "† 팀 논문 · ‡ 툴킷 변형 · 이 문서의 각주 번호는 anchors.fn 의 전역 id(docs/paper/footnotes.csv 1~14). 논문 표는 표별 로컬 번호(t1.1~4, t2.1~5; FN_MAP)로 다시 매긴다"]
     return "\n".join(out) + "\n", mismatches
 
 
