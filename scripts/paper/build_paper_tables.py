@@ -292,9 +292,9 @@ def build_patchmix(anchors, fam, table, meta, footnotes):
               r"two are measured on the same split with the same metric. \textbf{Bold} and \underline{underline} mark the highest and second-highest "
               r"``ours'' value per column among directly comparable rows.")
     common = common + r" Rows are grouped by the type of contribution (rotated labels)."
-    cap = {"A": "Reported vs.\\ reproduced results on " + dsdesc + ".",
+    cap = {"A": CAPTION_A,
            "B": "Reported vs.\\ reproduced results on " + dsdesc + ".",
-           "C": "Reported vs.\\ reproduced " + dsdesc + "."}[table] + common
+           "C": "Reported vs.\\ reproduced " + dsdesc + "."}[table] + ("" if table == "A" else common)
     L = [DELTA_COLORS, r"\begin{table*}[!t]", r"\centering", r"\caption{" + cap + "}", r"\label{tab:" + label + "}",
          r"\renewcommand{\arraystretch}{1}", r"\addtolength{\tabcolsep}{2pt}",
          r"\resizebox{\linewidth}{!}{", r"\begin{tabular}{" + colspec + "}", r"\toprule", *head, r"\hline \midrule"]
@@ -348,6 +348,18 @@ CAPTION_FN = {"8"}                           # OOD 프로토콜(7→4 병합·α
 FN_MAP = {"A": {"1": "1", "2": "1", "3": "2", "5": "3", "6": "4"},
           "M": {"7": "1", "13": "2", "14": "3", "6": "4", "10": "4", "11": "5"}}
 FN_KEY = {"A": "t1.", "M": "t2."}   # footnotes.csv 의 로컬 문안 id 접두사
+RANK_EXCLUDE = {"C": {"11"}}          # 각주 5(M2D 마지막 배치 탈락, 1,408/1,429) 인 OOD 행은 전체 테스트셋 순위(굵게/밑줄)에서 제외 (2026-09-14)
+# 2026-09-14 사용자 제공 캡션 문안(그대로 사용)
+CAPTION_A = (r"Toolkit results on ICBHI 2017 use the official 60/40 split and four-class cycle scoring. Reported values are transcribed as published; "
+             r"toolkit results are five-seed means\,$\pm$\,SD. $\Delta$Sc is toolkit minus reported Score where available (\textcolor{dpos}{green}: $\geq 0$; "
+             r"\textcolor{dneg}{red}: $<0$), omitted for the split, metric, or selection differences discussed in the text and notes. "
+             r"Bold and underlined values mark the highest and second-highest comparable toolkit means per column.")
+CAPTION_M = (r"Toolkit results on the SPRSound 2022 inter-patient test set (five seeds; mean\,$\pm$\,SD). SPRSound $\to$ SPRSound uses the official training set "
+             r"and seven classes, except LungMix (four). ICBHI $\to$ SPRSound evaluates checkpoints from the ICBHI training runs in Table~\ref{tab:icbhi_diff}, "
+             r"selected on ICBHI test data without SPRSound fine-tuning or checkpoint selection, using four merged classes. Evaluation uses 1,429 events unless noted. "
+             r"Bold and underlined values mark the two highest means per column among results using the same label space and evaluation samples. "
+             r"SG-SCL~\cite{kim2024stethoscope} was not trained on SPRSound (n/a); its backbone baselines appear in the Fine-tuning group. \mbox{--}: not run. "
+             r"Implementation and protocol details are given in Section~2 and the notes.")
 
 
 def _local(ids, table):
@@ -407,7 +419,8 @@ def build_merged(anchors, fam, meta, footnotes):
     marks = {}
     for t, i in (("B", 1), ("C", 2)):
         for k in ("sp", "se", "score"):
-            marks[t, k] = _rank_marks([agg_of(r[i], t)[k][0] if (r[i] is not None and comp(r[i]) and agg_of(r[i], t)["n"]) else None
+            marks[t, k] = _rank_marks([agg_of(r[i], t)[k][0] if (r[i] is not None and comp(r[i]) and agg_of(r[i], t)["n"]
+                                                                and not (_fns(r[i]) & RANK_EXCLUDE.get(t, set()))) else None
                                        for r in rows])
     fallback = _fallback_lookup(anchors)
     stem, label = MERGED
@@ -416,17 +429,7 @@ def build_merged(anchors, fam, meta, footnotes):
             r"\multicolumn{3}{c}{SPRSound $\to$ SPRSound} & \multicolumn{3}{c}{ICBHI $\to$ SPRSound (zero-shot)} \\",
             r"\cmidrule(lr){6-8}\cmidrule(lr){9-11}",
             r"& & & & & $S_p$ & $S_e$ & \textbf{Sc} & $S_p$ & $S_e$ & \textbf{Sc} \\"]
-    cap = (r"Reproduced results on the SPRSound 2022 inter-patient test set (1,429 events; five seeds, mean\,$\pm$\,std). "
-           r"SPRSound $\to$ SPRSound: trained on the SPRSound 2022 inter-patient training set with the 7-class label space; the LungMix entry follows "
-           r"its paper's 4-class merged labels and is not directly comparable with the 7-class entries. "
-           r"ICBHI $\to$ SPRSound: the ICBHI-trained checkpoints of Table~\ref{tab:icbhi_diff}, selected on the ICBHI test split without any use of SPRSound, "
-           r"evaluated zero-shot after merging the seven SPRSound labels into the four ICBHI classes (BTS-CARD with $\alpha=0$, whereas its paper reports the best $\alpha$). "
-           r"Methods whose released code does not cover the full method use re-implemented components or inferred settings recorded in the toolkit configurations. "
-           r"SPRSound is recorded with a single stethoscope~\cite{kim2024stethoscope}; SG-SCL, whose contrastive term is defined over stethoscope domains, "
-           r"was not trained on SPRSound in this study (n/a): the SPRSound baselines of its backbones are the fine-tuning rows, and its ICBHI $\to$ SPRSound entries "
-           r"evaluate the ICBHI-trained SG-SCL checkpoints. ``--'': not run in this study. "
-           r"\textbf{Bold} and \underline{underline} mark the highest and second-highest mean per column among rows sharing the label space. "
-           r"Exceptions in the evaluated samples or label space are marked by footnotes. Rows are grouped by the type of contribution (rotated labels).")
+    cap = CAPTION_M
     L = [r"\begin{table*}[!t]", r"\centering", r"\caption{" + cap + "}", r"\label{tab:" + label + "}",
          r"\renewcommand{\arraystretch}{1}", r"\addtolength{\tabcolsep}{2pt}",
          r"\resizebox{\linewidth}{!}{", r"\begin{tabular}{" + colspec + "}", r"\toprule", *head, r"\hline \midrule"]
@@ -483,7 +486,8 @@ def merged_html(anchors, fam, meta, footnotes, tex2html):
     marks = {}
     for t, i in (("B", 1), ("C", 2)):
         for k in ("sp", "se", "score"):
-            marks[t, k] = _rank_marks([agg_of(r[i], t)[k][0] if (r[i] is not None and comp(r[i]) and agg_of(r[i], t)["n"]) else None
+            marks[t, k] = _rank_marks([agg_of(r[i], t)[k][0] if (r[i] is not None and comp(r[i]) and agg_of(r[i], t)["n"]
+                                                                and not (_fns(r[i]) & RANK_EXCLUDE.get(t, set()))) else None
                                        for r in rows])
     A = {merge_key(a["family"]): a for a in anchors if a["table"] == "A" and a.get("pm_order")}
     row_band = [A[k]["band"] if k in A else (c or b)["band"] for k, b, c in rows]
