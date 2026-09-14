@@ -43,15 +43,39 @@ ALT_KEYS = [
 ]
 
 
+# 학습 run 이 아닌데 best.json 을 남기는 outputs/ 하위 — 논문 표의 원천이 아니므로 스캔에서 뺀다.
+#  * 평가 sandbox(`sandbox/`, `callback_out/`): eval_ood_sprsound·verify_paper_weights 가 콜백(RespireNetVoteEval 등)을
+#    유지한 채 돌면 원 run 과 같은 run.name 으로 best.json 을 다시 쓴다 → family 집계에 섞여 n 이 2배가 된다(2026-09-15 발견).
+#  * `weights_release/`: 배포 번들(원 run 의 사본), `tutorial/`: 튜토리얼(1 epoch·toy) 산출물.
+EXCLUDE_GROUPS = frozenset({"weights_release", "tutorial"})
+EXCLUDE_PARTS = frozenset({"sandbox", "callback_out"})
+
+
+def is_experiment_run(rel: pathlib.Path) -> bool:
+    """outputs/ 기준 상대경로(rel = <group>/.../best.json)가 논문 표의 원천이 되는 학습 run 인지."""
+    parts = rel.parts
+    if DATE_DIR.match(parts[0]):                      # 날짜 디렉터리 = hydra 작업 디렉터리
+        return False
+    if parts[0] in EXCLUDE_GROUPS:
+        return False
+    if EXCLUDE_PARTS.intersection(parts):             # 평가 sandbox 가 남긴 콜백 산출물
+        return False
+    if rel.parent.name.startswith("smoke-"):          # 스모크(limit_batches·1 epoch)
+        return False
+    return True
+
+
 def iter_run_dirs():
-    """결과가 있는 런 디렉터리를 모두 낸다. 날짜 디렉터리(= hydra 작업 디렉터리)는 건너뛴다."""
+    """결과가 있는 런 디렉터리를 모두 낸다(`is_experiment_run` 이 거른 것은 stderr 에 건수만 알린다)."""
+    skipped = collections.Counter()
     for best in sorted(OUTPUTS.glob("**/best.json")):
         rel = best.relative_to(OUTPUTS)
-        if DATE_DIR.match(rel.parts[0]):
-            continue
-        if best.parent.name.startswith("smoke-"):   # 스모크(limit_batches·1 epoch)는 논문 표의 원천이 아니다
+        if not is_experiment_run(rel):
+            skipped[rel.parts[0]] += 1
             continue
         yield best.parent, rel
+    if skipped:
+        print("  스캔 제외(학습 run 아님): " + " · ".join(f"{k} {v}" for k, v in sorted(skipped.items())), file=sys.stderr)
 
 
 def load_json(path: pathlib.Path):
