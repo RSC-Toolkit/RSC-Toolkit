@@ -411,10 +411,13 @@ def evaluate_run(run_dir: pathlib.Path, *, project_root: Optional[pathlib.Path] 
         return rec
 
     best_json = run_dir / "best.json"
-    if best_json.exists() and not overrides:
+    if best_json.exists():
         expected = json.loads(best_json.read_text())
         status, diffs, worst = compare(expected, info["metrics"], tol)
-        rec.update({"status": status, "diffs": diffs, "max_abs_diff": worst})
+        # override 가 있으면 프로토콜이 바뀌었을 수 있으므로 판정(PASS/MISMATCH)은 내리지 않고 "OK" 로 두되,
+        # 대조 결과(diffs·max_abs_diff)는 참고용으로 함께 돌려준다 — 경로만 바꾼 평가(튜토리얼의 공개 weight 재평가)가 이를 쓴다.
+        rec.update({"status": status if not overrides else "OK", "diffs": diffs, "max_abs_diff": worst,
+                    "compared_with_overrides": bool(overrides)})
     else:
         rec["status"] = "OK"
     return rec

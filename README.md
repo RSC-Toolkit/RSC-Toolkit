@@ -9,6 +9,12 @@ Respiratory Sound Classification Toolkit — **ICBHI 2017** 과 **SPRSound** 위
 현재 **모델 33종**이 등록돼 있고(SFT 기준선부터 대조학습·어댑터·파운데이션 모델까지),
 논문별 골든 텐서 회귀 테스트로 이식 충실도를 고정한다.
 
+## 처음이라면 — 튜토리얼
+
+설치 → toy 데이터 학습 → 재평가 → **자기 모델 등록**(CPU, 수 분) → ICBHI 실데이터 1 epoch → **공개 논문 weight 재평가**(GPU) 를
+한 번에 따라 하는 최소 경로: [`docs/TUTORIAL.md`](docs/TUTORIAL.md) (노트북 판 [`notebooks/tutorial.ipynb`](notebooks/tutorial.ipynb),
+자동 실행 `scripts/tutorial/run_tutorial.sh`). 공개 weight 목록은 [`docs/paper/weights_manifest.csv`](docs/paper/weights_manifest.csv).
+
 ## 설치
 
 ```bash

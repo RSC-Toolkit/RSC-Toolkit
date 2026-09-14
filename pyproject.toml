@@ -49,6 +49,13 @@ models = [
 ssl-weights = [
     "lightning-bolts",
 ]
+# 튜토리얼 노트북(notebooks/tutorial.ipynb) 실행·CI 검증용.
+notebook = [
+    "jupyter",
+    "nbconvert",
+    "nbformat",
+    "ipykernel",
+]
 dev = [
     "pytest",
     "black",

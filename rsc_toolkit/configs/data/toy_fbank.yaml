@@ -6,6 +6,7 @@ params:
   index_dataset_cls: rsc_toolkit.datasets.index_dataset.IndexDataset
   project_root: ${hydra:runtime.cwd}
   split_file: sample_data/toy_dataset/official_split.txt
+  data_dir: downloaded_datasets/toy   # `rsctk datasets build-index toy --data_dir …` 가 만든 index/ 의 위치 (없으면 번들 sample_data 로 폴백)
 
   sampling_rate: 16000
   sample_level: cycle
@@ -21,7 +22,7 @@ params:
   features:
     enabled: true
     kind: fbank
-    cache_dir: downloaded_datasets/features_cache
+    cache_dir: downloaded_datasets/features_cache_toy   # toy 전용 — ICBHI 파일과 sample_id 형식이 같아 공용 캐시를 쓰면 다른 config 의 피처를 읽을 수 있다 (REVIEW 2026-09-10 §7 P0)
     n_mels: 128
     target_frames: 1024
     frame_shift: 10
