@@ -80,6 +80,12 @@ def make_ood_data_cfg(data_cfg: dict, family: str) -> tuple[dict, str]:
     cfg = copy.deepcopy(data_cfg)
     p = cfg.get("params", {})
     dm = p.get("datamodule_name", "index")
+    if dm == "respirenet":
+        # RespireNet: ICBHI txt 주석 전용 데이터모듈 → test 셋만 SPRSound 병합 라벨 인덱스에서 만든다(정규화 통계·청킹·이미지 체인은 학습과 동일)
+        p["ood_index_csv"] = str(ROOT / ".datasets" / "sprsound" / "index" / "index_cycle_icbhi4.csv")
+        p["ood_data_dir"] = str(ROOT / ".datasets" / "sprsound" / "Classification")
+        p["ood_split"] = "test"
+        return cfg, "chain=icbhi_respirenet (4 kHz · 8 s chunks · magma image · cycle voting) applied to SPRSound"
     if dm == "bts_precomputed":
         # ICBHI 학습은 저자 사전계산 CLAP 피처 → SPRSound 는 BTS-CARD OOD 와 같은 툴킷 체인(sprsound_btscard_train: 48 kHz, meta7)
         from omegaconf import OmegaConf
@@ -181,13 +187,18 @@ def evaluate(cfg: dict, ckpt: pathlib.Path, family: str, sandbox: pathlib.Path, 
     orig_setup = datamodule.setup
     def _setup(stage=None):
         orig_setup(None)
-        info["val_counts"] = remap_labels(datamodule)
+        if getattr(datamodule, "ood", None):                 # RespireNet 인덱스 경로: 사이클 단위 라벨 개수
+            info["val_counts"] = list(datamodule.test_ds.cycle_label_counts)
+        else:
+            info["val_counts"] = remap_labels(datamodule)
     datamodule.setup = _setup  # type: ignore[assignment]
     out = trainer.validate(pl_module, datamodule=datamodule, verbose=False)
     metrics = {}
     for d in out or []:
         metrics.update({k: float(v) for k, v in d.items()})
     metrics.update({k: float(v) for k, v in trainer.callback_metrics.items()})
+    if "vote/icbhi_score" in metrics:                        # RespireNet: 사이클 다수결 지표(청크 지표가 아니라)
+        metrics = {**metrics, **{k: metrics[v] for k, v in vw.VOTE_MAP.items() if v in metrics}}
     info["metrics"] = {k: metrics[k] for k in ("S_p", "S_e", "icbhi_score") if k in metrics}
     info["all_metrics"] = metrics
     return info

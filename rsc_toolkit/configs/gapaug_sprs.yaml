@@ -1,0 +1,31 @@
+# GaP-Aug(Chang et al., ICASSP 2024) 레시피를 SPRSound 2022 inter-patient(7-class) 에 적용 — 툴킷 확장 관찰값(논문은 ICBHI 만; 2026-09-14 사용자 결정).
+#   gapaug_icbhi.yaml 과 동일: CNN14(AudioSet 16k) + GaP-aug + Mixup + NLL + triplet, 20,000 iter(40 epoch × 500 step), Adam 1e-5, AMP 없음.
+#   차이: 데이터 sprsound_gapaug(7-class, 클래스 균형 배치 4×7=28), 지표 sprsound_metrics, n_cls 7.
+#   실행: rsctk-train --config-name gapaug_sprs run.name=sprs-gapaug-s1 seed=1
+defaults:
+  - model: cnn14_gapaug
+  - data_defaults@data: base
+  - data: sprsound_gapaug
+  - loss: cross_entropy
+  - metrics: sprsound_metrics
+  - optimizer: adam_gapaug
+  - trainer: default
+  - callbacks: gapaug_paper
+  - _self_
+
+seed: 1
+
+model:
+  params:
+    n_cls: 7
+
+trainer:
+  params:
+    max_epochs: 40             # 40 × 500 step
+    max_steps: 20000
+    precision: 32
+
+run:
+  name: sprs-gapaug
+  group: gapaug
+  tags: [gapaug, cnn14, sprsound, extension]

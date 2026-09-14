@@ -258,6 +258,69 @@ class RespireNetChunkDataset(Dataset):
         return self.processor.make_features(audio), int(self.audio_data[index][1]), index
 
 
+
+class RespireNetIndexChunkDataset(Dataset):
+    """툴킷 인덱스(index_cycle*.csv)에서 사이클을 읽어 RespireNet 청크(4 kHz, 8 s repeat/pad, magma 이미지)로 만드는 **평가 전용** 데이터셋.
+
+    ICBHI 로 학습한 RespireNet ckpt 를 SPRSound 2022 inter-patient test 에 제로샷 평가하기 위한 경로(2026-09-14, 사용자 결정).
+    체인은 RespireNetChunkDataset 의 test 경로와 동일(증강·CBA 없음, split_and_pad 의 패딩 RNG 는 pad_seed).
+    라벨은 인덱스 csv 의 label 열을 그대로 쓴다(SPRSound 는 7→4 병합된 파생 인덱스 index_cycle_icbhi4.csv 를 넘긴다).
+    cycle id 는 원본과 같은 "<파일>_<cycle_idx>_<label>" 꼴이라 RespireNetVoteEval 의 사이클 다수결이 그대로 동작한다.
+    """
+
+    def __init__(self, index_csv, data_dir, split: str = "test", sample_rate: int = 4000, desired_length: float = 8.0,
+                 res_type: str = "kaiser_best", pad_seed: int = 0, mean: Optional[Sequence[float]] = DEFAULT_MEAN,
+                 std: Optional[Sequence[float]] = DEFAULT_STD, n_classes: int = 4):
+        self.data_dir = pathlib.Path(data_dir)
+        self.train_flag = False
+        self.augment = False
+        self.sample_rate, self.desired_length, self.res_type = int(sample_rate), float(desired_length), res_type
+        self.processor = RespireNetImageProcessor(sampling_rate=sample_rate, mean=mean or DEFAULT_MEAN, std=std or DEFAULT_STD)
+        df = pd.read_csv(index_csv)
+        df = df[df["split"] == split] if "split" in df.columns else df
+        cycles: List[tuple] = []
+        for rec, grp in df.groupby("recording_path", sort=True):
+            data, _ = librosa.load(str(self.data_dir / rec), sr=self.sample_rate, res_type=self.res_type)
+            stem = pathlib.Path(rec).stem
+            for cycle_idx, (_, row) in enumerate(grp.sort_values(["t0", "t1"]).iterrows()):
+                chunk = slice_data(float(row["t0"]), float(row["t1"]), data, self.sample_rate)
+                cycles.append((chunk, int(row["label"]), stem, cycle_idx))
+        self.filenames = sorted(df["recording_path"].unique().tolist())
+        self.n_cycles_raw, self.n_cycles_cba, self.aug_scale = len(cycles), 0, 0.0
+        rng = random.Random(pad_seed)
+        self.audio_data: List[Tuple[np.ndarray, int, str, int, int, float]] = []
+        self.identifiers: List[str] = []
+        self.cycle_ids: List[str] = []
+        for chunk, label, file_name, cycle_idx in cycles:
+            cid = f"{file_name}_{cycle_idx}_{label}"
+            self.cycle_ids.append(cid)
+            for padded, chunk_idx, pad_times in split_and_pad(chunk, self.desired_length, self.sample_rate, rng):
+                self.audio_data.append((padded, label, file_name, cycle_idx, chunk_idx, pad_times))
+                self.identifiers.append(cid)
+        self.labels = [s[1] for s in self.audio_data]
+        counts = np.bincount(self.labels, minlength=n_classes).astype(np.float64)
+        self.class_probs = counts / counts.sum()
+        self.cycle_label_counts = np.bincount([int(c.split("_")[-1]) for c in self.cycle_ids], minlength=n_classes).tolist()
+        logger.info("RespireNet index(%s): 녹음 %d, cycle %d, 청크 %d, 사이클 클래스 %s", index_csv, len(self.filenames),
+                    len(self.cycle_ids), len(self.audio_data), self.cycle_label_counts)
+
+    def __len__(self):
+        return len(self.audio_data)
+
+    def chunk_audio(self, index: int) -> np.ndarray:
+        return self.audio_data[index][0]
+
+    def set_normalization(self, mean: Sequence[float], std: Sequence[float]) -> None:
+        self.processor.mean, self.processor.std = tuple(float(v) for v in mean), tuple(float(v) for v in std)
+
+    def raw_image_tensor(self, index: int) -> torch.Tensor:
+        img = self.processor.image(self.chunk_audio(index))
+        return torch.from_numpy(np.ascontiguousarray(img)).permute(2, 0, 1).float().div(255.0)
+
+    def __getitem__(self, index: int):
+        audio = self.chunk_audio(index)
+        return self.processor.make_features(audio), int(self.audio_data[index][1]), index
+
 from rsc_toolkit.datasets import collate as _collate  # P2-6: collate 단일 구현
 
 # (x, y, 청크 인덱스 long)
@@ -274,8 +337,11 @@ class RespireNetDataModule(L.LightningDataModule):
                  pad_seed: int = 0, augment: bool = True, aug_seed: int = 0,
                  mean: Optional[Sequence[float]] = None, std: Optional[Sequence[float]] = None,
                  batch_size: int = 64, num_workers: int = 4, weighted_sampler: bool = True, stetho_id: int = -1,
-                 aug_scale: Optional[float] = None, cba_seed: Optional[int] = None):
+                 aug_scale: Optional[float] = None, cba_seed: Optional[int] = None,
+                 ood_index_csv: Optional[str] = None, ood_data_dir: Optional[str] = None, ood_split: str = "test"):
         super().__init__()
+        # 제로샷(OOD) 평가: test 셋만 다른 데이터셋의 인덱스에서 만든다(학습·정규화 통계는 ICBHI 그대로) — scripts/eval_ood_sprsound.py 가 넘긴다
+        self.ood = dict(index_csv=ood_index_csv, data_dir=ood_data_dir, split=ood_split) if ood_index_csv else None
         self.kw = dict(data_dir=data_dir, split_mode=split_mode, folds_file=folds_file, test_fold=test_fold,
                        official_split_file=official_split_file, sample_rate=sample_rate, desired_length=desired_length,
                        res_type=res_type, pad_seed=pad_seed, aug_seed=aug_seed, mean=None, std=None,
@@ -309,6 +375,12 @@ class RespireNetDataModule(L.LightningDataModule):
             if self.mean is None or self.std is None:
                 self.mean, self.std = self._compute_mean_std(self.train_ds)
             self.train_ds.set_normalization(self.mean, self.std)
+        if self.test_ds is None and self.ood is not None:
+            self.test_ds = RespireNetIndexChunkDataset(self.ood["index_csv"], self.ood["data_dir"], split=self.ood["split"],
+                                                       sample_rate=self.kw["sample_rate"], desired_length=self.kw["desired_length"],
+                                                       res_type=self.kw["res_type"], pad_seed=self.kw["pad_seed"])
+            if self.mean is not None and self.std is not None:
+                self.test_ds.set_normalization(self.mean, self.std)
         if self.test_ds is None:
             self.test_ds = RespireNetChunkDataset(train_flag=False, augment=False, **self.kw)
             if self.mean is None or self.std is None:  # 평가 전용 (fit 없이 test): eval.py 상수
