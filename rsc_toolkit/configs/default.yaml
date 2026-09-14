@@ -15,5 +15,5 @@ seed: 123
 
 run:
   name: ${data.name}-${model.name}
-  group: null
+  group: default        # callbacks/best_checkpoint.yaml 의 outputs/${run.group}/${run.name} 에 쓰인다 — null 이면 'outputs/None/…' 이 되므로 기본값을 둔다
   tags: []

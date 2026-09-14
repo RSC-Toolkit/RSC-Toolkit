@@ -55,6 +55,7 @@ notebook = [
     "nbconvert",
     "nbformat",
     "ipykernel",
+    "gdown",          # scripts/download_paper_weights.py (공개 논문 weight)
 ]
 dev = [
     "pytest",

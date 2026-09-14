@@ -6,7 +6,7 @@ Respiratory Sound Classification Toolkit — **ICBHI 2017** 과 **SPRSound** 위
 핵심은 **공식 스플릿 위의 공정 비교**다. 논문마다 다른 스플릿·지표·모델 선택 규칙을
 하나의 데이터·특징·평가 경로에 올려, "방법이 실제로 얼마나 기여하는가" 를 잴 수 있게 한다.
 
-현재 **모델 33종**이 등록돼 있고(SFT 기준선부터 대조학습·어댑터·파운데이션 모델까지),
+현재 **모델 34종**이 등록돼 있고(SFT 기준선부터 대조학습·어댑터·파운데이션 모델까지),
 논문별 골든 텐서 회귀 테스트로 이식 충실도를 고정한다.
 
 ## 처음이라면 — 튜토리얼
@@ -31,9 +31,9 @@ pip install -e ".[trainer,models]"
 ## 데이터 준비
 
 ```bash
-rsc-toolkit datasets download    --dataset icbhi
-rsc-toolkit datasets build-index --dataset icbhi
-rsc-toolkit datasets validate    --dataset icbhi
+rsctk datasets download    icbhi --data_dir .datasets/icbhi
+rsctk datasets build-index icbhi --data_dir .datasets/icbhi --sample_level cycle
+rsctk datasets validate    icbhi --data_dir .datasets/icbhi
 ```
 
 원본 데이터는 **불변**으로 다룬다 — 스플릿·인덱스는 전부 파생 파일로만 만든다.
@@ -48,7 +48,7 @@ rsc-toolkit-train --config-name patchmix_icbhi seed=1 run.name=my-first-run
 
 ```bash
 rsc-toolkit-train --config-name patchmix_icbhi \
-  model.params.method=ce trainer.max_epochs=10 seed=3
+  model.params.method=ce trainer.params.max_epochs=10 seed=3
 ```
 
 결과는 `outputs/<계열>/<run.name>/` 에 쌓이고, `best.json` 이 최종 지표를 담는다

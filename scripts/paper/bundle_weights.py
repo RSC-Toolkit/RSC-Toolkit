@@ -9,7 +9,8 @@ run 하나당 폴더 하나: best.pth · best.json · .hydra/config.yaml(+overri
   .venv/bin/python scripts/paper/bundle_weights.py --family icbhi-cnn6-ce --out outputs/weights_release     # seed 1–5
 
 대장 열: run, family, dataset, model, config_name, S_p, S_e, icbhi_score, epoch, best_pth_sha256, best_pth_bytes, bundle_sha256, url
-url 은 업로드 전에는 "[Google Drive]" 자리표시자이고, 업로드 뒤 사용자가 링크로 바꾼다(scripts/download_paper_weights.py 가 읽는다).
+url 은 업로드 전에는 "[Google Drive]" 자리표시자이고, 업로드 뒤 사용자가 **run 폴더 링크**로 바꾼다(scripts/download_paper_weights.py 가 읽는다).
+안전장치: 대상 run 전부를 먼저 검사(best.pth·best.json·hydra 스냅샷)하고, 묶음은 임시 폴더에 만든 뒤 교체하며, 대장은 run 마다 갱신한다.
 """
 from __future__ import annotations
 
@@ -28,6 +29,7 @@ MANIFEST = ROOT / "docs" / "paper" / "weights_manifest.csv"
 URL_PLACEHOLDER = "[Google Drive]"
 FIELDS = ["run", "family", "dataset", "model", "config_name", "S_p", "S_e", "icbhi_score", "epoch",
           "best_pth_sha256", "best_pth_bytes", "bundle_sha256", "url"]
+SNAPSHOT_FILES = ("config.yaml", "overrides.yaml")      # hydra.yaml 은 개발 머신 절대 경로가 들어 있고 평가에 안 쓰여 동봉하지 않는다
 
 
 def sha256(path: pathlib.Path) -> str:
@@ -42,37 +44,65 @@ def family_of(run: str) -> str:
     return re.sub(r"-s\d+$", "", run)
 
 
-def bundle(row: dict, out: pathlib.Path) -> dict:
-    run = row["run_name"]; run_dir = ROOT / row["run_dir"]; hydra_dir = ROOT / row["hydra_dir"] if row.get("hydra_dir") else None
-    dst = out / run
-    if dst.exists():
-        shutil.rmtree(dst)
-    dst.mkdir(parents=True)
+def dataset_of(row: dict) -> str:
+    if row.get("dataset"):
+        return row["dataset"]
+    head = row["run_name"].split("-", 1)[0]                     # icbhi-… / sprs-…
+    return {"icbhi": "icbhi", "sprs": "sprsound"}.get(head, "")
+
+
+def check_row(row: dict) -> tuple[pathlib.Path, pathlib.Path]:
+    """묶음에 필요한 입력이 전부 있는지 먼저 본다. (run_dir, hydra_dir) 를 돌려준다."""
+    run = row["run_name"]; run_dir = ROOT / row["run_dir"]
     for name in ("best.pth", "best.json"):
-        shutil.copy2(run_dir / name, dst / name)
-    if hydra_dir is not None and (hydra_dir / ".hydra" / "config.yaml").exists():
-        (dst / ".hydra").mkdir()
-        for name in ("config.yaml", "overrides.yaml", "hydra.yaml"):
-            if (hydra_dir / ".hydra" / name).exists():
-                shutil.copy2(hydra_dir / ".hydra" / name, dst / ".hydra" / name)
-    else:
+        if not (run_dir / name).exists():
+            raise SystemExit(f"{run}: {run_dir / name} 이 없다")
+    hydra_dir = ROOT / row["hydra_dir"] if row.get("hydra_dir") else None
+    if hydra_dir is None or not (hydra_dir / ".hydra" / "config.yaml").exists():
         raise SystemExit(f"{run}: hydra 스냅샷이 없어 묶음을 만들 수 없다 (results_master hydra_dir={row.get('hydra_dir')!r})")
-    best = json.loads((dst / "best.json").read_text())
-    (dst / "README.txt").write_text(
+    if not dataset_of(row):
+        raise SystemExit(f"{run}: dataset 을 알 수 없다 (results_master dataset 열 비어 있음, run 이름 접두사도 아님)")
+    return run_dir, hydra_dir
+
+
+def bundle(row: dict, out: pathlib.Path) -> dict:
+    run = row["run_name"]; run_dir, hydra_dir = check_row(row)
+    dst = out / run; tmp = out / f".tmp-{run}"
+    if tmp.exists():
+        shutil.rmtree(tmp)
+    tmp.mkdir(parents=True)
+    for name in ("best.pth", "best.json"):
+        shutil.copy2(run_dir / name, tmp / name)
+    (tmp / ".hydra").mkdir()
+    for name in SNAPSHOT_FILES:
+        if (hydra_dir / ".hydra" / name).exists():
+            shutil.copy2(hydra_dir / ".hydra" / name, tmp / ".hydra" / name)
+    best = json.loads((tmp / "best.json").read_text())
+    (tmp / "README.txt").write_text(
         f"RSC-Toolkit paper weight: {run}\n"
-        f"family={family_of(run)} dataset={row['dataset']} model={row['model_name']} config={row['config_name']}\n"
+        f"family={family_of(run)} dataset={dataset_of(row)} model={row['model_name']} config={row['config_name']}\n"
         f"best.json: S_p={best.get('S_p'):.2f} S_e={best.get('S_e'):.2f} Score={best.get('icbhi_score'):.2f} (epoch {best.get('epoch')})\n\n"
         "Files: best.pth (model state_dict under key 'model'), best.json (metrics at the saved epoch), .hydra/config.yaml (training config snapshot).\n"
         "Re-evaluate (from a git clone of RSC-Toolkit, dataset downloaded and indexed):\n"
         f"  rsc-toolkit-eval <this folder> --project-root <clone> --override data.params.data_dir=<dataset dir>\n"
         "See docs/TUTORIAL.md.\n")
-    files = sorted(p for p in dst.rglob("*") if p.is_file() and p.name != "sha256.txt")
-    lines = [f"{sha256(p)}  {p.relative_to(dst).as_posix()}" for p in files]
-    (dst / "sha256.txt").write_text("\n".join(lines) + "\n")
-    return {"run": run, "family": family_of(run), "dataset": row["dataset"], "model": row["model_name"], "config_name": row["config_name"],
+    files = sorted(p for p in tmp.rglob("*") if p.is_file() and p.name != "sha256.txt")
+    lines = [f"{sha256(p)}  {p.relative_to(tmp).as_posix()}" for p in files]
+    (tmp / "sha256.txt").write_text("\n".join(lines) + "\n")
+    if dst.exists():
+        shutil.rmtree(dst)
+    tmp.rename(dst)
+    return {"run": run, "family": family_of(run), "dataset": dataset_of(row), "model": row["model_name"], "config_name": row["config_name"],
             "S_p": f"{best.get('S_p'):.4f}", "S_e": f"{best.get('S_e'):.4f}", "icbhi_score": f"{best.get('icbhi_score'):.4f}", "epoch": best.get("epoch"),
             "best_pth_sha256": sha256(dst / "best.pth"), "best_pth_bytes": (dst / "best.pth").stat().st_size,
             "bundle_sha256": hashlib.sha256("\n".join(lines).encode()).hexdigest(), "url": URL_PLACEHOLDER}
+
+
+def write_manifest(rows: dict) -> None:
+    with open(MANIFEST, "w", newline="") as fh:
+        w = csv.DictWriter(fh, fieldnames=FIELDS); w.writeheader()
+        for run in sorted(rows):
+            w.writerow({k: rows[run].get(k, "") for k in FIELDS})
 
 
 def main() -> int:
@@ -82,23 +112,22 @@ def main() -> int:
     ap.add_argument("--out", default=str(ROOT / "outputs" / "weights_release"))
     args = ap.parse_args()
     master = {r["run_name"]: r for r in csv.DictReader(open(MASTER))}
-    runs = list(args.run) + [r for f in args.family for r in master if family_of(r) == f and re.search(r"-s[1-5]$", r)]
+    runs = list(dict.fromkeys(list(args.run) + [r for f in args.family for r in master if family_of(r) == f and re.search(r"-s[1-5]$", r)]))
     if not runs:
         ap.error("--run 또는 --family 를 주어라")
+    for run in runs:                                            # 전부 먼저 검사 — 하나라도 못 만들면 아무것도 건드리지 않는다
+        if run not in master:
+            raise SystemExit(f"{run} 이 results_master 에 없다")
+        check_row(master[run])
     out = pathlib.Path(args.out); out.mkdir(parents=True, exist_ok=True)
     rows = {r["run"]: r for r in csv.DictReader(open(MANIFEST))} if MANIFEST.exists() else {}
     for run in runs:
-        if run not in master:
-            raise SystemExit(f"{run} 이 results_master 에 없다")
         rec = bundle(master[run], out)
         if run in rows and rows[run].get("url") not in ("", URL_PLACEHOLDER):
             rec["url"] = rows[run]["url"]          # 이미 올린 링크는 보존
         rows[run] = rec
+        write_manifest(rows)                       # run 마다 갱신 — 뒤의 run 이 실패해도 대장과 디스크가 어긋나지 않는다
         print(f"{run:28s} → {out / run}  best.pth {rec['best_pth_bytes']/1e6:.1f} MB  sha256 {rec['best_pth_sha256'][:12]}…")
-    with open(MANIFEST, "w", newline="") as fh:
-        w = csv.DictWriter(fh, fieldnames=FIELDS); w.writeheader()
-        for run in sorted(rows):
-            w.writerow({k: rows[run].get(k, "") for k in FIELDS})
     print(f"manifest: {MANIFEST} ({len(rows)} rows)")
     return 0
 

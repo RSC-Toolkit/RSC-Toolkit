@@ -183,3 +183,19 @@ def test_cli_parses_and_reports_skip(tmp_path, capsys):
     assert rc == 1
     assert json.loads((tmp_path / "eval.json").read_text())["status"] == "SKIP"
     assert "SKIP" in capsys.readouterr().out
+
+
+def test_evaluate_run_with_overrides_reports_diffs_but_status_ok(tmp_path, monkeypatch):
+    """override 가 있으면 판정(PASS/MISMATCH) 대신 OK 이되 best.json 대조값은 돌려준다 (튜토리얼의 공개 weight 재평가가 쓴다)."""
+    import json
+    from rsc_toolkit import evaluate as ev
+    run_dir = tmp_path / "outputs" / "g" / "r"; run_dir.mkdir(parents=True)
+    (run_dir / "best.pth").write_bytes(b"x")
+    (run_dir / "best.json").write_text(json.dumps({"epoch": 1, "S_p": 80.0, "S_e": 40.0, "icbhi_score": 60.0}))
+    (run_dir / ".hydra").mkdir(); (run_dir / ".hydra" / "config.yaml").write_text("data: {params: {data_dir: a}}\ntrainer: {params: {}}\n")
+    monkeypatch.setattr(ev, "build_and_validate", lambda cfg, ckpt, sandbox, name: {"load": "strict_ok", "metrics": {"S_p": 80.0, "S_e": 40.0, "icbhi_score": 60.0}})
+    monkeypatch.setattr(ev, "install_readonly_chain_guard", lambda notes: (lambda: None))   # restore 콜백을 돌려줘야 한다
+    rec = ev.evaluate_run(run_dir, project_root=tmp_path, sandbox=tmp_path / "sb", overrides=["data.params.data_dir=b"])
+    assert rec["status"] == "OK" and rec["compared_with_overrides"] is True and rec["max_abs_diff"] == 0.0 and "S_e" in rec["diffs"]
+    rec2 = ev.evaluate_run(run_dir, project_root=tmp_path, sandbox=tmp_path / "sb2")
+    assert rec2["status"] == "PASS" and rec2["compared_with_overrides"] is False

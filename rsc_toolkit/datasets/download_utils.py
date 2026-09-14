@@ -80,6 +80,7 @@ def download_file(
     Raises:
         DownloadError: 재시도를 모두 소진했거나 크기가 기대치와 다를 때.
     """
+    logger.info("다운로드 시작: %s -> %s", url, out_path)   # 막힌 망에서 오래 침묵하지 않도록 첫 시도 전에 남긴다
     out = pathlib.Path(out_path)
     out.parent.mkdir(parents=True, exist_ok=True)
     part = out.with_name(out.name + PART_SUFFIX)

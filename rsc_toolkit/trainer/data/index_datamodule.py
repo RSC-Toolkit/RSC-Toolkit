@@ -320,7 +320,10 @@ class IndexDataModule(L.LightningDataModule):
         if self.index_csv is None:
             self.index_csv = self._default_index_path()
         if not self.index_csv.exists():
-            raise FileNotFoundError(f"Index csv not found: {self.index_csv}")
+            raise FileNotFoundError(
+                f"Index csv not found: {self.index_csv} — 먼저 인덱스를 만들어라: "
+                f"rsctk datasets build-index {self.dataset_name} --data_dir {self.outputs_directory} --sample_level {self.sample_level}"
+            )
         return self.index_dataset_cls(**self._index_dataset_kwargs(split=split, role=role))
 
     def _build_index_dataset(self, *, splits: Sequence[str], role: Optional[str] = None):

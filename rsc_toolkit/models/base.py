@@ -20,7 +20,7 @@
             return logits, loss_func(logits, labels)
 
 (등록 경로는 `factory.py` 를 보라 — 패키지 내부 모듈이면 자동 스캔되고,
-외부 패키지면 `rsc_toolkit.models` 엔트리포인트나 `RSC_TOOLKIT_PLUGINS` 로 붙인다.)
+외부 패키지면 `rsc_toolkit.plugins` 엔트리포인트(구 `rsc_toolkit.models` 도 읽는다)나 `RSC_TOOLKIT_PLUGINS` 로 붙인다.)
 """
 from abc import ABC, abstractmethod
 import logging

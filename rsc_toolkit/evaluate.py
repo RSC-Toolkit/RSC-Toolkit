@@ -207,7 +207,11 @@ def make_sandbox(path: pathlib.Path, project_root: pathlib.Path) -> None:
     path.mkdir(parents=True, exist_ok=True)
     for name in READ_ONLY_ROOTS:
         src, dst = pathlib.Path(project_root) / name, path / name
-        if src.exists() and not dst.exists():
+        if not src.exists():
+            continue
+        if dst.is_symlink() and dst.resolve() != src.resolve():
+            dst.unlink()                      # 다른 checkout 이 남긴 샌드박스를 재사용할 때 조용히 그쪽을 읽지 않도록 다시 잇는다
+        if not dst.exists():
             dst.symlink_to(src, target_is_directory=True)
     (path / "lightning").mkdir(exist_ok=True)
     (path / "callback_out").mkdir(exist_ok=True)

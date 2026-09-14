@@ -36,7 +36,7 @@ cells.append(md(r"""
 (논문과 같은 핀으로 맞추려면 `pip install -r requirements-lock.txt`). 패키지만 설치해 자기 모델을 붙이는 경로는
 `docs/TUTORIAL.md` 의 "패키지 설치" 절을 보라.
 
-환경변수로 동작을 바꿀 수 있다: `RSC_TUTORIAL_QUICK=1` → Part B 를 건너뛴다(CI 가 이렇게 돈다). `RSC_TUTORIAL_WORK` → 작업 디렉터리(기본 `<clone>/outputs/tutorial`).
+환경변수로 동작을 바꿀 수 있다: `RSC_TUTORIAL_QUICK=1` → Part B 를 건너뛴다(CI 가 이렇게 돈다). `RSC_TUTORIAL_WORK` → 작업 디렉터리(기본 `<clone>/outputs/tutorial`). `RSC_TUTORIAL_ROOT` → 저장소 루트를 직접 지정.
 """))
 
 cells.append(code(r"""
@@ -57,12 +57,12 @@ WORK = pathlib.Path(os.environ.get("RSC_TUTORIAL_WORK") or ROOT / "outputs" / "t
 WORK.mkdir(parents=True, exist_ok=True)
 QUICK = os.environ.get("RSC_TUTORIAL_QUICK", "0") == "1"
 import tempfile
-SANDBOX = pathlib.Path(tempfile.gettempdir()) / "rsc_tutorial_eval_sandbox"   # 재평가의 쓰기 격리 디렉터리 — outputs/ 밖이어야 한다(도구가 강제)
+SANDBOX = pathlib.Path(tempfile.mkdtemp(prefix="rsc_tutorial_sandbox_"))   # 재평가의 쓰기 격리 디렉터리 — 실행마다 새로, outputs/ 밖(도구가 강제)
 
 BIN = pathlib.Path(sys.executable).parent            # 이 커널의 venv 에 설치된 콘솔 스크립트를 쓴다
 RSCTK, TRAIN, EVAL = BIN / "rsctk", BIN / "rsc-toolkit-train", BIN / "rsc-toolkit-eval"
 for exe in (RSCTK, TRAIN, EVAL):
-    assert exe.exists(), f"{exe} 가 없다 — pip install -e '.[trainer,models]' 를 이 커널의 환경에 했는지 확인"
+    assert exe.exists(), f"{exe} 가 없다 — pip install -e '.[trainer,models,notebook]' 를 이 커널의 환경에 했는지 확인"
 
 ENV = {**os.environ,
        "RSCTK_PRETRAINED_ROOT": str(WORK / "pretrained"),          # 자동 다운로드되는 사전학습 가중치가 놓일 곳
@@ -94,7 +94,7 @@ cells.append(md(r"""
 인덱스 생성 → 학습 → 평가 경로가 실데이터와 동일하게 돈다.
 
 ### A-1. 인덱스 만들기
-툴킷은 원본 오디오를 건드리지 않고 **파생 인덱스**(`index/index_cycle.csv`)만 만든다.
+툴킷은 원본 오디오를 건드리지 않고 **파생 인덱스**(`index/index_cycle.csv`)만 만든다. train/test 구분은 인덱스가 아니라 데이터 config 의 `split_file`(여기서는 `sample_data/toy_dataset/official_split.txt`)이 정한다.
 """))
 
 cells.append(code(r"""
@@ -102,7 +102,8 @@ TOY = WORK / "toy"
 run(RSCTK, "datasets", "build-index", "toy", "--project_root", ROOT, "--data_dir", TOY, "--sample_level", "cycle")
 import pandas as pd
 idx = pd.read_csv(TOY / "index" / "index_cycle.csv")
-print(idx.shape, "cycles;", idx["label"].value_counts().to_dict(), "| splits:", idx["split"].value_counts().to_dict())
+split = pd.read_csv(ROOT / "sample_data" / "toy_dataset" / "official_split.txt", sep=r"\s+", header=None, names=["recording", "split"])
+print(idx.shape, "cycles;", idx["label"].value_counts().to_dict(), "| split file:", split["split"].value_counts().to_dict())
 """))
 
 cells.append(md(r"""
@@ -242,7 +243,7 @@ cells.append(md(r"""
 ### B-2. 1 epoch 학습 (CNN6 fine-tuning 레시피)
 
 논문 재현 config `sgscl_nonast_icbhi` + `model.name=cnn6_sft` 가 표 1 의 "CNN6 fine-tuning" 행이다(원래 400 epoch).
-여기서는 1 epoch 만 돌려 경로를 확인한다. PANNs Cnn6 사전학습 가중치는 `RSCTK_PRETRAINED_ROOT` 로 자동 다운로드된다.
+여기서는 1 epoch 만 돌려 경로를 확인한다. PANNs Cnn6 사전학습 가중치는 zenodo(record 3960586)에서 `$RSCTK_PRETRAINED_ROOT/upstream/Cnn6_mAP=0.343.pth` 로 자동 다운로드된다 — zenodo 가 막힌 망이면 그 파일을 같은 경로에 직접 둔다. GPU 학습이라 워커당 스레드 캡(`ENV_GPU`)을 건다.
 """))
 
 cells.append(code(r"""
@@ -263,8 +264,8 @@ cells.append(md(r"""
 ### B-3. 공개된 논문 weight 재평가
 
 논문 표의 weight 는 run 묶음(`best.pth` · `best.json` · `.hydra/config.yaml`)으로 공개된다. 목록과 링크는
-`docs/paper/weights_manifest.csv` 에 있고 `scripts/download_paper_weights.py` 가 받아서 sha256 을 대조한다.
-링크가 아직 `[Google Drive]` 자리표시자면 안내만 나온다 — 그때는 묶음을 직접 `WORK/paper_weights/<run>/` 에 두면 된다.
+`docs/paper/weights_manifest.csv` 에 있고 `scripts/download_paper_weights.py`(gdown, `notebook` extra 에 포함)가 받아서 sha256 을 대조한다.
+링크(run 폴더 링크)가 아직 `[Google Drive]` 자리표시자면 안내만 나온다 — 그때는 묶음을 직접 `WORK/paper_weights/<run>/` 에 두면 된다.
 
 받은 묶음은 설정 스냅샷을 품고 있으므로 `rsc-toolkit-eval <묶음> --override data.params.data_dir=<내 ICBHI 경로>` 로
 바로 재평가된다. 경로 override 가 붙은 평가는 `status: OK` 와 함께 `best.json`(논문 표의 값)과의 |Δ| 를 돌려주며, 같은 공식 test 이므로 |Δ| 는 0 이다.
@@ -284,7 +285,7 @@ else:
         res_paper = evaluate(bundle, None, f"data.params.data_dir={ICBHI}", f"data.params.features.cache_dir={WORK / 'cache_icbhi'}")
         print("논문 표 값(best.json):", json.loads((bundle / "best.json").read_text()))
         # 경로 override 가 있으면 도구는 판정 대신 status=OK 와 대조값(|Δ|)을 돌려준다 — 같은 공식 test 이므로 |Δ| 는 0 이어야 한다
-        assert res_paper["status"] in ("PASS", "OK") and res_paper.get("max_abs_diff", 1.0) <= 0.05, res_paper
+        assert res_paper["status"] in ("PASS", "OK") and (res_paper.get("max_abs_diff") or 1.0) <= 0.05, res_paper
 """))
 
 cells.append(md(r"""
@@ -294,6 +295,8 @@ cells.append(md(r"""
 - 손실·지표·datamodule·프로세서도 같은 등록소 방식이다(`rsc_toolkit/registries.py`).
 """))
 
+for i, c in enumerate(cells):                       # 결정적 cell id — 재생성해도 커밋본과 바이트 동일(랜덤 id 로 git 이 더러워지지 않게)
+    c["id"] = f"cell-{i:02d}"
 nb = nbf.v4.new_notebook()
 nb["cells"] = cells
 nb["metadata"] = {"kernelspec": {"name": "python3", "display_name": "Python 3", "language": "python"},
