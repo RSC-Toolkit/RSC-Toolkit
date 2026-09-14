@@ -20,6 +20,7 @@ MASTER = ROOT / "docs" / "results_master.csv"
 ANCHORS = ROOT / "docs" / "paper" / "anchors.csv"
 FOOTNOTES = ROOT / "docs" / "paper" / "footnotes.csv"
 META = ROOT / "docs" / "paper" / "model_meta.csv"      # Patch-Mix 스타일 표용 메타 (architecture / pretrain / venue / cite)
+PARAMS = ROOT / "docs" / "paper" / "params.csv"        # 표 2 #Param (M) 열 원천 — scripts/paper/count_params.py 가 생성 (2026-09-15)
 BAND_ORDER = ["Fine-tuning", "Augmentation", "Contrastive / auxiliary loss", "Foundation / PEFT", "Architecture / protocol"]
 BAND_SHORT = {"Fine-tuning": "Fine-tuning", "Augmentation": "Aug.", "Contrastive / auxiliary loss": "Contrastive",
               "Foundation / PEFT": "FM / PEFT", "Architecture / protocol": "Arch."}   # 회전 라벨 (2026-09-08 사용자: Team 밴드·표기 없음)
@@ -361,7 +362,8 @@ CAPTION_A = (r"Reported and toolkit results on ICBHI 2017. Toolkit results use t
 CAPTION_M = (r"Toolkit results on the SPRSound 2022 inter-patient test set (1,429 events unless noted; five seeds; mean\,$\pm$\,SD). "
              r"SPRSound $\to$ SPRSound uses seven classes. ICBHI $\to$ SPRSound is zero-shot, using four merged classes and "
              r"checkpoints selected only on ICBHI test data. Bold and underlined values mark the two highest means per column among results with "
-             r"matching label spaces and test samples. n/a: not available (see notes); \mbox{--}: not run. "
+             r"matching label spaces and test samples. \#Param: parameters of the inference model in millions, frozen backbones included. "
+             r"n/a: not available (see notes); \mbox{--}: not run. "
              r"Abbreviations as in Table~\ref{tab:icbhi_diff}.")
 # 2026-09-14 사용자 축약안. 표 1 아래 번호 없는 범례 한 줄(ABBREV_LINE); 자세한 정의는 본문(docs/paper/body_text_moved_from_footnotes.md).
 ABBREV_LINE = (r"\textit{Abbreviations:} IN, ImageNet; AS, AudioSet; LA, LAION-Audio-630K; Resp, respiratory audio; FM, foundation model; "
@@ -376,6 +378,30 @@ def _local(ids, table):
 
 def merge_key(family: str) -> str:
     return MERGE_KEY_OVERRIDES.get(family, re.sub(r"^(sprs|icbhi)-", "", family))
+
+
+def load_params():
+    """docs/paper/params.csv → {family: params_total(int)}. 파일이 없으면 빈 dict(열은 -- 로 채워진다)."""
+    if not PARAMS.exists():
+        return {}
+    out = {}
+    for r in csv.DictReader(open(PARAMS)):
+        if r.get("params_total"):
+            out[r["family"]] = int(r["params_total"])
+    return out
+
+
+def _param_value(b, c, params):
+    """통합 행의 #Param: SPRSound 쪽(B) 모델, 없으면 ICBHI 쪽(C). 두 쪽은 분류 헤드(7 vs 4 class)만 달라 0.1 M 해상도에서 같다(count_params 가 기록)."""
+    for a in (b, c):
+        if a is not None and a["family"] in params:
+            return params[a["family"]] / 1e6
+    return None
+
+
+def _param_cell(b, c, params):
+    v = _param_value(b, c, params)
+    return "--" if v is None else f"{v:.1f}"
 
 
 def merged_rows(anchors):
@@ -431,12 +457,13 @@ def build_merged(anchors, fam, meta, footnotes):
                                                                 and not (_fns(r[i]) & RANK_EXCLUDE.get(t, set()))) else None
                                        for r in rows])
     fallback = _fallback_lookup(anchors)
+    params = load_params()
     stem, label = MERGED
-    colspec = "p{2pt}ll" + "ccc" + "ccc"   # 2026-09-14: 표 1 과 중복되는 pretrain·venue 열 제거
-    head = [r"& \multirow{2}{*}{method} & \multirow{2}{*}{architecture} & "
+    colspec = "p{2pt}llr" + "ccc" + "ccc"   # 2026-09-14: 표 1 과 중복되는 pretrain·venue 열 제거 · 2026-09-15: #Param (M) 열(사용자 요청)
+    head = [r"& \multirow{2}{*}{method} & \multirow{2}{*}{architecture} & \multirow{2}{*}{\#Param (M)} & "
             r"\multicolumn{3}{c}{SPRSound $\to$ SPRSound} & \multicolumn{3}{c}{ICBHI $\to$ SPRSound (zero-shot)} \\",
-            r"\cmidrule(lr){4-6}\cmidrule(lr){7-9}",
-            r"& & & $S_p$ & $S_e$ & \textbf{Sc} & $S_p$ & $S_e$ & \textbf{Sc} \\"]
+            r"\cmidrule(lr){5-7}\cmidrule(lr){8-10}",
+            r"& & & & $S_p$ & $S_e$ & \textbf{Sc} & $S_p$ & $S_e$ & \textbf{Sc} \\"]
     cap = CAPTION_M
     L = [r"\begin{table*}[!t]", r"\centering", r"\caption{" + cap + "}", r"\label{tab:" + label + "}",
          r"\renewcommand{\arraystretch}{1}\footnotesize\setlength{\tabcolsep}{3pt}",
@@ -462,7 +489,7 @@ def build_merged(anchors, fam, meta, footnotes):
             first = (r"\multirow{" + str(band_sizes[cur_band]) + r"}{*}{\rotatebox[origin=c]{90}{\scriptsize\textbf{" + BAND_SHORT[cur_band] + "}}}")
         else:
             first = ""
-        cells = [first, name, m["arch"]]
+        cells = [first, name, m["arch"], _param_cell(b, c, params)]
         for t, a, other in (("B", b, c), ("C", c, b)):
             if a is None:
                 na = (other.get("na_fn") or "") if other else ""   # 사유는 각주(FN_MAP M)로; 캡션은 "n/a: not available" 만
@@ -506,11 +533,12 @@ def merged_html(anchors, fam, meta, footnotes, tex2html):
     A = {merge_key(a["family"]): a for a in anchors if a["table"] == "A" and a.get("pm_order")}
     row_band = [A[k]["band"] if k in A else (c or b)["band"] for k, b, c in rows]
     fallback = _fallback_lookup(anchors)
+    params = load_params()
     used = set()
     L = ['<div class="pm pm-M">', f'<p class="pm-title"><b>table2_SPRSound · SPRSound→SPRSound (7-class) | ICBHI→SPRSound 제로샷 (7→4 병합, 1,429 event) · reported 열 없음</b> · {len(rows)} 행</p>',
          '<div class="tbl"><table class="pmt"><thead>',
-         '<tr class="grp"><th colspan="3"></th><th colspan="3">SPRSound → SPRSound (ours, 5 seeds)</th><th colspan="3">ICBHI → SPRSound zero-shot (ours, 5 seeds)</th></tr>',
-         "<tr><th></th><th>method</th><th>architecture</th><th>Sp</th><th>Se</th><th>Sc</th><th>Sp</th><th>Se</th><th>Sc</th></tr>",
+         '<tr class="grp"><th colspan="4"></th><th colspan="3">SPRSound → SPRSound (ours, 5 seeds)</th><th colspan="3">ICBHI → SPRSound zero-shot (ours, 5 seeds)</th></tr>',
+         "<tr><th></th><th>method</th><th>architecture</th><th>#Param (M)</th><th>Sp</th><th>Se</th><th>Sc</th><th>Sp</th><th>Se</th><th>Sc</th></tr>",
          "</thead><tbody>"]
     cur_band = None
     for i, (k, b, c) in enumerate(rows):
@@ -523,7 +551,7 @@ def merged_html(anchors, fam, meta, footnotes, tex2html):
         if row_band[i] != cur_band:
             cur_band = row_band[i]
             first = f'<td class="pm-band" rowspan="{row_band.count(cur_band)}"><span>{BAND_SHORT[cur_band]}</span></td>'
-        cells = [first, f'<td class="name">{_html_esc(m["method"])}{_sup(name_fn, html=True)}{cite}</td>', f"<td>{_html_esc(tex2html(m['arch']))}</td>"]
+        cells = [first, f'<td class="name">{_html_esc(m["method"])}{_sup(name_fn, html=True)}{cite}</td>', f"<td>{_html_esc(tex2html(m['arch']))}</td>", f'<td class="m">{_param_cell(b, c, params)}</td>']
         for t, a, other in (("B", b, c), ("C", c, b)):
             if a is None:
                 na = (other.get("na_fn") or "") if other else ""
