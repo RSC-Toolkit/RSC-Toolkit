@@ -236,7 +236,7 @@ def _ours_pm(m, s, kind=None, pm=True):
     if m is None:
         return "--"
     core = _mark(f"{m:.2f}", kind)
-    return core + (r"{\scriptsize\,$\pm$" + f"{s:.2f}" + "}" if pm and s is not None else "")
+    return core + (r"$\,\pm\,$" + f"{s:.2f}" if pm and s is not None else "")   # 2026-09-14: 표준편차도 본문 크기(\scriptsize 제거)
 
 
 DELTA_COLORS = r"\definecolor{dpos}{RGB}{0,110,60}\definecolor{dneg}{RGB}{190,30,30}"  # 표 파일 상단에 삽입 (xcolor 필요)
@@ -296,8 +296,8 @@ def build_patchmix(anchors, fam, table, meta, footnotes):
            "B": "Reported vs.\\ reproduced results on " + dsdesc + ".",
            "C": "Reported vs.\\ reproduced " + dsdesc + "."}[table] + ("" if table == "A" else common)
     L = [DELTA_COLORS, r"\begin{table*}[!t]", r"\centering", r"\caption{" + cap + "}", r"\label{tab:" + label + "}",
-         r"\renewcommand{\arraystretch}{1}", r"\addtolength{\tabcolsep}{2pt}",
-         r"\resizebox{\linewidth}{!}{", r"\begin{tabular}{" + colspec + "}", r"\toprule", *head, r"\hline \midrule"]
+         r"\renewcommand{\arraystretch}{1}\footnotesize\setlength{\tabcolsep}{3pt}",
+         r"\resizebox{\ifdim\width>\linewidth\linewidth\else\width\fi}{!}{", r"\begin{tabular}{" + colspec + "}", r"\toprule", *head, r"\hline \midrule"]
     used_fn = set()
     band_sizes = {b: sum(1 for a in rows if a["band"] == b) for b in BAND_ORDER}
     cur_band = None
@@ -353,13 +353,16 @@ RANK_EXCLUDE = {"C": {"11"}}          # 각주 5(M2D 마지막 배치 탈락, 1,
 CAPTION_A = (r"Toolkit results on ICBHI 2017 use the official 60/40 split and four-class cycle scoring. Reported values are transcribed as published; "
              r"toolkit results are five-seed means\,$\pm$\,SD. $\Delta$Sc is toolkit minus reported Score where available (\textcolor{dpos}{green}: $\geq 0$; "
              r"\textcolor{dneg}{red}: $<0$), omitted for the split, metric, or selection differences discussed in the text and notes. "
-             r"Bold and underlined values mark the highest and second-highest comparable toolkit means per column.")
+             r"Bold and underlined values mark the highest and second-highest comparable toolkit means per column. "
+             r"Abbreviations: IN = ImageNet; AS = AudioSet; LA = LAION-Audio-630K audio--text pairs; Resp = respiratory audio "
+             r"(OPERA-CT: the OPERA pre-training set of COVID-19 Sounds, UK COVID-19, COUGHVID, ICBHI and HF Lung, 136K samples with downstream test data held out; "
+             r"M2D-Resp: COUGHVID, HF Lung and ICBHI 2017 training recordings mixed with AudioSet); FM = foundation model; PEFT = parameter-efficient fine-tuning; IS = Interspeech.")
 CAPTION_M = (r"Toolkit results on the SPRSound 2022 inter-patient test set (five seeds; mean\,$\pm$\,SD). SPRSound $\to$ SPRSound uses the official training set "
              r"and seven classes, except LungMix (four). ICBHI $\to$ SPRSound evaluates checkpoints from the ICBHI training runs in Table~\ref{tab:icbhi_diff}, "
              r"selected on ICBHI test data without SPRSound fine-tuning or checkpoint selection, using four merged classes. Evaluation uses 1,429 events unless noted. "
              r"Bold and underlined values mark the two highest means per column among results using the same label space and evaluation samples. "
              r"SG-SCL~\cite{kim2024stethoscope} was not trained on SPRSound (n/a); its backbone baselines appear in the Fine-tuning group. \mbox{--}: not run. "
-             r"Implementation and protocol details are given in Section~2 and the notes.")
+             r"Implementation and protocol details are given in Section~2 and the notes. FM = foundation model; PEFT = parameter-efficient fine-tuning.")
 
 
 def _local(ids, table):
@@ -424,15 +427,15 @@ def build_merged(anchors, fam, meta, footnotes):
                                        for r in rows])
     fallback = _fallback_lookup(anchors)
     stem, label = MERGED
-    colspec = "p{2pt}llcl" + "ccc" + "ccc"
-    head = [r"& \multirow{2}{*}{method} & \multirow{2}{*}{architecture} & \multirow{2}{*}{pretrain} & \multirow{2}{*}{venue} & "
+    colspec = "p{2pt}ll" + "ccc" + "ccc"   # 2026-09-14: 표 1 과 중복되는 pretrain·venue 열 제거
+    head = [r"& \multirow{2}{*}{method} & \multirow{2}{*}{architecture} & "
             r"\multicolumn{3}{c}{SPRSound $\to$ SPRSound} & \multicolumn{3}{c}{ICBHI $\to$ SPRSound (zero-shot)} \\",
-            r"\cmidrule(lr){6-8}\cmidrule(lr){9-11}",
-            r"& & & & & $S_p$ & $S_e$ & \textbf{Sc} & $S_p$ & $S_e$ & \textbf{Sc} \\"]
+            r"\cmidrule(lr){4-6}\cmidrule(lr){7-9}",
+            r"& & & $S_p$ & $S_e$ & \textbf{Sc} & $S_p$ & $S_e$ & \textbf{Sc} \\"]
     cap = CAPTION_M
     L = [r"\begin{table*}[!t]", r"\centering", r"\caption{" + cap + "}", r"\label{tab:" + label + "}",
-         r"\renewcommand{\arraystretch}{1}", r"\addtolength{\tabcolsep}{2pt}",
-         r"\resizebox{\linewidth}{!}{", r"\begin{tabular}{" + colspec + "}", r"\toprule", *head, r"\hline \midrule"]
+         r"\renewcommand{\arraystretch}{1}\footnotesize\setlength{\tabcolsep}{3pt}",
+         r"\resizebox{\ifdim\width>\linewidth\linewidth\else\width\fi}{!}{", r"\begin{tabular}{" + colspec + "}", r"\toprule", *head, r"\hline \midrule"]
     used_fn = set()
     band_of = lambda r: (r[2] or r[1])["band"]
     bands = [meta_band for meta_band in BAND_ORDER]
@@ -454,7 +457,7 @@ def build_merged(anchors, fam, meta, footnotes):
             first = (r"\multirow{" + str(band_sizes[cur_band]) + r"}{*}{\rotatebox[origin=c]{90}{\scriptsize\textbf{" + BAND_SHORT[cur_band] + "}}}")
         else:
             first = ""
-        cells = [first, name, m["arch"], tex_escape(m["pretrain"]).replace("+", r"\,+\,"), r"\textit{" + m["venue"] + "}"]
+        cells = [first, name, m["arch"]]
         for t, a, other in (("B", b, c), ("C", c, b)):
             if a is None:
                 na = (other.get("na_fn") or "") if other else ""   # 사유는 캡션에; 셀에는 표식 없이 n/a
@@ -495,8 +498,8 @@ def merged_html(anchors, fam, meta, footnotes, tex2html):
     used = set()
     L = ['<div class="pm pm-M">', f'<p class="pm-title"><b>table2_SPRSound · SPRSound→SPRSound (7-class) | ICBHI→SPRSound 제로샷 (7→4 병합, 1,429 event) · reported 열 없음</b> · {len(rows)} 행</p>',
          '<div class="tbl"><table class="pmt"><thead>',
-         '<tr class="grp"><th colspan="5"></th><th colspan="3">SPRSound → SPRSound (ours, 5 seeds)</th><th colspan="3">ICBHI → SPRSound zero-shot (ours, 5 seeds)</th></tr>',
-         "<tr><th></th><th>method</th><th>architecture</th><th>pretrain</th><th>venue</th><th>Sp</th><th>Se</th><th>Sc</th><th>Sp</th><th>Se</th><th>Sc</th></tr>",
+         '<tr class="grp"><th colspan="3"></th><th colspan="3">SPRSound → SPRSound (ours, 5 seeds)</th><th colspan="3">ICBHI → SPRSound zero-shot (ours, 5 seeds)</th></tr>',
+         "<tr><th></th><th>method</th><th>architecture</th><th>Sp</th><th>Se</th><th>Sc</th><th>Sp</th><th>Se</th><th>Sc</th></tr>",
          "</thead><tbody>"]
     cur_band = None
     for i, (k, b, c) in enumerate(rows):
@@ -509,8 +512,7 @@ def merged_html(anchors, fam, meta, footnotes, tex2html):
         if row_band[i] != cur_band:
             cur_band = row_band[i]
             first = f'<td class="pm-band" rowspan="{row_band.count(cur_band)}"><span>{BAND_SHORT[cur_band]}</span></td>'
-        cells = [first, f'<td class="name">{_html_esc(m["method"])}{_sup(name_fn, html=True)}{cite}</td>', f"<td>{_html_esc(tex2html(m['arch']))}</td>",
-                 f"<td>{_html_esc(m['pretrain'])}</td>", f"<td><i>{_html_esc(m['venue'].replace(chr(96), chr(8217)))}</i></td>"]
+        cells = [first, f'<td class="name">{_html_esc(m["method"])}{_sup(name_fn, html=True)}{cite}</td>', f"<td>{_html_esc(tex2html(m['arch']))}</td>"]
         for t, a, other in (("B", b, c), ("C", c, b)):
             if a is None:
                 na = (other.get("na_fn") or "") if other else ""
