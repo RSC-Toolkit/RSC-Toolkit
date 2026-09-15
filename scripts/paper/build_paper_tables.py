@@ -237,7 +237,8 @@ def _ours_pm(m, s, kind=None, pm=True):
     if m is None:
         return "--"
     core = _mark(f"{m:.2f}", kind)
-    return core + (r"$\,\pm\,$" + f"{s:.2f}" if pm and s is not None else "")   # 2026-09-14: 표준편차도 본문 크기(\scriptsize 제거)
+    # 2026-09-15 사용자 요청: 표준편차는 아래첨자로 작게 (mean${}_{\pm sd}$). 09-14 의 본문 크기 표기를 대체.
+    return core + (r"${}_{\pm" + f"{s:.2f}" + "}$" if pm and s is not None else "")
 
 
 DELTA_COLORS = r"\definecolor{dpos}{RGB}{0,110,60}\definecolor{dneg}{RGB}{190,30,30}"  # 표 파일 상단에 삽입 (xcolor 필요)
