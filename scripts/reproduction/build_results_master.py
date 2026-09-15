@@ -290,7 +290,11 @@ def main() -> int:
 
     # 지표 3종이 다 있는지는 논문 규약(D7)의 전제라 매번 확인한다.
     missing = [r["run_name"] for r in rows if any(r.get(k) in ("", None) for k in ("s_e", "s_p", "icbhi_score"))]
-    print(f"런 {len(rows)} 개 → {out.relative_to(ROOT)}", file=sys.stderr)
+    try:
+        shown = out.resolve().relative_to(ROOT)
+    except ValueError:      # 저장소 밖 --out (독스트링 예시 /tmp/x.csv) — 파일은 이미 완전히 썼다
+        shown = out
+    print(f"런 {len(rows)} 개 → {shown}", file=sys.stderr)
     prov = collections.Counter(r.get("provenance") or "none" for r in rows)
     print(f"  출처: " + " · ".join(f"{k} {v}" for k, v in prov.most_common()), file=sys.stderr)
     print(f"  Se/Sp/Score 결측 {len(missing)}", file=sys.stderr)

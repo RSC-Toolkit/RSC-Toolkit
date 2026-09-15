@@ -22,6 +22,8 @@ run:
 model:
   params:
     n_cls: 7
+    num_train_samples: 6656      # SPRSound 2022 train 이벤트 수 — 기본값(ICBHI 4,142)이면 콜백이 재할당하지만,
+                                 # 생성자에서 맞춰 두면 last.ckpt 재개·best.pth 로드가 모양 보정 없이 된다 (REVIEW 09-10 P1)
 
 trainer:
   params:

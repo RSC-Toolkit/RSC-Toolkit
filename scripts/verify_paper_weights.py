@@ -316,7 +316,7 @@ def main() -> int:
     ap.add_argument("--shard", default=None, help="i/n — 행을 i::n 으로 나눠 맡는다 (GPU 병렬용)")
     ap.add_argument("--smoke", action="store_true", help="그룹·출처별 1개씩만")
     ap.add_argument("--limit", type=int, default=0)
-    ap.add_argument("--tol", type=float, default=0.05, help="PASS 허용 |Δ| (% 단위 지표)")
+    ap.add_argument("--tol", type=float, default=0.05, help="PASS 허용 |Δ| (%% 단위 지표)")
     ap.add_argument("--device", default="cuda")
     ap.add_argument("--max-temp", type=int, default=74,
                     help="run 사이 온도 게이트(°C): 이 값 이상이면 5°C 아래로 식을 때까지 대기. 0 이면 끔")

@@ -83,7 +83,7 @@ GPU=0 scripts/eval.sh  outputs/patchmix/icbhi-patchmix-cl-s1
 |---|---|---|
 | AST fine-tuning (`ast_patchmix`) | `patchmix_icbhi model.params.method=ce` | `patchmix_sprs` (기본 ce) |
 | Patch-Mix CE / CL (`ast_patchmix`) | `patchmix_icbhi model.params.method=patchmix` / `…=patchmix_cl` (+`loss=cross_entropy`) | `patchmix_sprs model.params.method=patchmix_cl` |
-| SG-SCL / DAT (`ast_sgscl`) | `sgscl_icbhi` (기본 sgscl; `model.params.con_feat=feat1` 이 표의 행) / `model.params.method=dat` | `sgscl_sprs` |
+| SG-SCL / DAT (`ast_sgscl`) | `sgscl_icbhi` (기본 sgscl; `model.params.con_feat=feat1` 이 표의 행) / `model.params.method=dat` | — (SPRSound 는 단일 청진기라 청진기 도메인 대조항이 정의되지 않는다; 표 2 n/a) |
 | ResNet18/34·EfficientNet-B0·CNN6 SFT (`resnet18_sft` 등) | `sgscl_nonast_icbhi model.name=resnet18_sft` (`resnet34_sft`, `efficientnet_b0_sft`, `cnn6_sft`) | `sgscl_nonast_sprs model.name=…` |
 | SG-SCL on non-AST (`*_sft`) | `sgscl_nonast_icbhi model.name=cnn6_sft model.params.method=sgscl loss=cross_entropy` | — |
 | SCL w/ metadata: CE / Hybrid / M-SCL (`cnn6_sclmeta`) | `sclmeta_icbhi model.params.method=ce` / `…=hybrid` / 2단계: `sclmeta_icbhi_pretrain` → `sclmeta_icbhi_linear model.params.encoder_ckpt=<pretrain 의 final_state.pth>` | `sclmeta_sprs …` / `sclmeta_sprs_pretrain` → `sclmeta_sprs_linear` |

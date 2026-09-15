@@ -21,7 +21,8 @@ params:
   features:
     enabled: true
     kind: fbank
-    cache_dir: downloaded_datasets/features_cache
+    cache_dir: downloaded_datasets/features_cache_icbhi_fbank   # 전용 — 프로세서 설정(128×1024)이 icbhi_ddemae_16k 와 같아 캐시 키가
+                                                              # 겹치는데 오디오 체인(8 s repeat vs 10.24 s zero)이 달라 공용 dir 에서는 대장이 막는다 (REVIEW 09-10 §2 P1)
     n_mels: 128
     target_frames: 1024
     frame_shift: 10
