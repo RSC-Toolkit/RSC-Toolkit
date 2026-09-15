@@ -136,6 +136,14 @@ def main() -> int:
     results = []
     for i, row in enumerate(rows, 1):
         run_dir = ROOT / row["run_dir"]
+        if row.get("provenance") == "self":   # MVST 융합(뷰 5 + FuseMLP): 단일 모델 재평가 경로가 없다 → 전용 스크립트의 ICBHI 검산이 대신한다 (2026-09-15)
+            rec = {"group": row["paper_group"], "run": row["run_name"], "status": "SKIP", "seconds": 0.0,
+                   "note": "fusion run — verify with scripts/eval_ood_mvst_fusion.py --dataset icbhi (reproduces fusion best.json)"}
+            results.append(rec)
+            print(f"[{i}/{len(rows)}] {row['run_name']:36s} SKIP     {rec['note']}", flush=True)
+            with open(out_dir / "ood_results.jsonl", "a") as fh:
+                fh.write(json.dumps(rec, ensure_ascii=False) + "\n")
+            continue
         old = json.loads((run_dir / "ood.json").read_text())
         out_json = out_dir / "ood" / row["run_name"] / "ood.json"
         cmd = command_for(row, run_dir, old, out_json, args.device)
