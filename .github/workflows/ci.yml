@@ -35,7 +35,8 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           python -m pip install --index-url https://download.pytorch.org/whl/cpu torch==2.7.0 torchaudio==2.7.0 torchvision==0.22.0
-          python -m pip install -e ".[trainer,models,dev]"
+          # nbformat: tests/unit/test_tutorial_entry.py 가 커밋된 노트북과 생성기(scripts/tutorial/make_notebook.py)의 동기화를 검사한다
+          python -m pip install -e ".[trainer,models,dev]" nbformat
       - name: Unit tests
         # exact_golden: 비트 단위 골든 비교(SpecAugment·PAFA head 등)는 CPU/BLAS 가 다른 러너에서 마지막 자리에서 어긋난다 —
         # 개발 머신(GPU 서버)에서 돈다. 사전학습 체크포인트·실데이터가 필요한 테스트는 각자 skipif 로 건너뛴다.

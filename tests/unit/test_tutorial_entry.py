@@ -28,7 +28,9 @@ def test_toy_configs_use_their_own_cache_dir():
 
 
 def test_notebook_generator_matches_committed_notebook(tmp_path):
-    import nbformat
+    import pytest
+
+    nbformat = pytest.importorskip("nbformat", reason="nbformat 없음 (notebook extra) — CI unit-tests job 은 따로 설치한다")
     gen = ROOT / "scripts" / "tutorial" / "make_notebook.py"
     committed = nbformat.read(ROOT / "notebooks" / "tutorial.ipynb", as_version=4)
     # 생성기를 임시 위치로 실행해 커밋본과 셀 소스가 같은지 본다
