@@ -106,12 +106,13 @@ GPU=0 scripts/eval.sh  outputs/patchmix/icbhi-patchmix-cl-s1
 | MVST — 뷰 5개 + 융합 (`ast_mvst`) | `mvst_icbhi model.params.view=16` (16·32·64·128·256 각각) → `scripts/reproduction/aggregate_mvst_results.py` 로 융합 | `mvst_sprs model.params.view=…` |
 | M2D base / M2D-X / M2D-Resp (`m2d`) | `m2d_icbhi` / `model.params.pretrained_path=pretrained_models/upstream/m2d/<ckpt>` (M2D-Resp 는 `model.params.input_size=[80,608]` 추가) | `m2d_sprs …` (M2D-X 는 ICBHI 특화 공개 ckpt 를 그대로 미세조정 — 툴킷 관찰값, 논문 대응값 없음) |
 | OPERA-CT frozen / fine-tune (`opera_ct`) | `opera_embc_icbhi` / `opera_ft_icbhi` | `opera_embc_sprs` / `opera_ft_sprs` |
-| DDE-MAE (`audiomae_dde_cls`; 논문 표 제외) | `dde_icbhi_b2` / `dde_icbhi_stage1` → `dde_icbhi_stage2 model.params.encoder_ckpt=<stage1 final_state.pth>` | — |
+| DDE-MAE (`audiomae_dde_cls`; 논문 표 제외) | `dde_icbhi_b2 data=icbhi_ddemae_16k` / `dde_icbhi_stage1 data=icbhi_ddemae_16k` → `dde_icbhi_stage2 data=icbhi_ddemae_16k model.params.encoder_ckpt=<stage1 final_state.pth>` (config 기본 `icbhi_ddemae`(4 kHz)는 붕괴 판정 — 실제 run 은 전부 16 kHz override) | — |
 
 `seed=N run.name=<표의 이름>-sN` 을 항상 붙인다. 위 config 들이 쓰는 데이터 설정은 `rsc_toolkit/configs/data/`(ICBHI `icbhi_*`,
 SPRSound `sprsound_*`)에 있고, 사전학습 가중치는 `pretrained_models/upstream/` 또는 `RSCTK_PRETRAINED_ROOT` 아래에 둔다
 (없으면 AST·PANNs 는 자동 다운로드, BEATs·DASS·M2D·OPERA·AudioMAE 는 안내 메시지로 멈춘다).
 스모크(1 epoch·2 배치)는 `scripts/train.sh <config> trainer.params.max_epochs=1 ++trainer.params.limit_train_batches=2 ++trainer.params.limit_val_batches=2 run.name=smoke-…`.
+같은 `run.name` 의 best.pth/best.json 이 이미 있으면 학습은 시작하지 않는다(덮어쓰기 방지) — 새 이름을 쓰거나 `+run.overwrite=true` 를 붙인다. 등록된 컴포넌트 목록은 `rsc-toolkit list` (`rsctk list models`).
 
 ## 자기 모델 붙이기
 
