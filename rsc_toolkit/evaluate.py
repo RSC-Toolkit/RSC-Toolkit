@@ -271,8 +271,14 @@ def _chdir(path: pathlib.Path) -> Iterator[None]:
 
 
 # ----------------------------------------------------------------------------- 로드·평가
+# 학습 샘플 수에 따라 크기가 정해지는 버퍼(AMS-D 의 per-sample 상태) — 이 이름들만 ckpt 모양으로 맞춘다.
+# 그 밖의 모양 불일치(BN running stat·pos_embed 등)는 모델 구성이 다르다는 뜻이므로 strict 로드가 실패해야 한다
+# (예전엔 이름 불문 전부 0 으로 바꿔 "strict_ok" 로 통과시켰다 — REVIEW 2026-09-10 §4 P3).
+ADAPTABLE_BUFFER_SUFFIXES = ("all_predictions", "ids_masked")
+
+
 def adapt_buffer_shapes(model, sd: dict) -> List[str]:
-    """ckpt 의 버퍼 모양이 새 모델과 다르면(AMSD 의 per-sample 버퍼 등) 버퍼만 ckpt 모양으로 바꾼다."""
+    """ckpt 의 버퍼 모양이 새 모델과 다르면(AMSD 의 per-sample 버퍼) 그 버퍼만 ckpt 모양으로 바꾼다."""
     import torch
 
     changed = []
@@ -280,6 +286,8 @@ def adapt_buffer_shapes(model, sd: dict) -> List[str]:
     for name, tensor in sd.items():
         cur = buffers.get(name)
         if cur is None or tuple(cur.shape) == tuple(tensor.shape):
+            continue
+        if name.rpartition(".")[2] not in ADAPTABLE_BUFFER_SUFFIXES:
             continue
         mod_name, _, attr = name.rpartition(".")
         mod = model.get_submodule(mod_name) if mod_name else model
@@ -300,11 +308,15 @@ def load_checkpoint(model, ckpt_path: pathlib.Path) -> dict:
         model.load_state_dict(sd, strict=True)
         info["load"] = "strict_ok"
     except RuntimeError as exc:
-        res = model.load_state_dict(sd, strict=False)
         info["load"] = "strict_fail"
-        info["load_missing"] = list(res.missing_keys)[:20]
-        info["load_unexpected"] = list(res.unexpected_keys)[:20]
         info["load_error"] = str(exc)[:500]
+        try:
+            res = model.load_state_dict(sd, strict=False)
+            info["load_missing"] = list(res.missing_keys)[:20]
+            info["load_unexpected"] = list(res.unexpected_keys)[:20]
+        except RuntimeError as exc2:
+            # 모양 불일치(버퍼·가중치)는 strict=False 로도 못 싣는다 — 부분 로드 정보 없이 실패로 남긴다
+            info["load_error"] = str(exc2)[:500]
     return info
 
 

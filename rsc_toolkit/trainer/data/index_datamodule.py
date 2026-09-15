@@ -496,9 +496,16 @@ class IndexDataModule(L.LightningDataModule):
             def __init__(self, inner, sample_ids: Sequence[str]):
                 self.inner = inner
                 self.sample_ids = list(sample_ids)
+                if len(self.sample_ids) != len(inner):
+                    # id 는 인덱스 df 기준, 항목은 inner 기준 — 둘이 어긋나면 워커 안에서 IndexError 로 죽거나
+                    # 다른 샘플의 피처를 남의 id 로 저장한다 (REVIEW 2026-09-10 §2 P2).
+                    raise RuntimeError(
+                        f"피처 웜업: sample_id 수({len(self.sample_ids)})와 데이터셋 길이({len(inner)})가 다르다 — "
+                        "index_dataset 이 인덱스 행을 걸러내는 서브클래스라면 _collect_sample_ids 를 같은 규칙으로 맞춰라."
+                    )
 
             def __len__(self) -> int:
-                return len(self.inner)
+                return len(self.sample_ids)
 
             def __getitem__(self, i: int) -> Optional[str]:
                 sid = str(self.sample_ids[int(i)])

@@ -208,7 +208,9 @@ class QLungDataModule(IndexDataModule):
             raise ValueError(f"label_map 은 none|sprsound_7to4: {label_map!r}")
 
     def preprocess_key(self) -> str:
-        return (f"sr{self.sampling_rate}_len{self.desired_length_sec:g}_{self.pad_type}_fade{int(self.fade)}"
+        # 기존 캐시 파일명(AQS·acoustic .pt)을 유지해야 하므로 값이 있을 때의 서식은 바꾸지 않는다; None 은 예전엔 TypeError.
+        length = "none" if self.desired_length_sec is None else f"{self.desired_length_sec:g}"
+        return (f"sr{self.sampling_rate}_len{length}_{self.pad_type}_fade{int(self.fade)}"
                 f"_ras{int(self.resample_after_slice)}_{self.time_unit}")
 
     def _index_dataset_kwargs(self, *, split: str, role: Optional[str] = None) -> Dict[str, Any]:

@@ -113,14 +113,30 @@ def test_adapt_buffer_shapes_and_load_checkpoint(tmp_path):
         def __init__(self):
             super().__init__()
             self.lin = nn.Linear(2, 2)
-            self.register_buffer("stats", torch.zeros(3))
+            self.register_buffer("all_predictions", torch.zeros(3))   # AMS-D per-sample 버퍼 (학습 샘플 수에 따라 다름)
 
     m = M()
-    sd = {"lin.weight": torch.ones(2, 2), "lin.bias": torch.zeros(2), "stats": torch.arange(5.0)}
+    sd = {"lin.weight": torch.ones(2, 2), "lin.bias": torch.zeros(2), "all_predictions": torch.arange(5.0)}
     torch.save({"model": sd}, tmp_path / "best.pth")
     info = ev.load_checkpoint(m, tmp_path / "best.pth")
-    assert info["load"] == "strict_ok" and info["buffer_adapted"] == ["stats: (3,) -> (5,)"]
-    assert torch.equal(m.stats, torch.arange(5.0))
+    assert info["load"] == "strict_ok" and info["buffer_adapted"] == ["all_predictions: (3,) -> (5,)"]
+    assert torch.equal(m.all_predictions, torch.arange(5.0))
+
+
+def test_adapt_buffer_shapes_leaves_other_buffers_alone(tmp_path):
+    """per-sample 버퍼가 아닌 모양 불일치(BN running stat 등)는 모델 구성이 다른 것 — 0 으로 덮지 말고 strict 실패."""
+    class M(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.lin = nn.Linear(2, 2)
+            self.register_buffer("running_mean", torch.zeros(3))
+
+    m = M()
+    sd = {"lin.weight": torch.ones(2, 2), "lin.bias": torch.zeros(2), "running_mean": torch.arange(5.0)}
+    assert ev.adapt_buffer_shapes(m, sd) == []
+    torch.save({"model": sd}, tmp_path / "best.pth")
+    info = ev.load_checkpoint(m, tmp_path / "best.pth")
+    assert info["load"] != "strict_ok"
 
     torch.save({"lin.weight": torch.ones(2, 2)}, tmp_path / "partial.pth")  # state_dict 자체 + 키 누락
     info = ev.load_checkpoint(M(), tmp_path / "partial.pth")

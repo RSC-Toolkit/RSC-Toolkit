@@ -71,6 +71,16 @@ class ICBHIScore(Metric):
         B, C = logits.shape
         k = min(self.topk, C)
 
+        if target.numel() > 0:
+            lo, hi = int(target.min()), int(target.max())
+            if lo < 0 or hi >= self.num_classes:
+                # 예전엔 [0, num_classes) 밖 라벨을 per-class 루프가 조용히 버려, 7-class 라벨을 4-class 메트릭에 넣으면
+                # 남은 라벨만으로 Score 가 계산돼 100 에 가까운 값이 나왔다 (REVIEW 2026-09-10 §4 P2).
+                raise ValueError(
+                    f"ICBHIScore(num_classes={self.num_classes}) 에 범위 밖 라벨이 들어왔다: min {lo}, max {hi}. "
+                    f"metrics config 의 num_classes 와 데이터셋 라벨 공간(예: SPRSound 7-class vs 7→4 병합)이 맞는지 확인하라."
+                )
+
         # top-k predicted indices: [B, k]
         pred = logits.topk(k, dim=1, largest=True, sorted=True).indices
 

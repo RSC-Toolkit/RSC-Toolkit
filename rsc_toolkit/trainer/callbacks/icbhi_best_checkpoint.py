@@ -8,12 +8,12 @@ val 데이터로더에 공식 test split 을 물리는 것(config 의 val_splits
 
 ICBHIScore 메트릭이 로그하는 "icbhi_score" / "S_e" / "S_p" 를 읽는다.
 """
-import json
 import logging
 import pathlib
 
 import lightning as L
-import torch
+
+from rsc_toolkit.trainer.callbacks.atomic_io import atomic_json_dump, atomic_torch_save
 
 logger = logging.getLogger(__name__)
 
@@ -77,8 +77,8 @@ class ICBHIBestScoreCheckpoint(L.Callback):
         self.dirpath.mkdir(parents=True, exist_ok=True)
         model = getattr(pl_module, self.model_attr, pl_module)
         path = self.dirpath / self.filename
-        torch.save({"model": model.state_dict(), **self.best_info}, path)
-        json.dump(self.best_info, open(path.with_suffix(".json"), "w"), indent=1)
+        atomic_torch_save({"model": model.state_dict(), **self.best_info}, path)
+        atomic_json_dump(self.best_info, path.with_suffix(".json"))
         logger.info("Best 갱신: epoch %d, Score %.2f (Sp %.2f / Se %.2f) -> %s",
                     self.best_info["epoch"], score, sp, se, path)
 

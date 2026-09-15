@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import pathlib
 from typing import Any, Dict, Iterable, List
 
 import hydra
@@ -16,6 +17,48 @@ from rsc_toolkit.trainer.factories.build_trainer import build_trainer
 
 
 logger = logging.getLogger(__name__)
+
+
+def existing_run_artifacts(trainer: L.Trainer) -> List[pathlib.Path]:
+    """이 run 이름으로 이미 저장된 산출물(best.pth/best.json/final_state.pth …) — 콜백의 dirpath/filename 에서 찾는다.
+
+    같은 run.name 을 다시 투입하면 예전엔 아무 경고 없이 best.pth 를 덮어썼다 (REVIEW 2026-09-10 §4 P2).
+    재개용 last.ckpt(EpochResumeCheckpoint)는 제외한다 — 그것은 이어가기 신호다.
+    """
+    from rsc_toolkit.trainer.callbacks.resume_checkpoint import EpochResumeCheckpoint
+
+    found = set()
+    for cb in trainer.callbacks:
+        if isinstance(cb, EpochResumeCheckpoint):
+            continue
+        dirpath, filename = getattr(cb, "dirpath", None), getattr(cb, "filename", None)
+        if dirpath is not None and filename is not None:
+            d = pathlib.Path(dirpath)
+            for name in {str(filename), "best.json", pathlib.Path(str(filename)).with_suffix(".json").name}:
+                if (d / name).is_file():
+                    found.add(d / name)
+        path = getattr(cb, "path", None)          # GapAugFinalMetrics 류: 파일 경로 하나
+        if isinstance(path, (str, pathlib.Path)) and pathlib.Path(path).is_file():
+            found.add(pathlib.Path(path))
+    return sorted(found)
+
+
+def guard_existing_run(trainer: L.Trainer, cfg_dict: Dict[str, Any], resuming: bool) -> None:
+    """새로 시작하는 학습이 기존 산출물을 덮어쓰려 하면 멈춘다 (`+run.overwrite=true` 로 허용)."""
+    if resuming:
+        return
+    existing = existing_run_artifacts(trainer)
+    if not existing:
+        return
+    run_cfg = cfg_dict.get("run") or {}
+    if bool(run_cfg.get("overwrite", False)):
+        logger.warning("run.overwrite=true — 같은 run.name 의 기존 산출물을 덮어쓴다: %s", ", ".join(map(str, existing)))
+        return
+    raise RuntimeError(
+        f"run.name={run_cfg.get('name')!r} 의 산출물이 이미 있다: {', '.join(map(str, existing))}. "
+        "그대로 시작하면 best.pth/best.json 을 덮어쓴다 — 새 run.name 을 쓰거나, 이어가려면 last.ckpt 가 있는 상태에서 "
+        "resume=auto(기본)로 투입하고, 정말 덮어쓰려면 +run.overwrite=true 를 붙여라."
+    )
 
 
 def _to_plain_dict(cfg: DictConfig) -> Dict[str, Any]:
@@ -134,6 +177,8 @@ def main(cfg: DictConfig) -> None:
             logger.info("재개: %s 에서 이어서 학습한다", ckpt_path)
     elif resume != "never":
         raise ValueError(f"resume 은 auto|never 여야 한다: {resume!r}")
+
+    guard_existing_run(trainer, cfg_dict, resuming=ckpt_path is not None)
 
     trainer.fit(pl_module, datamodule=datamodule, ckpt_path=str(ckpt_path) if ckpt_path else None)
 

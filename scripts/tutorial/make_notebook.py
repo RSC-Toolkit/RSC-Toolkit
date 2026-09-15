@@ -124,7 +124,9 @@ def train_toy(run_name: str, *extra, config_dir=None):
     run(TRAIN, "--config-name", "default", *opts, "data=toy_fbank", *model, "callbacks=best_checkpoint",
         f"data.params.project_root={ROOT}", f"data.params.data_dir={TOY}", f"data.params.features.cache_dir={WORK / 'cache_toy'}",
         "data.params.num_workers=0", "trainer.params.max_epochs=1", "trainer.params.accelerator=cpu",
-        f"run.name={run_name}", "run.group=tutorial", f"hydra.run.dir={WORK / 'hydra' / run_name}", *extra)
+        f"run.name={run_name}", "run.group=tutorial", f"hydra.run.dir={WORK / 'hydra' / run_name}",
+        "+run.overwrite=true",   # 노트북을 다시 실행하면 같은 run 이름의 best.pth 가 이미 있다 — 덮어쓰기를 명시 허용
+        *extra)
     best = json.loads((WORK / "outputs" / "tutorial" / run_name / "best.json").read_text())
     print("best.json:", best)
     return best
@@ -253,7 +255,8 @@ else:
     name = "icbhi-cnn6-1epoch"
     run(TRAIN, "--config-name", "sgscl_nonast_icbhi", "model.name=cnn6_sft",
         f"data.params.project_root={ROOT}", f"data.params.data_dir={ICBHI}", f"data.params.features.cache_dir={WORK / 'cache_icbhi'}",
-        "trainer.params.max_epochs=1", f"run.name={name}", "run.group=tutorial", f"hydra.run.dir={WORK / 'hydra' / name}", env=ENV_GPU)
+        "trainer.params.max_epochs=1", f"run.name={name}", "run.group=tutorial", f"hydra.run.dir={WORK / 'hydra' / name}",
+        "+run.overwrite=true", env=ENV_GPU)
     # sgscl_nonast_paper 콜백은 outputs/sgscl/<run.name> 에 저장한다
     print(json.loads((WORK / "outputs" / "sgscl" / name / "best.json").read_text()))
     res_1ep = evaluate(WORK / "outputs" / "sgscl" / name, WORK / "hydra" / name)

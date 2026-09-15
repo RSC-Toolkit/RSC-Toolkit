@@ -29,7 +29,15 @@ def collate_xy_meta(
 ) -> Tuple[torch.Tensor, ...]:
     x = torch.stack([b[0] for b in batch], dim=0)
     if label_mode == "long":
-        y = torch.as_tensor([b[1] for b in batch], dtype=torch.long)
+        labels = [b[1] for b in batch]
+        if any(lab is None for lab in labels):
+            # 계약상 label 은 int|None(ICBHI clip 인덱스는 label 빈 값) — 학습 배치에 None 이 섞이면 torch.as_tensor 의
+            # 알 수 없는 TypeError 대신 원인을 말한다 (REVIEW 2026-09-10 §2 P2).
+            raise ValueError(
+                f"배치에 label 이 None 인 샘플이 {sum(lab is None for lab in labels)}/{len(labels)} 개 있다 — "
+                "라벨 없는 인덱스(clip 단위 등)로는 지도 학습 배치를 만들 수 없다. sample_level·split 설정을 확인하라."
+            )
+        y = torch.as_tensor(labels, dtype=torch.long)
     elif label_mode == "stack":
         y = torch.stack([b[1] for b in batch], dim=0)
     else:

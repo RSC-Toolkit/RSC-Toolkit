@@ -33,12 +33,24 @@ class AudioPreprocessor:
         if target_samples <= 0:
             return audio
 
+        if audio.ndim != 2:
+            raise ValueError(f"AudioPreprocessor 는 (channels, samples) 2-D 텐서를 받는다: {tuple(audio.shape)}")
         channels, length = audio.shape
+        if length <= 0:
+            # 길이 0 구간은 반복 패딩에서 ZeroDivisionError / "negative dimension" 로 죽거나(repeat·repeat_fade),
+            # zero 패딩에서는 무음이 조용히 나왔다 (REVIEW 2026-09-10 §2 P2). 인덱스 결함은 여기서 드러나야 한다.
+            raise ValueError("길이 0 오디오 구간은 패딩할 수 없다 — 인덱스의 start/end(t0 ≥ t1) 를 확인하라")
 
         if self.cfg.pad_type == "sclmeta":
             import torchaudio.transforms as T
 
             fade_samples = int(self.sampling_rate / 16)
+            if length < fade_samples:
+                # 원본(scl_icbhi2017)도 구간 원음에 fade 를 먼저 거므로 sr/16 보다 짧은 구간에서는 torchaudio Fade 가
+                # "negative dimension" 으로 죽는다 — 원인이 보이는 오류로 바꾼다(현재 인덱스 최소 0.126 s 라 미발현).
+                raise ValueError(
+                    f"sclmeta 패딩: 구간 길이 {length} 샘플이 fade 길이 sr/16={fade_samples} 보다 짧다 — 인덱스 구간을 확인하라"
+                )
             audio = T.Fade(fade_in_len=fade_samples, fade_out_len=fade_samples, fade_shape="linear")(audio)
             if audio.shape[-1] > target_samples:
                 return audio[..., :target_samples]

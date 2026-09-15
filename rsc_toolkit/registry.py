@@ -99,6 +99,7 @@ class Registry(Mapping):
         self._scan_packages = tuple(scan_packages)
         self._scan_exclude = set(scan_exclude)
         self._scanned = False
+        self._failed: Dict[str, str] = {}  # 스캔 중 import 에 실패한 모듈 -> 원인 (KeyError 메시지에 덧붙인다)
 
     # ── 등록 ────────────────────────────────────────────────────────────────
     def register(self, name: str) -> Callable[[Any], Any]:
@@ -172,7 +173,17 @@ class Registry(Mapping):
             return self._resolve_lazy(name)
         if default is not _MISSING:
             return default
-        raise KeyError(f"Unknown {self.kind} '{name}'. Available: {sorted(self)}")
+        hint = ""
+        if self._failed:
+            failed = "; ".join(f"{m}: {why}" for m, why in sorted(self._failed.items()))
+            hint = f" 스캔 중 import 에 실패해 등록되지 못한 모듈이 있다 — {failed}"
+        raise KeyError(f"Unknown {self.kind} '{name}'. Available: {sorted(self)}.{hint}")
+
+    @property
+    def failed_modules(self) -> Dict[str, str]:
+        """패키지 스캔에서 import 에 실패한 모듈과 원인 (진단용 읽기 전용 사본)."""
+        self._discover()
+        return dict(self._failed)
 
     def _resolve_lazy(self, name: str) -> Any:
         target = self._lazy[name]
@@ -208,8 +219,14 @@ class Registry(Mapping):
         if not self._scanned:
             # 아래 import 가 다시 이 registry 를 건드리는 재귀를 막기 위해 먼저 표시한다.
             self._scanned = True
-            for package_name in self._scan_packages:
-                self._scan_package(package_name)
+            try:
+                for package_name in self._scan_packages:
+                    self._scan_package(package_name)
+            except BaseException:
+                # 스캔이 중간에 끊기면 "다 됐다" 표시가 남아 뒤쪽 모듈이 영구 미등록이 된다 — 되돌려 다음 조회가 다시 훑게 한다.
+                self._scanned = False
+                raise
+        # 플러그인은 내장 스캔이 끝난 뒤에 읽는다 — 이름 충돌 시 내장 쪽이 아니라 플러그인 쪽이 실패해야 한다.
         load_plugins()
 
     def _scan_package(self, package_name: str) -> None:
@@ -221,17 +238,25 @@ class Registry(Mapping):
         for _, module_name, is_pkg in pkgutil.iter_modules(package.__path__):
             if is_pkg or module_name.startswith("_") or module_name in self._scan_exclude:
                 continue
+            full = f"{package_name}.{module_name}"
             try:
-                importlib.import_module(f"{package_name}.{module_name}")
-            except ImportError as exc:
-                logger.warning(
-                    "%s 모듈 %s.%s 을 불러오지 못해 등록에서 제외한다 (선택 의존성 누락?): %s",
-                    self.kind, package_name, module_name, exc,
+                importlib.import_module(full)
+            except Exception as exc:
+                # 예전엔 ImportError 만 삼켜서: 선택 의존성 누락은 조용히 사라지고(경고 한 줄), 내부 오타(NameError·
+                # AttributeError·등록 이름 충돌 ValueError)는 스캔 전체를 중단시켜 알파벳순 뒤 모듈이 통째로 빠졌다
+                # (REVIEW 2026-09-10 §1 P2). 모듈 단위로 격리하고 실패를 기록해 KeyError 가 원인을 지목하게 한다.
+                self._failed[full] = f"{type(exc).__name__}: {exc}"
+                level = logging.WARNING if isinstance(exc, ImportError) else logging.ERROR
+                logger.log(
+                    level,
+                    "%s 모듈 %s 을 불러오지 못해 등록에서 제외한다 (%s): %s",
+                    self.kind, full, "선택 의존성 누락?" if isinstance(exc, ImportError) else "모듈 내부 오류", exc,
                 )
 
     def rescan(self) -> None:
         """패키지 스캔과 플러그인 로드를 다시 한다 (멱등; 테스트·REPL 용)."""
         self._scanned = False
+        self._failed.clear()
         self._discover()
         load_plugins(force=True)
 

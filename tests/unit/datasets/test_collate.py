@@ -58,3 +58,12 @@ def test_make_collate_is_picklable_for_dataloader_workers():
         C.collate_xy_meta([(_x(1), 0)], label_mode="nope")
     with pytest.raises(ValueError):
         C.collate_xy_meta([(_x(1), 0, 1)], meta_index=2, meta_mode="nope")
+
+
+def test_none_label_is_a_clear_error():
+    import pytest
+    from rsc_toolkit.datasets.collate import collate_xy_meta
+
+    batch = [(torch.zeros(2), 0), (torch.zeros(2), None)]
+    with pytest.raises(ValueError, match="label 이 None"):
+        collate_xy_meta(batch)

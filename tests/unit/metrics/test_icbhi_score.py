@@ -182,3 +182,17 @@ def test_update_raises_on_bad_logits_shape():
     y = torch.tensor([0, 1])
     with pytest.raises(ValueError):
         metric.update(logits, y)
+
+
+def test_update_raises_on_out_of_range_labels():
+    """[0, num_classes) 밖 라벨은 조용히 버려지지 않는다 (7-class 라벨 → 4-class 메트릭이면 Score ≈ 100 이 나오던 문제)."""
+    from rsc_toolkit.metrics.icbhi.score import ICBHIScore
+
+    m = ICBHIScore(num_classes=4)
+    logits = torch.zeros(3, 4)
+    with pytest.raises(ValueError, match="범위 밖 라벨"):
+        m.update(logits, torch.tensor([0, 1, 6]))
+    with pytest.raises(ValueError):
+        m.update(logits, torch.tensor([-1, 0, 0]))
+    m.update(logits, torch.tensor([0, 3, 2]))          # 경계값은 허용
+    m.update(torch.zeros(0, 4), torch.zeros(0, dtype=torch.long))   # 빈 배치 무해

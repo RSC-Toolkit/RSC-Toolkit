@@ -3,7 +3,8 @@ import logging
 import pathlib
 
 import lightning as L
-import torch
+
+from rsc_toolkit.trainer.callbacks.atomic_io import atomic_torch_save
 
 logger = logging.getLogger(__name__)
 
@@ -16,5 +17,5 @@ class FinalStateCheckpoint(L.Callback):
     def on_train_end(self, trainer, pl_module):
         model = getattr(pl_module, self.model_attr, pl_module)
         self.dirpath.mkdir(parents=True, exist_ok=True)
-        torch.save({"model": model.state_dict(), "epoch": trainer.current_epoch}, self.dirpath / self.filename)
+        atomic_torch_save({"model": model.state_dict(), "epoch": trainer.current_epoch}, self.dirpath / self.filename)
         logger.info("최종 상태 저장: %s (epoch %d)", self.dirpath / self.filename, trainer.current_epoch)

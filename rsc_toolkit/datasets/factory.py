@@ -52,8 +52,13 @@ class DatasetFactory:
         def _try_import(name: str) -> None:
             try:
                 importlib.import_module(name)
-            except ImportError as exc:
-                logger.warning("데이터셋 모듈 %s 을 불러오지 못해 등록에서 제외한다 (선택 의존성 누락?): %s", name, exc)
+            except Exception as exc:
+                # ImportError 만 삼키면 내부 오타(NameError 등)가 스캔 전체를 중단시킨다 — 모듈 단위 격리 + 기록
+                # (registry.Registry._scan_package 와 같은 원칙, REVIEW 2026-09-10 §1 P2).
+                DATASETS._failed[name] = f"{type(exc).__name__}: {exc}"
+                logger.log(logging.WARNING if isinstance(exc, ImportError) else logging.ERROR,
+                           "데이터셋 모듈 %s 을 불러오지 못해 등록에서 제외한다 (%s): %s", name,
+                           "선택 의존성 누락?" if isinstance(exc, ImportError) else "모듈 내부 오류", exc)
 
         for _, module_name, is_pkg in pkgutil.iter_modules(package.__path__):
             if "_dataset" in module_name:

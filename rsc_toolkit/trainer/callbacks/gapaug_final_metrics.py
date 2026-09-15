@@ -14,6 +14,8 @@ import pathlib
 
 import lightning as L
 
+from rsc_toolkit.trainer.callbacks.atomic_io import atomic_json_dump
+
 logger = logging.getLogger(__name__)
 
 
@@ -43,5 +45,5 @@ class FinalMetricsToBestJson(L.Callback):
                 data = {}
         data.update(self._last)
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        self.path.write_text(json.dumps(data, indent=1))
+        atomic_json_dump(data, self.path)
         logger.info("최종 iterate 지표 기록 → %s: %s", self.path, self._last)

@@ -8,11 +8,12 @@ Score 기준 best 도 참고로 함께 기록한다. 재개(EpochResumeCheckpoin
 """
 from __future__ import annotations
 
-import json
 import logging
 import pathlib
 
 import lightning as L
+
+from rsc_toolkit.trainer.callbacks.atomic_io import atomic_json_dump, atomic_torch_save
 import numpy as np
 import torch
 
@@ -85,12 +86,10 @@ class RespireNetVoteEval(L.Callback):
             self.best_info = info
             self.dirpath.mkdir(parents=True, exist_ok=True)
             model = getattr(pl_module, self.model_attr, pl_module)
-            torch.save({"model": model.state_dict(), **info}, self.dirpath / self.filename)
-            json.dump({**info, "best_score_info": self.best_score_info},
-                      open(self.dirpath / "best.json", "w"), indent=1)
+            atomic_torch_save({"model": model.state_dict(), **info}, self.dirpath / self.filename)
+            atomic_json_dump({**info, "best_score_info": self.best_score_info}, self.dirpath / "best.json")
             logger.info("Best(cycle acc) 갱신: epoch %d acc %.2f | Sp %.2f Se %.2f Score %.2f",
                         epoch, res["cycle_acc"], res["S_p"], res["S_e"], res["icbhi_score"])
         elif self.best_info is not None:
             # Score-best 참고 기록만 갱신
-            json.dump({**self.best_info, "best_score_info": self.best_score_info},
-                      open(self.dirpath / "best.json", "w"), indent=1)
+            atomic_json_dump({**self.best_info, "best_score_info": self.best_score_info}, self.dirpath / "best.json")

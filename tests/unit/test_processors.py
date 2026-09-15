@@ -225,3 +225,19 @@ def test_audio_preprocessor_trim():
     out = pre(audio)
     assert out.shape == (1, 3)
     assert torch.allclose(out, torch.tensor([[1.0, 2.0, 3.0]]))
+
+
+def test_audio_preprocessor_rejects_empty_or_wrong_rank():
+    import pytest
+    from rsc_toolkit.processors.audio import AudioPreprocessConfig, AudioPreprocessor
+
+    for pad in ("repeat", "repeat_fade", "zero", "sclmeta"):
+        proc = AudioPreprocessor(16000, AudioPreprocessConfig(desired_length_sec=1.0, pad_type=pad))
+        with pytest.raises(ValueError, match="길이 0"):
+            proc(torch.zeros(1, 0))
+        with pytest.raises(ValueError, match="2-D"):
+            proc(torch.zeros(16))
+        assert proc(torch.ones(1, 4000)).shape == (1, 16000)    # 정상 경로는 그대로
+    proc = AudioPreprocessor(16000, AudioPreprocessConfig(desired_length_sec=1.0, pad_type="sclmeta"))
+    with pytest.raises(ValueError, match="fade 길이"):         # sr/16 보다 짧은 구간: 예전엔 torchaudio "negative dimension"
+        proc(torch.ones(1, 16))

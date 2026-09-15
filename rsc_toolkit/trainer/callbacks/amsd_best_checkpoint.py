@@ -8,11 +8,11 @@ AMS-D 용 best 선택 — ICBHIBestScoreCheckpoint 와 같은 프로토콜(val=�
 """
 from __future__ import annotations
 
-import json
 import logging
 from typing import Sequence
 
-import torch
+
+from rsc_toolkit.trainer.callbacks.atomic_io import atomic_json_dump, atomic_torch_save
 
 from .icbhi_best_checkpoint import ICBHIBestScoreCheckpoint
 
@@ -61,7 +61,7 @@ class AMSDBestScoreCheckpoint(ICBHIBestScoreCheckpoint):
         self.dirpath.mkdir(parents=True, exist_ok=True)
         model = getattr(pl_module, self.model_attr, pl_module)
         path = self.dirpath / self.filename
-        torch.save({"model": model.state_dict(), **info}, path)
-        json.dump(info, open(path.with_suffix(".json"), "w"), indent=1)
+        atomic_torch_save({"model": model.state_dict(), **info}, path)
+        atomic_json_dump(info, path.with_suffix(".json"))
         logger.info("Best 갱신(%s): epoch %d, %s=%.2f | 표준 Sp/Se/Score %s/%s/%s", self.score_key, info["epoch"], self.score_key, score,
                     info.get("S_p"), info.get("S_e"), info.get("icbhi_score"))

@@ -215,6 +215,41 @@ class TestPackageScan:
                     sys.modules.pop(m)
 
 
+    def test_internal_module_error_is_isolated_and_reported(self, tmp_path, monkeypatch):
+        """ImportError 가 아닌 내부 오류(NameError 등)도 모듈 단위로 격리되고, KeyError 메시지가 원인을 지목한다
+        (REVIEW 2026-09-10 §1 P2 — 예전엔 스캔 전체가 중단돼 알파벳순 뒤 모듈이 영구 미등록)."""
+        pkg = tmp_path / "rsc_scan_fixture_pkg2"
+        pkg.mkdir()
+        (pkg / "__init__.py").write_text("")
+        (pkg / "a_broken.py").write_text("undefined_name_here\n")          # NameError (알파벳순 첫 모듈)
+        (pkg / "b_good.py").write_text(
+            textwrap.dedent(
+                """
+                import rsc_scan_fixture_pkg2 as p
+                @p.REG.register("good2")
+                class Good2: pass
+                """
+            )
+        )
+        monkeypatch.syspath_prepend(str(tmp_path))
+        try:
+            import rsc_scan_fixture_pkg2 as p
+
+            p.REG = Registry("scan2", scan_packages=("rsc_scan_fixture_pkg2",))
+            assert "good2" in p.REG                                    # 뒤 모듈이 살아남았다
+            assert list(p.REG.failed_modules) == ["rsc_scan_fixture_pkg2.a_broken"]
+            assert p.REG.failed_modules["rsc_scan_fixture_pkg2.a_broken"].startswith("NameError")
+            with pytest.raises(KeyError) as exc:
+                p.REG.get("nope")
+            assert "a_broken" in str(exc.value) and "NameError" in str(exc.value)
+            p.REG.rescan()
+            assert "good2" in p.REG and "rsc_scan_fixture_pkg2.a_broken" in p.REG.failed_modules
+        finally:
+            for m in list(sys.modules):
+                if m.startswith("rsc_scan_fixture_pkg2"):
+                    sys.modules.pop(m)
+
+
 class TestPluginLoader:
     def test_env_var_plugin_is_imported_and_broken_one_is_skipped(self, tmp_path, monkeypatch):
         module_name = "rsc_registry_env_plugin_fixture"
