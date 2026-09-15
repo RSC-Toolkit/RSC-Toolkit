@@ -5,6 +5,7 @@ cycle 다수결). 같은 pad_seed/res_type 이면 tests/golden/respirenet/ckpt_e
   .venv/bin/python scripts/reproduction/eval_respirenet_checkpoint.py [--split official]
 """
 import argparse
+import os
 import json
 
 import numpy as np
@@ -31,7 +32,8 @@ def vote(preds, identifiers, cycle_ids):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--ckpt", default="/tmp/claude-10008/-raid-doyoung-projects-RSC-Toolkit/88feaa60-f05e-4f32-8234-95e341f584ce/scratchpad/reference/respirenet/models/ckpt_best.pkl")
+    ap.add_argument("--ckpt", default=os.environ.get("RSCTK_RESPIRENET_REF_CKPT", "outputs/reference/respirenet/models/ckpt_best.pkl"),
+                    help="저자 fine-tuned ckpt (microsoft/RespireNet models/ckpt_best.pkl); 기본은 저장소 안 저자 코드 사본, RSCTK_RESPIRENET_REF_CKPT 로 지정")
     ap.add_argument("--data", default=".datasets/icbhi")
     ap.add_argument("--split", default="fold", choices=["fold", "official"])
     ap.add_argument("--test_fold", type=int, default=4)
@@ -40,6 +42,8 @@ def main():
     ap.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
     ap.add_argument("--golden", default="tests/golden/respirenet/ckpt_eval.json")
     args = ap.parse_args()
+    if not os.path.exists(args.ckpt):
+        raise SystemExit(f"저자 ckpt 가 없다: {args.ckpt} — microsoft/RespireNet 의 models/ckpt_best.pkl 을 두거나 --ckpt / RSCTK_RESPIRENET_REF_CKPT 로 지정하라")
 
     ds = RespireNetChunkDataset(args.data, train_flag=False, split_mode=args.split, test_fold=args.test_fold,
                                 folds_file="rsc_toolkit/datasets/icbhi/data/patient_list_foldwise.txt",

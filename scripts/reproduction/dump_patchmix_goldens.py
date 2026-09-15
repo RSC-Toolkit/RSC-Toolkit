@@ -43,9 +43,19 @@ def main():
     out = pathlib.Path(args.out).resolve()
     out.mkdir(parents=True, exist_ok=True)
 
+    import subprocess
     import timm
+
+    def _git(*args):
+        try:
+            return subprocess.run(["git", "-C", str(repo), *args], capture_output=True, text=True, check=True).stdout.strip()
+        except Exception:
+            return None
+
+    # 참조 저장소는 URL·커밋으로 기록한다 — 로컬 클론 경로는 머신마다 다르고 골든의 출처 정보가 아니다
     json.dump(
-        {"torch": torch.__version__, "timm": timm.__version__, "repo": str(repo)},
+        {"torch": torch.__version__, "timm": timm.__version__,
+         "repo": _git("config", "--get", "remote.origin.url") or repo.name, "commit": _git("rev-parse", "--short", "HEAD")},
         open(out / "reference_versions.json", "w"), indent=1,
     )
 

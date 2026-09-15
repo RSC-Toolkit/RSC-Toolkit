@@ -1,9 +1,11 @@
 # -*- coding: utf-8 -*-
 """docs/RESULTS_BY_DATASET.md §1 요약표를 그대로 읽어 HTML 대장을 만든다 (수치 손으로 옮기지 않기)."""
 import re, html, pathlib, datetime
+import sys
 
 SRC = pathlib.Path("docs/RESULTS_BY_DATASET.md")
-OUT = pathlib.Path("/tmp/claude-10008/-raid-doyoung-projects-RSC-Toolkit/88feaa60-f05e-4f32-8234-95e341f584ce/scratchpad/rsc_repro_ledger.html")
+OUT = pathlib.Path(sys.argv[1]) if len(sys.argv) > 1 else pathlib.Path("outputs/reports/rsc_repro_ledger.html")   # 인자로 출력 경로 지정 가능
+OUT.parent.mkdir(parents=True, exist_ok=True)
 
 lines = SRC.read_text().splitlines()
 

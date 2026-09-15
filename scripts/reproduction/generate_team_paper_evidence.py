@@ -1,8 +1,10 @@
 # -*- coding: utf-8 -*-
 """팀 논문 3편 저자 확인 자료 — 결과 시각화 + 이슈 정리 HTML."""
 import pathlib, statistics as st
+import sys
 
-OUT = pathlib.Path("/tmp/claude-10008/-raid-doyoung-projects-RSC-Toolkit/88feaa60-f05e-4f32-8234-95e341f584ce/scratchpad/team_paper_evidence.html")
+OUT = pathlib.Path(sys.argv[1]) if len(sys.argv) > 1 else pathlib.Path("outputs/reports/team_paper_evidence.html")   # 인자로 출력 경로 지정 가능
+OUT.parent.mkdir(parents=True, exist_ok=True)
 
 # ── 데이터 (outputs/*/best.json 실측) ──────────────────────────────────────
 LADDER = [  # (단계, 설명, 논문 mean, 논문 std, 우리 mean, 우리 std)
