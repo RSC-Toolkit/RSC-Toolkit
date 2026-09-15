@@ -205,3 +205,5 @@ pretrained_models
 
 # 논문 재현용 참조 가상환경 (구버전 torch/timm)
 .venv-ref-*/
+# rsc-toolkit-eval 기본 샌드박스 (evaluate.py; 읽기 전용 평가의 쓰기 자리)
+.rsc_eval_sandbox/

@@ -225,48 +225,49 @@ def main() -> int:
     log = open(out / "results.jsonl", "a")
     jobs = [(family_of(r), r) for r in args.runs.split(",") if r] if args.runs else [(f, f"{f}-s{s}") for f in fams for s in seeds]
     for fam, run in jobs:
-        if True:
-            row = by_run.get(run)
-            rec = {"family": fam, "run": run, "status": "ERROR", "ts": time.time()}
-            t0 = time.time()
-            try:
-                if row is None:
-                    raise KeyError(f"{run} 이 results_master 에 없다")
-                run_dir = ROOT / row["run_dir"]
-                if (run_dir / "ood.json").exists() and not args.no_write_run:
-                    rec.update(status="SKIP", note="ood.json 이미 있음"); continue
-                cfg, source = vw.resolve_config(row, master)
-                if cfg is None:
-                    rec.update(status="SKIP", note="설정 스냅샷 없음"); continue
-                cfg, dropped = vw.sanitize_config(cfg, sandbox, run)
-                rec["config_source"], rec["dropped_callbacks"] = source, dropped
-                vw.wait_for_cool_gpu(args.max_temp, 70)
-                info = evaluate(cfg, run_dir / "best.pth", fam, sandbox, run)
-                rec.update({k: v for k, v in info.items() if k != "all_metrics"})
-                m = info.get("metrics", {})
-                if not m or len(m) < 3:
-                    rec["status"] = "ERROR"; rec["error"] = f"metrics missing: {list(info.get('all_metrics', {}))[:10]}"
-                elif info.get("val_counts") != EXPECTED_COUNTS:
-                    rec["status"] = "COUNT_MISMATCH"
-                else:
-                    rec["status"] = "OK"
-                    if not args.no_write_run:
-                        payload = {"inter": {**m, "n": 1429, "class_counts": info["val_counts"]},
-                                   "protocol": "ICBHI-trained best.pth → SPRSound 2022 inter-patient test, 7→4 merged; "
-                                               "recipe's ICBHI preprocessing chain applied to SPRSound",
-                                   "chain": info.get("chain"), "generated_by": "scripts/eval_ood_sprsound.py", "generated": time.strftime("%Y-%m-%d %H:%M")}
-                        if info.get("note"):
-                            payload["note"] = info["note"]
-                        (run_dir / "ood.json").write_text(json.dumps(payload, indent=1, ensure_ascii=False))
-            except Exception as exc:
-                rec["error"] = f"{type(exc).__name__}: {exc}"[:800]; rec["traceback"] = traceback.format_exc()[-2000:]
-            finally:
-                rec["seconds"] = round(time.time() - t0, 1)
-                log.write(json.dumps(rec, ensure_ascii=False) + "\n"); log.flush()
-                m = rec.get("metrics") or {}
-                print(f"{run:32s} {rec['status']:14s} " + (f"Sp {m['S_p']:.2f} Se {m['S_e']:.2f} Sc {m['icbhi_score']:.2f}" if m else rec.get("error", rec.get("note", ""))[:120]) + f"  ({rec['seconds']}s)", flush=True)
-                if torch.cuda.is_available():
-                    torch.cuda.empty_cache()
+        row = by_run.get(run)
+        rec = {"family": fam, "run": run, "status": "ERROR", "ts": time.time()}
+        t0 = time.time()
+        try:
+            if row is None:
+                raise KeyError(f"{run} 이 results_master 에 없다")
+            run_dir = ROOT / row["run_dir"]
+            if (run_dir / "ood.json").exists() and not args.no_write_run:
+                rec.update(status="SKIP", note="ood.json 이미 있음"); continue
+            cfg, source = vw.resolve_config(row, master)
+            if cfg is None:
+                rec.update(status="SKIP", note="설정 스냅샷 없음"); continue
+            cfg, dropped = vw.sanitize_config(cfg, sandbox, run)
+            if str(args.device).startswith("cpu"):      # --device 는 예전엔 받기만 하고 무시됐다 (REVIEW 2026-09-10 §8 P2)
+                cfg.setdefault("trainer", {}).setdefault("params", {}).update(accelerator="cpu", devices=1)
+            rec["config_source"], rec["dropped_callbacks"] = source, dropped
+            vw.wait_for_cool_gpu(args.max_temp, 70)
+            info = evaluate(cfg, run_dir / "best.pth", fam, sandbox, run)
+            rec.update({k: v for k, v in info.items() if k != "all_metrics"})
+            m = info.get("metrics", {})
+            if not m or len(m) < 3:
+                rec["status"] = "ERROR"; rec["error"] = f"metrics missing: {list(info.get('all_metrics', {}))[:10]}"
+            elif info.get("val_counts") != EXPECTED_COUNTS:
+                rec["status"] = "COUNT_MISMATCH"
+            else:
+                rec["status"] = "OK"
+                if not args.no_write_run:
+                    payload = {"inter": {**m, "n": 1429, "class_counts": info["val_counts"]},
+                               "protocol": "ICBHI-trained best.pth → SPRSound 2022 inter-patient test, 7→4 merged; "
+                                           "recipe's ICBHI preprocessing chain applied to SPRSound",
+                               "chain": info.get("chain"), "generated_by": "scripts/eval_ood_sprsound.py", "generated": time.strftime("%Y-%m-%d %H:%M")}
+                    if info.get("note"):
+                        payload["note"] = info["note"]
+                    (run_dir / "ood.json").write_text(json.dumps(payload, indent=1, ensure_ascii=False))
+        except Exception as exc:
+            rec["error"] = f"{type(exc).__name__}: {exc}"[:800]; rec["traceback"] = traceback.format_exc()[-2000:]
+        finally:
+            rec["seconds"] = round(time.time() - t0, 1)
+            log.write(json.dumps(rec, ensure_ascii=False) + "\n"); log.flush()
+            m = rec.get("metrics") or {}
+            print(f"{run:32s} {rec['status']:14s} " + (f"Sp {m['S_p']:.2f} Se {m['S_e']:.2f} Sc {m['icbhi_score']:.2f}" if m else rec.get("error", rec.get("note", ""))[:120]) + f"  ({rec['seconds']}s)", flush=True)
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
     return 0
 
 

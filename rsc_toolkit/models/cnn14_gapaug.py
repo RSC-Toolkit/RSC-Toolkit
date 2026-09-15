@@ -252,13 +252,14 @@ class Cnn14GaPAug(BaseRSCModel, nn.Module):
 
     # ------------------------------------------------------------------ 사전학습
     def load_panns_weights(self, path: Optional[str], variant: str = "16k") -> Dict[str, list]:
+        from rsc_toolkit.paths import download_target, resolve_pretrained
+
         if path is None:
             spec = PANNS_CNN14[variant]
             if spec["sample_rate"] != self.sample_rate or spec["fmax"] != self.fmax:
                 logger.warning("PANNs Cnn14 %s ckpt 는 %d Hz / fmax %.0f 로 학습됐는데 모델은 %d Hz / fmax %.0f — "
                                "데이터 config(sampling_rate)·fmax 를 함께 맞춰야 한다",
                                variant, spec["sample_rate"], spec["fmax"], self.sample_rate, self.fmax)
-            from rsc_toolkit.paths import download_target, resolve_pretrained
 
             ckpt = resolve_pretrained([spec["path"]]) or download_target(spec["path"])  # RSCTK_PRETRAINED_ROOT → cwd 순
             if not ckpt.exists():
@@ -270,7 +271,7 @@ class Cnn14GaPAug(BaseRSCModel, nn.Module):
                 record_download_provenance(ckpt, url=spec["url"], known_size=spec["size"], known_sha256=spec["sha256"])
                 self._append_provenance_extras(ckpt, variant)
         else:
-            ckpt = pathlib.Path(path)
+            ckpt = resolve_pretrained(explicit=path)   # 상대 경로면 cwd → RSCTK_PRETRAINED_ROOT 아래 (P2-9 경로 독립)
         state = torch.load(ckpt, map_location="cpu", weights_only=False)
         state = state.get("model", state)
         kept = {k: v for k, v in state.items() if not k.startswith(EXCLUDE_PREFIXES)}

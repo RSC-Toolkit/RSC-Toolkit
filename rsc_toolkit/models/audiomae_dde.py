@@ -43,6 +43,7 @@ from timm.models.vision_transformer import Block
 from .base import BaseRSCModel
 from .factory import ModelFactory
 from .m2d.encoder import PatchEmbed, get_2d_sincos_pos_embed
+from rsc_toolkit.paths import resolve_pretrained
 from rsc_toolkit.methods.dde_mae import VCLUB, permute_token_noise, siamese_hinge, time_shuffle
 
 logger = logging.getLogger(__name__)
@@ -481,7 +482,9 @@ class DDEMAE(BaseRSCModel, nn.Module):
                                   patch_hw=self.encoder_r.patch_hw, decoder_mode=decoder_mode, patch_size=patch_size)
         self.load_info = None
         if pretrained_path is not None:
-            self.load_info = load_audiomae_checkpoint(self.encoder_r, pretrained_path, self.decoder, skip_decoder_embed=dual)
+            # 상대 경로는 cwd → RSCTK_PRETRAINED_ROOT 아래 순으로 찾는다 (P2-9 경로 독립; 예전엔 직행)
+            self.load_info = load_audiomae_checkpoint(self.encoder_r, str(resolve_pretrained(explicit=pretrained_path)),
+                                                      self.decoder, skip_decoder_embed=dual)
         # E_I = 사전학습 인코더 복제 (논문 §2.3 "duplicate the pretrained encoder")
         self.encoder_i = copy.deepcopy(self.encoder_r) if dual else None
         self.club = VCLUB(D, D, club_hidden) if self.use_mi else None

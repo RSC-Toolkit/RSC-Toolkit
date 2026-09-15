@@ -6,6 +6,7 @@ RespireNet(EMBC 2021) 묶음의 P0 골든·구성 테스트.
 tests/golden/respirenet/ckpt_eval.json (fold-4 test, seed 0: Sp 80.26 / Se 52.02 / Score 66.14).
 """
 import json
+import os
 import pathlib
 import random
 
@@ -38,7 +39,9 @@ def _repo_root() -> pathlib.Path:
 REPO = _repo_root()
 GOLDEN = REPO / "tests" / "golden" / "respirenet"
 DATA = REPO / ".datasets" / "icbhi"
-CKPT = pathlib.Path("/tmp/claude-10008/-raid-doyoung-projects-RSC-Toolkit/88feaa60-f05e-4f32-8234-95e341f584ce/scratchpad/reference/respirenet/models/ckpt_best.pkl")
+# 저자 fine-tuned ckpt(microsoft/RespireNet models/ckpt_best.pkl) — 저장소 안 저자 코드 사본 또는 RSCTK_RESPIRENET_REF_CKPT.
+# 예전엔 다른 세션의 scratchpad 경로를 가리켜 strict-load 게이트가 조용히 건너뛰어졌다 (REVIEW 2026-09-10 §6 P3).
+CKPT = pathlib.Path(os.environ.get("RSCTK_RESPIRENET_REF_CKPT") or REPO / "outputs" / "reference" / "respirenet" / "models" / "ckpt_best.pkl")
 
 needs_golden = pytest.mark.skipif(not (GOLDEN / "images.pt").exists(), reason="골든 없음")
 needs_data = pytest.mark.skipif(not (DATA / "101_1b1_Al_sc_Meditron.wav").exists(), reason="ICBHI 원음 없음")

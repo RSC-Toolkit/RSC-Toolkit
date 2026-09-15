@@ -44,7 +44,7 @@ from __future__ import annotations
 
 import contextlib
 import logging
-import pathlib
+import os
 from typing import Dict, List, Optional, Sequence, Tuple
 
 import torch
@@ -54,6 +54,7 @@ import torch.nn.functional as F
 from .bts import BTSModel, _as_4d
 from .factory import ModelFactory
 from .grl import ReverseLayerF
+from rsc_toolkit.paths import resolve_pretrained
 
 logger = logging.getLogger(__name__)
 
@@ -152,13 +153,27 @@ class LearnableConstant(nn.Module):
         self.dummy_vector = nn.Parameter(torch.tensor(float(initial_value)), requires_grad=bool(trainable))
 
 
+NDE_HUB_FALLBACK_ENV = "RSCTK_NDE_HUB_FALLBACK"   # "1" 이면 로컬 사본이 없을 때 HF 허브 nlpie/tiny-clinicalbert 로 대체
+
+
 def _resolve_nde_name(name: str) -> str:
-    p = pathlib.Path(name)
-    if p.exists():
-        return str(p)
+    """NDE(TinyBERT) 가중치 자리: 로컬 경로(cwd → RSCTK_PRETRAINED_ROOT 아래)를 찾고, 없으면 그대로(허브 id) 돌려준다.
+
+    기본값 DEFAULT_NDE_LOCAL 이 없을 때 예전엔 경고 한 줄만 남기고 HF 허브로 **조용히 대체**해 네트워크 없는 환경에서
+    학습 시작 뒤에 죽거나, 다른 스냅샷의 토크나이저를 쓰게 됐다 (REVIEW 2026-09-10 §6 P2). 이제 대체는 옵트인이다.
+    """
+    found = resolve_pretrained(explicit=name)          # 절대/존재하는 상대 경로 → ROOT 아래 → 그대로
+    if found is not None and found.exists():
+        return str(found)
     if name == DEFAULT_NDE_LOCAL:
-        logger.warning("%s 가 없어 HF 허브 %s 를 쓴다", name, NDE_HUB_NAME)
-        return NDE_HUB_NAME
+        if os.environ.get(NDE_HUB_FALLBACK_ENV, "").strip() == "1":
+            logger.warning("%s 가 없어 HF 허브 %s 를 쓴다 (%s=1)", name, NDE_HUB_NAME, NDE_HUB_FALLBACK_ENV)
+            return NDE_HUB_NAME
+        raise FileNotFoundError(
+            f"BTS-CARD NDE 가중치 {name} 가 없다 (cwd 와 RSCTK_PRETRAINED_ROOT 아래 모두). "
+            f"`{NDE_HUB_NAME}` 스냅샷을 그 자리에 두거나, model.params.nde_pretrained_name={NDE_HUB_NAME} 로 허브 id 를 "
+            f"명시하거나, {NDE_HUB_FALLBACK_ENV}=1 로 자동 대체를 허용하라."
+        )
     return name
 
 

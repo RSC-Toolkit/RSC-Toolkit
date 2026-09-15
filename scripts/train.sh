@@ -11,12 +11,12 @@
 # (또는 model.name=<등록 이름>). 등록된 이름 목록: rsc-toolkit list (없으면 python -c "import rsc_toolkit.registries as r; print(sorted(r.MODELS))").
 # 결과: outputs/<계열>/<run.name>/best.pth·best.json (계열은 config 의 callbacks dirpath), hydra 스냅샷 outputs/<날짜>/<시각>/.hydra.
 #
-# 환경변수: GPU(기본 0; CUDA_VISIBLE_DEVICES) · PY(기본 .venv/bin/python) · THREAD_CAP(기본 1 — 동시 다중 run 시 dataloader
+# 환경변수: GPU(기본: 환경의 CUDA_VISIBLE_DEVICES, 없으면 0) · PY(기본 .venv/bin/python) · THREAD_CAP(기본 1 — 동시 다중 run 시 dataloader
 #           워커의 OpenCV/OpenBLAS 스레드 폭주 방지; 0 이면 캡 안 함)
 set -euo pipefail
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 PY=${PY:-$ROOT/.venv/bin/python}
-GPU=${GPU:-0}
+GPU=${GPU:-${CUDA_VISIBLE_DEVICES:-0}}   # GPU 미지정이면 환경의 CUDA_VISIBLE_DEVICES 를 존중 (예전엔 항상 0 으로 덮었다)
 if [ $# -lt 1 ]; then
   sed -n 2,16p "$0"; exit 1
 fi

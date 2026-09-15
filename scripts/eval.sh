@@ -11,11 +11,11 @@
 # 모델·데이터를 다시 세우고 strict 로드 → validate. 학습 산출물은 읽기만 하고(쓰기는 샌드박스), best.json 이 있으면 대조한다.
 # 여러 run 전수 검증은 scripts/verify_paper_weights.sh (GPU 병렬·요약표).
 #
-# 환경변수: GPU(기본 0) · PY(기본 .venv/bin/python) · SANDBOX(기본 /tmp/rsc_eval_sandbox_<uid>) · THREAD_CAP(기본 1)
+# 환경변수: GPU(기본: 환경의 CUDA_VISIBLE_DEVICES, 없으면 0) · PY(기본 .venv/bin/python) · SANDBOX(기본 /tmp/rsc_eval_sandbox_<uid>) · THREAD_CAP(기본 1)
 set -euo pipefail
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 PY=${PY:-$ROOT/.venv/bin/python}
-GPU=${GPU:-0}
+GPU=${GPU:-${CUDA_VISIBLE_DEVICES:-0}}   # GPU 미지정이면 환경의 CUDA_VISIBLE_DEVICES 를 존중 (예전엔 항상 0 으로 덮었다)
 SANDBOX=${SANDBOX:-${TMPDIR:-/tmp}/rsc_eval_sandbox_$(id -u)}
 if [ $# -lt 1 ]; then
   sed -n 2,14p "$0"; exit 1

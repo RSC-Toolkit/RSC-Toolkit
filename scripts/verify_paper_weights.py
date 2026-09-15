@@ -121,7 +121,10 @@ def select_rows(args) -> list[dict]:
     if args.group:
         rows = [r for r in rows if r["paper_group"] in set(args.group)]
     if args.dataset:
-        rows = [r for r in rows if r["dataset"] == args.dataset or (not r["dataset"] and args.dataset in r["run_name"])]
+        prefix = {"icbhi": "icbhi-", "sprsound": "sprs-"}[args.dataset]
+        # dataset 열이 빈 옛 행은 run 이름으로 판정 — SPRSound 행은 "sprs-" 접두사라 "sprsound" 문자열 검색으로는 16행이 빠졌다
+        rows = [r for r in rows if r["dataset"] == args.dataset
+                or (not r["dataset"] and (args.dataset in r["run_name"] or r["run_name"].startswith(prefix)))]
     if args.run:
         rows = [r for r in rows if r["run_name"] in set(args.run)]
     if args.smoke:

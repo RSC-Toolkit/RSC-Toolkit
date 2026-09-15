@@ -223,7 +223,6 @@ class CNN6SFT(nn.Module):
 
 # ------------------------------------------------------------- 등록 래퍼 (set_model 상당)
 class _SFTClassifierModel(BaseRSCModel, nn.Module):
-    accepts_meta = ("dev",)  # batch[2] = ICBHI 청진기 id (sgscl_nonast 데이터; method=ce 는 받되 무시)
     """
     backbone + nn.Linear 분류기 (원본 set_model 의 비-AST 구성).
 
@@ -237,6 +236,7 @@ class _SFTClassifierModel(BaseRSCModel, nn.Module):
     per-sample SpecAugment 구성을 그대로 유지하기 위한 기본값이다. 논문 프로토콜
     재현 시에는 config 에서 policy 를 주고 datamodule 증강을 끈다.
     """
+    accepts_meta = ("dev",)  # batch[2] = ICBHI 청진기 id (sgscl_nonast 데이터; method=ce 는 받되 무시)
 
     backbone_cls = None  # 서브클래스에서 지정
 

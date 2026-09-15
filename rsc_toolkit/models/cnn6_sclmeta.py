@@ -70,6 +70,7 @@ class CNN6SCLMeta(BaseRSCModel, nn.Module):
         self.supcon = SupConLoss(temperature=temperature)
 
         self.classifier = nn.Linear(self.final_feat_dim, n_cls) if method in ("ce", "hybrid", "linear") else None
+        self.n_cls = int(n_cls)   # scl/mscl 사전학습의 더미 로짓 폭 (예전엔 4 고정 → 7-class 에서 train/acc@1 무의미)
         self.projector = Projector(self.final_feat_dim, out_dim, apply_bn=False) if method in ("hybrid", "scl", "mscl") else None
         self.projector2 = Projector(self.final_feat_dim, out_dim, apply_bn=False) if method == "mscl" else None
 
@@ -115,7 +116,7 @@ class CNN6SCLMeta(BaseRSCModel, nn.Module):
         if not self.training or self.method == "linear":
             if self.classifier is None:
                 # scl/mscl 사전학습 run 은 평가가 없다 (config 에서 limit_val_batches=0); 방어적 더미
-                z = torch.zeros(audio_batch.shape[0], 4, device=audio_batch.device)
+                z = torch.zeros(audio_batch.shape[0], self.n_cls, device=audio_batch.device)
                 return z, torch.zeros((), device=audio_batch.device, requires_grad=self.training)
             logits = self.forward(audio_batch)
             return logits, loss_func(logits, labels)
@@ -134,11 +135,11 @@ class CNN6SCLMeta(BaseRSCModel, nn.Module):
                 torch.cat([pred1, pred2], dim=0), torch.cat([labels, labels], dim=0))
             return pred1, loss
         if self.method == "scl":
-            return torch.zeros(f1.shape[0], 4, device=f1.device), self.supcon(self.projector(f1), self.projector(f2), labels)
+            return torch.zeros(f1.shape[0], self.n_cls, device=f1.device), self.supcon(self.projector(f1), self.projector(f2), labels)
         # mscl
         if meta_labels is None:
             raise ValueError("method=mscl 에는 meta_labels(sa) 가 필요하다 — datamodule meta_label_mode=sa")
         p1, p2 = self.projector(f1), self.projector(f2)
         q1, q2 = self.projector2(f1), self.projector2(f2)
         loss = (1.0 - self.lam) * self.supcon(p1, p2, meta_labels) + self.lam * self.supcon(q1, q2, labels)
-        return torch.zeros(f1.shape[0], 4, device=f1.device), loss
+        return torch.zeros(f1.shape[0], self.n_cls, device=f1.device), loss
