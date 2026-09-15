@@ -268,7 +268,7 @@ cells.append(md(r"""
 
 논문 표의 weight 는 run 묶음(`best.pth` · `best.json` · `.hydra/config.yaml`)으로 공개된다. 목록과 링크는
 `docs/paper/weights_manifest.csv` 에 있고 `scripts/download_paper_weights.py`(gdown, `notebook` extra 에 포함)가 받아서 sha256 을 대조한다.
-링크(run 폴더 링크)가 아직 `[Google Drive]` 자리표시자면 안내만 나온다 — 그때는 묶음을 직접 `WORK/paper_weights/<run>/` 에 두면 된다.
+링크(Drive 폴더 링크: run 폴더 자체 또는 run 폴더들을 담은 상위 폴더)가 아직 `[Google Drive]` 자리표시자면 안내만 나온다 — 그때는 묶음을 직접 `WORK/paper_weights/<run>/` 에 두면 된다.
 
 받은 묶음은 설정 스냅샷을 품고 있으므로 `rsc-toolkit-eval <묶음> --override data.params.data_dir=<내 ICBHI 경로>` 로
 바로 재평가된다. 경로 override 가 붙은 평가는 `status: OK` 와 함께 `best.json`(논문 표의 값)과의 |Δ| 를 돌려주며, 같은 공식 test 이므로 |Δ| 는 0 이다.
