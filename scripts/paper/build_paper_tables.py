@@ -285,12 +285,12 @@ def build_patchmix(anchors, fam, table, meta, footnotes):
     stem, dsdesc, label = PM_TABLES[table]
     colspec = "p{2pt}llcl" + "ccc" + "ccc" + "c"
     head = [r"& \multirow{2}{*}{method} & \multirow{2}{*}{architecture} & \multirow{2}{*}{pretrain} & \multirow{2}{*}{venue} & "
-            r"\multicolumn{3}{c}{reported in paper} & \multicolumn{3}{c}{ours (5 seeds)} & \multirow{2}{*}{$\Delta$Sc} \\",
+            r"\multicolumn{3}{c}{reported in paper} & \multicolumn{3}{c}{ours (5 seeds)} & \multirow{2}{*}{$\Delta S_c$} \\",
             r"\cmidrule(lr){6-8}\cmidrule(lr){9-11}",
-            r"& & & & & $S_p$ & $S_e$ & Sc & $S_p$ & $S_e$ & \textbf{Sc} & \\"]
+            r"& & & & & $S_p$ & $S_e$ & $S_c$ & $S_p$ & $S_e$ & $\mathbf{S_c}$ & \\"]
     common = (r" ``Reported'' copies the numbers from each paper (single run or mean over the paper's seeds; blank where the paper reports "
               r"nothing for this setting); ``ours'' is the toolkit re-implementation with five seeds (mean\,$\pm$\,std). "
-              r"$\Delta$Sc = ours $-$ reported Score (\textcolor{dpos}{green}: at or above, \textcolor{dneg}{red}: below), shown only where the "
+              r"$\Delta S_c$ = ours $-$ reported Score (\textcolor{dpos}{green}: at or above, \textcolor{dneg}{red}: below), shown only where the "
               r"two are measured on the same split with the same metric. \textbf{Bold} and \underline{underline} mark the highest and second-highest "
               r"``ours'' value per column among directly comparable rows.")
     common = common + r" Rows are grouped by the type of contribution (rotated labels)."
@@ -358,7 +358,7 @@ FN_KEY = {"A": "t1.", "M": "t2."}   # footnotes.csv 의 로컬 문안 id 접두�
 RANK_EXCLUDE = {"C": {"11"}}          # 각주 5(M2D 마지막 배치 탈락, 1,408/1,429) 인 OOD 행은 전체 테스트셋 순위(굵게/밑줄)에서 제외 (2026-09-14)
 # 2026-09-14 사용자 제공 캡션 문안(그대로 사용)
 CAPTION_A = (r"Reported and toolkit results on ICBHI 2017. Toolkit results use the official 60/40 split and four-class scoring (five seeds; "
-             r"mean\,$\pm$\,SD). $\Delta$Sc = toolkit $-$ reported Score, shown only for comparable splits, metrics, and checkpoint selection. "
+             r"mean\,$\pm$\,SD). $\Delta S_c$ = toolkit $-$ reported Score, shown only for comparable splits, metrics, and checkpoint selection. "
              r"Bold and underlined values mark the highest and second-highest comparable toolkit means per column.")
 CAPTION_M = (r"Toolkit results on the SPRSound 2022 inter-patient test set (1,429 events unless noted; five seeds; mean\,$\pm$\,SD). "
              r"SPRSound $\to$ SPRSound uses seven classes. ICBHI $\to$ SPRSound is zero-shot, using four merged classes and "
@@ -464,7 +464,7 @@ def build_merged(anchors, fam, meta, footnotes):
     head = [r"& \multirow{2}{*}{method} & \multirow{2}{*}{architecture} & \multirow{2}{*}{\#Param (M)} & "
             r"\multicolumn{3}{c}{SPRSound $\to$ SPRSound} & \multicolumn{3}{c}{ICBHI $\to$ SPRSound (zero-shot)} \\",
             r"\cmidrule(lr){5-7}\cmidrule(lr){8-10}",
-            r"& & & & $S_p$ & $S_e$ & \textbf{Sc} & $S_p$ & $S_e$ & \textbf{Sc} \\"]
+            r"& & & & $S_p$ & $S_e$ & $\mathbf{S_c}$ & $S_p$ & $S_e$ & $\mathbf{S_c}$ \\"]
     cap = CAPTION_M
     L = [r"\begin{table*}[!t]", r"\centering", r"\caption{" + cap + "}", r"\label{tab:" + label + "}",
          r"\renewcommand{\arraystretch}{1}\footnotesize\setlength{\tabcolsep}{3pt}",
@@ -539,7 +539,7 @@ def merged_html(anchors, fam, meta, footnotes, tex2html):
     L = ['<div class="pm pm-M">', f'<p class="pm-title"><b>table2_SPRSound · SPRSound→SPRSound (7-class) | ICBHI→SPRSound 제로샷 (7→4 병합, 1,429 event) · reported 열 없음</b> · {len(rows)} 행</p>',
          '<div class="tbl"><table class="pmt"><thead>',
          '<tr class="grp"><th colspan="4"></th><th colspan="3">SPRSound → SPRSound (ours, 5 seeds)</th><th colspan="3">ICBHI → SPRSound zero-shot (ours, 5 seeds)</th></tr>',
-         "<tr><th></th><th>method</th><th>architecture</th><th>#Param (M)</th><th>Sp</th><th>Se</th><th>Sc</th><th>Sp</th><th>Se</th><th>Sc</th></tr>",
+         "<tr><th></th><th>method</th><th>architecture</th><th>#Param (M)</th><th>Sp</th><th>Se</th><th>S<sub>c</sub></th><th>Sp</th><th>Se</th><th>S<sub>c</sub></th></tr>",
          "</thead><tbody>"]
     cur_band = None
     for i, (k, b, c) in enumerate(rows):
@@ -604,7 +604,7 @@ def patchmix_html(anchors, fam, meta, footnotes):
         used = set()
         L = [f'<div class="pm pm-{table}">', f'<p class="pm-title"><b>{titles[table]}</b> · {len(rows)} 행</p>', '<div class="tbl"><table class="pmt"><thead>',
              '<tr class="grp"><th colspan="5"></th><th colspan="3">reported in paper</th><th colspan="3">ours (5 seeds)</th><th></th></tr>',
-             "<tr><th></th><th>method</th><th>architecture</th><th>pretrain</th><th>venue</th><th>Sp</th><th>Se</th><th>Sc</th><th>Sp</th><th>Se</th><th>Sc</th><th>ΔSc</th></tr>",
+             "<tr><th></th><th>method</th><th>architecture</th><th>pretrain</th><th>venue</th><th>Sp</th><th>Se</th><th>S<sub>c</sub></th><th>Sp</th><th>Se</th><th>S<sub>c</sub></th><th>ΔS<sub>c</sub></th></tr>",
              "</thead><tbody>"]
         cur_band = None
         for i, a in enumerate(rows):
