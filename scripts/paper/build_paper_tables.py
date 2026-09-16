@@ -359,7 +359,7 @@ FN_MAP = {"A": {"3": "1", "5": "2"},
 # 2026-09-15 사용자: M2D-X SPRSound 미세조정 각주(전역 16 = 표 2 로컬 5)도 삭제 → 표 2 각주 1~6.
 # 2026-09-15 사용자: OPERA-CT 전체 미세조정 각주(전역 15 = 표 1 로컬 3 · 표 2 로컬 5)는 의미 없음 → 두 표에서 제거, 뒤 번호 당김(표 2 6·7·8 → 5·6·7).
 FN_KEY = {"A": "t1.", "M": "t2."}   # footnotes.csv 의 로컬 문안 id 접두사
-RANK_EXCLUDE = {"C": {"11"}}          # 각주 5(M2D 마지막 배치 탈락, 1,408/1,429) 인 OOD 행은 전체 테스트셋 순위(굵게/밑줄)에서 제외 (2026-09-14)
+RANK_EXCLUDE = {"C": {"11"}}          # 각주 4(M2D 마지막 배치 나머지 1건 탈락, 1,428/1,429 — 2026-09-16 실측 정정) 인 OOD 행은 전체 테스트셋 순위(굵게/밑줄)에서 제외 (2026-09-14)
 # 2026-09-14 사용자 제공 캡션 문안(그대로 사용)
 CAPTION_A = (r"Reported and toolkit results on ICBHI 2017. Toolkit results use the official 60/40 split and four-class scoring (five seeds; "
              r"mean\,$\pm$\,SD). $\Delta S_c$ = toolkit $-$ reported Score, shown only for comparable splits, metrics, and checkpoint selection. "
