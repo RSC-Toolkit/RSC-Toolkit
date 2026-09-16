@@ -22,7 +22,7 @@ FOOTNOTES = ROOT / "docs" / "paper" / "footnotes.csv"
 META = ROOT / "docs" / "paper" / "model_meta.csv"      # Patch-Mix 스타일 표용 메타 (architecture / pretrain / venue / cite)
 PARAMS = ROOT / "docs" / "paper" / "params.csv"        # 표 2 #Param (M) 열 원천 — scripts/paper/count_params.py 가 생성 (2026-09-15)
 BAND_ORDER = ["Fine-tuning", "Augmentation", "Contrastive / auxiliary loss", "Foundation / PEFT", "Architecture / protocol"]
-BAND_SHORT = {"Fine-tuning": "Fine-tuning", "Augmentation": "Aug.", "Contrastive / auxiliary loss": "Contrastive",
+BAND_SHORT = {"Fine-tuning": "Fine-tuning", "Augmentation": "Aug.", "Contrastive / auxiliary loss": "Contrastive / auxiliary loss",   # 2026-09-16 사용자: 구성원(PAFA·AMS-D·QLung·BTS 계열)이 대조 학습이 아니라 전체 이름으로
               "Foundation / PEFT": "FM / PEFT", "Architecture / protocol": "Arch."}   # 회전 라벨 (2026-09-08 사용자: Team 밴드·표기 없음)
 
 DISCLOSURE_LABEL = {"full": "Code + training scripts released", "code": "Code released",
