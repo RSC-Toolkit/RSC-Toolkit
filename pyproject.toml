@@ -12,7 +12,7 @@ readme = "README.md"
 requires-python = ">=3.9"
 # Own code: PolyForm Noncommercial 1.0.0. Files with ported third-party code keep their original licenses
 # (see THIRD_PARTY_NOTICES.md and LICENSES/).
-license = "PolyForm-Noncommercial-1.0.0 AND MIT AND BSD-3-Clause AND Apache-2.0 AND CC-BY-NC-4.0 AND CC-BY-NC-SA-4.0"
+license = "PolyForm-Noncommercial-1.0.0 AND MIT AND BSD-3-Clause AND Apache-2.0 AND CC-BY-NC-4.0 AND CC-BY-NC-SA-4.0 AND LicenseRef-NTT-Software-License-Agreement-for-Evaluation"
 license-files = ["LICENSE", "THIRD_PARTY_NOTICES.md", "LICENSES/*"]
 
 dependencies = [

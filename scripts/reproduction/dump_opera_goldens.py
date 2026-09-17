@@ -1,3 +1,5 @@
+# Portions of this file (TfmEncHead, MLPHead) are adapted from EVAR (https://github.com/nttcslab/eval-audio-repr); that code is under the NTT Software License Agreement for Evaluation.
+# See THIRD_PARTY_NOTICES.md. The rest of the file is under the PolyForm Noncommercial License 1.0.0.
 """
 Official-code parity goldens for OPERA-CT (evelyn0414/OPERA, HTSAT-Swin) + the NTT EMBC'25 frozen evaluation path (eval-audio-repr app/icbhi_sprs) —
 runs the official code in our venv (torchlibrosa and efficientnet_pytorch are on unused paths and stubbed; easydict and nnAudio come from a scratch pylib).

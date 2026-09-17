@@ -1,5 +1,6 @@
-# Portions of this file are adapted from AFNO-transformer (https://github.com/NVlabs/AFNO-transformer), class AFNO1D; that code is under the CC-BY-NC-SA-4.0 license.
-# See THIRD_PARTY_NOTICES.md. The rest of the file is under the PolyForm Noncommercial License 1.0.0.
+# Class AFNO1D in this file is adapted from AFNO-transformer (https://github.com/NVlabs/AFNO-transformer); the original and
+# this adaptation are under the CC-BY-NC-SA-4.0 license. See THIRD_PARTY_NOTICES.md.
+# The rest of the file is under the PolyForm Noncommercial License 1.0.0.
 """
 Adaptive differential denoising layer of ADD-RSC (Interspeech 2025, deegy666/ADD-RSC) — faithful port of
 models/adapt_diff_denoise.py (exact port of the official code, verified against goldens).

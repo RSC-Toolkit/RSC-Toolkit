@@ -28,6 +28,9 @@ source. The PolyForm Noncommercial terms apply to the rest of the repository.
 | [IBN-Net](https://github.com/XingangPan/IBN-Net) | `rsc_toolkit/models/resnest_ibn_domaintransfer.py` (`IBN` block) | MIT ([text](LICENSES/MIT-IBN-Net.txt)) | Copyright (c) 2017 Wei Yang |
 | [AudioMAE](https://github.com/facebookresearch/AudioMAE), including a patched window attention from [timm](https://github.com/huggingface/pytorch-image-models) | `rsc_toolkit/models/audiomae_dde.py` | CC BY-NC 4.0 ([text](LICENSES/CC-BY-NC-4.0.txt)); timm parts Apache-2.0 ([text](LICENSES/Apache-2.0.txt)) | Copyright (c) Meta Platforms, Inc. and affiliates; Copyright 2019 Ross Wightman |
 | [AFNO-transformer](https://github.com/NVlabs/AFNO-transformer) | `rsc_toolkit/models/addrsc/denoise.py` (`AFNO1D`) | CC BY-NC-SA 4.0 ([text](LICENSES/CC-BY-NC-SA-4.0.txt)) | Copyright (c) NVIDIA Corporation |
+| [EVAR (eval-audio-repr)](https://github.com/nttcslab/eval-audio-repr) | `rsc_toolkit/models/opera_ct.py` (`TfmEncHead`, `MLPHead`), `scripts/reproduction/dump_opera_goldens.py` | NTT Software License Agreement for Evaluation ([upstream](https://github.com/nttcslab/eval-audio-repr/blob/main/LICENSE)) | Copyright Nippon Telegraph and Telephone Corporation |
+| [M2D](https://github.com/nttcslab/m2d) | `rsc_toolkit/models/m2d/encoder.py` | NTT Software License Agreement for Evaluation ([upstream](https://github.com/nttcslab/m2d/blob/master/LICENSE.pdf)) | Copyright Nippon Telegraph and Telephone Corporation |
+| [MAE](https://github.com/facebookresearch/mae) (sin-cos position embedding) | `rsc_toolkit/models/m2d/encoder.py` | CC BY-NC 4.0 ([text](LICENSES/CC-BY-NC-4.0.txt)) | Copyright (c) Meta Platforms, Inc. and affiliates |
 
 Changes: the code listed above was modified to fit the toolkit's model, datamodule and callback interfaces; each file's
 header comment and docstring describe the differences from the original.

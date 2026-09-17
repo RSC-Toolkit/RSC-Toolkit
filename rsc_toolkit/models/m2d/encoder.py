@@ -1,3 +1,6 @@
+# Portions of this file are adapted from M2D (https://github.com/nttcslab/m2d); that code is under the NTT Software License Agreement for Evaluation.
+# The sin-cos position embedding follows MAE (https://github.com/facebookresearch/mae), which is under the CC-BY-NC-4.0 license.
+# See THIRD_PARTY_NOTICES.md. The rest of the file is under the PolyForm Noncommercial License 1.0.0.
 """
 M2D encoder (ViT-Base, audio log-mel patches) — re-implements the same computation as nttcslab/m2d `M2DEncoderViT` on top of timm ViT.
 
