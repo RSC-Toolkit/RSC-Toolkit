@@ -62,6 +62,29 @@ def _folder_id(url: str) -> str:
     return tail.split("?", 1)[0].split("/", 1)[0].strip()
 
 
+def select_bundle_files(entries: list[tuple[str, tuple[str, ...]]], run: str) -> tuple[list, str | None]:
+    """Pick the files of one run bundle from a Drive folder listing.
+
+    entries: (file id, path parts relative to the listing root). A bundle root is a directory that directly contains best.pth.
+    The run's bundle is the root whose last component is `run`; files of deeper bundles inside it are excluded (the family folder
+    of a seed-1 run can have the same name as the run, e.g. icbhi-patchmix-ce/icbhi-patchmix-ce{,-s2,...}/). If the listing holds
+    exactly one bundle, that bundle is used (the url is the run folder itself). Returns ([(file id, parts inside the bundle)], problem).
+    """
+    roots = {parts[:-1] for _, parts in entries if parts and parts[-1] == "best.pth"}
+    named = [r for r in roots if r and r[-1] == run]
+    if len(named) == 1:
+        prefix = named[0]
+    elif not named and len(roots) == 1:
+        prefix = next(iter(roots))
+    else:
+        seen = sorted({"/".join(parts) for _, parts in entries})[:8]
+        return [], f"cannot find a single bundle for {run} in the folder (bundles named {run}: {len(named)}; found: {seen})"
+    deeper = [r for r in roots if len(r) > len(prefix) and r[:len(prefix)] == prefix]
+    wanted = [(fid, parts[len(prefix):]) for fid, parts in entries
+              if parts[:len(prefix)] == prefix and not any(parts[:len(r)] == r for r in deeper)]
+    return wanted, None
+
+
 def download_run(url: str, run: str, dst: pathlib.Path) -> str | None:
     """Download a run bundle from a Drive folder link into dst/. Returns the reason if there is a problem.
 
@@ -94,16 +117,9 @@ def download_run(url: str, run: str, dst: pathlib.Path) -> str | None:
         except ValueError:
             rel = pathlib.Path(f.path).parts
         entries.append((f.id, tuple(rel)))
-    # Select files under a `<run>/` directory at any depth (the parent folder may contain nested folders)
-    wanted = [(fid, parts[parts.index(run) + 1:]) for fid, parts in entries if run in parts[:-1]]
-    if not wanted:
-        # The url is the run folder itself: if there is exactly one best.pth, treat its directory as the bundle root
-        roots = {parts[:-1] for _, parts in entries if parts[-1] == "best.pth"}
-        if len(roots) != 1:
-            seen = sorted({"/".join(parts) for _, parts in entries})[:8]
-            return f"folder has no {run}/ and does not contain exactly one best.pth (found: {seen})"
-        prefix = roots.pop()
-        wanted = [(fid, parts[len(prefix):]) for fid, parts in entries if parts[:len(prefix)] == prefix]
+    wanted, problem = select_bundle_files(entries, run)
+    if problem:
+        return problem
     dst.mkdir(parents=True, exist_ok=True)
     for fid, parts in wanted:
         if not parts:

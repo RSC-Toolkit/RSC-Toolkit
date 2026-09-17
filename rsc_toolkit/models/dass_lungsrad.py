@@ -45,7 +45,6 @@ logger = logging.getLogger(__name__)
 
 DASS_CKPT_CANDIDATES = (
     "pretrained_models/upstream/dass/DASS_medium_v2.pth",
-    "outputs/reference/papers/lungsrad/DASS_medium_v2.pth",
 )
 METHODS = ("ce", "ce_blur", "patchmix_cl")
 CL_MODES = ("dual", "time", "freq", "2d", "dual_seq")

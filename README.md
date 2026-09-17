@@ -144,14 +144,16 @@ rsc-toolkit-train --config-name patchmix_icbhi model.params.method=patchmix_cl l
   trainer.params.max_epochs=10 seed=3 run.name=my-run-s3
 ```
 
-Outputs are written to `outputs/<group>/<run.name>/`:
+Each run writes:
 
-- `best.pth` — weights of the selected checkpoint
-- `best.json` — its metrics, e.g. `{"epoch", "S_p", "S_e", "icbhi_score"}` with `icbhi_score = (S_p + S_e) / 2`
-- the Hydra snapshot of the resolved config (`outputs/<date>/<time>/.hydra/config.yaml`), used for re-evaluation
+- `outputs/<group>/<run.name>/best.pth` — weights of the selected checkpoint
+- `outputs/<group>/<run.name>/best.json` — its metrics, e.g. `{"epoch", "S_p", "S_e", "icbhi_score"}` with
+  `icbhi_score = (S_p + S_e) / 2`
+- `outputs/<date>/<time>/.hydra/config.yaml` — the resolved config snapshot, found automatically by re-evaluation
+- `lightning_logs/<run.name>/` — TensorBoard logs
 
-`scripts/train.sh <config> [overrides]` is a shell wrapper that selects the GPU (`GPU=<n>`) and caps per-worker
-BLAS/OpenCV threads. A run refuses to start if `best.pth`/`best.json` already exist for the same `run.name`; choose a
+`scripts/train.sh <config> [overrides]` is a shell wrapper that selects the GPU (`GPU=<n>`), caps per-worker
+BLAS/OpenCV threads and runs `.venv/bin/python` of the repository (set `PY=<interpreter>` to use another one). A run refuses to start if `best.pth`/`best.json` already exist for the same `run.name`; choose a
 new name or add `+run.overwrite=true`.
 
 Checkpoint selection follows each paper's rule. Several recipes only save a checkpoint once S_e exceeds a threshold
@@ -175,14 +177,14 @@ scripts/eval.sh outputs/bts/icbhi-bts-s1          # shell wrapper (GPU=<n>, SAND
 
 `rsc-toolkit-eval` finds the run's config snapshot, rebuilds the model and data through the same factories used in
 training, loads `best.pth` strictly and evaluates the test split. Training outputs are read-only: all writes go to the
-sandbox (default `.rsc_eval_sandbox` in the working directory; `scripts/eval.sh` uses `/tmp/rsc_eval_sandbox_<uid>`
-unless `SANDBOX` is set), which must be outside `outputs/`.
+sandbox (default `.rsc_eval_sandbox` in the working directory; `scripts/eval.sh` uses `${TMPDIR:-/tmp}/rsc_eval_sandbox_<uid>`
+unless `SANDBOX` is set and, like `train.sh`, honours `GPU` and `PY`), which must be outside `outputs/`.
 
 The status line reads:
 
 - `PASS` / `MISMATCH` — `best.json` exists and the new metrics agree with it within `--tol` (default 0.05 points) or not;
 - `OK` — no `best.json`, or `--override` was used (the protocol may differ, so no verdict is given; the differences are
-  still reported as `diffs` / `max_abs_diff`).
+  still written as `diffs` / `max_abs_diff` to the `--out` JSON).
 
 The snapshot is used as saved, so a smoke run is re-evaluated on its 2 validation batches; add
 `--override trainer.params.limit_val_batches=1.0` to score the full test split.
@@ -197,12 +199,14 @@ result is the ICBHI 4-class S_p / S_e / Score on the 1,429 test events.
 ```bash
 # needs the SPRSound download and index from "Datasets"
 python scripts/eval_zero_shot_sprsound.py outputs/sgscl/icbhi-cnn6-ce-s1 --sandbox /tmp/rsc_eval_sandbox
-python scripts/eval_zero_shot_sprsound.py paper_weights/icbhi-cnn6-ce-s1 paper_weights/icbhi-patchmix-ce --out zero_shot.jsonl
+python scripts/eval_zero_shot_sprsound.py paper_weights/icbhi-cnn6-ce-s1 paper_weights/icbhi-patchmix-ce --out outputs/zero_shot.jsonl
 ```
 
-The script writes a derived 4-class index (`.datasets/sprsound/index/index_cycle_icbhi4.csv`) and its own feature caches,
-never touches the run directories, and prints `OK` per run (`PASS` / `MISMATCH` if the run directory holds a recorded
-`ood.json`). Use `--sprsound-dir` for another data location and `--device cpu` without a GPU.
+The script writes a derived 4-class index (`.datasets/sprsound/index/index_cycle_icbhi4.csv`) and its own feature caches
+and never touches the run directories. It always scores the full test set (a smoke run's batch limits are ignored) and
+prints S_p / S_e / Score with `OK` per run, or `PASS` / `MISMATCH` when the run directory holds a recorded `ood.json`
+(released bundles do not). The class counts (`[1040, 83, 305, 1]`) and all details go to the `--out` JSON lines. Use
+`--sprsound-dir` for another data location, `--override` for config changes and `--device cpu` without a GPU.
 
 ## Released paper weights
 
@@ -213,21 +217,29 @@ The weights behind the benchmark tables are released as run bundles (`best.pth`,
 pip install -e ".[notebook]"                                   # gdown
 python scripts/download_paper_weights.py --list
 python scripts/download_paper_weights.py --run icbhi-cnn6-ce-s1 --out paper_weights/
-rsc-toolkit-eval paper_weights/icbhi-cnn6-ce-s1 --sandbox /tmp/rsc_eval_sandbox \
-  --override data.params.data_dir=.datasets/icbhi
+rsc-toolkit-eval paper_weights/icbhi-cnn6-ce-s1 --sandbox /tmp/rsc_eval_sandbox
 ```
 
 The downloader verifies every file against the bundle's `sha256.txt` and the manifest. Bundles carry their own config
-snapshot, so no `outputs/` directory is needed; the re-evaluation reports `OK` with `max_abs_diff` against the released
-`best.json` (0.0 on the official test set). All bundles live in one shared Google Drive folder, so listing it can take a
+snapshot, so no `outputs/` directory is needed; run the command from the directory that holds `.datasets/icbhi` and it
+reports `PASS` against the released `best.json`. If the dataset lives elsewhere, add
+`--override data.params.data_dir=<path>`; the status is then `OK` and `max_abs_diff` in the `--out` JSON is 0.0. All bundles live in one shared Google Drive folder, so listing it can take a
 few minutes and occasionally fails with HTTP 500; the downloader retries automatically.
 
 Released: 340 runs from 68 model families, seeds 1–5, on both datasets — most methods in the recipe table below (not
-LungMix, GaP-Aug, Prototype, DDE-MAE or the M2D family); `--list` shows the exact runs. Run names are `<dataset>-<family>-s<seed>`, except that seed 1 of
-`icbhi-ast-sft`, `icbhi-patchmix-ce` and `icbhi-patchmix-cl` has no `-s1` suffix. MVST fusion bundles
-(`*-mvst-*fusion-s<seed>`) contain the gated fusion head; the five view models are released as separate runs (`*-v16` …
-`*-v256`) and are re-evaluated with `rsc-toolkit-eval`, while the fusion stage is reproduced with
-`scripts/reproduction/mvst_fusion.py`.
+LungMix, GaP-Aug, Prototype, DDE-MAE or the M2D family); `--list` shows the exact runs. Run names are `<family>-s<seed>`, where the family starts with `icbhi-` or
+`sprs-`; seed 1 of `icbhi-ast-sft`, `icbhi-patchmix-ce` and `icbhi-patchmix-cl` has no `-s1` suffix. MVST fusion bundles
+(`*-mvst-*fusion-s<seed>`) contain the trained gated fusion head for reference. The five view models are released as
+separate runs (`*-v16` … `*-v256`) and are re-evaluated with `rsc-toolkit-eval`; the fusion head can be re-trained from
+them with:
+
+```bash
+python scripts/reproduction/mvst_fusion.py --seed 1 --out outputs/mvst/my-fusion-s1 \
+  --ckpts 16=paper_weights/icbhi-mvst-official-v16-s1/best.pth 32=paper_weights/icbhi-mvst-official-v32-s1/best.pth \
+          64=paper_weights/icbhi-mvst-official-v64-s1/best.pth 128=paper_weights/icbhi-mvst-official-v128-s1/best.pth \
+          256=paper_weights/icbhi-mvst-official-v256-s1/best.pth
+# SPRSound: add --dataset sprsound and use the sprs-mvst-v*-s1 runs
+```
 
 Weights inherit the licence terms of the pre-trained backbone they were fine-tuned from (for example, OPERA-CT weights are
 CC BY-NC). Weights built on backbones whose licence does not allow redistribution (the M2D family) are not released.
@@ -250,7 +262,7 @@ GPU=0 scripts/eval.sh  outputs/patchmix/icbhi-patchmix-cl-s1
 | SG-SCL / DAT (`ast_sgscl`) | `sgscl_icbhi` (default `sgscl`; benchmark rows use `model.params.con_feat=feat1`) / `model.params.method=dat` | — (SPRSound uses a single stethoscope, so the device-domain contrastive term is undefined) |
 | ResNet18/34, EfficientNet-B0, CNN6 fine-tuning (`resnet18_sft`, …) | `sgscl_nonast_icbhi model.name=resnet18_sft` (`resnet34_sft`, `efficientnet_b0_sft`, `cnn6_sft`) | `sgscl_nonast_sprs model.name=…` |
 | SG-SCL on non-AST backbones (`*_sft`) | `sgscl_nonast_icbhi model.name=cnn6_sft model.params.method=sgscl loss=cross_entropy` | — |
-| SCL with metadata: CE / Hybrid / M-SCL (`cnn6_sclmeta`) | `sclmeta_icbhi model.params.method=ce` / `…=hybrid` / two stages: `sclmeta_icbhi_pretrain` → `sclmeta_icbhi_linear model.params.encoder_ckpt=<final_state.pth of the pretraining run>` | `sclmeta_sprs …` / `sclmeta_sprs_pretrain` → `sclmeta_sprs_linear` |
+| SCL with metadata: CE / Hybrid / M-SCL (`cnn6_sclmeta`) | `sclmeta_icbhi model.params.method=ce` / `…=hybrid` / two stages: `sclmeta_icbhi_pretrain` → `sclmeta_icbhi_linear model.params.encoder_ckpt=outputs/sclmeta/<pretraining run.name>/final_state.pth` | `sclmeta_sprs …` / `sclmeta_sprs_pretrain` → `sclmeta_sprs_linear` |
 | Audio-CLAP fine-tuning (`audioclap`) | `bts_icbhi model=audioclap` | `bts_sprs model=audioclap` |
 | BTS (`bts`) | `bts_icbhi` | `bts_sprs` |
 | BTS-CARD (`bts_card`) | `btscard_icbhi trainer.params.max_epochs=30 optimizer.name=adamw` (paper setting) / `btscard_icbhi` (official-script setting) | `btscard_sprs` |
@@ -270,7 +282,7 @@ GPU=0 scripts/eval.sh  outputs/patchmix/icbhi-patchmix-cl-s1
 | MVST, five views + fusion (`ast_mvst`) | `mvst_icbhi model.params.view=16` (for each of 16, 32, 64, 128, 256), then train the fusion head with `scripts/reproduction/mvst_fusion.py` | `mvst_sprs model.params.view=…` |
 | M2D / M2D-X / M2D-Resp (`m2d`) | `m2d_icbhi` / `model.params.pretrained_path=pretrained_models/upstream/m2d/<ckpt>` (M2D-Resp also `model.params.input_size=[80,608]`) | `m2d_sprs …` |
 | OPERA-CT frozen / fine-tuned (`opera_ct`) | `opera_embc_icbhi` / `opera_ft_icbhi` | `opera_embc_sprs` / `opera_ft_sprs` |
-| DDE-MAE (`audiomae_dde_cls`) | `dde_icbhi_b2 data=icbhi_ddemae_16k` / `dde_icbhi_stage1 data=icbhi_ddemae_16k` → `dde_icbhi_stage2 data=icbhi_ddemae_16k model.params.encoder_ckpt=<stage-1 final_state.pth>` | — |
+| DDE-MAE (`audiomae_dde_cls`) | `dde_icbhi_b2 data=icbhi_ddemae_16k` / `dde_icbhi_stage1 data=icbhi_ddemae_16k` → `dde_icbhi_stage2 data=icbhi_ddemae_16k model.params.encoder_ckpt=outputs/ddemae/<stage-1 run.name>/final_state.pth` | — |
 
 Data configs live in `rsc_toolkit/configs/data/` (`icbhi_*`, `sprsound_*`). "Toolkit extension" marks a setting the
 original paper did not report; its recipe is the paper's ICBHI recipe applied unchanged.
@@ -291,8 +303,8 @@ Checkpoints marked automatic are fetched on first use; a missing manual checkpoi
 | ImageNet weights | ResNet18/34, EfficientNet-B0, ResNeSt (Domain Transfer), RespireNet | torchvision / timm cache | automatic |
 | CLAP `laion/clap-htsat-unfused` | Audio-CLAP, BTS, BTS-CARD, QLung (Audio-CLAP) | Hugging Face cache | automatic |
 | HF AST `MIT/ast-finetuned-audioset-10-10-0.4593` | LoRA-RSC | `pretrained_models/upstream/hf/ast-finetuned-audioset-10-10-0.4593/` | `hf download MIT/ast-finetuned-audioset-10-10-0.4593 --local-dir <path>` |
-| AST AudioSet 16-16 | AMS-D, MVST | `pretrained_models/upstream/audioset_16_16_0.4422.pth` | convert `MIT/ast-finetuned-audioset-16-16-0.442` with `scripts/reproduction/convert_hf_ast_to_yuangong.py` |
-| BEATs iter3+ (AS2M) | BEATs fine-tuning, PAFA, PC-MCL (BEATs) | `pretrained_models/upstream/BEATs_iter3_plus_AS2M.pt` | [microsoft/unilm BEATs](https://github.com/microsoft/unilm/tree/master/beats) (sha256 `d43cbfad…8d34`) |
+| AST AudioSet 16-16 | AMS-D, MVST | `pretrained_models/upstream/audioset_16_16_0.4422.pth` | `python scripts/reproduction/convert_hf_ast_to_yuangong.py` (downloads `MIT/ast-finetuned-audioset-16-16-0.442` and writes this path) |
+| BEATs iter3+ (AS2M) | BEATs fine-tuning, PAFA, PC-MCL (BEATs) | `pretrained_models/upstream/BEATs_iter3_plus_AS2M.pt` | [microsoft/unilm BEATs](https://github.com/microsoft/unilm/tree/master/beats) (sha256 `d43cbfad4d7b56381c061d7a24774f908d4d94c72961f6eb1d9090ff18cd8d34`) |
 | DASS medium v2 | Lung-SRAD | `pretrained_models/upstream/dass/DASS_medium_v2.pth` | [DASS release v0.2](https://github.com/Saurabhbhati/DASS/releases/download/v0.2/DASS_medium_v2.pth) |
 | OPERA-CT encoder | OPERA-CT | `pretrained_models/upstream/opera/encoder-operaCT.ckpt` | [evelyn0414/OPERA on Hugging Face](https://huggingface.co/evelyn0414/OPERA/blob/main/encoder-operaCT.ckpt) |
 | M2D ViT-Base | M2D | `pretrained_models/upstream/m2d/m2d_vit_base-80x200p16x4-230529/checkpoint-300.pth` | unzip [m2d release v0.1.0](https://github.com/nttcslab/m2d/releases/download/v0.1.0/m2d_vit_base-80x200p16x4-230529.zip) |
@@ -331,13 +343,14 @@ call the same method; branch on `self.training` if they must differ. A model tha
 (metadata) declares `accepts_meta = ("dev", ...)`, and the adapter checks it against the datamodule's `meta_kind`
 before training starts.
 
-A complete example that trains on the toy data from the repository root (CPU, about a minute). The model file and its
-config live outside the package; `PYTHONPATH` makes the module importable and `RSC_TOOLKIT_PLUGINS` imports it so the
-decorator registers the model:
+A complete example that trains on the toy data (CPU, about a minute), run from the repository root after the quick start.
+The model file and its config live in a directory outside the repository; `PYTHONPATH` makes the module importable and
+`RSC_TOOLKIT_PLUGINS` imports it so the decorator registers the model:
 
 ```bash
-mkdir -p my_plugin/configs/model
-cat > my_plugin/my_model.py <<'EOF'
+PLUGIN=$(realpath ..)/my_plugin
+mkdir -p $PLUGIN/configs/model
+cat > $PLUGIN/my_model.py <<'EOF'
 from torch import nn
 from rsc_toolkit.models.base import BaseRSCModel
 from rsc_toolkit.models.factory import ModelFactory
@@ -353,10 +366,10 @@ class MyModel(BaseRSCModel, nn.Module):
         logits = self.net(audio_batch.unsqueeze(1))      # fbank features arrive as [B, F, T]
         return logits, loss_func(logits, labels)
 EOF
-printf 'name: my_model\nparams:\n  n_cls: 4\n  hidden: 16\n' > my_plugin/configs/model/my_model.yaml
+printf 'name: my_model\nparams:\n  n_cls: 4\n  hidden: 16\n' > $PLUGIN/configs/model/my_model.yaml
 
-export PYTHONPATH=$PWD/my_plugin RSC_TOOLKIT_PLUGINS=my_model
-rsc-toolkit-train --config-name default --config-dir $PWD/my_plugin/configs data=toy_fbank model=my_model \
+export PYTHONPATH=$PLUGIN RSC_TOOLKIT_PLUGINS=my_model
+rsc-toolkit-train --config-name default --config-dir $PLUGIN/configs data=toy_fbank model=my_model \
   callbacks=best_checkpoint data.params.data_dir=.datasets/toy data.params.num_workers=0 \
   trainer.params.max_epochs=1 trainer.params.accelerator=cpu run.group=mine run.name=my-model
 rsc-toolkit-eval outputs/mine/my-model --sandbox /tmp/rsc_eval_sandbox     # same PYTHONPATH / RSC_TOOLKIT_PLUGINS
@@ -492,6 +505,7 @@ research, education and other noncommercial purposes. Commercial use requires se
 
 Code from the original RSC-Toolkit code base stays under the MIT License. Files that contain code ported from other
 projects keep their original licenses (MIT, BSD-3-Clause, Apache-2.0,
-CC BY-NC 4.0, CC BY-NC-SA 4.0, and the NTT Software License Agreement for Evaluation for code adapted from M2D and EVAR); each such file names its source in a header comment, and the list with full license
-texts is in [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) and [`LICENSES/`](LICENSES). Released weights inherit the
+CC BY-NC 4.0, CC BY-NC-SA 4.0, and the NTT Software License Agreement for Evaluation for code adapted from M2D and EVAR); each such file names its source in a header comment, and the list is in
+[`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md), with full license texts in [`LICENSES/`](LICENSES) (the NTT agreement
+is linked there instead). Released weights inherit the
 license of the pre-trained backbone they were fine-tuned from.

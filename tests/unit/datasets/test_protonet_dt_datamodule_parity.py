@@ -77,6 +77,7 @@ def fingerprint(name):
 
 @needs_icbhi
 @needs_golden
+@pytest.mark.exact_golden  # waveform sums compared to 4 decimals depend on the BLAS thread count
 @pytest.mark.parametrize("name", ["icbhi_protonet", "icbhi_domaintransfer"])
 def test_datamodule_fingerprint_matches_former_swap_implementation(name):
     golden = json.loads(GOLDEN.read_text())[name]
