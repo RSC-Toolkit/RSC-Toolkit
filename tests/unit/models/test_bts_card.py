@@ -45,7 +45,7 @@ def _hf_clap_cached() -> bool:
     return any(p.name.startswith("models--laion--clap-htsat-unfused") for p in hub.glob("models--*"))
 
 
-needs_models = pytest.mark.skipif(not (_hf_clap_cached() and BERT_LOCAL.exists()),
+needs_models = pytest.mark.skipif(not (_hf_clap_cached() and (BERT_LOCAL / "config.json").exists()),   # 새 clone 엔 provenance.json 만 추적돼 폴더는 있다
                                   reason="laion/clap-htsat-unfused 캐시 또는 tiny-clinicalbert 로컬 사본 없음")
 needs_golden = pytest.mark.skipif(not (GOLDEN / "forward_golden.pt").exists(), reason="골든 없음")
 
