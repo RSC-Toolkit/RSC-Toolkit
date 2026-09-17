@@ -95,8 +95,8 @@ rsc-toolkit-train --config-name default data=toy_fbank model=cnn model.params.ba
 rsc-toolkit-eval outputs/quickstart/toy-cnn --sandbox /tmp/rsc_eval_sandbox
 ```
 
-[`TUTORIAL.md`](TUTORIAL.md) walks through the full path — toy data, registering your own model, one epoch on real
-ICBHI data, and re-evaluating a released weight. The same content is available as a notebook,
+The [tutorial](tutorial/README.md) walks through the full path step by step — toy data, registering your own model,
+one epoch on real ICBHI data, and re-evaluating a released weight. The same content is available as a notebook,
 [`notebooks/tutorial.ipynb`](notebooks/tutorial.ipynb), and can be run end to end with `scripts/tutorial/run_tutorial.sh`.
 
 ## Datasets
@@ -319,65 +319,70 @@ non-commercial).
 
 ## Adding your own model
 
-**No fork is needed.** Subclass `BaseRSCModel`, implement `training_forward`, and register the class; the training and
-validation loops work unchanged.
+**No fork is needed.** A model is a subclass of `BaseRSCModel` that implements `training_forward` and is registered by
+name; the training and validation loops work unchanged. The full contract is documented in
+[`rsc_toolkit/models/base.py`](rsc_toolkit/models/base.py).
+
+The example below trains a small CNN on the toy data (CPU, about a minute) after the [quick start](#quick-start-cpu-a-few-minutes).
+Keep your files in a directory outside the repository, for example next to the clone:
+
+```
+../my_plugin/
+  my_model.py
+  configs/model/my_model.yaml
+```
+
+**1. Model** — save as `../my_plugin/my_model.py`:
 
 ```python
 from torch import nn
 from rsc_toolkit.models.base import BaseRSCModel
 from rsc_toolkit.models.factory import ModelFactory
 
-@ModelFactory.register_model_class("my_model")
-class MyModel(BaseRSCModel, nn.Module):
-    def __init__(self, n_cls: int = 4, **params):
-        super().__init__()
-        self.net = ...          # n_cls is injected from model.params.n_cls
-
-    def training_forward(self, audio_batch, labels, loss_func, **kwargs):
-        logits = self.net(audio_batch)
-        return logits, loss_func(logits, labels)   # return (logits, loss)
-```
-
-The full contract is documented in [`rsc_toolkit/models/base.py`](rsc_toolkit/models/base.py). Training and validation
-call the same method; branch on `self.training` if they must differ. A model that consumes the third batch element
-(metadata) declares `accepts_meta = ("dev", ...)`, and the adapter checks it against the datamodule's `meta_kind`
-before training starts.
-
-A complete example that trains on the toy data (CPU, about a minute), run from the repository root after the quick start.
-The model file and its config live in a directory outside the repository; `PYTHONPATH` makes the module importable and
-`RSC_TOOLKIT_PLUGINS` imports it so the decorator registers the model:
-
-```bash
-PLUGIN=$(realpath ..)/my_plugin
-mkdir -p $PLUGIN/configs/model
-cat > $PLUGIN/my_model.py <<'EOF'
-from torch import nn
-from rsc_toolkit.models.base import BaseRSCModel
-from rsc_toolkit.models.factory import ModelFactory
 
 @ModelFactory.register_model_class("my_model")
 class MyModel(BaseRSCModel, nn.Module):
     def __init__(self, n_cls: int = 4, hidden: int = 16, **params):
-        super().__init__()
+        super().__init__()                               # n_cls and hidden come from the model config below
         self.net = nn.Sequential(nn.Conv2d(1, hidden, 3, padding=1), nn.ReLU(), nn.AdaptiveAvgPool2d(1),
                                  nn.Flatten(), nn.Linear(hidden, n_cls))
 
     def training_forward(self, audio_batch, labels, loss_func, **kwargs):
         logits = self.net(audio_batch.unsqueeze(1))      # fbank features arrive as [B, F, T]
-        return logits, loss_func(logits, labels)
-EOF
-printf 'name: my_model\nparams:\n  n_cls: 4\n  hidden: 16\n' > $PLUGIN/configs/model/my_model.yaml
-
-export PYTHONPATH=$PLUGIN RSC_TOOLKIT_PLUGINS=my_model
-rsc-toolkit-train --config-name default --config-dir $PLUGIN/configs data=toy_fbank model=my_model \
-  callbacks=best_checkpoint data.params.data_dir=.datasets/toy data.params.num_workers=0 \
-  trainer.params.max_epochs=1 trainer.params.accelerator=cpu run.group=mine run.name=my-model
-rsc-toolkit-eval outputs/mine/my-model --sandbox /tmp/rsc_eval_sandbox     # same PYTHONPATH / RSC_TOOLKIT_PLUGINS
+        return logits, loss_func(logits, labels)         # return (logits, loss)
 ```
 
-`audio_batch` has the shape produced by the data config (for example `[B, F, T]` for fbank features), and `loss_func` is the loss from the config. `--config-name default` only adds an EMA callback, so pass
-`callbacks=best_checkpoint` to save `best.pth`. The example uses the toy index from the quick start; training on ICBHI works the same way with
-`data=icbhi_fbank data.params.data_dir=.datasets/icbhi` (after the ICBHI download and index).
+**2. Model config** — save as `../my_plugin/configs/model/my_model.yaml`:
+
+```yaml
+name: my_model
+params:
+  n_cls: 4
+  hidden: 16
+```
+
+**3. Train and re-evaluate** — run from the repository root. `PYTHONPATH` makes the module importable,
+`RSC_TOOLKIT_PLUGINS` imports it so the decorator registers the model, and `--config-dir` adds your config:
+
+```bash
+export PYTHONPATH=$(realpath ../my_plugin) RSC_TOOLKIT_PLUGINS=my_model
+rsc-toolkit-train --config-name default --config-dir $(realpath ../my_plugin/configs) data=toy_fbank model=my_model \
+  callbacks=best_checkpoint data.params.data_dir=.datasets/toy data.params.num_workers=0 \
+  trainer.params.max_epochs=1 trainer.params.accelerator=cpu run.group=mine run.name=my-model
+rsc-toolkit-eval outputs/mine/my-model --sandbox /tmp/rsc_eval_sandbox
+```
+
+Notes:
+
+- `audio_batch` has the shape produced by the data config (for example `[B, F, T]` for fbank features), and `loss_func`
+  is the loss from the config.
+- Training and validation call the same method; branch on `self.training` if they must differ.
+- A model that consumes the third batch element (metadata) declares `accepts_meta = ("dev", ...)`; the adapter checks it
+  against the datamodule's `meta_kind` before training starts.
+- `--config-name default` only adds an EMA callback, so pass `callbacks=best_checkpoint` to save `best.pth`.
+- Keep `PYTHONPATH` and `RSC_TOOLKIT_PLUGINS` set for `rsc-toolkit-eval` as well.
+- Training on ICBHI works the same way with `data=icbhi_fbank data.params.data_dir=.datasets/icbhi` (after the ICBHI
+  download and index).
 
 ### Other extension points
 

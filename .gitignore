@@ -208,7 +208,7 @@ pretrained_models
 # Default rsc-toolkit-eval sandbox (evaluate.py; write location for read-only evaluation)
 .rsc_eval_sandbox/
 
-# Internal working documents stay local; public documentation is README.md and TUTORIAL.md
+# Internal working documents stay local; public documentation is README.md and tutorial/
 docs/
 
 # Internal paper tooling that reads docs/ (paper tables, results_master.csv) — kept local only

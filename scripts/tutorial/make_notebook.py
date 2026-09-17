@@ -34,7 +34,7 @@ This notebook is the minimal path for **first-time users** of the toolkit, meant
 
 **Setup**: Python ≥ 3.9 (3.11 recommended); after cloning the repository, `pip install -e ".[trainer,models,notebook]"`
 (for the same pins as the paper, `pip install -r requirements-lock.txt`). To plug in your own model with only the installed package,
-see the "Using the installed package only" section of `TUTORIAL.md`.
+see "Installing without a clone" in `tutorial/01-setup.md`.
 
 Environment variables change the behavior: `RSC_TUTORIAL_QUICK=1` → skip Part B (as in CI). `RSC_TUTORIAL_WORK` → working directory (default `<clone>/outputs/tutorial`). `RSC_TUTORIAL_ROOT` → set the repository root explicitly.
 """))

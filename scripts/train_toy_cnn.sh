@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Portions of this file come from the original RSC-Toolkit code base by Miika Toikkanen; that code is under the MIT license.
 # See THIRD_PARTY_NOTICES.md. The rest of the file is under the PolyForm Noncommercial License 1.0.0.
-# Trains a CNN on the bundled synthetic toy data for 1 epoch on CPU — installation check. Full guide: TUTORIAL.md · notebooks/tutorial.ipynb
+# Trains a CNN on the bundled synthetic toy data for 1 epoch on CPU — installation check. Full guide: tutorial/README.md · notebooks/tutorial.ipynb
 set -euo pipefail
 ROOT=$(cd "$(dirname "$0")/.." && pwd); cd "$ROOT"
 PY=${PY:-$ROOT/.venv/bin/python}; [ -x "$PY" ] || PY=$(command -v python3)   # works even if the venv is not on PATH
