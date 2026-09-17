@@ -24,25 +24,34 @@ method can be measured on equal terms.
 3. [Datasets](#datasets)
 4. [Training](#training)
 5. [Evaluating a checkpoint](#evaluating-a-checkpoint)
-6. [Released paper weights](#released-paper-weights)
-7. [Reproducing a method](#reproducing-a-method)
-8. [Adding your own model](#adding-your-own-model)
-9. [Configuration reference](#configuration-reference)
-10. [Testing](#testing)
-11. [Known limitations](#known-limitations)
-12. [License](#license)
+6. [Zero-shot evaluation on SPRSound](#zero-shot-evaluation-on-sprsound)
+7. [Released paper weights](#released-paper-weights)
+8. [Reproducing a method](#reproducing-a-method)
+9. [Pre-trained checkpoints](#pre-trained-checkpoints)
+10. [Adding your own model](#adding-your-own-model)
+11. [Configuration reference](#configuration-reference)
+12. [Testing](#testing)
+13. [Known limitations](#known-limitations)
+14. [License](#license)
 
 ---
 
 ## Installation
 
-Python ≥ 3.9 (3.11 recommended).
+Python 3.11 is recommended (the package supports ≥ 3.9, but the pinned environment below needs 3.11). The install takes
+about 3 minutes and 6.5 GB (mostly PyTorch with CUDA).
 
 ```bash
 git clone https://github.com/RSC-Toolkit/RSC-Toolkit.git
 cd RSC-Toolkit
 python3.11 -m venv .venv && source .venv/bin/activate
 pip install -e ".[trainer,models]"
+```
+
+For CPU-only use, install the CPU build of PyTorch **before** the command above (about 1 GB instead of 6 GB):
+
+```bash
+pip install --index-url https://download.pytorch.org/whl/cpu torch==2.7.0 torchaudio==2.7.0 torchvision==0.22.0
 ```
 
 | extra | what it installs |
@@ -53,17 +62,12 @@ pip install -e ".[trainer,models]"
 | `ssl-weights` | lightning-bolts — only for the ResNet50 SimCLR weights |
 | `dev` | pytest, black, flake8, isort |
 
-To reproduce the exact environment used for the released weights:
+The default install takes the latest compatible versions of the dependencies. To reproduce the exact environment used for
+the released weights (Python 3.11):
 
 ```bash
 pip install -r requirements-lock.txt
 pip install -e . --no-deps
-```
-
-For CPU-only use, install the CPU build of PyTorch first (about 1 GB instead of 6 GB):
-
-```bash
-pip install --index-url https://download.pytorch.org/whl/cpu torch==2.7.0 torchaudio==2.7.0 torchvision==0.22.0
 ```
 
 Check the installation:
@@ -115,12 +119,18 @@ rsctk datasets build-index sprsound --data_dir .datasets/sprsound --sample_level
 rsctk datasets validate    sprsound --data_dir .datasets/sprsound
 ```
 
-The configs expect the datasets under `.datasets/icbhi` and `.datasets/sprsound` relative to the working directory;
-override `data.params.data_dir=...` to use another location. Raw recordings are never modified — splits, indices and
+Sizes: ICBHI is a 1.98 GB download (3.9 GB on disk) from the official challenge site, SPRSound a 2.2 GB archive of the
+GitHub repository (5.8 GB on disk). Each download takes a few minutes. The ICBHI archive is checked against a known
+checksum; the SPRSound archive follows the repository's `main` branch and has no fixed checksum.
+
+Always pass `--data_dir`: without it, `rsctk datasets` uses the operating system's user data directory, while the configs
+expect the datasets under `.datasets/icbhi` and `.datasets/sprsound` relative to the working directory (override
+`data.params.data_dir=...` to use another location). Raw recordings are never modified — splits, indices and
 label mappings are written as derived files. In the SPRSound 4-class view, Rhonchi and Stridor events are excluded rather
 than merged into wheeze (the 2022 inter-patient test set contains neither class).
 
-Features are computed once and cached (`downloaded_datasets/features_cache` by default, or `RSCTK_FEATURE_CACHE_ROOT`).
+Features are computed once and cached (`downloaded_datasets/features_cache` by default, or `RSCTK_FEATURE_CACHE_ROOT`);
+the first run of a recipe spends a few minutes on this, and the caches for all recipes together take several GB.
 The cache key includes every setting that affects the features, and each cache directory keeps a chain ledger
 (`_chain.json`) so that a different preprocessing chain never silently reuses stale features.
 
@@ -144,24 +154,55 @@ Outputs are written to `outputs/<group>/<run.name>/`:
 BLAS/OpenCV threads. A run refuses to start if `best.pth`/`best.json` already exist for the same `run.name`; choose a
 new name or add `+run.overwrite=true`.
 
-Smoke test (1 epoch, 2 batches):
+Checkpoint selection follows each paper's rule. Several recipes only save a checkpoint once S_e exceeds a threshold
+(for example 5 % in the Patch-Mix protocol), so a very short run may finish without writing `best.pth`; the log then
+says `best was never updated`. For quick checks, replace the recipe's callbacks with the generic best-score checkpoint:
 
 ```bash
+# Smoke test: 1 epoch, 2 batches, checkpoint saved regardless of S_e
 scripts/train.sh patchmix_icbhi trainer.params.max_epochs=1 \
-  ++trainer.params.limit_train_batches=2 ++trainer.params.limit_val_batches=2 run.name=smoke-patchmix
+  ++trainer.params.limit_train_batches=2 ++trainer.params.limit_val_batches=2 \
+  callbacks=best_checkpoint run.name=smoke-patchmix
 ```
 
 ## Evaluating a checkpoint
 
 ```bash
-rsc-toolkit-eval outputs/patchmix/icbhi-patchmix-ce-s1
+rsc-toolkit-eval outputs/patchmix/smoke-patchmix --sandbox /tmp/rsc_eval_sandbox
 rsc-toolkit-eval outputs/qlung/icbhi-qlung-s1 --override data.params.batch_size=16 --out eval.json
-scripts/eval.sh outputs/bts/icbhi-bts-s1          # shell wrapper (GPU=<n>, sandbox)
+scripts/eval.sh outputs/bts/icbhi-bts-s1          # shell wrapper (GPU=<n>, SANDBOX=<dir>)
 ```
 
 `rsc-toolkit-eval` finds the run's config snapshot, rebuilds the model and data through the same factories used in
-training, loads `best.pth` strictly and evaluates the test split. Training outputs are read-only (all writes go to the
-sandbox, which must be outside `outputs/`). If `best.json` exists, the result is compared with it (PASS when |Δ| ≤ 0.05).
+training, loads `best.pth` strictly and evaluates the test split. Training outputs are read-only: all writes go to the
+sandbox (default `.rsc_eval_sandbox` in the working directory; `scripts/eval.sh` uses `/tmp/rsc_eval_sandbox_<uid>`
+unless `SANDBOX` is set), which must be outside `outputs/`.
+
+The status line reads:
+
+- `PASS` / `MISMATCH` — `best.json` exists and the new metrics agree with it within `--tol` (default 0.05 points) or not;
+- `OK` — no `best.json`, or `--override` was used (the protocol may differ, so no verdict is given; the differences are
+  still reported as `diffs` / `max_abs_diff`).
+
+The snapshot is used as saved, so a smoke run is re-evaluated on its 2 validation batches; add
+`--override trainer.params.limit_val_batches=1.0` to score the full test split.
+
+## Zero-shot evaluation on SPRSound
+
+ICBHI-trained checkpoints can be evaluated on the SPRSound 2022 inter-patient test set without retraining. The recipe's
+ICBHI preprocessing is applied to SPRSound unchanged, and SPRSound events are mapped to the ICBHI classes (normal,
+crackle = fine/coarse crackle, wheeze, both; Rhonchi and Stridor are excluded, and the test set contains neither). The
+result is the ICBHI 4-class S_p / S_e / Score on the 1,429 test events.
+
+```bash
+# needs the SPRSound download and index from "Datasets"
+python scripts/eval_zero_shot_sprsound.py outputs/sgscl/icbhi-cnn6-ce-s1 --sandbox /tmp/rsc_eval_sandbox
+python scripts/eval_zero_shot_sprsound.py paper_weights/icbhi-cnn6-ce-s1 paper_weights/icbhi-patchmix-ce --out zero_shot.jsonl
+```
+
+The script writes a derived 4-class index (`.datasets/sprsound/index/index_cycle_icbhi4.csv`) and its own feature caches,
+never touches the run directories, and prints `OK` per run (`PASS` / `MISMATCH` if the run directory holds a recorded
+`ood.json`). Use `--sprsound-dir` for another data location and `--device cpu` without a GPU.
 
 ## Released paper weights
 
@@ -177,7 +218,16 @@ rsc-toolkit-eval paper_weights/icbhi-cnn6-ce-s1 --sandbox /tmp/rsc_eval_sandbox 
 ```
 
 The downloader verifies every file against the bundle's `sha256.txt` and the manifest. Bundles carry their own config
-snapshot, so no `outputs/` directory is needed.
+snapshot, so no `outputs/` directory is needed; the re-evaluation reports `OK` with `max_abs_diff` against the released
+`best.json` (0.0 on the official test set). All bundles live in one shared Google Drive folder, so listing it can take a
+few minutes and occasionally fails with HTTP 500; the downloader retries automatically.
+
+Released: 340 runs from 68 model families, seeds 1–5, on both datasets — most methods in the recipe table below (not
+LungMix, GaP-Aug, Prototype, DDE-MAE or the M2D family); `--list` shows the exact runs. Run names are `<dataset>-<family>-s<seed>`, except that seed 1 of
+`icbhi-ast-sft`, `icbhi-patchmix-ce` and `icbhi-patchmix-cl` has no `-s1` suffix. MVST fusion bundles
+(`*-mvst-*fusion-s<seed>`) contain the gated fusion head; the five view models are released as separate runs (`*-v16` …
+`*-v256`) and are re-evaluated with `rsc-toolkit-eval`, while the fusion stage is reproduced with
+`scripts/reproduction/mvst_fusion.py`.
 
 Weights inherit the licence terms of the pre-trained backbone they were fine-tuned from (for example, OPERA-CT weights are
 CC BY-NC). Weights built on backbones whose licence does not allow redistribution (the M2D family) are not released.
@@ -217,7 +267,7 @@ GPU=0 scripts/eval.sh  outputs/patchmix/icbhi-patchmix-cl-s1
 | Domain Transfer, ResNeSt (`resnest_ibn_dt`) | `domaintransfer_icbhi` (baseline: `model.params.baseline=true model.params.mixup_alpha=0 data.params.splice_per_class=0 …`) | `domaintransfer_sprs` |
 | Prototype, CNN8-Pt (`protonet`) | `protonet_icbhi` (CNN8 baseline: `model.params.method=cnn8`) | `protonet_sprs` |
 | RespireNet CNN / +CBA (`respirenet`) | `respirenet_icbhi data.params.split_mode=official data.params.pad_seed=1 data.params.aug_seed=1` / add `data.params.aug_scale=1 data.params.cba_seed=1` (authors' fold 4: omit `split_mode`) | — |
-| MVST, five views + fusion (`ast_mvst`) | `mvst_icbhi model.params.view=16` (for each of 16, 32, 64, 128, 256), then fuse with `scripts/reproduction/aggregate_mvst_results.py` | `mvst_sprs model.params.view=…` |
+| MVST, five views + fusion (`ast_mvst`) | `mvst_icbhi model.params.view=16` (for each of 16, 32, 64, 128, 256), then train the fusion head with `scripts/reproduction/mvst_fusion.py` | `mvst_sprs model.params.view=…` |
 | M2D / M2D-X / M2D-Resp (`m2d`) | `m2d_icbhi` / `model.params.pretrained_path=pretrained_models/upstream/m2d/<ckpt>` (M2D-Resp also `model.params.input_size=[80,608]`) | `m2d_sprs …` |
 | OPERA-CT frozen / fine-tuned (`opera_ct`) | `opera_embc_icbhi` / `opera_ft_icbhi` | `opera_embc_sprs` / `opera_ft_sprs` |
 | DDE-MAE (`audiomae_dde_cls`) | `dde_icbhi_b2 data=icbhi_ddemae_16k` / `dde_icbhi_stage1 data=icbhi_ddemae_16k` → `dde_icbhi_stage2 data=icbhi_ddemae_16k model.params.encoder_ckpt=<stage-1 final_state.pth>` | — |
@@ -225,12 +275,35 @@ GPU=0 scripts/eval.sh  outputs/patchmix/icbhi-patchmix-cl-s1
 Data configs live in `rsc_toolkit/configs/data/` (`icbhi_*`, `sprsound_*`). "Toolkit extension" marks a setting the
 original paper did not report; its recipe is the paper's ICBHI recipe applied unchanged.
 
-**Pre-trained backbones.** Put checkpoints under `pretrained_models/upstream/` or point `RSCTK_PRETRAINED_ROOT` to a
-directory that holds them. AST, PANNs and Hugging Face models (CLAP, AudioSet AST) are downloaded automatically; BEATs,
-DASS, M2D, OPERA-CT and AudioMAE checkpoints must be downloaded manually — the toolkit stops with the expected path and
-source when one is missing.
-
 Per-method seed aggregation scripts are in `scripts/reproduction/aggregate_*.py`.
+
+## Pre-trained checkpoints
+
+Recipes start from published pre-trained models. Paths are relative to the working directory; alternatively put the files
+in one directory and set `RSCTK_PRETRAINED_ROOT` (the `pretrained_models/` prefix is dropped when looking there).
+Checkpoints marked automatic are fetched on first use; a missing manual checkpoint stops the run with the expected path.
+
+| checkpoint | used by | path | how to get it |
+|---|---|---|---|
+| AST AudioSet 10-10 | Patch-Mix, AST fine-tuning, SG-SCL, QLung, PC-MCL (AST), LungAdapter, LungMix, AdD-RSC | downloaded on first use | automatic ([Dropbox](https://www.dropbox.com/s/cv4knew8mvbrnvq/audioset_0.4593.pth?dl=1)) |
+| PANNs CNN6 | CNN6 fine-tuning, SG-SCL (CNN6), SCL with metadata | downloaded on first use | automatic ([Zenodo 3960586](https://zenodo.org/record/3960586)) |
+| PANNs CNN14 16 kHz | GaP-Aug | downloaded on first use | automatic ([Zenodo 3987831](https://zenodo.org/record/3987831)) |
+| ImageNet weights | ResNet18/34, EfficientNet-B0, ResNeSt (Domain Transfer), RespireNet | torchvision / timm cache | automatic |
+| CLAP `laion/clap-htsat-unfused` | Audio-CLAP, BTS, BTS-CARD, QLung (Audio-CLAP) | Hugging Face cache | automatic |
+| HF AST `MIT/ast-finetuned-audioset-10-10-0.4593` | LoRA-RSC | `pretrained_models/upstream/hf/ast-finetuned-audioset-10-10-0.4593/` | `hf download MIT/ast-finetuned-audioset-10-10-0.4593 --local-dir <path>` |
+| AST AudioSet 16-16 | AMS-D, MVST | `pretrained_models/upstream/audioset_16_16_0.4422.pth` | convert `MIT/ast-finetuned-audioset-16-16-0.442` with `scripts/reproduction/convert_hf_ast_to_yuangong.py` |
+| BEATs iter3+ (AS2M) | BEATs fine-tuning, PAFA, PC-MCL (BEATs) | `pretrained_models/upstream/BEATs_iter3_plus_AS2M.pt` | [microsoft/unilm BEATs](https://github.com/microsoft/unilm/tree/master/beats) (sha256 `d43cbfad…8d34`) |
+| DASS medium v2 | Lung-SRAD | `pretrained_models/upstream/dass/DASS_medium_v2.pth` | [DASS release v0.2](https://github.com/Saurabhbhati/DASS/releases/download/v0.2/DASS_medium_v2.pth) |
+| OPERA-CT encoder | OPERA-CT | `pretrained_models/upstream/opera/encoder-operaCT.ckpt` | [evelyn0414/OPERA on Hugging Face](https://huggingface.co/evelyn0414/OPERA/blob/main/encoder-operaCT.ckpt) |
+| M2D ViT-Base | M2D | `pretrained_models/upstream/m2d/m2d_vit_base-80x200p16x4-230529/checkpoint-300.pth` | unzip [m2d release v0.1.0](https://github.com/nttcslab/m2d/releases/download/v0.1.0/m2d_vit_base-80x200p16x4-230529.zip) |
+| M2D-X (ICBHI) | M2D-X | `pretrained_models/upstream/m2d/m2d_x_vit_base-…/checkpoint-600.pth` | extract [m2d_x_icbhi.tgz](https://github.com/nttcslab/m2d/releases/download/v0.2.0/m2d_x_icbhi.tgz) |
+| M2D-Resp | M2D-Resp | `pretrained_models/upstream/m2d/m2d_vit_base-80x608p16x16p16k-250826-AS+Resp400K/…` | unzip the [EVAR release](https://github.com/nttcslab/eval-audio-repr/releases/download/0.1.0/m2d_vit_base-80x608p16x16p16k-250826-AS+Resp400K.zip) |
+| AudioMAE (AudioSet-2M pre-trained) | DDE-MAE | `pretrained_models/upstream/audiomae/pretrained.pth` | [AudioMAE](https://github.com/facebookresearch/AudioMAE) pre-trained checkpoint (Google Drive link in its README) |
+| BTS precomputed features | BTS (ICBHI) | `pretrained_models/upstream/bts/training.pt`, `test.pt` | [BTS](https://github.com/kaen2891/bts) README (Google Drive) |
+| tiny-clinicalbert | BTS-CARD | `pretrained_models/upstream/hf/tiny-clinicalbert/` | `hf download nlpie/tiny-clinicalbert --local-dir <path>`, or set `RSCTK_NDE_HUB_FALLBACK=1` |
+
+Pass another M2D checkpoint with `model.params.pretrained_path=<path>`. These checkpoints keep their own licenses (some are
+non-commercial).
 
 ## Adding your own model
 
@@ -258,12 +331,40 @@ call the same method; branch on `self.training` if they must differ. A model tha
 (metadata) declares `accepts_meta = ("dev", ...)`, and the adapter checks it against the datamodule's `meta_kind`
 before training starts.
 
-Register the module and provide a model config from outside the repository:
+A complete example that trains on the toy data from the repository root (CPU, about a minute). The model file and its
+config live outside the package; `PYTHONPATH` makes the module importable and `RSC_TOOLKIT_PLUGINS` imports it so the
+decorator registers the model:
 
 ```bash
-RSC_TOOLKIT_PLUGINS=my_pkg.my_model rsc-toolkit-train --config-name default --config-dir my_configs \
-  data=icbhi_patchmix model=my_model
+mkdir -p my_plugin/configs/model
+cat > my_plugin/my_model.py <<'EOF'
+from torch import nn
+from rsc_toolkit.models.base import BaseRSCModel
+from rsc_toolkit.models.factory import ModelFactory
+
+@ModelFactory.register_model_class("my_model")
+class MyModel(BaseRSCModel, nn.Module):
+    def __init__(self, n_cls: int = 4, hidden: int = 16, **params):
+        super().__init__()
+        self.net = nn.Sequential(nn.Conv2d(1, hidden, 3, padding=1), nn.ReLU(), nn.AdaptiveAvgPool2d(1),
+                                 nn.Flatten(), nn.Linear(hidden, n_cls))
+
+    def training_forward(self, audio_batch, labels, loss_func, **kwargs):
+        logits = self.net(audio_batch.unsqueeze(1))      # fbank features arrive as [B, F, T]
+        return logits, loss_func(logits, labels)
+EOF
+printf 'name: my_model\nparams:\n  n_cls: 4\n  hidden: 16\n' > my_plugin/configs/model/my_model.yaml
+
+export PYTHONPATH=$PWD/my_plugin RSC_TOOLKIT_PLUGINS=my_model
+rsc-toolkit-train --config-name default --config-dir $PWD/my_plugin/configs data=toy_fbank model=my_model \
+  callbacks=best_checkpoint data.params.data_dir=.datasets/toy data.params.num_workers=0 \
+  trainer.params.max_epochs=1 trainer.params.accelerator=cpu run.group=mine run.name=my-model
+rsc-toolkit-eval outputs/mine/my-model --sandbox /tmp/rsc_eval_sandbox     # same PYTHONPATH / RSC_TOOLKIT_PLUGINS
 ```
+
+`audio_batch` has the shape produced by the data config (for example `[B, F, T]` for fbank features), and `loss_func` is the loss from the config. `--config-name default` only adds an EMA callback, so pass
+`callbacks=best_checkpoint` to save `best.pth`. The example uses the toy index from the quick start; training on ICBHI works the same way with
+`data=icbhi_fbank data.params.data_dir=.datasets/icbhi` (after the ICBHI download and index).
 
 ### Other extension points
 
@@ -363,12 +464,15 @@ sample_data/      synthetic toy dataset (ICBHI file format) used by the tutorial
 ## Testing
 
 ```bash
-pytest -m "not slow"      # fast regression tests (CPU)
-pytest                    # everything, including golden-tensor tests (some need GPUs, datasets or checkpoints)
+pip install -e ".[dev]"
+pytest tests/unit tests/integration -m "not slow and not exact_golden"   # what CI runs (CPU, a few minutes)
+pytest -m "not slow"                                                      # also bit-exact golden comparisons
 ```
 
-Tests that need unavailable datasets, checkpoints or CUDA kernels are skipped. CI (`.github/workflows/ci.yml`) runs the
-wheel smoke test, the CPU unit tests and the tutorial on toy data.
+Tests that need unavailable datasets, checkpoints, golden files or CUDA kernels are skipped. Golden files that contain
+dataset audio are not distributed, so most golden comparisons skip in a fresh clone. Tests marked `exact_golden` compare
+tensors bit for bit and can fail on a different CPU, BLAS library or thread count. CI (`.github/workflows/ci.yml`) runs
+the wheel smoke test, the CPU unit tests and the tutorial on toy data.
 
 ## Known limitations
 
@@ -376,6 +480,10 @@ wheel smoke test, the CPU unit tests and the tutorial on toy data.
   data in place.
 - The wheel does not include `sample_data/`; with a plain `pip install` start from your own data or ICBHI.
 - `scripts/packaging/smoke_installed_wheel.sh` checks an installed wheel from a clean virtual environment.
+- The ICBHI download may log an SSL error and retry without certificate verification; the archive is still checked
+  against its known checksum.
+- On first use some recipes download pre-trained checkpoints (see [Pre-trained checkpoints](#pre-trained-checkpoints)),
+  also when re-evaluating a released weight.
 
 ## License
 
@@ -384,6 +492,6 @@ research, education and other noncommercial purposes. Commercial use requires se
 
 Code from the original RSC-Toolkit code base stays under the MIT License. Files that contain code ported from other
 projects keep their original licenses (MIT, BSD-3-Clause, Apache-2.0,
-CC BY-NC 4.0, CC BY-NC-SA 4.0); each such file names its source in a header comment, and the list with full license
+CC BY-NC 4.0, CC BY-NC-SA 4.0, and the NTT Software License Agreement for Evaluation for code adapted from M2D and EVAR); each such file names its source in a header comment, and the list with full license
 texts is in [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) and [`LICENSES/`](LICENSES). Released weights inherit the
 license of the pre-trained backbone they were fine-tuned from.
