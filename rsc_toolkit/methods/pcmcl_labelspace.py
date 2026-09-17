@@ -1,3 +1,5 @@
+# Portions of this file are ported from PC-MCL (https://github.com/wa976/PC-MCL), which does not include a license file.
+# See THIRD_PARTY_NOTICES.md. The rest of the file is under the PolyForm Noncommercial License 1.0.0.
 """
 **Label space** of PC-MCL: class index ↔ attribute vector conversion, concatenation combinations and bucket rules in one place.
 

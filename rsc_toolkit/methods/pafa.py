@@ -1,3 +1,5 @@
+# Portions of this file are ported from PAFA (https://github.com/wa976/PAFA), which does not include a license file.
+# See THIRD_PARTY_NOTICES.md. The rest of the file is under the PolyForm Noncommercial License 1.0.0.
 """
 Projection head and loss of the PAFA paper (Interspeech 2025), a faithful port of the official code (verbatim).
 

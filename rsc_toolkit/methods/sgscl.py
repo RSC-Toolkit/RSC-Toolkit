@@ -1,3 +1,5 @@
+# Portions of this file are ported from SG-SCL (https://github.com/kaen2891/stethoscope-guided_supervised_contrastive_learning), which does not include a license file.
+# See THIRD_PARTY_NOTICES.md. The rest of the file is under the PolyForm Noncommercial License 1.0.0.
 """
 Training method of the SG-SCL paper (ICASSP 2024): a faithful port of the official code (official-code parity).
 

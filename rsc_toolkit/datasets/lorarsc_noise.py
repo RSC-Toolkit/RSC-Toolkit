@@ -1,3 +1,5 @@
+# Portions of this file are ported from LoRA-RSC (https://github.com/deegy666/LoRA-RSC), based on PETL_AST (https://github.com/umbertocappellazzo/PETL_AST), which does not include a license file.
+# See THIRD_PARTY_NOTICES.md. The rest of the file is under the PolyForm Noncommercial License 1.0.0.
 """
 **Alternative interpretation** of the LoRA-RSC (ICASSP 2025) waveform noise (1D waveform -> per-sample N(0, 0.3^2) Gaussian noise) -- IndexDataset subclass behind a flag.
 

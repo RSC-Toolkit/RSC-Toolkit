@@ -1,3 +1,5 @@
+# Portions of this file are ported from QLung (https://github.com/RSC-Toolkit/QLung), which does not include a license file.
+# See THIRD_PARTY_NOTICES.md. The rest of the file is under the PolyForm Noncommercial License 1.0.0.
 """
 QLung data path -- caches AQS (acoustic quality score) per sample_id and sends it as the 3rd batch element (meta_labels slot, **float**).
 

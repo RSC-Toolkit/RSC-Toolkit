@@ -1,5 +1,6 @@
 # Portions of this file are adapted from VMamba (https://github.com/MzeroMiko/VMamba); that code is under the MIT license.
 # Portions of this file are adapted from DASS (https://github.com/Saurabhbhati/DASS); that code is under the BSD-3-Clause license.
+# Portions of this file are ported from Lung-SRAD (https://github.com/RSC-Toolkit/Lung-SRAD), which does not include a license file.
 # See THIRD_PARTY_NOTICES.md. The rest of the file is under the PolyForm Noncommercial License 1.0.0.
 """
 VMamba VSSM (v2 family, DASS-medium setting) — faithful port of the Lung-SRAD official code models_DASS/vmamba_patchmix.py

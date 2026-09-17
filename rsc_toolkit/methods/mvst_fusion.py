@@ -1,3 +1,5 @@
+# Portions of this file are ported from MVST (https://github.com/wentaoheunnc/MVST), which does not include a license file.
+# See THIRD_PARTY_NOTICES.md. The rest of the file is under the PolyForm Noncommercial License 1.0.0.
 """
 Gated fusion of MVST (ICASSP 2024), a faithful port of the official gated_fusion.py / fusion.py.
 

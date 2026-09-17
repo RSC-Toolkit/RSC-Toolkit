@@ -1,3 +1,5 @@
+# Portions of this file are ported from LoRA-RSC (https://github.com/deegy666/LoRA-RSC), based on PETL_AST (https://github.com/umbertocappellazzo/PETL_AST), which does not include a license file.
+# See THIRD_PARTY_NOTICES.md. The rest of the file is under the PolyForm Noncommercial License 1.0.0.
 """
 Per-step CosineAnnealingLR, as in LoRA-RSC utils/engine_icbhi.py:34 (scheduler.step() after every optimizer.step),
 main_icbhi.py:197 CosineAnnealingLR(optimizer, T_max=len(train_loader)*epochs) (eta_min 0, no warmup).

@@ -1,3 +1,5 @@
+# Portions of this file are ported from MVST (https://github.com/wentaoheunnc/MVST), which does not include a license file.
+# See THIRD_PARTY_NOTICES.md. The rest of the file is under the PolyForm Noncommercial License 1.0.0.
 """
 MVST stage 3: dumps features with the best.pth of the 5 views and trains/evaluates the gated fusion (FuseMLP) (official save_features.py + fusion.py).
 

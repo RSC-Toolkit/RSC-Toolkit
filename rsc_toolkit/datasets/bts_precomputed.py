@@ -1,3 +1,5 @@
+# Portions of this file are ported from BTS (https://github.com/kaen2891/bts), which does not include a license file.
+# See THIRD_PARTY_NOTICES.md. The rest of the file is under the PolyForm Noncommercial License 1.0.0.
 """
 Loader for the preprocessed ICBHI tensors (training.pt / test.pt) released with the BTS paper (kaen2891/bts).
 

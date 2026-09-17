@@ -1,3 +1,5 @@
+# Portions of this file are ported from scl_icbhi2017 (https://github.com/ilyassmoummad/scl_icbhi2017), which does not include a license file.
+# See THIRD_PARTY_NOTICES.md. The rest of the file is under the PolyForm Noncommercial License 1.0.0.
 """
 SCL-metadata (Moummad & Farrugia, ICASSP 2023; arXiv 2210.16192) — exact port of the official code.
 

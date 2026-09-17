@@ -1,3 +1,5 @@
+# Portions of this file are ported from ICASSP-2025-Lungmix (https://github.com/Tigerdwgth/ICASSP-2025-Lungmix), which does not include a license file.
+# See THIRD_PARTY_NOTICES.md. The rest of the file is under the PolyForm Noncommercial License 1.0.0.
 """
 Lungmix (ICASSP 2025, Ge et al., arXiv 2501.00064) waveform mixing augmentation.
 

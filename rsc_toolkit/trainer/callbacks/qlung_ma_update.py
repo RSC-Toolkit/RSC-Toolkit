@@ -1,3 +1,5 @@
+# Portions of this file are ported from QLung (https://github.com/RSC-Toolkit/QLung), which does not include a license file.
+# See THIRD_PARTY_NOTICES.md. The rest of the file is under the PolyForm Noncommercial License 1.0.0.
 """
 QLung MA (--ma_update --ma_beta 0.6): a LiveWeightAveraging subclass with **excluded prefixes**.
 

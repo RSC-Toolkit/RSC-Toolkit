@@ -1,3 +1,5 @@
+# Portions of this file are ported from Lung-SRAD (https://github.com/RSC-Toolkit/Lung-SRAD), which does not include a license file.
+# See THIRD_PARTY_NOTICES.md. The rest of the file is under the PolyForm Noncommercial License 1.0.0.
 """
 Lung-SRAD (Interspeech 2026, arXiv 2606.11922; RSC-Toolkit/Lung-SRAD d28d783) — DASS-medium(VMamba-S v2) + Spectral-Aware
 Regularization (Gaussian blur hook) + Dual-Axis Patch-Mix CL, exact port of the official code.

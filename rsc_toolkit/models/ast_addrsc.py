@@ -1,3 +1,5 @@
+# Portions of this file are ported from ADD-RSC (https://github.com/deegy666/ADD-RSC), which does not include a license file.
+# See THIRD_PARTY_NOTICES.md. The rest of the file is under the PolyForm Noncommercial License 1.0.0.
 """
 ADD-RSC (Interspeech 2025, deegy666/ADD-RSC e2b0f82) — adaptive differential denoising layer + AST classifier, faithful port
 of the official code (exact port of the official code, verified against goldens).

@@ -1,3 +1,5 @@
+# Portions of this file are ported from scl_icbhi2017 (https://github.com/ilyassmoummad/scl_icbhi2017), which does not include a license file.
+# See THIRD_PARTY_NOTICES.md. The rest of the file is under the PolyForm Noncommercial License 1.0.0.
 """
 SpecAugment from the SCL-metadata repository, ported as-is from augmentations.py (torchaudio iid masking, fill value 0).
 

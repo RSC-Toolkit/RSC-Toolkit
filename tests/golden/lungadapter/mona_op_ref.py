@@ -1,8 +1,10 @@
+# Portions of this file are ported from Mona (https://github.com/Leiyi-Hu/mona), which does not include a license file.
+# See THIRD_PARTY_NOTICES.md. The rest of the file is under the PolyForm Noncommercial License 1.0.0.
 """
 MonaOp reference implementation from Mona (arXiv 2311.15010, [22] in LungAdapter); golden for the conv part of the LungAdapter Attention-Adapter, Eq. (6)-(7).
 
 Source: https://github.com/Leiyi-Hu/mona  Swin-Transformer-Classification/mmcls/models/backbones/swin_transformer_mona.py (class MonaOp)
-      License: MIT (original file header "Copyright (c) 2021 Microsoft, Licensed under The MIT License"; the Mona repository LICENSE is also MIT)
+      License: the original file header reads "Copyright (c) 2021 Microsoft, Licensed under The MIT License"; the Mona repository root has no license file.
       Copy: only the MonaOp class, verbatim (mmcv dependency removed).
 """
 import torch.nn as nn

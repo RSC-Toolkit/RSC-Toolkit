@@ -1,3 +1,5 @@
+# Portions of this file are ported from LoRA-RSC (https://github.com/deegy666/LoRA-RSC), based on PETL_AST (https://github.com/umbertocappellazzo/PETL_AST), which does not include a license file.
+# See THIRD_PARTY_NOTICES.md. The rest of the file is under the PolyForm Noncommercial License 1.0.0.
 """
 LoRA-RSC (ICASSP 2025, deegy666/LoRA-RSC d1f0653) — ICBHI classifier adding LoRA to the K/V projections of HF AST (AudioSet 10/10),
 faithful port of the official code (exact port of the official code, verified against goldens).

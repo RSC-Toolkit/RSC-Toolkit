@@ -1,3 +1,5 @@
+# Portions of this file are ported from QLung (https://github.com/RSC-Toolkit/QLung), which does not include a license file.
+# See THIRD_PARTY_NOTICES.md. The rest of the file is under the PolyForm Noncommercial License 1.0.0.
 """
 AST of QLung (Interspeech 2026) — faithful port of the official code (RSC-Toolkit/QLung 46408dd) (exact port of the official code, verified against goldens).
 

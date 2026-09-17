@@ -1,3 +1,5 @@
+# Portions of this file are ported from BTS (https://github.com/kaen2891/bts), which does not include a license file.
+# See THIRD_PARTY_NOTICES.md. The rest of the file is under the PolyForm Noncommercial License 1.0.0.
 """
 Metadata-text fusion CLAP from the BTS paper (Interspeech 2024) — exact port of the official code.
 

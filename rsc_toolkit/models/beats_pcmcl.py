@@ -1,3 +1,5 @@
+# Portions of this file are ported from PC-MCL (https://github.com/wa976/PC-MCL), which does not include a license file.
+# See THIRD_PARTY_NOTICES.md. The rest of the file is under the PolyForm Noncommercial License 1.0.0.
 """
 BEATs model of PC-MCL (arXiv 2601.17080; wa976/PC-MCL) — exact port of the official code. Backbone of the main result (65.37).
 

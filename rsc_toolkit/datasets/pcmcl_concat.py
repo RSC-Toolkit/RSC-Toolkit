@@ -1,3 +1,5 @@
+# Portions of this file are ported from PC-MCL (https://github.com/wa976/PC-MCL), which does not include a license file.
+# See THIRD_PARTY_NOTICES.md. The rest of the file is under the PolyForm Noncommercial License 1.0.0.
 """
 Training dataset of PC-MCL (arXiv 2601.17080; official code wa976/PC-MCL util/dataset_pcmcl.py ConcatenationMultilabelDataset)
 -- keeps respiratory cycles at original length + dynamic concatenation at __getitem__ time (11 combinations) + PM (patient matching) pair generation.
