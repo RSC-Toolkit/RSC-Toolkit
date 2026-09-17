@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-논문 weight 공개 묶음 만들기 + 공개 대장(docs/paper/weights_manifest.csv) 갱신.
+논문 weight 공개 묶음 만들기 + 공개 대장(weights_manifest.csv) 갱신.
 
 run 하나당 폴더 하나: best.pth · best.json · .hydra/config.yaml(+overrides.yaml) · README.txt · sha256.txt
 → 이 폴더를 그대로 `rsc-toolkit-eval <폴더> --project-root <clone>` 로 재평가할 수 있다(설정 스냅샷이 동봉되므로 outputs/ 가 없어도 된다).
@@ -33,7 +33,7 @@ import sys
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 MASTER = ROOT / "docs" / "results_master.csv"
-MANIFEST = ROOT / "docs" / "paper" / "weights_manifest.csv"
+MANIFEST = ROOT / "weights_manifest.csv"
 URL_PLACEHOLDER = "[Google Drive]"
 FIELDS = ["run", "family", "dataset", "model", "config_name", "S_p", "S_e", "icbhi_score", "epoch",
           "best_pth_sha256", "best_pth_bytes", "bundle_sha256", "url"]
@@ -127,7 +127,7 @@ def bundle(row: dict, out: pathlib.Path, master_rows: list[dict] | None = None, 
         f"Files: best.pth (model state_dict under key 'model'), best.json (metrics at the saved epoch), {snapshot_note}.\n"
         "Re-evaluate (from a git clone of RSC-Toolkit, dataset downloaded and indexed):\n"
         f"  rsc-toolkit-eval <this folder> --project-root <clone> --override data.params.data_dir=<dataset dir>\n"
-        "See docs/TUTORIAL.md.\n")
+        "See TUTORIAL.md.\n")
     files = sorted(p for p in tmp.rglob("*") if p.is_file() and p.name != "sha256.txt")
     lines = [f"{sha256(p)}  {p.relative_to(tmp).as_posix()}" for p in files]
     (tmp / "sha256.txt").write_text("\n".join(lines) + "\n")
@@ -236,7 +236,7 @@ def write_index(out: pathlib.Path, made: list[tuple[str, pathlib.Path, dict]]) -
     for (ds, f) in sorted(fam):
         rs = fam[(ds, f)]
         L.append(f"| {ds} | `{f}` | {len(rs)} | {sum(float(r['best_pth_MB']) for r in rs)/1e3:.2f} GB |")
-    L += ["", "Re-evaluate a bundle: `rsc-toolkit-eval <run folder> --project-root <clone> --override data.params.data_dir=<dataset dir>` (docs/TUTORIAL.md).",
+    L += ["", "Re-evaluate a bundle: `rsc-toolkit-eval <run folder> --project-root <clone> --override data.params.data_dir=<dataset dir>` (TUTORIAL.md).",
           "MVST: the `*-fusion-s<k>` folder holds the fusion MLP; the five `*-v{16,32,64,128,256}-s<k>` view bundles of the same seed are required (scripts/verify_paper_weights.py)."]
     (out / "README.md").write_text("\n".join(L) + "\n")
 

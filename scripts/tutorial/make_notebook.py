@@ -34,7 +34,7 @@ cells.append(md(r"""
 
 **준비**: Python ≥ 3.9 (권장 3.11), 저장소 clone 뒤 `pip install -e ".[trainer,models,notebook]"`
 (논문과 같은 핀으로 맞추려면 `pip install -r requirements-lock.txt`). 패키지만 설치해 자기 모델을 붙이는 경로는
-`docs/TUTORIAL.md` 의 "패키지 설치" 절을 보라.
+`TUTORIAL.md` 의 "패키지 설치" 절을 보라.
 
 환경변수로 동작을 바꿀 수 있다: `RSC_TUTORIAL_QUICK=1` → Part B 를 건너뛴다(CI 가 이렇게 돈다). `RSC_TUTORIAL_WORK` → 작업 디렉터리(기본 `<clone>/outputs/tutorial`). `RSC_TUTORIAL_ROOT` → 저장소 루트를 직접 지정.
 """))
@@ -267,7 +267,7 @@ cells.append(md(r"""
 ### B-3. 공개된 논문 weight 재평가
 
 논문 표의 weight 는 run 묶음(`best.pth` · `best.json` · `.hydra/config.yaml`)으로 공개된다. 목록과 링크는
-`docs/paper/weights_manifest.csv` 에 있고 `scripts/download_paper_weights.py`(gdown, `notebook` extra 에 포함)가 받아서 sha256 을 대조한다.
+`weights_manifest.csv` 에 있고 `scripts/download_paper_weights.py`(gdown, `notebook` extra 에 포함)가 받아서 sha256 을 대조한다.
 링크(Drive 폴더 링크: run 폴더 자체 또는 run 폴더들을 담은 상위 폴더)가 아직 `[Google Drive]` 자리표시자면 안내만 나온다 — 그때는 묶음을 직접 `WORK/paper_weights/<run>/` 에 두면 된다.
 
 받은 묶음은 설정 스냅샷을 품고 있으므로 `rsc-toolkit-eval <묶음> --override data.params.data_dir=<내 ICBHI 경로>` 로

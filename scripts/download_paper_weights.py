@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-공개된 논문 weight 내려받기 — docs/paper/weights_manifest.csv 의 url 로 묶음(best.pth·best.json·.hydra/·sha256.txt)을 받고
+공개된 논문 weight 내려받기 — weights_manifest.csv 의 url 로 묶음(best.pth·best.json·.hydra/·sha256.txt)을 받고
 sha256.txt 의 모든 항목과 대장의 best_pth_sha256 을 대조한다. url 은 Google Drive **폴더 링크**(…/folders/<id>)로,
 run 폴더 자체이거나 여러 run 폴더를 담은 **상위 폴더**여도 된다(상위 폴더면 <run>/ 아래 파일만 골라 받는다).
 
@@ -21,7 +21,7 @@ import pathlib
 import sys
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
-MANIFEST = ROOT / "docs" / "paper" / "weights_manifest.csv"
+MANIFEST = ROOT / "weights_manifest.csv"
 URL_PLACEHOLDER = "[Google Drive]"
 
 
@@ -128,7 +128,7 @@ def main() -> int:
                 print(f"{run}: 이미 있음, sha256 전부 일치 → {dst}"); continue
             print(f"{run}: 기존 폴더 {dst} 가 대장과 다르다 ({problem}) — 다시 받는다")
         if r["url"] == URL_PLACEHOLDER or not r["url"]:
-            print(f"{run}: 아직 공개 링크가 없다(대장 url={r['url']!r}). 링크가 생기면 docs/paper/weights_manifest.csv 의 url 을 채우고 다시 실행하라. "
+            print(f"{run}: 아직 공개 링크가 없다(대장 url={r['url']!r}). 링크가 생기면 weights_manifest.csv 의 url 을 채우고 다시 실행하라. "
                   f"묶음이 손에 있으면 {dst}/ 에 직접 두어도 된다.")
             rc = max(rc, 2); continue
         if "/folders/" not in r["url"]:

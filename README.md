@@ -12,8 +12,8 @@ Respiratory Sound Classification Toolkit — **ICBHI 2017** 과 **SPRSound** 위
 ## 처음이라면 — 튜토리얼
 
 설치 → toy 데이터 학습 → 재평가 → **자기 모델 등록**(CPU, 수 분) → ICBHI 실데이터 1 epoch → **공개 논문 weight 재평가**(GPU) 를
-한 번에 따라 하는 최소 경로: [`docs/TUTORIAL.md`](docs/TUTORIAL.md) (노트북 판 [`notebooks/tutorial.ipynb`](notebooks/tutorial.ipynb),
-자동 실행 `scripts/tutorial/run_tutorial.sh`). 공개 weight 목록은 [`docs/paper/weights_manifest.csv`](docs/paper/weights_manifest.csv).
+한 번에 따라 하는 최소 경로: [`TUTORIAL.md`](TUTORIAL.md) (노트북 판 [`notebooks/tutorial.ipynb`](notebooks/tutorial.ipynb),
+자동 실행 `scripts/tutorial/run_tutorial.sh`). 공개 weight 목록은 [`weights_manifest.csv`](weights_manifest.csv).
 
 ## 설치
 
@@ -70,7 +70,7 @@ run 디렉터리의 hydra 스냅샷으로 학습 때와 같은 팩토리에서 �
 
 모든 재현은 `scripts/train.sh <config> [override…]` 한 줄이다. `<config>` 가 논문(모델 계열)과 데이터셋을 정하고,
 같은 config 안의 변형(백본·method·뷰)은 override 로 고른다. 결과는 `outputs/<계열>/<run.name>/best.pth·best.json`,
-재평가는 `scripts/eval.sh outputs/<계열>/<run.name>`. 아래 표의 run.name 은 논문 표(`docs/results_master.csv`)가 쓰는
+재평가는 `scripts/eval.sh outputs/<계열>/<run.name>`. 아래 표의 run.name 은 논문 표가 쓰는
 이름이며 `-s<seed>` 로 끝난다(seed 1–5). `GPU=<n>` 으로 카드를 고른다.
 
 ```bash
@@ -219,8 +219,7 @@ pytest                    # 골든 텐서 포함 전체
 
 - [`DEV.md`](DEV.md) — 개발 환경
 - [`AGENTS.md`](AGENTS.md) — 저장소 작업 규약
-- [`docs/RESULTS_BY_DATASET.md`](docs/RESULTS_BY_DATASET.md) — 데이터셋별 재현 결과와 이슈
-- [`docs/REPRODUCTION_TARGETS.md`](docs/REPRODUCTION_TARGETS.md) — 재현 대상 논문 목록과 정찰 결과
+- [`TUTORIAL.md`](TUTORIAL.md) — 설치·toy 학습·공개 weight 재평가 최소 경로
 
 ## 알려진 제약
 

@@ -207,3 +207,6 @@ pretrained_models
 .venv-ref-*/
 # rsc-toolkit-eval 기본 샌드박스 (evaluate.py; 읽기 전용 평가의 쓰기 자리)
 .rsc_eval_sandbox/
+
+# 내부 작업 문서(논문 표 원장·리뷰·검증 기록 등)는 로컬에만 둔다 — 공개 문서는 README.md·TUTORIAL.md (2026-09-17 결정)
+docs/

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 번들 toy 데이터로 소형 AST(tiny224, 사전학습 없음)를 CPU 에서 1 epoch 학습 — 설치 확인용. 전체 안내: docs/TUTORIAL.md
+# 번들 toy 데이터로 소형 AST(tiny224, 사전학습 없음)를 CPU 에서 1 epoch 학습 — 설치 확인용. 전체 안내: TUTORIAL.md
 set -euo pipefail
 ROOT=$(cd "$(dirname "$0")/.." && pwd); cd "$ROOT"
 PY=${PY:-$ROOT/.venv/bin/python}; [ -x "$PY" ] || PY=$(command -v python3)   # venv 가 PATH 에 없어도 동작
