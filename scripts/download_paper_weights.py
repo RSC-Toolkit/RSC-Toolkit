@@ -99,7 +99,9 @@ def download_run(url: str, run: str, dst: pathlib.Path) -> str | None:
     files, err = None, None
     for attempt in range(1, ATTEMPTS + 1):          # Google Drive sometimes answers a large folder listing with HTTP 500
         try:
-            files = gdown.download_folder(id=_folder_id(url), output=str(listing_base) + os.sep, skip_download=True, quiet=True)
+            files = _with_elapsed_time(
+                f"{run}: reading the Drive folder listing (a shared parent folder takes several minutes)",
+                lambda: gdown.download_folder(id=_folder_id(url), output=str(listing_base) + os.sep, skip_download=True, quiet=True))
             break
         except Exception as exc:                    # permissions (link not shared) or network
             err = f"{type(exc).__name__}: {str(exc)[:200]}"
@@ -121,21 +123,57 @@ def download_run(url: str, run: str, dst: pathlib.Path) -> str | None:
     if problem:
         return problem
     dst.mkdir(parents=True, exist_ok=True)
-    for fid, parts in wanted:
-        if not parts:
-            continue
+    wanted = [(fid, parts) for fid, parts in wanted if parts]
+    for i, (fid, parts) in enumerate(wanted, 1):
+        rel = "/".join(parts)
         local = dst.joinpath(*parts)
         local.parent.mkdir(parents=True, exist_ok=True)
-        got = None
+        print(f"{run}: [{i}/{len(wanted)}] {rel}", flush=True)
+        got, err = None, None
         for attempt in range(1, ATTEMPTS + 1):
-            got = gdown.download(id=fid, output=str(local), quiet=True)
+            try:                                     # gdown raises (e.g. FileURLRetrievalError) when Drive refuses the request
+                got = gdown.download(id=fid, output=str(local), quiet=False)   # quiet=False shows gdown's byte progress bar
+            except Exception as exc:
+                err = f"{type(exc).__name__}: {str(exc).splitlines()[0][:200] if str(exc) else ''}"
             if got:
                 break
             if attempt < ATTEMPTS:
+                print(f"{run}: {rel} failed (attempt {attempt}/{ATTEMPTS}); retrying in {RETRY_WAIT_S} s", flush=True)
                 time.sleep(RETRY_WAIT_S)
         if not got:
-            return f"{'/'.join(parts)} download failed"
+            return f"{rel} download failed after {ATTEMPTS} attempts{': ' + err if err else ''}"
     return None
+
+
+def _with_elapsed_time(label: str, fn):
+    """Run fn() while printing the elapsed time, so a long silent step (the Drive folder listing) visibly makes progress."""
+    import threading
+
+    result, error = {}, {}
+
+    def target():
+        try:
+            result["value"] = fn()
+        except BaseException as exc:                 # re-raised in the caller's thread
+            error["exc"] = exc
+
+    worker = threading.Thread(target=target, daemon=True)
+    start = time.time()
+    worker.start()
+    interactive = sys.stdout.isatty()
+    while worker.is_alive():
+        worker.join(timeout=1 if interactive else 30)
+        elapsed = int(time.time() - start)
+        text = f"{label} … {elapsed // 60}m{elapsed % 60:02d}s"
+        if interactive:
+            print(f"\r{text}", end="", flush=True)
+        elif worker.is_alive():
+            print(text, flush=True)
+    elapsed = int(time.time() - start)
+    print(f"{chr(13) if interactive else ''}{label} … done in {elapsed // 60}m{elapsed % 60:02d}s", flush=True)
+    if "exc" in error:
+        raise error["exc"]
+    return result["value"]
 
 
 def main() -> int:

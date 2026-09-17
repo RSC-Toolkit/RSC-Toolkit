@@ -37,7 +37,8 @@ python "$ROOT/scripts/download_paper_weights.py" --run icbhi-cnn6-ce-s1 --out "$
 What to expect with the current downloader:
 
 - For every requested run, the script first reads the listing of the whole shared folder (about 740 subfolders). This takes
-  about 6 minutes per run; the files themselves then download quickly (350 MB in about 30 s).
+  about 6 minutes per run and the script shows the elapsed time meanwhile; the files then download quickly (350 MB in about
+  30 s), each with a progress bar (`[4/6] best.pth` followed by the byte count).
 - After many requests Google Drive may refuse for a while (`status code 500 … have had many accesses`, or
   `… but Gdown can't. Please check connections and permissions`). Wait and run the same command again, or download in the
   browser as in example 2.
