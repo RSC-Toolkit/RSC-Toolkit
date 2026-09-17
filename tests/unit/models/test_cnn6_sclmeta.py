@@ -1,7 +1,7 @@
 """
-SCL-metadata 묶음(CE·SCL·Hybrid·M-SCL, CNN6)의 P0 골든 테스트.
+Official-code parity golden tests for the SCL-metadata group (CE, SCL, Hybrid, M-SCL; CNN6).
 
-골든 출처: scripts/reproduction/dump_sclmeta_goldens.py — 공식 ilyassmoummad/scl_icbhi2017 코드를 우리 venv 에서 실행.
+Golden source: scripts/reproduction/dump_sclmeta_goldens.py — the official ilyassmoummad/scl_icbhi2017 code run in our venv.
 """
 import json
 import pathlib
@@ -19,22 +19,22 @@ def _repo_root() -> pathlib.Path:
     for c in pathlib.Path(__file__).resolve().parents:
         if (c / "pyproject.toml").exists():
             return c
-    raise RuntimeError("리포 루트를 찾지 못했다")
+    raise RuntimeError("repository root not found")
 
 
 REPO = _repo_root()
 GOLDEN = REPO / "tests" / "golden" / "sclmeta"
 DATA = REPO / ".datasets" / "icbhi"
 PANN = REPO / "pretrained_models" / "upstream" / "Cnn6_mAP=0.343.pth"
-needs_golden = pytest.mark.skipif(not (GOLDEN / "features.pt").exists(), reason="골든 없음")
-needs_data = pytest.mark.skipif(not (DATA / "index" / "index_cycle.csv").exists(), reason="ICBHI 인덱스 없음")
-needs_pann = pytest.mark.skipif(not PANN.exists(), reason="PANN Cnn6 ckpt 없음")
+needs_golden = pytest.mark.skipif(not (GOLDEN / "features.pt").exists(), reason="golden missing")
+needs_data = pytest.mark.skipif(not (DATA / "index" / "index_cycle.csv").exists(), reason="ICBHI index missing")
+needs_pann = pytest.mark.skipif(not PANN.exists(), reason="PANN Cnn6 ckpt missing")
 
 
 @needs_golden
 @needs_data
 def test_audio_pipeline_matches_reference():
-    """구간 로드→리샘플→fade in/out→순환 패딩→fade_out (dataset.py:93-124) 이 IndexDataset 경로와 비트 일치."""
+    """Segment load -> resample -> fade in/out -> circular padding -> fade_out (dataset.py:93-124) is bit-identical to the IndexDataset path."""
     from rsc_toolkit.datasets.index_dataset import IndexDataset
     from rsc_toolkit.processors.audio import AudioPreprocessConfig, AudioPreprocessor
 
@@ -52,7 +52,7 @@ def test_audio_pipeline_matches_reference():
 
 
 @needs_golden
-@pytest.mark.exact_golden  # 비트 단위 비교 — 개발 머신 전용 (CI 러너마다 CPU 가 달라 마지막 자리에서 어긋난다)
+@pytest.mark.exact_golden  # bitwise comparison — dev machine only (CPUs differ across CI runners, so the last digits diverge)
 def test_feature_stages_match_reference():
     g = torch.load(GOLDEN / "features.pt")
     proc = SCLMetaMelProcessor()
@@ -78,7 +78,7 @@ def test_cnn6_embedding_matches_reference():
         emb = m.forward_features(g["val"])
     assert torch.allclose(emb, c["emb"], atol=1e-6), float((emb - c["emb"]).abs().max())
     ours = {k: list(v.shape) for k, v in m.encoder.state_dict().items()}
-    # 원본 embed_only 모델 키는 접두어(예: cnn6.) 뒤에 conv_block* 가 오고, 미사용 linear.* 2 키가 더 있다(26 키)
+    # original embed_only model keys have a prefix (e.g. cnn6.) followed by conv_block*, plus 2 unused linear.* keys (26 keys)
     ref = {k[k.index("conv_block"):]: v for k, v in c["state_dict_shapes"].items() if "conv_block" in k}
     assert ours == ref and len(c["state_dict_shapes"]) == 26
 
@@ -141,12 +141,12 @@ def test_specaugment_gate_uses_randn_quirk():
     x = torch.rand(64, 1, 64, 251)
     torch.manual_seed(0)
     applied = sum(int(not torch.equal(sa(x), x)) for _ in range(200))
-    assert 140 < applied < 195  # p=1.0 인데 randn 게이트라 ≈84%
+    assert 140 < applied < 195  # p=1.0, but the randn gate gives ≈84%
 
 
 @needs_data
 def test_segment_loading_equals_full_load_then_slice():
-    """frame_offset/num_frames 구간 로드가 전체 로드 후 슬라이스와 동일한 샘플을 준다 (경계 포함)."""
+    """frame_offset/num_frames segment loading yields the same samples as a full load followed by slicing (including boundaries)."""
     import torchaudio
     from rsc_toolkit.datasets.icbhi.processing import slice_audio
     from rsc_toolkit.datasets.index_dataset import IndexDataset

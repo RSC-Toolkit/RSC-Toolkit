@@ -1,6 +1,6 @@
-# Domain Transfer(ICASSP 2022) ICBHI 데이터 — 8 kHz 리샘플 → 사이클 분할 → circular padding 8 s
-# (+ 학습만: 클래스별 splice 샘플 · 파형 증강 3종). 논문 §2.1·§3.2, 공식 60/40 스플릿.
-# 모델이 스펙트로그램을 내부에서 계산하므로 파형을 그대로 넘긴다(kind: waveform, 캐시 없음).
+# Domain Transfer (ICASSP 2022) ICBHI data — resample to 8 kHz → split into cycles → circular padding to 8 s
+# (+ training only: per-class splice samples · 3 waveform augmentations). Paper §2.1·§3.2, official 60/40 split.
+# The model computes the spectrogram internally, so the waveform is passed as is (kind: waveform, no cache).
 name: icbhi_domaintransfer
 params:
   datamodule_name: domaintransfer
@@ -9,20 +9,20 @@ params:
   project_root: ${hydra:runtime.cwd}
   split_file: rsc_toolkit/datasets/icbhi/data/official_split.txt
   data_dir: .datasets/icbhi
-  sampling_rate: 8000        # 논문 §3.2
+  sampling_rate: 8000        # paper §3.2
   sample_level: cycle
-  desired_length_sec: null   # 길이 고정은 DTIndexDataset 이 담당(circular padding, test 에도 적용)
-  fade: false                # 논문에 없음 (툴킷 기본 sr/16 페이드를 끔)
-  target_len: 64000          # 8 s @8 kHz — 논문 "about 8 seconds"
-  splice_per_class: 500      # 가정: 논문은 "same number" 만 기재하고 개수는 미기재
-  aug_prob: 0.5              # 가정: 적용 확률 미기재
-  use_noise: true            # 백색잡음만 (환경잡음 미적용 — 사용자 결정 2026-08-30)
+  desired_length_sec: null   # DTIndexDataset fixes the length (circular padding, also applied to test)
+  fade: false                # not in the paper (disables the toolkit default sr/16 fade)
+  target_len: 64000          # 8 s @8 kHz — paper: "about 8 seconds"
+  splice_per_class: 500      # Assumption: the paper states only "same number", not the count
+  aug_prob: 0.5              # Assumption: application probability not specified
+  use_noise: true            # white noise only (environmental noise not applied)
   use_stretch: true
   use_pitch: true
   train_splits: [train]
   val_splits: [test]
   test_splits: [test]
-  batch_size: 64             # 논문 §3.2
+  batch_size: 64             # paper §3.2
   num_workers: 8
   shuffle_train: true
   drop_last_train: false
@@ -32,4 +32,4 @@ params:
     kind: waveform
   feature_precompute: false
   specaugment:
-    enabled: false           # 논문 증강은 전부 파형·스펙트로그램 단계에서 직접 처리
+    enabled: false           # all paper augmentations are handled directly at the waveform/spectrogram stage

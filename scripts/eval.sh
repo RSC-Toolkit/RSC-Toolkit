@@ -1,20 +1,20 @@
 #!/bin/bash
-# 학습된 weight(outputs/<계열>/<run>/best.pth) 를 불러 test 를 다시 돌린다 — rsc-toolkit-eval 의 얇은 셸 래퍼.
+# Loads trained weights (outputs/<family>/<run>/best.pth) and re-runs the test set — a thin shell wrapper around rsc-toolkit-eval.
 #
-#   scripts/eval.sh <run-dir> [rsc-toolkit-eval 옵션...]
+#   scripts/eval.sh <run-dir> [rsc-toolkit-eval options...]
 #
-#   예) scripts/eval.sh outputs/patchmix/icbhi-patchmix-ce-s1                     # best.json 과 자동 대조 (PASS/MISMATCH)
-#       GPU=2 scripts/eval.sh outputs/qlung/icbhi-qlung-s1 --override data.params.batch_size=16 --out eval.json
-#       scripts/eval.sh outputs/m2d/icbhi-m2dx-s5-s1 --hydra-dir outputs/2026-08-27/10-12-33     # 스냅샷 직접 지정
+#   e.g. scripts/eval.sh outputs/patchmix/icbhi-patchmix-ce-s1                   # compared against best.json automatically (PASS/MISMATCH)
+#        GPU=2 scripts/eval.sh outputs/qlung/icbhi-qlung-s1 --override data.params.batch_size=16 --out eval.json
+#        scripts/eval.sh outputs/m2d/icbhi-m2dx-s5-s1 --hydra-dir outputs/2026-08-27/10-12-33     # explicit snapshot
 #
-# 설정은 그 run 의 hydra 스냅샷(run.name 이 같은 outputs/<날짜>/<시각>/.hydra)을 자동으로 찾아 학습 때와 같은 팩토리로
-# 모델·데이터를 다시 세우고 strict 로드 → validate. 학습 산출물은 읽기만 하고(쓰기는 샌드박스), best.json 이 있으면 대조한다.
+# The config comes from the run's hydra snapshot (outputs/<date>/<time>/.hydra with the same run.name), found automatically; the model
+# and data are rebuilt with the same factories as in training, then strict load -> validate. Training outputs are read only (writes go to the sandbox); best.json is compared if present.
 #
-# 환경변수: GPU(기본: 환경의 CUDA_VISIBLE_DEVICES, 없으면 0) · PY(기본 .venv/bin/python) · SANDBOX(기본 /tmp/rsc_eval_sandbox_<uid>) · THREAD_CAP(기본 1)
+# Environment variables: GPU (default: CUDA_VISIBLE_DEVICES from the environment, else 0) · PY (default .venv/bin/python) · SANDBOX (default /tmp/rsc_eval_sandbox_<uid>) · THREAD_CAP (default 1)
 set -euo pipefail
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 PY=${PY:-$ROOT/.venv/bin/python}
-GPU=${GPU:-${CUDA_VISIBLE_DEVICES:-0}}   # GPU 미지정이면 환경의 CUDA_VISIBLE_DEVICES 를 존중 (예전엔 항상 0 으로 덮었다)
+GPU=${GPU:-${CUDA_VISIBLE_DEVICES:-0}}   # if GPU is unset, respect CUDA_VISIBLE_DEVICES from the environment
 SANDBOX=${SANDBOX:-${TMPDIR:-/tmp}/rsc_eval_sandbox_$(id -u)}
 if [ $# -lt 1 ]; then
   sed -n 2,14p "$0"; exit 1

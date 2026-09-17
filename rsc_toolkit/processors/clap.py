@@ -36,7 +36,7 @@ class CLAPProcessor(BaseAudioProcessor):
 
     @classmethod
     def from_options(cls, opts, *, sampling_rate, feature_cache):
-        # 예전 IndexDataModule._build_feature_processor 의 kind=="clap" 분기와 같은 생성 인자
+        # constructor arguments for kind=="clap"
         return cls(sampling_rate=sampling_rate, model_name=opts["clap_model_name"], feature_cache=feature_cache)
 
     def get_processor_config(self) -> Dict[str, Any]:
@@ -55,10 +55,10 @@ class CLAPProcessor(BaseAudioProcessor):
         Audio should be shape [channels, samples] or [samples]
         """
         assert len(audio.shape) == 1, f"Got unexpected shape: {audio.shape}"
-        # transformers 의 ClapFeatureExtractor 는 **torch 1-D 텐서를 2-D(배치)로 오인**해
-        # 샘플 수 × 샘플 수 크기의 배열을 만들려다 MemoryError 를 낸다(48 kHz·8 s 면 3 TiB 요구).
-        # numpy 1-D 로 넘기면 정상 경로를 탄다. 이 우회는 SPRSound OOD 경로(datasets/sprsound_ood.py)
-        # 에서 먼저 쓰였고, 그 결과가 BTS 저자 배포 텐서와 비트 단위로 일치함을 ICBHI 에서 확인했다.
+        # transformers' ClapFeatureExtractor **mistakes a torch 1-D tensor for a 2-D batch** and tries to
+        # allocate a samples × samples array, raising MemoryError (3 TiB for 48 kHz, 8 s).
+        # Passing a numpy 1-D array takes the normal path. The same workaround is used in the SPRSound OOD path
+        # (datasets/sprsound_ood.py); its output is bit-identical to the tensors released by the BTS authors on ICBHI.
         feats = self.processor(audio=audio.detach().cpu().numpy(), return_tensors="pt", padding=True)["input_features"]
         return feats
     

@@ -1,4 +1,4 @@
-"""DDE-MAE 1단계 손실 분해(recon / siamese / mi) 로깅 — 모델이 training_forward 에서 남긴 last_losses 를 step·epoch 단위로 기록한다."""
+"""Logs the DDE-MAE stage-1 loss breakdown (recon / siamese / mi): records the last_losses left by the model's training_forward per step and per epoch."""
 import lightning as L
 
 

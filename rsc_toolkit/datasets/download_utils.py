@@ -16,26 +16,26 @@ import urllib3
 logger = logging.getLogger(__name__)
 
 
-# 연결은 빨리 포기하되, 데이터가 흐르는 중에는 넉넉히 기다린다.
-# (ICBHI 배포 서버는 응답이 느려 read timeout 30초로는 자주 끊긴다)
+# Give up on connecting quickly, but wait generously while data is flowing.
+# (the ICBHI distribution server responds slowly and a 30 s read timeout often drops the connection)
 DEFAULT_CONNECT_TIMEOUT = 30
 DEFAULT_READ_TIMEOUT = 120
 DEFAULT_MAX_RETRIES = 5
 DEFAULT_CHUNK_SIZE = 1024 * 1024
 
-# 받는 중인 파일은 최종 경로가 아니라 이 접미사를 붙인 임시 경로에 쓴다.
-# 그래야 "파일이 있다 = 다 받았다" 가 성립한다.
+# A file being downloaded is written to a temporary path with this suffix, not to the final path,
+# so that "the file exists" implies "the download is complete".
 PART_SUFFIX = ".part"
 
 PathLike = Union[str, os.PathLike]
 
 
 class DownloadError(RuntimeError):
-    """다운로드가 재시도 후에도 끝내 완료되지 못했을 때."""
+    """Raised when a download cannot be completed even after retries."""
 
 
 def _open_stream(url: str, *, headers: dict, connect_timeout: float, read_timeout: float):
-    """SSL 검증을 먼저 시도하고, 인증서가 깨져 있으면 검증 없이 재시도한다."""
+    """Try with SSL verification first; retry without verification if the certificate is broken."""
     try:
         return requests.get(
             url,
@@ -44,7 +44,7 @@ def _open_stream(url: str, *, headers: dict, connect_timeout: float, read_timeou
             timeout=(connect_timeout, read_timeout),
         )
     except requests.exceptions.SSLError:
-        logger.warning("⚠️ SSL 오류. 인증서 검증 없이 재시도한다: %s", url)
+        logger.warning("⚠️ SSL error. Retrying without certificate verification: %s", url)
         urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
         return requests.get(
             url,
@@ -67,27 +67,27 @@ def download_file(
     read_timeout: float = DEFAULT_READ_TIMEOUT,
 ) -> pathlib.Path:
     """
-    파일을 내려받는다. 중단되면 이어받고, 다 받은 뒤에만 최종 경로로 옮긴다.
+    Download a file. Resume after interruptions and move to the final path only once complete.
 
     Args:
-        expected_size: 알고 있는 정확한 바이트 수. 주면 완료 후 대조한다.
-        max_retries: 연결/읽기 오류 시 재시도 횟수.
-        resume: 서버가 Range 를 지원하면 남은 부분만 이어받는다.
+        expected_size: exact byte count, if known. Checked after completion.
+        max_retries: number of retries on connection/read errors.
+        resume: resume only the remaining part if the server supports Range.
 
     Returns:
-        완성된 파일 경로.
+        Path of the completed file.
 
     Raises:
-        DownloadError: 재시도를 모두 소진했거나 크기가 기대치와 다를 때.
+        DownloadError: when all retries are exhausted or the size does not match the expected value.
     """
-    logger.info("다운로드 시작: %s -> %s", url, out_path)   # 막힌 망에서 오래 침묵하지 않도록 첫 시도 전에 남긴다
+    logger.info("Starting download: %s -> %s", url, out_path)   # logged before the first attempt so a blocked network does not stay silent
     out = pathlib.Path(out_path)
     out.parent.mkdir(parents=True, exist_ok=True)
     part = out.with_name(out.name + PART_SUFFIX)
 
     if out.exists() and expected_size is not None and out.stat().st_size != expected_size:
         logger.warning(
-            "기존 파일 크기가 기대치와 다르다 (%d != %d). 다시 받는다: %s",
+            "Existing file size does not match expected (%d != %d). Re-downloading: %s",
             out.stat().st_size,
             expected_size,
             out,
@@ -112,8 +112,8 @@ def download_file(
                 read_timeout=read_timeout,
             ) as r:
                 if r.status_code == 416:
-                    # 이미 다 받은 상태에서 Range 를 요청한 경우.
-                    logger.info("서버가 416 을 반환했다. 받은 내용을 완료로 본다: %s", out.name)
+                    # Range was requested although the file is already complete.
+                    logger.info("Server returned 416. Treating the received content as complete: %s", out.name)
                     break
 
                 r.raise_for_status()
@@ -121,8 +121,8 @@ def download_file(
                 remaining = int(r.headers.get("content-length", 0)) or None
 
                 if downloaded and r.status_code != 206:
-                    # 서버가 Range 를 무시하고 전체를 다시 보냈다.
-                    logger.warning("서버가 이어받기를 지원하지 않는다. 처음부터 받는다: %s", out.name)
+                    # The server ignored Range and resent the whole file.
+                    logger.warning("Server does not support resuming. Downloading from the start: %s", out.name)
                     downloaded = 0
 
                 total = (remaining + downloaded) if remaining is not None else None
@@ -143,7 +143,7 @@ def download_file(
                         f.write(chunk)
                         pbar.update(len(chunk))
 
-            # 스트림이 끝까지 왔으면 완료로 본다.
+            # If the stream reached its end, treat the download as complete.
             break
 
         except (requests.exceptions.RequestException, OSError) as exc:
@@ -151,12 +151,12 @@ def download_file(
             got = part.stat().st_size if part.exists() else 0
             if attempt >= max_retries:
                 raise DownloadError(
-                    f"{max_retries}회 시도 후에도 다운로드 실패: {url} "
-                    f"(현재 {got} bytes, 이어받기 파일 {part})"
+                    f"Download failed after {max_retries} attempts: {url} "
+                    f"(currently {got} bytes, partial file {part})"
                 ) from exc
             backoff = min(2 ** (attempt - 1), 30)
             logger.warning(
-                "다운로드 중단 (%d/%d회): %s — %.0f초 후 %d bytes 지점부터 이어받는다",
+                "Download interrupted (%d/%d): %s -- resuming in %.0f s from byte %d",
                 attempt,
                 max_retries,
                 exc,
@@ -166,22 +166,22 @@ def download_file(
             time.sleep(backoff)
 
     if not part.exists():
-        raise DownloadError(f"다운로드 결과 파일이 없다: {part} (원인: {last_error})")
+        raise DownloadError(f"Downloaded file not found: {part} (cause: {last_error})")
 
     size = part.stat().st_size
 
-    # 호출자가 준 기대 크기가 우선이고, 없으면 서버가 알려준 크기와 대조한다.
-    # 둘 다 없을 때만 검증 없이 받아들인다.
+    # An expected size given by the caller takes precedence; otherwise compare with the size reported by the server.
+    # Accept without verification only when neither is available.
     target = expected_size if expected_size is not None else advertised_total
     if target is not None and size != target:
         raise DownloadError(
-            f"다운로드 크기가 기대치와 다르다: {size} != {target} ({url}). "
-            f"받다 만 파일을 {part} 에 남겨두니 다시 실행하면 이어받는다."
+            f"Download size does not match expected: {size} != {target} ({url}). "
+            f"The partial file is kept at {part}; rerunning resumes the download."
         )
 
-    # 여기까지 왔을 때만 최종 경로를 차지한다.
+    # Only now does the file take the final path.
     os.replace(part, out)
-    logger.info("✅ 다운로드 완료: %s (%d bytes)", out.name, size)
+    logger.info("✅ Download complete: %s (%d bytes)", out.name, size)
     return out
 
 
@@ -202,12 +202,12 @@ def record_download_provenance(
     strict: bool = False,
 ) -> dict:
     """
-    받은 파일의 크기·sha256 을 <파일명>.provenance.json 에 기록하고,
-    알려진 값(known_*)이 있으면 대조한다.
+    Record the size and sha256 of the downloaded file in <filename>.provenance.json and
+    compare them with known values (known_*) if given.
 
-    알려진 값과 다르면 상류 배포본이 바뀐 것이다. 기본은 경고만 하고 진행한다 —
-    목적은 "어떤 데이터로 실험했는지" 를 남기는 것이지 다운로드를 막는 것이 아니다.
-    바뀐 데이터를 절대 쓰면 안 되는 상황이면 strict=True 로 DownloadError 를 받는다.
+    A mismatch with the known values means the upstream release has changed. By default this only warns and continues --
+    the goal is to record "which data the experiments used", not to block the download.
+    When changed data must never be used, pass strict=True to get a DownloadError.
     """
     p = pathlib.Path(path)
     size = p.stat().st_size
@@ -234,27 +234,27 @@ def record_download_provenance(
 
     if matches is False:
         msg = (
-            f"상류 배포본이 알려진 것과 다르다: {p.name} size={size} sha256={digest[:12]}… "
-            f"(알려진 size={known_size}, sha256={(known_sha256 or '')[:12]}…). "
-            f"데이터가 바뀌었을 수 있으니 재현 결과를 비교할 때 주의하라. 기록: {out}"
+            f"Upstream release differs from the known one: {p.name} size={size} sha256={digest[:12]}… "
+            f"(known size={known_size}, sha256={(known_sha256 or '')[:12]}…). "
+            f"The data may have changed; take care when comparing reproduction results. Record: {out}"
         )
         if strict:
             raise DownloadError(msg)
         logger.warning("⚠️ %s", msg)
     else:
-        logger.info("다운로드 출처 기록: %s", out)
+        logger.info("Recorded download provenance: %s", out)
     return record
 
 
 def is_valid_zip(zip_path: PathLike, *, deep: bool = False) -> bool:
     """
-    zip 이 끝까지 온전한지 본다.
+    Check that a zip file is complete.
 
-    zip 의 중앙 디렉토리는 파일 맨 뒤에 있다. 받다 만 zip 은 이게 없어서
-    여는 순간 걸린다. 기대 크기를 몰라도 되므로 완료 판정에 쓰기 좋고,
-    헤더만 읽으므로 2GB 짜리도 즉시 끝난다.
+    The zip central directory sits at the very end of the file. A partially downloaded zip lacks it
+    and fails as soon as it is opened. No expected size is needed, which makes this a good completeness
+    check, and only headers are read, so even a 2 GB file finishes instantly.
 
-    deep=True 면 전 항목의 CRC 까지 대조한다(느리다).
+    With deep=True, the CRC of every entry is also checked (slow).
     """
     path = pathlib.Path(zip_path)
     if not path.exists():
@@ -267,7 +267,7 @@ def is_valid_zip(zip_path: PathLike, *, deep: bool = False) -> bool:
                 return z.testzip() is None
             return True
     except (zipfile.BadZipFile, OSError) as exc:
-        logger.warning("온전하지 않은 zip: %s (%s)", path, exc)
+        logger.warning("Incomplete zip: %s (%s)", path, exc)
         return False
 
 

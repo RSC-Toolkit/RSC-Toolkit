@@ -27,9 +27,9 @@ def generate_fbank(
     per_sample_stats: bool = False,
 ) -> torch.Tensor:
     """
-    per_sample_stats=True 는 patch-mix/SG-SCL 계열 공식 코드의 비-AST 분기 재현:
-    고정 상수 대신 해당 fbank 자신의 mean/std 로 (x - mean) / (std * 2) 정규화한다.
-    (참조: kaen2891/sgscl util/icbhi_util.py generate_fbank — AST 만 고정 상수)
+    per_sample_stats=True reproduces the non-AST branch of the patch-mix/SG-SCL family official code:
+    normalizes (x - mean) / (std * 2) with the fbank's own mean/std instead of fixed constants.
+    (ref: kaen2891/sgscl util/icbhi_util.py generate_fbank — only AST uses fixed constants)
     """
     audio = _ensure_2d_audio(audio)
     fbank = torchaudio.compliance.kaldi.fbank(
@@ -50,11 +50,11 @@ def generate_fbank(
 
 
 class MelBankAudioProcessor(BaseAudioProcessor):
-    is_spectrogram = True  # kind mel/fbank — 학습 배치에 SpecAugment 허용
+    is_spectrogram = True  # kind mel/fbank — SpecAugment allowed on training batches
 
     @classmethod
     def from_options(cls, opts, *, sampling_rate, feature_cache):
-        # 예전 IndexDataModule._build_feature_processor 의 kind in {"mel","fbank"} 분기와 같은 생성 인자
+        # constructor arguments for kind in {"mel","fbank"}
         return cls(
             sampling_rate=sampling_rate,
             n_mels=opts["n_mels"],
@@ -90,7 +90,7 @@ class MelBankAudioProcessor(BaseAudioProcessor):
         super().__init__(**kwargs)
     
     def get_processor_config(self) -> Dict[str, Any]:
-        # per_sample_stats 는 캐시 키에 반드시 포함 — 정규화가 다른 피처가 섞이면 안 된다
+        # per_sample_stats must be part of the cache key — features with different normalization must not mix
         return {
             "sampling_rate": self.sampling_rate,
             "n_mels": self.n_mels,

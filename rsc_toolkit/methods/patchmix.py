@@ -1,17 +1,17 @@
 """
-Patch-Mix 논문(Interspeech 2023)의 손실 함수 — 공식 코드 충실 이식.
+Loss functions of the Patch-Mix paper (Interspeech 2023), a faithful port of the official code.
 
-출처:
-- 논문: Patch-Mix Contrastive Learning with Audio Spectrogram Transformer on
+Sources:
+- Paper: Patch-Mix Contrastive Learning with Audio Spectrogram Transformer on
   Respiratory Sound Classification (https://arxiv.org/abs/2305.14032)
-- 공식 코드: https://github.com/raymin0223/patch-mix_contrastive_learning
+- Official code: https://github.com/raymin0223/patch-mix_contrastive_learning
   method/patchmix.py, method/patchmix_cl.py (MIT, Copyright (c) Sangmin Bae)
 
-원본과의 비구조적 차이 (수학은 동일):
-- 원본은 마스크 텐서에 `.cuda()` 를 하드코딩했다. 여기서는 입력 텐서의 device 를
-  따른다 — CPU 테스트가 가능해야 P0 골든 대조를 돌릴 수 있다.
-- 원본 PatchMixConLoss.forward 는 `args` 객체에서 negative_pair 를 읽는다.
-  여기서는 생성자 인자 `negative_pair` 로 받는다 (기본 'all' = 논문 본 실험).
+Non-structural differences from the original code (the math is identical):
+- The original code hardcodes `.cuda()` on the mask tensors. Here the device of the input tensor
+  is used, so that the golden comparison can run in CPU tests.
+- The original PatchMixConLoss.forward reads negative_pair from the `args` object.
+  Here it is the constructor argument `negative_pair` (default 'all' = the paper's main experiment).
 """
 import torch
 import torch.nn as nn
@@ -19,7 +19,7 @@ import torch.nn.functional as F
 
 
 class PatchMixLoss(nn.Module):
-    """lam * CE(pred, y_a) + (1 - lam) * CE(pred, y_b). 패치 믹싱은 모델 쪽에 있다."""
+    """lam * CE(pred, y_a) + (1 - lam) * CE(pred, y_b). Patch mixing is done in the model."""
 
     def __init__(self, criterion: nn.Module):
         super().__init__()
@@ -57,9 +57,9 @@ class PatchMixConLoss(nn.Module):
         if self.negative_pair == "diff_label":
             labels_a = labels_a.contiguous().view(-1, 1)
             logits_mask = torch.ne(labels_a, labels_a.T).to(device) + (mask_a.bool() + mask_b.bool())
-            # 원본(method/patchmix_cl.py)은 여기가 in-place(`exp_logits *= ...`)인데, exp 의
-            # backward 가 자기 출력을 저장하므로 원본은 이 경로에서 backward 가 반드시
-            # RuntimeError 로 죽는다 (원본과의 유일한 의도적 차이 — 수치는 동일하다).
+            # The original code (method/patchmix_cl.py) does this in place (`exp_logits *= ...`), but exp's
+            # backward saves its own output, so backward on this path always fails with
+            # RuntimeError there (the only intentional difference from the original code; values are identical).
             exp_logits = exp_logits * logits_mask.float()
 
         log_prob = logits - torch.log(exp_logits.sum(1, keepdim=True))

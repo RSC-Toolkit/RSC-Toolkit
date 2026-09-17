@@ -83,11 +83,11 @@ class SPRSoundDatasetDownloader(BaseRSCDatasetDownloader):
             f"\t- Download and unzip archive from {self.dataset_download_url}\n"
         )
 
-        # 상류가 GitHub 의 main 브랜치 zip 이라 크기가 고정이 아니다.
-        # 대신 zip 이 온전한지로 완료를 판정한다.
+        # Upstream is the GitHub main-branch zip, so its size is not fixed.
+        # Completion is judged by zip integrity instead.
         if self.force or not is_valid_zip(self.zip_path):
             download_file(url=self.dataset_download_url, out_path=str(self.zip_path))
-            # main 브랜치 zip 은 시점마다 내용이 달라지므로, 어떤 스냅샷을 받았는지 기록해 둔다.
+            # The main-branch zip changes over time, so record which snapshot was downloaded.
             record_download_provenance(self.zip_path, url=self.dataset_download_url)
         else:
             logger.info("✅ Found %s, skipping download.", self.zip_path.name)

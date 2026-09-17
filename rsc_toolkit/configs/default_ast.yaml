@@ -6,8 +6,8 @@ defaults:
   - metrics: icbhi_metrics
   - optimizer: adam
   - trainer: default
-  # 콜백 선택: ema(기본) 또는 none. `callbacks=none` 으로 끌 수 있다.
-  # trainer 뒤에 와야 trainer.params.callbacks 를 덮어쓴다.
+  # callback choice: ema (default) or none. Disable with `callbacks=none`.
+  # must come after trainer to override trainer.params.callbacks.
   - callbacks: ema
   - _self_
 

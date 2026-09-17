@@ -1,5 +1,5 @@
 """
-LoRA-RSC(ICASSP 2025, deegy666/LoRA-RSC d1f0653) P0 골든 — 공식 코드를 README 핀 환경(transformers 4.28.1) 참조 venv 에서 실행.
+LoRA-RSC (ICASSP 2025, deegy666/LoRA-RSC d1f0653) official-code parity goldens — runs the official code in a reference venv with the README-pinned environment (transformers 4.28.1).
 
   uv venv .venv-ref-lorarsc --python 3.10
   uv pip install --python .venv-ref-lorarsc/bin/python 'torch==2.4.1+cpu' 'torchaudio==2.4.1+cpu' --index-url https://download.pytorch.org/whl/cpu
@@ -7,13 +7,13 @@ LoRA-RSC(ICASSP 2025, deegy666/LoRA-RSC d1f0653) P0 골든 — 공식 코드를 
   CUDA_VISIBLE_DEVICES= .venv-ref-lorarsc/bin/python scripts/reproduction/dump_lorarsc_goldens.py \
       --repo outputs/reference/lorarsc --hf pretrained_models/upstream/hf/ast-finetuned-audioset-10-10-0.4593 --out tests/golden/lorarsc
 
-골든 내용:
-  features.pt : 원본 dataset/icbhi.py get_sample/get_dataset 체인(구간 로드→16k 리샘플→Fade(sr/16)→8 s 순환 패딩+fade_out) 을
-                toy_dataset 4 cycle 에 그대로 적용한 파형(waveforms), np.random.randn(len(audio)) 잡음(스칼라 DC 오프셋) 값,
-                4.28.1 ASTFeatureExtractor(max_length=500) 출력(잡음 유/무) (N,500,128). 원본의 2D (1,N) 배열 호출 결과(예외 여부)도 기록.
-  model.pt    : 공식 AST_LoRA(max_length 500, CLS, rank=96(=reduction), alpha 8) — from_pretrained 직후 LoRA 가중치 통계
-                (fast-init 재초기화 quirk 확인: 0 이 아님), pos_embed 0 확인, 파라미터 수(총/학습), state_dict 키·모양,
-                LoRA·헤드를 det_fill 로 결정화한 뒤 eval forward 로짓과 CE 손실. full-FT(src/AST.py) 도 같은 방식으로 기록.
+Golden contents:
+  features.pt : waveforms from applying the original dataset/icbhi.py get_sample/get_dataset chain (segment load→16k resample→Fade(sr/16)→8 s circular padding+fade_out)
+                as-is to 4 cycles of toy_dataset, the np.random.randn(len(audio)) noise values (scalar DC offset), and the
+                4.28.1 ASTFeatureExtractor(max_length=500) outputs (with/without noise) (N,500,128). Also records the result of the original 2D (1,N) array call (whether it raises).
+  model.pt    : official AST_LoRA (max_length 500, CLS, rank=96 (=reduction), alpha 8) — LoRA weight statistics right after from_pretrained
+                (checks the fast-init re-initialization quirk: not zero), pos_embed zero check, parameter counts (total/trainable), state_dict keys/shapes,
+                eval forward logits and CE loss after making LoRA and head deterministic with det_fill. full-FT (src/AST.py) is recorded the same way.
 """
 import argparse
 import json
@@ -28,7 +28,7 @@ import torchaudio
 import torchaudio.transforms as T
 
 TOY = [("107_2b3_Al_mc_AKGC417L", [(0.887, 2.601, 1), (2.601, 5.327, 1)]),
-       ("107_2b3_Ar_mc_AKGC417L", None)]  # 두 번째 파일은 .txt 앞 2 cycle
+       ("107_2b3_Ar_mc_AKGC417L", None)]  # second file: first 2 cycles from its .txt
 
 
 def det_fill(t, scale=1.0):
@@ -43,7 +43,7 @@ def read_cycles(txt, n=2):
 
 
 def original_waveform(path, onset, offset, sr_target=16000, duration=8):
-    """dataset/icbhi.py get_sample + get_dataset(pad_type='circular') 그대로 (librosa.get_samplerate → torchaudio.info)."""
+    """dataset/icbhi.py get_sample + get_dataset(pad_type='circular') as-is (librosa.get_samplerate → torchaudio.info)."""
     sr = torchaudio.info(str(path)).sample_rate
     audio, _ = torchaudio.load(str(path), int(onset * sr), (int(offset * sr) - int(onset * sr)))
     if audio.shape[0] > 1:
@@ -79,7 +79,7 @@ def main():
 
     assert transformers.__version__ == "4.28.1", transformers.__version__
 
-    # ---------------- (a) 특징 추출 ----------------
+    # ---------------- (a) feature extraction ----------------
     processor = ASTFeatureExtractor.from_pretrained(args.hf, max_length=500)
     assert processor.max_length == 500
     waveforms, labels, feats_noise, feats_clean, noises, meta = [], [], [], [], [], []
@@ -91,9 +91,9 @@ def main():
         for onset, offset, label in cycles:
             audio = original_waveform(wav, onset, offset)
             audio_numpy = audio.numpy().astype(np.float64)  # (1, 128000)
-            noise = np.random.randn(len(audio_numpy))      # len == 1 → 스칼라 하나
+            noise = np.random.randn(len(audio_numpy))      # len == 1 → a single scalar
             augmented = audio_numpy + 0.3 * noise
-            if orig_2d_call is None:  # 원본 그대로의 2D (1,N) 호출이 실제로 되는지 기록
+            if orig_2d_call is None:  # record whether the original 2D (1,N) call actually works
                 try:
                     r = processor(augmented, sampling_rate=16000, return_tensors="pt")["input_values"]
                     orig_2d_call = {"ok": True, "shape": list(r.shape)}
@@ -110,10 +110,10 @@ def main():
     torch.save({"waveforms": waveforms, "labels": torch.tensor(labels), "noise_scalar": torch.tensor(noises),
                 "features_noise": feats_noise, "features_clean": feats_clean, "meta": meta, "orig_2d_call": orig_2d_call},
                out / "features.pt")
-    print("2D 호출:", orig_2d_call, "| 잡음 유/무 특징 max|diff|:", float((feats_noise - feats_clean).abs().max()))
+    print("2D call:", orig_2d_call, "| feature max|diff| with/without noise:", float((feats_noise - feats_clean).abs().max()))
 
-    # ---------------- (b)(c)(d) 모델 ----------------
-    x = feats_noise.unsqueeze(1)  # 원본 dataset: (N,1,500,128); AST_LoRA.forward 가 squeeze(1)
+    # ---------------- (b)(c)(d) model ----------------
+    x = feats_noise.unsqueeze(1)  # original dataset: (N,1,500,128); AST_LoRA.forward applies squeeze(1)
     y = torch.tensor(labels)
     torch.manual_seed(10)
     model = AST_LoRA(max_length=500, num_classes=4, final_output="CLS", rank=96, alpha=8, model_ckpt=args.hf)
@@ -125,7 +125,7 @@ def main():
     n_total = sum(p.numel() for p in model.parameters())
     n_train = sum(p.numel() for p in model.parameters() if p.requires_grad)
     trainable_names = [n for n, p in model.named_parameters() if p.requires_grad]
-    # 결정화: LoRA 4×12 + 헤드 (down/up 은 작은 스케일)
+    # make deterministic: LoRA 4×12 + head (down/up at a small scale)
     lora_state = {}
     for i, layer in enumerate(model.encoder.layer):
         sa = layer.attention.attention
@@ -140,7 +140,7 @@ def main():
     with torch.no_grad():
         logits = model(x)
         loss = nn.CrossEntropyLoss()(logits, y)
-        # 학습 모드(원본 train() 오버라이드: encoder/embeddings eval 유지) 에서도 동일해야 함 (dropout 0)
+        # must also match in training mode (the original train() override keeps encoder/embeddings in eval) (dropout 0)
         model.train(True)
         logits_train = model(x)
         model.eval()

@@ -1,15 +1,15 @@
 """
-RespireNet(microsoft/RespireNet) P0 골든 — 공식 코드를 우리 venv 에서 실행 (cv2·cmapy·nlpaug 는
-스크래치 pylibs 를 PYTHONPATH 로).
+RespireNet (microsoft/RespireNet) official-code parity goldens — runs the official code in our venv (cv2, cmapy and nlpaug
+from scratch pylibs via PYTHONPATH).
 
   PYTHONPATH=<pylibs> .venv/bin/python scripts/reproduction/dump_respirenet_goldens.py \
-      --repo <RespireNet 클론> --data .datasets/icbhi --out tests/golden/respirenet
+      --repo <RespireNet clone> --data .datasets/icbhi --out tests/golden/respirenet
 
-원본을 재현 가능하게 만드는 패치(수치 분포는 동일): os.listdir → 정렬, random.random(패딩 방향) → seed 0
-Random, librosa.load res_type=kaiser_best 고정. 골든:
-- chunks_meta.json  : fold-4 test 의 identifiers/labels/청크 수, official 60/40 train/test 청크 수
-- images.pt         : fold-4 test 처음 6 청크(+장치별 1개씩)의 BRC 후 uint8 RGB 이미지와 정규화 텐서
-- ckpt_eval.json    : ckpt_best.pkl 로 fold-4 test 전수 평가 — 청크 예측, cycle 다수결 conf matrix, Sp/Se/Score
+Patches that make the original reproducible (same numerical distribution): os.listdir → sorted, random.random (padding direction) → seed-0
+Random, librosa.load res_type=kaiser_best fixed. Goldens:
+- chunks_meta.json  : fold-4 test identifiers/labels/chunk counts, official 60/40 split train/test chunk counts
+- images.pt         : post-BRC uint8 RGB images and normalized tensors of the first 6 fold-4 test chunks (+1 per device)
+- ckpt_eval.json    : full fold-4 test evaluation with ckpt_best.pkl — chunk predictions, cycle majority-vote conf matrix, Sp/Se/Score
 """
 import argparse
 import json
@@ -33,7 +33,7 @@ def main():
     repo = pathlib.Path(args.repo).resolve()
     sys.path.insert(0, str(repo))
 
-    # ---- 재현성 패치 ----
+    # ---- reproducibility patches ----
     _listdir = os.listdir
     os.listdir = lambda p: sorted(_listdir(p))
     seeded = random.Random(0)
@@ -48,7 +48,7 @@ def main():
     tf = Compose([ToTensor(), Normalize(mean, std)])
     folds = str(repo / "data" / "patient_list_foldwise.txt")
 
-    # 원본 device_to_id 는 listdir 순 — 정렬하면 순서가 달라지므로 우리 고정값과 대조만 기록
+    # the original device_to_id follows listdir order — sorting changes that order, so only a comparison with our fixed values is recorded
     test = image_dataloader.image_loader(args.data, folds, 4, False, "params_json", tf, -1)
     meta = {"fold4_test": {"n_chunks": len(test), "identifiers": test.identifiers, "labels": [int(l) for l in test.labels],
                            "cycle_ids": test.filenames_with_labels}}
@@ -59,7 +59,7 @@ def main():
     json.dump(meta, open(out / "chunks_meta.json", "w"))
     print("fold4 test chunks", len(test), "train chunks", len(train), train.class_probs)
 
-    # ---- 이미지 골든 (test 는 __getitem__ 에 난수 없음) ----
+    # ---- image goldens (test __getitem__ has no randomness) ----
     dev_first = {}
     for i, s in enumerate(test.audio_data):
         d = test.file_to_device[s[2]]
@@ -67,7 +67,7 @@ def main():
     idxs = sorted(set(list(range(6)) + list(dev_first.values())))
     images = []
     for i in idxs:
-        # 원본 __getitem__ 의 이미지 단계만 (transform 전 uint8) 재현하기 위해 transform 을 잠시 끈다
+        # temporarily disable the transform to reproduce only the image stage of the original __getitem__ (uint8 before transform)
         test.input_transform = None
         img_uint8, label = test[i]
         test.input_transform = tf
@@ -75,9 +75,9 @@ def main():
         images.append({"index": i, "identifier": test.identifiers[i], "label": int(label),
                        "image_uint8": torch.from_numpy(np.ascontiguousarray(img_uint8)), "tensor": x})
     torch.save(images, out / "images.pt")
-    print("이미지 골든", [(im["index"], tuple(im["image_uint8"].shape)) for im in images])
+    print("image goldens", [(im["index"], tuple(im["image_uint8"].shape)) for im in images])
 
-    # ---- ckpt 평가 골든 ----
+    # ---- ckpt evaluation goldens ----
     from nets.network_cnn import model as Model  # noqa: E402
     net = Model(num_classes=4)
     net.load_state_dict(torch.load(str(repo / "models" / "ckpt_best.pkl"), map_location="cpu", weights_only=True))
@@ -101,7 +101,7 @@ def main():
            "acc": float((np.array(y_true) == np.array(y_pred)).mean() * 100), "pad_seed": 0, "res_type": "kaiser_best"}
     json.dump(rec, open(out / "ckpt_eval.json", "w"), indent=1)
     print(f"ckpt eval: Sp {sp:.2f} / Se {se:.2f} / Score {(sp+se)/2:.2f} acc {rec['acc']:.2f}")
-    print("완료:", out)
+    print("done:", out)
 
 
 if __name__ == "__main__":

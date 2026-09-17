@@ -1,4 +1,4 @@
-# GaP-Aug §3.1: Adam, lr 1e-5 (weight decay·스케줄 미기재 → wd 0, 스케줄 없음 가정)
+# GaP-Aug §3.1: Adam, lr 1e-5 (weight decay and schedule not specified → wd 0 and no schedule assumed)
 name: adam
 params:
   lr: 1e-5

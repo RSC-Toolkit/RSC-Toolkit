@@ -1,19 +1,21 @@
 """
-ADD-RSC(Interspeech 2025, deegy666/ADD-RSC e2b0f82) — 적응 차분 잡음제거 층 + AST 분류기, 공식 코드 충실 이식 (P0).
+ADD-RSC (Interspeech 2025, deegy666/ADD-RSC e2b0f82) — adaptive differential denoising layer + AST classifier, faithful port
+of the official code (exact port of the official code, verified against goldens).
 
-원본 main.py set_model/train (--model ast, 기본값):
+Original main.py set_model/train (--model ast, defaults):
   images (B,1,798,128) fbank → [SpecAugment] → Resize((1024,256)) bilinear → squeeze(1) → (B,1024,256)
-  denoise_images, aux_logits = DiffTransformerLayer(256, 8, depth 6)(images)          # 단일 층, 보조 로짓 = 앞 두 프레임 평균의 Linear
+  denoise_images, aux_logits = DiffTransformerLayer(256, 8, depth 6)(images)          # single layer; aux logits = Linear on the mean of the first two frames
   features = ASTModel(fstride=tstride=16, input_fdim=1024, input_tdim=256)(denoise_images.unsqueeze(1))   # (cls+dist)/2, 768
   output = classifier(features)                                                          # deepcopy(mlp_head) = LN + Linear(768, n_cls)
-  loss = beta·LabelSmoothing(aux_logits) + (1−beta)·CE(output)    (beta 0.5; --weighted_loss 는 원본에서 NameError 로 사용 불가 → 비가중)
-  train/validate 모두 torch.cuda.amp.autocast (fp16) — GradScaler 없음.
+  loss = beta·LabelSmoothing(aux_logits) + (1−beta)·CE(output)    (beta 0.5; --weighted_loss raises NameError in the original and is unusable → unweighted)
+  Both train and validate use torch.cuda.amp.autocast (fp16) — no GradScaler.
 
-AST 사전학습 로드(models/ast.py audioset_pretrain 분기): 랜덤 DeiT-B/384 골격(16×16 stride 16, 격자 64×16 = 1024 패치, pos_embed trunc_normal)
-에 AudioSet 10/10 ckpt(YuanGong audioset_10_10_0.4593.pth, module.v.* 키)에서 **이름·모양이 같은 키만** 복사 → pos_embed(1214 ≠ 1026) 는
-미로드(난수 유지), patch_embed.proj·블록·norm·cls/dist 로드. 이어 pos_embed[2:] 를 (1,768,16,64) 로 본 뒤 (f_dim 64, t_dim 16) 로
-bilinear 보간 — forward 의 transpose 로 실제 conv 격자는 16×64 라 배열이 뒤섞이지만 원본 그대로 둔다.
-ResNet50 변형(사전학습 없음)은 범위 밖.
+AST pretrained loading (models/ast.py audioset_pretrain branch): onto a random DeiT-B/384 skeleton (16×16 stride 16, grid 64×16 = 1024 patches,
+pos_embed trunc_normal), **only keys with matching name and shape** are copied from the AudioSet 10/10 ckpt (YuanGong
+audioset_10_10_0.4593.pth, module.v.* keys) → pos_embed (1214 ≠ 1026) is not loaded (stays random); patch_embed.proj, blocks, norm,
+cls/dist are loaded. Then pos_embed[2:] is viewed as (1,768,16,64) and bilinearly interpolated to (f_dim 64, t_dim 16) — because of the
+transpose in forward the actual conv grid is 16×64, so the layout gets scrambled, but this is kept as in the original.
+The ResNet50 variant (no pretraining) is out of scope.
 """
 from __future__ import annotations
 
@@ -45,22 +47,22 @@ class ADDRSC(BaseRSCModel, nn.Module):
         self,
         n_cls: int = 4,
         fstride: int = 16, tstride: int = 16,
-        input_fdim: int = 1024, input_tdim: int = 256,          # 원본 ASTModel 인자 (뒤집힌 값 그대로)
+        input_fdim: int = 1024, input_tdim: int = 256,          # original ASTModel arguments (swapped values kept as-is)
         audioset_pretrain: bool = True,
-        pretrained_path: Optional[str] = None,                  # YuanGong audioset_10_10_0.4593.pth (없으면 툴킷 아카이브)
+        pretrained_path: Optional[str] = None,                  # YuanGong audioset_10_10_0.4593.pth (falls back to the toolkit archive)
         model_size: str = "base384",
         denoise_d_model: int = 256, denoise_num_heads: int = 8, denoise_depth: int = 6,
         loss_beta: float = 0.5,
         label_smoothing: float = 0.20,
-        input_layout: str = "freq_time",                        # 툴킷 fbank (B,128,798) → (B,798,128) → Resize(1024,256)
+        input_layout: str = "freq_time",                        # toolkit fbank (B,128,798) → (B,798,128) → Resize(1024,256)
         resize_to: Tuple[int, int] = (1024, 256),
-        amp: bool = True,                                       # 원본 autocast(fp16) — GradScaler 없음 (trainer precision 32 와 함께 쓴다)
+        amp: bool = True,                                       # original autocast(fp16) — no GradScaler (used with trainer precision 32)
     ):
         super().__init__()
         self.input_layout, self.resize_to, self.loss_beta, self.amp = input_layout, tuple(resize_to), float(loss_beta), bool(amp)
         self.final_feat_dim = 768
 
-        # --- set_model 순서: 잡음제거 층 → ASTModel → classifier ---
+        # --- set_model order: denoising layer → ASTModel → classifier ---
         self.bias_denoise_encoder = DiffTransformerLayer(d_model=denoise_d_model, num_heads=denoise_num_heads, depth=denoise_depth, n_cls=n_cls)
 
         self.v = _create_deit_skeleton(model_size, pretrained=False)
@@ -74,12 +76,12 @@ class ADDRSC(BaseRSCModel, nn.Module):
         self.v.pos_embed = nn.Parameter(torch.zeros(1, num_patches + 2, self.original_embedding_dim))
         trunc_normal_(self.v.pos_embed, std=0.02)
         self.grid = (f_dim, t_dim)
-        # 내부 ASTModel(label_dim=527) 의 mlp_head — ckpt 의 mlp_head 가 여기로 로드되지만 이후 새 mlp_head 로 대체된다 (원본 그대로)
+        # mlp_head of the inner ASTModel(label_dim=527) — the ckpt mlp_head is loaded here but later replaced by a new mlp_head (as in the original)
         self.mlp_head = nn.Sequential(nn.LayerNorm(self.original_embedding_dim), nn.Linear(self.original_embedding_dim, 527))
         self.audioset_load_info = None
         if audioset_pretrain:
-            self.audioset_load_info = self.load_audioset_matching_keys(pretrained_path)  # 527 헤드 상태에서의 로드 결과
-            # ast.py:154-159 — 난수 pos_embed 를 (16, 64) 격자로 보고 (f_dim, t_dim)=(64, 16) 으로 bilinear 보간 (전치된 격자, 원본 그대로)
+            self.audioset_load_info = self.load_audioset_matching_keys(pretrained_path)  # load result with the 527-class head
+            # ast.py:154-159 — view the random pos_embed as a (16, 64) grid and bilinearly interpolate to (f_dim, t_dim)=(64, 16) (transposed grid, as in the original)
             new_pos_embed = self.v.pos_embed[:, 2:, :].detach().reshape(1, 1024, 768).transpose(1, 2).reshape(1, 768, 16, 64)
             new_pos_embed = F.interpolate(new_pos_embed, size=(f_dim, t_dim), mode="bilinear")
             new_pos_embed = new_pos_embed.reshape(1, 768, num_patches).transpose(1, 2)
@@ -88,17 +90,17 @@ class ADDRSC(BaseRSCModel, nn.Module):
         self.classifier = deepcopy(self.mlp_head)  # main.py:262
         self.denoise_criterion = LabelSmoothingLoss(size=n_cls, smoothing=label_smoothing)
 
-    # ----------------------------------------------------------------- 구성
+    # ----------------------------------------------------------------- construction
     def get_shape(self, fstride, tstride, input_fdim, input_tdim):
         test_proj = nn.Conv2d(1, self.original_embedding_dim, kernel_size=(16, 16), stride=(fstride, tstride))
         out = test_proj(torch.randn(1, 1, input_fdim, input_tdim))
         return out.shape[2], out.shape[3]
 
     def load_audioset_matching_keys(self, path: Optional[str]) -> dict:
-        """ast.py:130-137 — DataParallel 키(module.v.*, module.mlp_head.*) 중 이름·모양이 같은 것만 복사."""
+        """ast.py:130-137 — copy only DataParallel keys (module.v.*, module.mlp_head.*) with matching name and shape."""
         p = pathlib.Path(path) if path else next((pathlib.Path(c) for c in AUDIOSET_CKPT_CANDIDATES if pathlib.Path(c).exists()), None)
         if p is None or not p.exists():
-            raise FileNotFoundError(f"AudioSet ckpt 가 없다: {path or AUDIOSET_CKPT_CANDIDATES}")
+            raise FileNotFoundError(f"AudioSet ckpt not found: {path or AUDIOSET_CKPT_CANDIDATES}")
         weights = torch.load(p, map_location="cpu", weights_only=True)
         current_v, current_head = self.v.state_dict(), self.mlp_head.state_dict()
         loaded, mismatch = [], []
@@ -113,12 +115,12 @@ class ADDRSC(BaseRSCModel, nn.Module):
                         mismatch.append(k2)
         self.v.load_state_dict(current_v, strict=False)
         self.mlp_head.load_state_dict(current_head, strict=False)
-        logger.info("ADD-RSC AudioSet 로드: %d 키, 모양 불일치(미로드) %s", len(loaded), mismatch)
+        logger.info("ADD-RSC AudioSet load: %d keys, shape mismatch (not loaded) %s", len(loaded), mismatch)
         return {"loaded": loaded, "mismatch": mismatch}
 
-    # ------------------------------------------------------------------ 실행
+    # ------------------------------------------------------------------ execution
     def to_model_input(self, x: torch.Tensor) -> torch.Tensor:
-        """툴킷 fbank (B,128,798) → (B,798,128) → Resize((1024,256)) bilinear (업샘플이라 antialias 무관) → (B,1024,256)."""
+        """Toolkit fbank (B,128,798) → (B,798,128) → Resize((1024,256)) bilinear (upsampling, so antialias has no effect) → (B,1024,256)."""
         if x.dim() == 3:
             x = x.unsqueeze(1)
         if self.input_layout == "freq_time":
@@ -127,7 +129,7 @@ class ADDRSC(BaseRSCModel, nn.Module):
         return x.squeeze(1)
 
     def forward_ast(self, x: torch.Tensor) -> torch.Tensor:
-        """ast.py forward: (B,1,1024,256) → transpose(2,3) → 패치 → cls/dist → blocks → (cls+dist)/2."""
+        """ast.py forward: (B,1,1024,256) → transpose(2,3) → patches → cls/dist → blocks → (cls+dist)/2."""
         x = x.transpose(2, 3)
         B = x.shape[0]
         x = self.v.patch_embed(x)
@@ -157,5 +159,5 @@ class ADDRSC(BaseRSCModel, nn.Module):
             if self.training:
                 loss = self.loss_beta * denoise_loss + (1 - self.loss_beta) * class_loss
             else:
-                loss = denoise_loss + class_loss  # validate(): 가중 없이 합 (기록용)
+                loss = denoise_loss + class_loss  # validate(): unweighted sum (for logging)
         return output.float(), loss

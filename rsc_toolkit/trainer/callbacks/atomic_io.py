@@ -1,9 +1,9 @@
-"""best.pth / best.json / final_state.pth 의 원자적 저장.
+"""Atomic saving of best.pth / best.json / final_state.pth.
 
-예전엔 torch.save·json.dump 가 대상 파일을 직접 덮어썼다 — 저장 도중(디스크 풀·프로세스 종료) 죽으면 이전 best 가
-손상된 채 남아 aggregate·재검증이 그 run 을 통째로 잃는다 (REVIEW 2026-09-10 §4 P2). last.ckpt 가 이미 쓰던
-tmp + os.replace 규약을 그대로 옮긴다: 같은 디렉터리에 `<이름>.tmp.<pid>` 로 쓴 뒤 교체하므로 어느 순간에도
-대상 경로에는 온전한 이전 파일 또는 온전한 새 파일만 있다.
+Writing the target file directly would leave a corrupted best file if the process dies mid-write (disk full, kill),
+and aggregation and re-verification would lose the whole run. This uses the same tmp + os.replace convention as
+last.ckpt: write to `<name>.tmp.<pid>` in the same directory, then replace, so at any moment the
+target path holds either the complete previous file or the complete new file.
 """
 from __future__ import annotations
 

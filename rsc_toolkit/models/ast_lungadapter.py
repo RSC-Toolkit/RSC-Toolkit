@@ -1,52 +1,53 @@
 """
-LungAdapter(Interspeech 2024, Xiao et al.) — 동결 AST + Attention-Adapter/Res-Adapter, **논문 명세 재구현** (공식·비공식 코드 없음).
+LungAdapter (Interspeech 2024, Xiao et al.) — frozen AST + Attention-Adapter/Res-Adapter, **re-implementation from the paper description**
+(no official or unofficial code exists).
 
-논문: LungAdapter: Efficient Adapting Audio Spectrogram Transformer for Lung Sound Classification
+Paper: LungAdapter: Efficient Adapting Audio Spectrogram Transformer for Lung Sound Classification
       (DOI 10.21437/Interspeech.2024-106)
 
-골격: 논문 'experimental setup mostly follows [13]'(Bae Patch-Mix) + 'AST pre-trained from Bae et al. on ImageNet and Audioset'
-      → 툴킷 ast_patchmix.PatchMixAST(IN+AS ckpt audioset_0.4593.pth, 뒤집힌 798×128 quirk 포함)를 그대로 부모로 쓴다.
-      백본(self.v.*)·mlp_head 는 전부 동결, 어댑터 + classifier(LN+Linear, 식4)만 학습.
+Skeleton: the paper states 'experimental setup mostly follows [13]' (Bae Patch-Mix) + 'AST pre-trained from Bae et al. on ImageNet and Audioset'
+      → the toolkit ast_patchmix.PatchMixAST (IN+AS ckpt audioset_0.4593.pth, including the swapped 798×128 quirk) is used as the parent as-is.
+      Backbone (self.v.*) and mlp_head are fully frozen; only the adapters + classifier (LN+Linear, Eq. 4) are trained.
 
-각 timm Block(12개)에 (논문 Fig.1·식 5-8):
-  (a) Attention-Adapter — MHSA 출력 뒤 직렬 ('positioned after the MHSA layer'):
+In each timm Block (12 total) (paper Fig. 1, Eq. 5-8):
+  (a) Attention-Adapter — in series after the MHSA output ('positioned after the MHSA layer'):
         h  = W_down(s1·X)                       [768→16]
         h' = h + (1/3)·Σ_{k=3,5,7} DWConv_k(h)
         y  = W_up[ s2·GELU(Conv_1x1(h') + h') ] + s1·X
-      원형은 참고문헌 [22] Mona(MonaOp: 2D DWConv 3/5/7 평균+identity → 1×1 conv+identity → GELU → up-proj).
-  (b) Res-Adapter — MLP 와 병렬(AdaptFormer 류): W_up(GELU(W_down(X))), bottleneck ratio 0.15 → round(768·0.15)=115.
-      Fig.1 중앙 패널(PDF 벡터 기하)에서 Res-Adapter 입력선은 MHSA 잔차합 ⊕ **뒤**·두 번째 LayerNorm **앞**의 잔차 스트림에서
-      분기하고 출력은 MLP 뒤 ⊕ 로 들어간다 → 입력 = x (norm2(x) 아님). 그림은 MLP 의 항등 skip 을 그리지 않지만
-      식(3)·동결 AST 유지로 해석해 x + MLP(norm2 x) + ResAdapter(x) 로 구현한다.
+      The prototype is reference [22] Mona (MonaOp: mean of 2D DWConv 3/5/7 + identity → 1×1 conv + identity → GELU → up-proj).
+  (b) Res-Adapter — parallel to the MLP (AdaptFormer-style): W_up(GELU(W_down(X))), bottleneck ratio 0.15 → round(768·0.15)=115.
+      In the center panel of Fig. 1 (PDF vector geometry), the Res-Adapter input line branches from the residual stream **after** the MHSA
+      residual sum ⊕ and **before** the second LayerNorm, and its output enters the ⊕ after the MLP → input = x (not norm2(x)). The figure
+      does not draw the MLP identity skip, but following Eq. (3) and keeping the frozen AST intact, it is implemented as x + MLP(norm2 x) + ResAdapter(x).
 
-논문이 확정하지 않은 항목은 전부 플래그이며 기본값은 파라미터 수(Table 1/2: Attn만 0.34M · Res만 2.14M · 둘 다 2.48M, ±0.01M)에
-동시에 맞는 조합 **중 하나**다 (tests/unit/models/test_ast_lungadapter.py 에 조합별 표 고정). 정찰 verdict.corrections 가 지적하듯
-Res 115 bias 없음+LN(2,142,724) / Attn 1D+LN+벡터 s1(343,300) 등 다른 조합도 세 값을 ±0.01M 로 동시에 만족하므로
-파라미터 수만으로 1D/2D·스케일 형태·LN/bias 유무를 확정할 수 없다 (저자 확인 필요):
-  conv_dim      : "2d"(기본; 패치 격자 freq 12 × time 79, cls/dist 토큰은 DWConv 우회) | "1d"(토큰 축, cls/dist 포함)
-  scale_form    : "vector"(기본; s1∈R^768, s2∈R^16 학습) | "scalar"(s1, s2 스칼라 학습)
-  attn_insert   : "pre_residual"(기본; x = x + Adapter(attn(norm1 x))) | "post_residual"(Mona 코드: x = x + attn(...); x = Adapter(x))
-  res_input     : "x"(기본; Fig.1 분기점 = ⊕ 뒤·LN2 앞 잔차 스트림) | "norm2"(MLP 와 같은 norm2(x) 입력 — 대안 플래그)
-  res_scale     : "none"(기본; 논문 식(8)·Fig.1 우측(FC-GELU-FC, 좌측과 달리 S 기호 없음) 그대로, 상수 res_scale_init=1)
-                  | "vector"(768-d 학습 스케일) | "scalar"(학습 스칼라)
-                  ※ "vector" 는 Res-only 2,134,888(2.13M)·둘 다 2,468,392(2.47M)을 Table 1/2 의 2.14M/2.48M 에 맞추는
-                    파라미터 맞춤 추정이라 기본값으로 굳히지 않는다. 기본 조합은 Attn만 0.34 ✓ / Res만 2.13(2.14 와 0.0051 차, ±0.01M 안)
-                    / 둘 다 2.468(2.48 과 0.0116 차, ±0.01M 을 0.0016 초과) — 논문 카운트가 블록당 ≈770 개(총 ≈9k) 더 많은 이유는
-                    미해결(저자 질문). 세 값을 동시에 맞추려면 model.params.res_scale=vector.
-  zero_init_up  : True(기본; 두 어댑터의 W_up 을 0 으로 초기화 → 학습 시작 시 동결 AST 와 동일 출력, AdaptFormer/LoRA 관례)
-  s1/s2 초기값 1.0, res_scale 초기값 1.0 (Mona gammax=1 / 논문 미기재 — 추정)
-  어댑터 dropout 없음 (Mona 원형의 dropout 0.1 미채택; 논문 미기재 — 추정)
-  weight decay(옵티마이저 wd 1e-6, Bae 상속 추정)는 s1/s2 스케일 파라미터에도 걸린다 — 논문 근거 없음, 영향 미미(플래그 없음)
-기본 조합(2D·벡터 s1/s2·res_scale none)의 학습 파라미터: Attn만 338,116 / Res만 2,134,888 / 둘 다 2,468,392
-(Total = PatchMixAST 87,531,736 + 어댑터 = 87,865,240 / 89,662,012 / 89,995,516) — 논문 0.34M/2.14M/2.48M
-(Total 87.87/89.67/90.01M 은 87.53+Trainable 반올림 합) 과 비교하면 '둘 다' 만 0.0116M 부족(위 res_scale 항목).
-res_scale=vector 이면 338,116 / 2,144,104 / 2,477,608 (Total 90,004,732) 로 세 값 모두 ±0.01M 안.
+Everything the paper leaves unspecified is a flag; the defaults are **one of** the combinations that simultaneously match the parameter counts
+(Table 1/2: Attn only 0.34M · Res only 2.14M · both 2.48M, ±0.01M) (per-combination table pinned in tests/unit/models/test_ast_lungadapter.py).
+Other combinations such as Res 115 without bias + LN (2,142,724) / Attn 1D + LN + vector s1 (343,300) also satisfy all three values within ±0.01M,
+so parameter counts alone cannot determine 1D/2D, scale form, or presence of LN/bias (unresolved without the authors):
+  conv_dim      : "2d" (default; patch grid freq 12 × time 79, cls/dist tokens bypass DWConv) | "1d" (token axis, cls/dist included)
+  scale_form    : "vector" (default; learned s1∈R^768, s2∈R^16) | "scalar" (learned scalar s1, s2)
+  attn_insert   : "pre_residual" (default; x = x + Adapter(attn(norm1 x))) | "post_residual" (Mona code: x = x + attn(...); x = Adapter(x))
+  res_input     : "x" (default; Fig. 1 branch point = residual stream after ⊕, before LN2) | "norm2" (same norm2(x) input as the MLP — alternative flag)
+  res_scale     : "none" (default; exactly paper Eq. (8) and Fig. 1 right (FC-GELU-FC, no S symbol unlike the left), constant res_scale_init=1)
+                  | "vector" (learned 768-d scale) | "scalar" (learned scalar)
+                  Note: "vector" is a parameter-count-fitting guess that brings Res-only 2,134,888 (2.13M) and both 2,468,392 (2.47M) to the
+                    2.14M/2.48M of Table 1/2, so it is not made the default. The default combination gives Attn only 0.34 ✓ / Res only 2.13
+                    (0.0051 off 2.14, within ±0.01M) / both 2.468 (0.0116 off 2.48, exceeding ±0.01M by 0.0016) — why the paper's count is
+                    ≈770 higher per block (≈9k total) is unresolved. To match all three values use model.params.res_scale=vector.
+  zero_init_up  : True (default; W_up of both adapters initialized to 0 → output identical to the frozen AST at the start of training, AdaptFormer/LoRA convention)
+  s1/s2 init 1.0, res_scale init 1.0 (Mona gammax=1 / not specified in the paper — assumed)
+  no adapter dropout (the Mona prototype's dropout 0.1 is not adopted; not specified in the paper — assumed)
+  weight decay (optimizer wd 1e-6, assumed inherited from Bae) also applies to the s1/s2 scale parameters — no basis in the paper, negligible effect (no flag)
+Trainable parameters of the default combination (2D, vector s1/s2, res_scale none): Attn only 338,116 / Res only 2,134,888 / both 2,468,392
+(Total = PatchMixAST 87,531,736 + adapters = 87,865,240 / 89,662,012 / 89,995,516) — compared with the paper's 0.34M/2.14M/2.48M
+(Total 87.87/89.67/90.01M is the rounded sum 87.53 + Trainable), only 'both' is 0.0116M short (see res_scale above).
+With res_scale=vector: 338,116 / 2,144,104 / 2,477,608 (Total 90,004,732), all three within ±0.01M.
 
-전처리 표기: 논문 3.1.2 '25 ms Hamming window' vs 상속한 icbhi_patchmix(kaldi fbank window_type='hanning', Bae util/icbhi_util.py:395
-과 동일) — Bae 코드 상속으로 hanning 을 쓴다 (논문 표기와 불일치, 정찰 verdict 지적).
+Preprocessing wording: paper 3.1.2 says '25 ms Hamming window' vs the inherited icbhi_patchmix (kaldi fbank window_type='hanning', identical to
+Bae util/icbhi_util.py:395) — hanning is used, inherited from the Bae code (inconsistent with the paper's wording).
 
-학습 레시피(논문 명시): Adam lr 5e-4, cosine, bs 8, 50 epoch, weighted CE. 나머지(SpecAugment icbhi_ast_sup, MA 0.5, AMP, wd 1e-6,
-best-on-test Score 최고 && Se>5)는 Bae 상속 **추정** → configs/lungadapter_icbhi.yaml·callbacks/lungadapter_paper.yaml 에서 조정.
+Training recipe (stated in the paper): Adam lr 5e-4, cosine, bs 8, 50 epochs, weighted CE. The rest (SpecAugment icbhi_ast_sup, MA 0.5, AMP, wd 1e-6,
+best-on-test highest Score && Se>5) is **assumed** inherited from Bae → adjust in configs/lungadapter_icbhi.yaml and callbacks/lungadapter_paper.yaml.
 """
 from __future__ import annotations
 
@@ -72,9 +73,9 @@ def _make_scale(form: str, dim: int, init: float) -> nn.Parameter:
 
 
 class MultiScaleDWConv(nn.Module):
-    """식(6)-(7) 의 conv 부분 = Mona MonaOp: (1/3)Σ DWConv_{3,5,7} + identity → Conv1×1 + identity.
+    """Conv part of Eq. (6)-(7) = Mona MonaOp: (1/3)Σ DWConv_{3,5,7} + identity → Conv1×1 + identity.
 
-    conv_dim="2d": 입력 (B, C, H, W) 격자 / "1d": 입력 (B, C, N) 토큰 열. 반환은 GELU 이전 값 (Conv(h')+h')."""
+    conv_dim="2d": input is a (B, C, H, W) grid / "1d": input is a (B, C, N) token sequence. Returns the pre-GELU value (Conv(h')+h')."""
 
     def __init__(self, channels: int, conv_dim: str = "2d", kernels: Tuple[int, ...] = (3, 5, 7)):
         super().__init__()
@@ -88,12 +89,12 @@ class MultiScaleDWConv(nn.Module):
         self.projector = Conv(channels, channels, kernel_size=1)
 
     def forward(self, h: torch.Tensor) -> torch.Tensor:
-        h_prime = h + sum(conv(h) for conv in self.dwconvs) / float(len(self.dwconvs))   # 식(6)
-        return self.projector(h_prime) + h_prime                                          # 식(7) 괄호 안
+        h_prime = h + sum(conv(h) for conv in self.dwconvs) / float(len(self.dwconvs))   # Eq. (6)
+        return self.projector(h_prime) + h_prime                                          # inside the brackets of Eq. (7)
 
 
 class AttentionAdapter(nn.Module):
-    """논문 식(5)-(7). forward(x, grid): x (B, N, D); grid=(H, W) 는 2D 일 때 패치 격자 (N = n_prefix + H·W)."""
+    """Paper Eq. (5)-(7). forward(x, grid): x (B, N, D); grid=(H, W) is the patch grid in 2D mode (N = n_prefix + H·W)."""
 
     def __init__(
         self,
@@ -120,32 +121,32 @@ class AttentionAdapter(nn.Module):
     def _conv_tokens(self, h: torch.Tensor, grid: Optional[Tuple[int, int]]) -> torch.Tensor:
         b, n, c = h.shape
         if self.conv_dim == "1d":
-            # 토큰 축 1D DWConv — cls/dist 토큰도 열에 포함(시퀀스 앞 2개)
+            # 1D DWConv along the token axis — cls/dist tokens included in the sequence (first 2 positions)
             return self.conv(h.transpose(1, 2)).transpose(1, 2)
         if grid is None:
-            raise ValueError("conv_dim='2d' 는 패치 격자 grid=(H, W) 가 필요하다")
+            raise ValueError("conv_dim='2d' requires the patch grid grid=(H, W)")
         hh, ww = grid
         p = self.n_prefix
         if n != p + hh * ww:
-            raise ValueError(f"토큰 수 {n} ≠ prefix {p} + {hh}×{ww}")
+            raise ValueError(f"token count {n} ≠ prefix {p} + {hh}×{ww}")
         patches = h[:, p:, :].reshape(b, hh, ww, c).permute(0, 3, 1, 2)
         patches = self.conv(patches).permute(0, 2, 3, 1).reshape(b, hh * ww, c)
         if p == 0:
             return patches
-        # cls/dist 토큰: 격자에 없으므로 DWConv 항은 0 (h'=h), 1×1 conv(토큰별 선형)만 적용
+        # cls/dist tokens: not on the grid, so the DWConv term is 0 (h'=h); only the 1×1 conv (per-token linear) is applied
         prefix = h[:, :p, :]
         prefix = self.conv.projector(prefix.transpose(1, 2).unsqueeze(-1)).squeeze(-1).transpose(1, 2) + prefix
         return torch.cat([prefix, patches], dim=1)
 
     def forward(self, x: torch.Tensor, grid: Optional[Tuple[int, int]] = None) -> torch.Tensor:
         sx = self.s1 * x                                   # s1·X
-        h = self.down(sx)                                  # 식(5)
+        h = self.down(sx)                                  # Eq. (5)
         z = self._conv_tokens(h, grid)                     # Conv(h') + h'
-        return self.up(self.s2 * F.gelu(z)) + sx           # 식(7)
+        return self.up(self.s2 * F.gelu(z)) + sx           # Eq. (7)
 
 
 class ResAdapter(nn.Module):
-    """논문 식(8): W_up(GELU(W_down(X))). bottleneck = round(dim · ratio) (768·0.15 = 115.2 → 115)."""
+    """Paper Eq. (8): W_up(GELU(W_down(X))). bottleneck = round(dim · ratio) (768·0.15 = 115.2 → 115)."""
 
     def __init__(self, dim: int = 768, ratio: float = 0.15, bottleneck: Optional[int] = None, zero_init_up: bool = True):
         super().__init__()
@@ -161,7 +162,7 @@ class ResAdapter(nn.Module):
 
 
 class LungAdapterBlock(nn.Module):
-    """timm Block 래퍼. 원 Block 의 norm1/attn/ls1/drop_path1/norm2/mlp/ls2/drop_path2 만 호출한다(버전 의존 최소화).
+    """timm Block wrapper. Calls only norm1/attn/ls1/drop_path1/norm2/mlp/ls2/drop_path2 of the wrapped Block (minimizes version dependence).
 
     timm 1.0.28 Block.forward: x = x + dp1(ls1(attn(norm1 x))); x = x + dp2(ls2(mlp(norm2 x)))  (DeiT: ls/dp = Identity)"""
 
@@ -191,7 +192,7 @@ class LungAdapterBlock(nn.Module):
             self.res_scale = _make_scale(res_scale, dim, res_scale_init)
         else:
             self.register_buffer("res_scale", torch.tensor(float(res_scale_init)), persistent=False)
-        self.grid: Optional[Tuple[int, int]] = None   # forward_features 가 매 호출 설정 (H=freq 패치, W=time 패치)
+        self.grid: Optional[Tuple[int, int]] = None   # set by forward_features on every call (H=freq patches, W=time patches)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         blk = self.block
@@ -215,18 +216,18 @@ class LungAdapterBlock(nn.Module):
 
 @ModelFactory.register_model_class("ast_lungadapter")
 class LungAdapterAST(PatchMixAST):
-    """PatchMixAST(IN+AS, 뒤집힌 798×128 quirk) + 블록별 LungAdapter, 백본 동결. method 는 'ce' 고정."""
+    """PatchMixAST (IN+AS, swapped 798×128 quirk) + per-block LungAdapter, frozen backbone. method is fixed to 'ce'."""
 
     def __init__(
         self,
         n_cls: int = 4,
-        # ---- 어댑터 (논문 명시) ----
+        # ---- adapters (stated in the paper) ----
         use_attn_adapter: bool = True,
         use_res_adapter: bool = True,
         attn_hidden: int = 16,
         res_ratio: float = 0.15,
         res_bottleneck: Optional[int] = None,
-        # ---- 논문 미기재 → 플래그 (모듈 docstring) ----
+        # ---- not specified in the paper → flags (see module docstring) ----
         conv_dim: str = "2d",
         scale_form: str = "vector",
         s1_init: float = 1.0,
@@ -237,7 +238,7 @@ class LungAdapterAST(PatchMixAST):
         res_scale_init: float = 1.0,
         zero_init_up: bool = True,
         freeze_backbone: bool = True,
-        # ---- 부모(PatchMixAST) 인자 ----
+        # ---- parent (PatchMixAST) arguments ----
         fstride: int = 10,
         tstride: int = 10,
         input_fdim: int = 798,
@@ -255,7 +256,7 @@ class LungAdapterAST(PatchMixAST):
             pretrained_path=pretrained_path, verbose=verbose, method="ce", input_layout=input_layout,
         )
         if not (use_attn_adapter or use_res_adapter):
-            logger.warning("LungAdapterAST: 어댑터 없음 — 동결 AST + 헤드(linear probe)만 학습한다")
+            logger.warning("LungAdapterAST: no adapters — training only the frozen AST + head (linear probe)")
         dim = self.original_embedding_dim
         self.adapter_cfg: Dict[str, object] = dict(
             use_attn_adapter=use_attn_adapter, use_res_adapter=use_res_adapter, attn_hidden=attn_hidden,
@@ -273,8 +274,8 @@ class LungAdapterAST(PatchMixAST):
             wrapped.append(LungAdapterBlock(blk, attn_ad, res_ad, attn_insert, res_input, res_scale, res_scale_init, dim))
         self.v.blocks = nn.Sequential(*wrapped)
 
-        # 실제 패치 격자: forward_features 가 transpose(2,3) 뒤 conv 하므로 (H=freq 패치, W=time 패치) = (12, 79)
-        f_dim, t_dim = self.get_shape(fstride, tstride, input_fdim, input_tdim)   # (79, 12) — quirk 인자 기준
+        # actual patch grid: forward_features applies the conv after transpose(2,3), so (H=freq patches, W=time patches) = (12, 79)
+        f_dim, t_dim = self.get_shape(fstride, tstride, input_fdim, input_tdim)   # (79, 12) — in terms of the quirk arguments
         self.token_grid = (t_dim, f_dim)
         self._set_grid(self.token_grid)
 
@@ -284,13 +285,13 @@ class LungAdapterAST(PatchMixAST):
         tr, tot = self.count_parameters()
         logger.info("LungAdapterAST: trainable %.3fM / total %.3fM (%s)", tr / 1e6, tot / 1e6, self.adapter_cfg)
 
-    # ------------------------------------------------------------------ 유틸
+    # ------------------------------------------------------------------ utilities
     def _set_grid(self, grid: Tuple[int, int]) -> None:
         for blk in self.v.blocks:
             blk.grid = grid
 
     def _freeze(self) -> None:
-        """self.v.* (원 Block 포함) 과 mlp_head 동결; 어댑터·스케일·classifier 만 학습."""
+        """Freeze self.v.* (including the wrapped Blocks) and mlp_head; train only adapters, scales, and classifier."""
         for p in self.v.parameters():
             p.requires_grad = False
         for p in self.mlp_head.parameters():
@@ -317,7 +318,8 @@ class LungAdapterAST(PatchMixAST):
     def forward_features(self, x, y=None, patch_mix=False, time_domain=False):
         if x.dim() == 3:
             x = x.unsqueeze(1)
-        # 부모와 동일한 격자 계산 (transpose 전 x: (B,1,T,F) → 격자 H=(F-16)/10+1, W=(T-16)/10+1)
+        # same grid computation as the parent (x before transpose: (B,1,T,F) → grid H=(F-16)/10+1, W=(T-16)/10+1)
+
         grid = (int((x.size(3) - 16) / 10) + 1, int((x.size(2) - 16) / 10) + 1)
         self._set_grid(grid)
         return super().forward_features(x, y=y, patch_mix=patch_mix, time_domain=time_domain)

@@ -1,9 +1,9 @@
-"""P2-8 — ProtoNet·Domain Transfer datamodule 의 `__new__` 바꿔치기 제거 패리티.
+"""Parity after removing the `__new__` swap in the ProtoNet and Domain Transfer datamodules.
 
-골든 `tests/golden/protonet_dt_datamodule_fingerprint.json` 은 **예전 구현**(setup 뒤 IndexDataset 을 Proto/DTIndexDataset 으로
-바꿔치기)으로 실데이터(ICBHI)에서 기록한 지문이다: 데이터셋 클래스·길이·전용 속성·첫 3 샘플의 파형 합·splice 개수·
-마지막(splice) 샘플·balanced class weight. 새 구현(생성 시점 주입 + `_index_dataset_kwargs`/role)이 같은 값을 내야 한다.
-ICBHI 인덱스가 없는 환경(CI)에서는 건너뛴다.
+The golden `tests/golden/protonet_dt_datamodule_fingerprint.json` is a fingerprint recorded on real data (ICBHI) with the **former implementation**
+(swapping IndexDataset for Proto/DTIndexDataset after setup): dataset class, length, dedicated attributes, waveform sums of the first 3 samples,
+splice count, last (splice) sample, balanced class weight. The new implementation (injection at construction + `_index_dataset_kwargs`/role) must produce the same values.
+Skipped in environments without the ICBHI index (CI).
 """
 from __future__ import annotations
 
@@ -19,8 +19,8 @@ import rsc_toolkit
 
 REPO = pathlib.Path(rsc_toolkit.__file__).resolve().parent.parent
 GOLDEN = REPO / "tests" / "golden" / "protonet_dt_datamodule_fingerprint.json"
-needs_icbhi = pytest.mark.skipif(not (REPO / ".datasets/icbhi/index/index_cycle.csv").exists(), reason="ICBHI 인덱스 없음")
-needs_golden = pytest.mark.skipif(not GOLDEN.exists(), reason="골든 없음")
+needs_icbhi = pytest.mark.skipif(not (REPO / ".datasets/icbhi/index/index_cycle.csv").exists(), reason="ICBHI index missing")
+needs_golden = pytest.mark.skipif(not GOLDEN.exists(), reason="golden missing")
 
 ATTR_KEYS = ("cycle_len", "is_train", "bandpass", "target_len", "aug_prob", "use_noise", "use_stretch", "use_pitch",
              "snr_low", "snr_high", "stretch_range", "pitch_semitones", "stretch_impl", "fade", "sampling_rate")
@@ -92,7 +92,7 @@ def test_former_swap_helpers_are_gone():
 
     assert "_swap_datasets" not in vars(ProtoNetDataModule)
     assert "_index_dataset_kwargs" in vars(ProtoNetDataModule) and "_index_dataset_kwargs" in vars(DomainTransferDataModule)
-    # 전용 인자 조립: role 에 따라 is_train 이 갈리고, DT 는 증강 인자를 그대로 넘긴다
+    # dedicated argument assembly: is_train depends on role, and DT passes the augmentation arguments through
     p = ProtoNetDataModule.__new__(ProtoNetDataModule)
     p.index_csv, p.raw_data_directory, p.sampling_rate, p.sample_level, p.audio_preprocessor = "i.csv", "/raw", 4000, "cycle", None
     p.fade, p.resample_after_slice, p.time_unit, p.split_file, p.index_dataset_params = True, False, "s", None, {}

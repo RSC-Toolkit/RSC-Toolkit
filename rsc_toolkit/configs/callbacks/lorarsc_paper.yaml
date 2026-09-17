@@ -1,6 +1,6 @@
 # @package _global_
-# LoRA-RSC 학습 프로토콜: 스텝 단위 CosineAnnealingLR(T_max=259×100, eta_min 0, warmup 없음), MA/EMA 없음,
-# best-on-test = 매 epoch 공식 test Score 최고 (Se 게이트 없음 → min_se -1), 재개 지원.
+# LoRA-RSC training protocol: per-step CosineAnnealingLR (T_max=259×100, eta_min 0, no warmup), no MA/EMA,
+# best-on-test = best official test Score every epoch (no Se gate → min_se -1), resumable.
 trainer:
   params:
     callbacks:

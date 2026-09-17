@@ -1,14 +1,14 @@
 # @package _global_
-# PC-MCL 학습 프로토콜 콜백 — 학습 스크립트 부재 → PAFA 계보 **가정**: MA 0.5(--ma_update, argparse 기본 beta 0), epoch 코사인(lr 5e-5, 100 ep,
-# eta_min=lr·1e-3; misc.py adjust_learning_rate), best-on-test Score 최고 && Se > 0.1 (main.py:960 — Se 는 % 단위라 min_se 0.1), 재개 지원.
-# warmup(--warm, 10 ep) 은 미사용 가정.
+# PC-MCL training-protocol callbacks — no training script released → **assumed** from the PAFA lineage: MA 0.5 (--ma_update, argparse default beta 0), per-epoch cosine (lr 5e-5, 100 ep,
+# eta_min=lr·1e-3; misc.py adjust_learning_rate), best-on-test with best Score && Se > 0.1 (main.py:960 — Se is in %, hence min_se 0.1), resumable.
+# warmup (--warm, 10 ep) is assumed unused.
 trainer:
   params:
     callbacks:
       - _target_: rsc_toolkit.trainer.callbacks.ma_update.LiveWeightAveraging
         beta: 0.5
       - _target_: rsc_toolkit.trainer.callbacks.paper_cosine_lr.PaperCosineLR
-        learning_rate: ${optimizer.params.lr}        # 단일 출처 — optimizer 그룹. 하드코딩 복사본이 CLI 스윕을 침묵 무효화했다
+        learning_rate: ${optimizer.params.lr}        # single source: the optimizer group (a hard-coded copy would silently ignore CLI sweeps)
         epochs: ${trainer.params.max_epochs}
       - _target_: rsc_toolkit.trainer.callbacks.icbhi_best_checkpoint.ICBHIBestScoreCheckpoint
         dirpath: outputs/pcmcl/${run.name}

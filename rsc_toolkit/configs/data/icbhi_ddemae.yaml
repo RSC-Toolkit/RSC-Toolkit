@@ -1,37 +1,37 @@
-# DDE-MAE(Wei et al., Interspeech 2025) ICBHI 데이터 — 논문 명세 재구현·가정 런.
-# 논문 명시: 4 kHz 다운샘플(§3.1), 60/40 ('Following the official experimental settings' → 공식 고정 스플릿으로 해석, 플래그),
-#           4-class cycle, 증강 없음(§3.6 mixup/cutmix 미사용 서술; SpecAug 언급 없음).
-# 미기재 → 가정: 특징 = Audio-MAE 관례 kaldi fbank 128 bins / 10 ms hop / 25 ms 창(kaldi 기본) / hanning / dither 0,
-#           Audio-MAE AudioSet 정규화 상수 (x+4.2677393)/(4.5689974*2), 10.24 s 클립(긴 사이클 절단, 짧으면 0-패딩).
-# [패딩 수준 — 가정·주의] 툴킷 zero 패딩은 **파형 단위**(processors/audio.py) 라 패딩 구간의 fbank 가 log(eps) ≈ −15.94 → 정규화 후 −1.2776 상수.
-#           Audio-MAE dataset.py 의 ZeroPad2d 는 **특징(fbank) 단위** 0 패딩 → 정규화 후 +0.467 이라 값이 다르다(툴킷에 특징 단위 패딩 없음).
-#           ICBHI 사이클(평균 ~2.7 s) 은 10.24 s 의 대부분이 패딩: 캐시 표본 20개에서 1024 프레임 중 584–929 (57–91%) 가 −1.2776.
-#           또 10.24 s × 4 kHz = 40,960 샘플 → kaldi 프레임 1022 → processors/mel.py 가 마지막 2 프레임을 0.0(정규화 공간) 으로 채움 (1022+2).
-#           대안 플래그(저자 질문 후): desired_length_sec 를 사이클 길이에 맞춤(예: 2.56 s → target_frames 256, 모델 img_size (256,128)) 또는 pad_type repeat_fade.
-# [4 kHz × 128 mel — 가정·주의] kaldi 창 100 샘플 → FFT 128 (65 bins) 위 128 mel 필터: 캐시 특징 측정 결과 128 행 중 21 행이 모든 비패딩 프레임에서
-#           −1.2776 상수(빈 mel 필터). 사전학습(16 kHz, 0–8 kHz 대역) 특징과 대역·해상도 불일치(위험) — 저자 질문 2번.
-#           대안 플래그: 4 kHz 다운샘플 후 16 kHz 로 재업샘플(sampling_rate 16000 + 앞단 4 kHz 저역 통과 = 사전학습 대역 정합) 또는 n_mels 축소.
-# [P1 전제] feature_precompute_num_workers 0 이라 캐시(downloaded_datasets/features_cache/features/ce42de187845f15c, 6898개) 가 없으면 15 s/it 로
-#           2시간+ 재계산됨 — 캐시 키(특징 파라미터) 를 바꾸면 큐 투입 전 feature_precompute_num_workers=16 으로 한 번 미리 채울 것.
+# DDE-MAE (Wei et al., Interspeech 2025) ICBHI data — re-implementation from the paper specification (assumption run).
+# Stated in the paper: 4 kHz downsampling (§3.1), 60/40 ('Following the official experimental settings' → interpreted as the fixed official split; flagged),
+#           4-class cycles, no augmentation (§3.6 states no mixup/cutmix; SpecAug not mentioned).
+# Not specified → assumed: features = Audio-MAE convention kaldi fbank 128 bins / 10 ms hop / 25 ms window (kaldi default) / hanning / dither 0,
+#           Audio-MAE AudioSet normalization constants (x+4.2677393)/(4.5689974*2), 10.24 s clips (long cycles truncated, short ones zero-padded).
+# [Padding level — assumption, caution] toolkit zero padding is **waveform-level** (processors/audio.py), so the fbank of the padded region is log(eps) ≈ −15.94 → constant −1.2776 after normalization.
+#           Audio-MAE dataset.py's ZeroPad2d pads with 0 at the **feature (fbank) level** → +0.467 after normalization, a different value (the toolkit has no feature-level padding).
+#           ICBHI cycles (mean ~2.7 s) leave most of the 10.24 s as padding: in 20 cached samples, 584–929 of 1024 frames (57–91%) are −1.2776.
+#           Also 10.24 s × 4 kHz = 40,960 samples → 1022 kaldi frames → processors/mel.py fills the last 2 frames with 0.0 (normalized space) (1022+2).
+#           Alternative flags: match desired_length_sec to the cycle length (e.g. 2.56 s → target_frames 256, model img_size (256,128)) or pad_type repeat_fade.
+# [4 kHz × 128 mel — assumption, caution] kaldi window of 100 samples → FFT 128 (65 bins) under 128 mel filters: measured on cached features, 21 of 128 rows are
+#           constant −1.2776 (empty mel filters) in every non-padded frame. Band/resolution mismatch with the pretraining features (16 kHz, 0–8 kHz band) (risk).
+#           Alternative flags: after 4 kHz downsampling, upsample back to 16 kHz (sampling_rate 16000 + 4 kHz low-pass up front = matches the pretraining band) or fewer n_mels.
+# [Prerequisite] feature_precompute_num_workers is 0, so without the cache (downloaded_datasets/features_cache/features/ce42de187845f15c, 6898 items) recomputation runs at 15 s/it
+#           for 2+ hours — if the cache key (feature parameters) changes, pre-fill it once with feature_precompute_num_workers=16 before training.
 name: index
 params:
   datamodule_name: index
   dataset_name: icbhi
   index_dataset_cls: rsc_toolkit.datasets.index_dataset.IndexDataset
   project_root: ${hydra:runtime.cwd}
-  split_file: rsc_toolkit/datasets/icbhi/data/official_split.txt   # 가정: 공식 고정 60/40 (논문 문구 'randomly selected' 모호)
+  split_file: rsc_toolkit/datasets/icbhi/data/official_split.txt   # Assumption: fixed official 60/40 split (the paper's wording 'randomly selected' is ambiguous)
   data_dir: .datasets/icbhi
 
-  sampling_rate: 4000              # 논문 §3.1 명시
+  sampling_rate: 4000              # stated in paper §3.1
   sample_level: cycle
-  desired_length_sec: 10.24        # 가정: Audio-MAE 1024 프레임 × 10 ms (실제 1022 + 2 프레임 0.0)
-  pad_type: zero                   # 가정: 파형 0-패딩 → 특징값 −1.2776 (Audio-MAE 특징 단위 ZeroPad2d 의 +0.467 과 다름; 대안 repeat_fade)
+  desired_length_sec: 10.24        # Assumption: Audio-MAE 1024 frames × 10 ms (actually 1022 + 2 frames of 0.0)
+  pad_type: zero                   # Assumption: waveform zero-padding → feature value −1.2776 (differs from +0.467 of Audio-MAE's feature-level ZeroPad2d; alternative: repeat_fade)
 
   train_splits: [train]
-  val_splits: [test]               # 매 epoch 공식 test 평가 → best-on-test (논문 검증셋 미기재)
+  val_splits: [test]               # official test evaluation every epoch → best-on-test (no validation set specified in the paper)
   test_splits: [test]
 
-  batch_size: 8                    # 1단계 논문 명시 8; 2단계 미기재 → 8 가정
+  batch_size: 8                    # stage 1: 8 per the paper; stage 2 not specified → 8 assumed
   num_workers: 4
   shuffle_train: true
   drop_last_train: false
@@ -45,7 +45,7 @@ params:
     frame_shift: 10
     window_type: hanning
     dither: 0.0
-    normalize: true                # (x - (-4.2677393)) / (4.5689974 * 2) — Audio-MAE AudioSet 상수 가정
+    normalize: true                # (x - (-4.2677393)) / (4.5689974 * 2) — Audio-MAE AudioSet constants assumed
     per_sample_stats: false
 
   feature_precompute: true
@@ -53,4 +53,4 @@ params:
   feature_precompute_num_workers: 0
 
   specaugment:
-    enabled: false                 # 논문 증강 언급 없음
+    enabled: false                 # the paper mentions no augmentation

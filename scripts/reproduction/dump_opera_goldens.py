@@ -1,18 +1,18 @@
 """
-OPERA-CT(evelyn0414/OPERA, HTSAT-Swin) + NTT EMBC'25 동결 평가 경로(eval-audio-repr app/icbhi_sprs)의 P0 골든 —
-공식 코드를 우리 venv 에서 실행한다 (torchlibrosa·efficientnet_pytorch 는 사용되지 않는 경로라 스텁; easydict·nnAudio 는 스크래치 pylib).
+Official-code parity goldens for OPERA-CT (evelyn0414/OPERA, HTSAT-Swin) + the NTT EMBC'25 frozen evaluation path (eval-audio-repr app/icbhi_sprs) —
+runs the official code in our venv (torchlibrosa and efficientnet_pytorch are on unused paths and stubbed; easydict and nnAudio come from a scratch pylib).
 
   PYTHONPATH=<pylib> .venv/bin/python scripts/reproduction/dump_opera_goldens.py \
       --opera outputs/reference/opera --evar outputs/reference/m2d_evar \
       --ckpt pretrained_models/upstream/opera/encoder-operaCT.ckpt --out tests/golden/opera
 
-골든:
-- features.pt : sclmeta 골든 파형(ICBHI 6 + SPRS 6, 16 kHz 8 s 순환 패딩) 배치 → evar ar_opera.get_entire_signal_librosa
-                (배치 단위 librosa trim → mel64(1024/512, 50–8000) → dB(ref=배치 max, top_db 80) → 배치 min-max) (B,64,251);
-                무음 가장자리를 붙인 합성 배치의 librosa trim 인덱스; seed 고정 evar SpecAugment(20,40; 배치 공유 마스크)
-- htsat.pt    : 공식 Cola(encoder="htsat") 에 ckpt 로드(strict=False) 시 missing/unexpected 키, htsat state_dict 키/모양,
-                eval 임베딩 extract_feature(dim=768) (B,768), seed 고정 train 모드 임베딩(bn0 배치통계 + DropPath) 과 그 후 bn0 running 통계
-- head.pt     : seed 고정 TfmEncHead(768→n_cls, depth 4, heads 1, mlp_ratio 1) / MLP(768,(128,),n_cls) state_dict 와 eval 로짓
+Goldens:
+- features.pt : batch of sclmeta golden waveforms (ICBHI 6 + SPRS 6, 16 kHz 8 s circular padding) → evar ar_opera.get_entire_signal_librosa
+                (batch-level librosa trim → mel64 (1024/512, 50–8000) → dB (ref=batch max, top_db 80) → batch min-max) (B,64,251);
+                librosa trim indices of a synthetic batch with silent edges; fixed-seed evar SpecAugment (20,40; mask shared across the batch)
+- htsat.pt    : missing/unexpected keys when loading the ckpt into the official Cola(encoder="htsat") (strict=False), htsat state_dict keys/shapes,
+                eval embeddings extract_feature(dim=768) (B,768), fixed-seed train-mode embeddings (bn0 batch statistics + DropPath) and the bn0 running statistics afterwards
+- head.pt     : state_dict and eval logits of the fixed-seed TfmEncHead(768→n_cls, depth 4, heads 1, mlp_ratio 1) / MLP(768,(128,),n_cls)
 """
 import argparse
 import json
@@ -60,7 +60,7 @@ def main():
     import librosa
     from src.model.models_cola import Cola
     import evar.ar_opera as ao
-    # evar/finetune.py 는 evar.data(샘플러 등) 를 끌어와 import 가 무거우므로 SpecAugment 클래스 소스만 그대로 exec 한다
+    # evar/finetune.py pulls in evar.data (samplers etc.) and is heavy to import, so only the SpecAugment class source is exec'd as-is
     import torchaudio
     src = (pathlib.Path(args.evar) / "finetune.py").read_text()
     block = src[src.index("class SpecAugment:"):src.index("class AudioFineuneAug")]
@@ -74,7 +74,7 @@ def main():
     icbhi = torch.stack([w["wav"] for w in torch.load("tests/golden/sclmeta/audio.pt")])          # (6, 128000)
     sprs = torch.stack([w["wav"] for w in torch.load("tests/golden/sclmeta_sprs/audio.pt")])      # (6, 128000)
     assert icbhi.shape == sprs.shape == (6, 128000)
-    # 무음 가장자리 합성 배치: 앞 0.5 s / 뒤 0.3 s 를 0 으로 (원본 trim 이 실제로 자르는 경우를 만든다)
+    # synthetic batch with silent edges: zero the first 0.5 s / last 0.3 s (creates a case where the original trim actually cuts)
     synth = icbhi.clone()
     synth[:, : 8000] = 0.0
     synth[:, -4800:] = 0.0
@@ -84,13 +84,13 @@ def main():
         _, idx = librosa.effects.trim(x.numpy(), frame_length=FRAME_LEN, hop_length=HOP)
         trims[name] = [int(idx[0]), int(idx[1])]
     print("trim indices", trims)
-    assert trims["icbhi"] == [0, 128000] and trims["sprs"] == [0, 128000], "골든 파형이 trim 되면 원본 경로가 죽는다"
+    assert trims["icbhi"] == [0, 128000] and trims["sprs"] == [0, 128000], "if the golden waveforms get trimmed, the original path breaks"
 
     with torch.no_grad():
         feat_icbhi = ao.get_entire_signal_librosa(icbhi, input_sec=8)  # (6, 64, 251) float32
         feat_sprs = ao.get_entire_signal_librosa(sprs, input_sec=8)
     print("features", tuple(feat_icbhi.shape), feat_icbhi.dtype, float(feat_icbhi.min()), float(feat_icbhi.max()))
-    # 배치 분할 의존성 기록: 앞 3개만 넣은 특징 (배치 통계가 달라진다)
+    # record the batch-split dependence: features from only the first 3 (batch statistics change)
     with torch.no_grad():
         feat_icbhi_half = ao.get_entire_signal_librosa(icbhi[:3], input_sec=8)
 
@@ -139,7 +139,7 @@ def main():
     # ---------------- heads (solve.py) ----------------
     from timm.models.vision_transformer import Block
 
-    class TfmEncHead(nn.Module):  # solve.py 그대로
+    class TfmEncHead(nn.Module):  # solve.py as-is
         def __init__(self, embed_dim=768, output_dim=3, depth=2, heads=1, mlp_ratio=1):
             super().__init__()
             self.sem_token = nn.Parameter(torch.zeros(1, 1, embed_dim))
@@ -166,7 +166,7 @@ def main():
             x = self.norm(x)
             return self.linear(x)
 
-    class MLP(nn.Module):  # solve.py 그대로
+    class MLP(nn.Module):  # solve.py as-is
         def __init__(self, input_size, hidden_sizes, output_size, hidden_dropout=0.5, mean=0.0, std=0.01, bias=0.):
             super().__init__()
             self.norm = torch.nn.BatchNorm1d(input_size, affine=False)
@@ -197,7 +197,7 @@ def main():
         logits_mlp = mlp(tokens)
     torch.save(
         {
-            # state_dict 전체(57 MB) 대신 키별 모양·합·절대평균 요약 — 같은 시드로 만든 툴킷 헤드와 대조
+            # instead of the full state_dict (57 MB), a per-key summary of shape, sum and mean absolute value — compared against the toolkit head built with the same seed
             "tfm_seed": 3, "tfm_state_meta": {k: [list(v.shape), float(v.double().sum()), float(v.double().abs().mean())] for k, v in tfm.state_dict().items()},
             "logits_tfm": logits_tfm,
             "mlp_seed": 4, "mlp_state_meta": {k: [list(v.shape), float(v.double().sum()), float(v.double().abs().mean())] for k, v in mlp.state_dict().items()},

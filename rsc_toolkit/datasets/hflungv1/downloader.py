@@ -112,8 +112,8 @@ class HFLungV1DatasetDownloader(BaseRSCDatasetDownloader):
         return (pathlib.Path(__file__).parent / "data" / "metadata.csv").resolve()
 
     def _ensure_metadata(self) -> None:
-        # 업스트림 GitLab 저장소에는 metadata.csv가 없으므로 (라벨 CSV로부터 생성된)
-        # 패키지 번들본을 데이터 폴더로 복사해 validate 계약을 만족시킨다.
+        # The upstream GitLab repository has no metadata.csv, so the packaged copy (generated from the label CSVs)
+        # is copied into the data folder to satisfy the validate contract.
         if self.metadata_path.exists():
             return
         bundled = self._package_metadata_path()

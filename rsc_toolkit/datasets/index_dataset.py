@@ -58,12 +58,12 @@ class IndexDataset(Dataset):
         self.return_meta = bool(return_meta)
         self.fade = bool(fade)
         self.audio_preprocessor = audio_preprocessor
-        # True: 원 sr 로 [t0,t1) 구간만 잘라 그 구간을 리샘플 (SCL-metadata 계열 dataset.py —
-        #       torchaudio.load(frame_offset, num_frames) 후 Resample). 녹음 전체 리샘플 후 자르는 것과
-        #       경계 샘플이 미세하게 다르다. fade 는 적용하지 않는다(전처리기가 담당).
+        # True: crop only the [t0,t1) segment at the original sr and resample that segment (SCL-metadata family dataset.py --
+        #       torchaudio.load(frame_offset, num_frames) then Resample). Boundary samples differ slightly from resampling
+        #       the whole recording and then cropping. No fade is applied (the preprocessor handles it).
         self.resample_after_slice = bool(resample_after_slice)
-        # "ms_int": SPRSound 계열(scl_icbhi2017 dataset.py:202) — 온셋/오프셋이 ms 정수라
-        #          start = ms * int(sr/1000) 로 자른다 (t0 는 초로 저장돼 있어 round(t0*1000) 으로 복원).
+        # "ms_int": SPRSound family (scl_icbhi2017 dataset.py:202) -- onsets/offsets are integer ms, so
+        #          crop at start = ms * int(sr/1000) (t0 is stored in seconds and recovered as round(t0*1000)).
         if time_unit not in ("s", "ms_int"):
             raise ValueError(f"time_unit must be 's' or 'ms_int', got {time_unit!r}")
         self.time_unit = time_unit
@@ -102,8 +102,8 @@ class IndexDataset(Dataset):
             return (self.index_csv.parent / p).resolve()
         return (self.data_root / p).resolve()
 
-    # 인덱스 CSV 옆에 두는 split 파일 이름.
-    # sprsound·hflungv1 processor 가 이미 이 이름으로 index_dir 에 써 놓는다.
+    # Name of the split file placed next to the index CSV.
+    # The sprsound and hflungv1 processors write it to index_dir under this name.
     SPLIT_FILE_NAME = "official_split.txt"
 
     def _sibling_split_file(self) -> pathlib.Path:
@@ -111,24 +111,24 @@ class IndexDataset(Dataset):
 
     def _split_column_has_values(self) -> bool:
         """
-        split 컬럼이 실제로 쓸 수 있는 값을 갖고 있는지 본다.
+        Check whether the split column holds usable values.
 
-        ICBHI 인덱스는 split 컬럼이 있지만 전 행이 비어 있다. 컬럼 존재만 보고
-        이 경로를 타면 매칭이 0건이라 `No data found for split ...` 로 죽는다.
+        ICBHI indexes have a split column, but every row is empty. Taking this path based only on
+        column presence would match 0 rows and fail with `No data found for split ...`.
         """
         if "split" not in self.df.columns:
             return False
-        # 결측을 먼저 떨궈야 한다. pandas 3 에서 astype(str) 은 결측을 문자열
-        # "nan" 으로 바꾸지 않고 결측인 채로 두므로, 문자열 비교로는 거를 수 없다.
+        # Missing values must be dropped first. In pandas 3, astype(str) keeps missing values as missing
+        # instead of turning them into the string "nan", so a string comparison cannot filter them.
         values = self.df["split"].dropna().astype(str).str.strip()
         return bool((values != "").any())
 
     def _apply_split(self, split: str, split_file: Optional[Union[str, pathlib.Path]]) -> None:
         """
-        split 을 적용한다. 우선순위:
-          1. 명시적으로 준 split_file
-          2. 값이 들어 있는 split 컬럼
-          3. 인덱스 CSV 옆의 official_split.txt
+        Apply the split. Priority:
+          1. an explicitly given split_file
+          2. a split column with values
+          3. official_split.txt next to the index CSV
         """
         if split_file is not None:
             self._filter_df_by_split(self._load_official_split_map(split_file), split)
@@ -140,19 +140,19 @@ class IndexDataset(Dataset):
 
         sibling = self._sibling_split_file()
         if sibling.exists():
-            logger.info("split 컬럼이 비어 있어 %s 를 사용한다.", sibling)
+            logger.info("split column is empty; using %s.", sibling)
             self._filter_df_by_split(self._load_official_split_map(sibling), split)
             return
 
         raise ValueError(
-            f"split={split!r} 을 적용할 수 없다. split_file 을 직접 주거나, "
-            f"인덱스에 split 값이 들어 있거나, {sibling} 가 있어야 한다."
+            f"Cannot apply split={split!r}. Pass split_file explicitly, "
+            f"or the index must contain split values, or {sibling} must exist."
         )
 
     def _load_official_split_map(
         self, split_file: Union[str, pathlib.Path]
     ) -> Mapping[str, str]:
-        """recording_id -> split ("train" or "test"). 파서는 rsc_toolkit.datasets.splits.read_split_file 한 곳."""
+        """recording_id -> split ("train" or "test"). The single parser is rsc_toolkit.datasets.splits.read_split_file."""
         from rsc_toolkit.datasets.splits import read_split_file
 
         return read_split_file(split_file)
@@ -210,8 +210,8 @@ class IndexDataset(Dataset):
 
             t0 = float(row["t0"])
             t1 = float(row["t1"])
-            # 원본(scl_icbhi2017 dataset.py:93-94)처럼 구간만 읽는다: frame_offset=int(t0*sr),
-            # num_frames=int(t1*sr)-int(t0*sr). WAV 라 전체를 읽고 자르는 것과 샘플이 같고 훨씬 빠르다.
+            # Read only the segment, as in the original (scl_icbhi2017 dataset.py:93-94): frame_offset=int(t0*sr),
+            # num_frames=int(t1*sr)-int(t0*sr). For WAV this yields the same samples as reading everything and cropping, and is much faster.
             sr = torchaudio.info(str(wav_path)).sample_rate
             if self.time_unit == "ms_int":
                 k = int(sr / 1000)
@@ -286,8 +286,8 @@ class IndexFeatureDataset(Dataset):
         self.index_ds = index_ds
         self.fp = feature_processor
         self.feature_transform = feature_transform
-        # sgscl 계열(DAT·SG-SCL)용: 아이템 dict → meta 라벨 정수.
-        # 지정하면 4번째 원소로 meta 라벨을 돌려준다 (원본은 train 셋에서만 meta 반환).
+        # For the sgscl family (DAT, SG-SCL): item dict -> integer meta label.
+        # When set, the meta label is returned as the 4th element (the original returns meta only for the train set).
         self.meta_label_fn = meta_label_fn
 
     def __len__(self):

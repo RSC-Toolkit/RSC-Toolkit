@@ -1,9 +1,9 @@
 """
-Patch-Mix / SG-SCL 계열 논문들이 공유하는 projection head — 공식 코드 충실 이식.
+Projection head shared by the Patch-Mix / SG-SCL family of papers — exact port of the official code.
 
-출처: https://github.com/raymin0223/patch-mix_contrastive_learning models/projector.py (MIT)
-      (kaen2891/stethoscope-guided_supervised_contrastive_learning 도 동일 구조를 사용)
-구조: Linear(in,in) - BatchNorm1d(in) - ReLU - Linear(in,out). apply_bn=False 면 BN 생략.
+Source: https://github.com/raymin0223/patch-mix_contrastive_learning models/projector.py (MIT)
+      (kaen2891/stethoscope-guided_supervised_contrastive_learning uses the same structure)
+Structure: Linear(in,in) - BatchNorm1d(in) - ReLU - Linear(in,out). BN is omitted when apply_bn=False.
 """
 import torch.nn as nn
 

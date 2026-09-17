@@ -1,12 +1,12 @@
 """
-split_iter(K) 학습 어댑터 — nttcslab/m2d app/icbhi_sprs 패치본 ce.py 의 저메모리 분할 배치 동작 재현.
+split_iter(K) training adapter: reproduces the low-memory split-batch behavior of ce.py in the nttcslab/m2d app/icbhi_sprs patch.
 
-train: 배치 전체를 model.train_transform (배치 min-max·SpecAug 가 B 기준) → D = B // K 개씩 K 번
-       forward → 손실(부분배치 평균) backward 누적 → optimizer.step 1회. 나머지 B - K·D 개는 버린다(원본 quirk; 학습 레시피의 일부라 유지).
-val:   D = B // K 개씩 model.val_transform (min-max 가 D 기준) → forward. 원본 ce.py 는 나머지 B - K·D 개를 평가에서 빠뜨렸지만
-       (SPRSound test 1,429 = 64×22 + 21 → 1 건 탈락) 툴킷은 나머지를 (K+1) 번째 서브배치로 평가한다 — 2026-09-16 사용자 지시
-       ("테스트 데이터 누락은 말이 안 된다"). 앞 K·D 건의 서브배치 구성·min-max 는 원본과 같아 예측이 비트 동일하고 나머지 건만 더해진다.
-스케줄러는 epoch 끝에 수동 step (원본 scheduler.step() 위치와 동일).
+train: whole batch through model.train_transform (batch min-max and SpecAug over B) → K forwards of D = B // K samples each
+       → backward of the loss (sub-batch mean) accumulated → one optimizer.step. The remaining B - K·D samples are dropped (quirk of the original code; kept as part of the training recipe).
+val:   model.val_transform on D = B // K samples at a time (min-max over D) → forward. The original ce.py leaves the remaining B - K·D samples out of evaluation
+       (SPRSound test 1,429 = 64×22 + 21 → 1 sample dropped); the toolkit evaluates the remainder as a (K+1)-th sub-batch so that no test sample
+       is dropped. The sub-batch composition and min-max of the first K·D samples match the original code, so their predictions are bit-identical; only the remainder is added.
+The scheduler is stepped manually at epoch end (same position as scheduler.step() in the original code).
 """
 from typing import Any, Dict, List, Optional
 
@@ -16,8 +16,8 @@ from .pl_adapter import PLAdapter
 
 
 class SplitIterAdapter(PLAdapter):
-    # BaseRSCModel 계약(training_forward) 밖의 M2D 계열 전용 프로토콜. 생성 시점에 검사해
-    # 다른 모델과 잘못 조합했을 때 학습 도중 AttributeError 로 발견되는 일을 막는다.
+    # M2D-family protocol outside the BaseRSCModel contract (training_forward). Checked at construction so that
+    # a wrong combination with another model is not discovered mid-training as an AttributeError.
     REQUIRED_MODEL_ATTRS = ("train_transform", "val_transform")
 
     def __init__(self, *args, rsc_model=None, split_iter: int = 4, **kwargs):
@@ -26,12 +26,12 @@ class SplitIterAdapter(PLAdapter):
         missing = [a for a in self.REQUIRED_MODEL_ATTRS if not callable(getattr(rsc_model, a, None))]
         if missing:
             raise TypeError(
-                f"adapter=split_iter 는 모델에 {missing} 메서드를 요구한다 (M2D 계열 전용 프로토콜). "
-                f"{type(rsc_model).__name__} 은 BaseRSCModel 계약(training_forward)만 구현했다 — "
-                "adapter=pl 을 쓰거나 해당 메서드를 구현하라."
+                f"adapter=split_iter requires the model to have the methods {missing} (M2D-family protocol). "
+                f"{type(rsc_model).__name__} only implements the BaseRSCModel contract (training_forward); "
+                "use adapter=pl or implement these methods."
             )
         if int(split_iter) < 1:
-            raise ValueError(f"split_iter 는 1 이상이어야 한다: {split_iter!r}")
+            raise ValueError(f"split_iter must be >= 1: {split_iter!r}")
         super().__init__(*args, rsc_model=rsc_model, **kwargs)
         self.K = int(split_iter)
         self.automatic_optimization = False
@@ -64,7 +64,7 @@ class SplitIterAdapter(PLAdapter):
             sch.step()
 
     def val_chunks(self, B: int) -> list:
-        """검증 서브배치 경계 [(start, end), …]: D=B//K 개씩 K 개 + 나머지(있으면) 1 개. B < K 면 통째로 1 개. 모든 샘플이 정확히 한 번 평가된다."""
+        """Validation sub-batch bounds [(start, end), …]: K chunks of D=B//K plus one for the remainder (if any). If B < K, a single chunk. Every sample is evaluated exactly once."""
         D = B // self.K
         bounds = [(i * D, (i + 1) * D) for i in range(self.K)] if D > 0 else []
         if self.K * D < B:

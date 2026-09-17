@@ -7,7 +7,7 @@ from rsc_toolkit.metrics.icbhi.sesp import EPS, sesp_score
 
 
 def get_score(hits, counts, pflag=False):
-    """BTS util/icbhi_util.py get_score 와 같은 값 (normal = 클래스 0). 산식은 sesp_score 한 곳에 있다."""
+    """Same values as get_score in BTS util/icbhi_util.py (normal = class 0). The formula lives in sesp_score only."""
     sp, se, sc = sesp_score(hits, counts, normal_index=0, eps=EPS)
     if pflag:
         print("S_p: {}, S_e: {}, Score: {}".format(sp, se, sc))
@@ -24,9 +24,9 @@ class ICBHIScore(Metric):
       S_e = acc on all other classes
       Score = (S_p + S_e)/2
 
-    출력 키는 기본 {"S_p", "S_e", "icbhi_score"} 다. SPRSound 처럼 다른 데이터셋에 쓸 때 `score_key="sprsound_score"`
-    로 이름을 바꾸거나, 같은 클래스 두 개를 나란히 둘 때 `key_prefix` 로 충돌을 피할 수 있다 (기본값이면 예전과 같다 —
-    best-checkpoint 콜백의 score_key·best.json 스키마·검증 스크립트가 기본 키를 전제한다).
+    Output keys default to {"S_p", "S_e", "icbhi_score"}. For other datasets such as SPRSound the score can be renamed with
+    `score_key="sprsound_score"`, and `key_prefix` avoids collisions when two instances are used side by side (the best-checkpoint
+    callback's score_key, the best.json schema, and the verification scripts assume the default keys).
     """
     full_state_update = False
 
@@ -53,7 +53,7 @@ class ICBHIScore(Metric):
 
     @property
     def keys(self) -> Dict[str, str]:
-        """compute() 가 내는 키 이름 — 콜백이 문자열을 알아맞히는 대신 여기서 읽는다."""
+        """Key names produced by compute() — callbacks read them here instead of guessing the strings."""
         p = self.key_prefix
         return {"S_p": f"{p}S_p", "S_e": f"{p}S_e", "score": f"{p}{self.score_key}"}
 
@@ -74,11 +74,11 @@ class ICBHIScore(Metric):
         if target.numel() > 0:
             lo, hi = int(target.min()), int(target.max())
             if lo < 0 or hi >= self.num_classes:
-                # 예전엔 [0, num_classes) 밖 라벨을 per-class 루프가 조용히 버려, 7-class 라벨을 4-class 메트릭에 넣으면
-                # 남은 라벨만으로 Score 가 계산돼 100 에 가까운 값이 나왔다 (REVIEW 2026-09-10 §4 P2).
+                # Labels outside [0, num_classes) would be silently dropped by the per-class loop: feeding 7-class labels to a
+                # 4-class metric would compute the Score from the remaining labels only and yield values close to 100.
                 raise ValueError(
-                    f"ICBHIScore(num_classes={self.num_classes}) 에 범위 밖 라벨이 들어왔다: min {lo}, max {hi}. "
-                    f"metrics config 의 num_classes 와 데이터셋 라벨 공간(예: SPRSound 7-class vs 7→4 병합)이 맞는지 확인하라."
+                    f"ICBHIScore(num_classes={self.num_classes}) received out-of-range labels: min {lo}, max {hi}. "
+                    f"Check that num_classes in the metrics config matches the dataset label space (e.g. SPRSound 7-class vs 7→4 merged)."
                 )
 
         # top-k predicted indices: [B, k]
@@ -94,8 +94,8 @@ class ICBHIScore(Metric):
             self.hits[cls] += (correct & mask).sum()
 
     def compute(self) -> Dict[str, torch.Tensor]:
-        # 텐서 산술로 계산하되 산식은 sesp_score 와 동일(eps 1e-10). torch.float32 상태를 그대로 쓴다 —
-        # 예전 compute 와 비트 단위로 같아야 best.json·골든 값이 유지된다.
+        # Tensor arithmetic with the same formula as sesp_score (eps 1e-10), using the torch.float32 state as is —
+        # the result must stay bit-identical so that best.json and golden values remain valid.
         counts = self.counts.float()
         hits = self.hits.float()
 

@@ -1,21 +1,21 @@
 """
-BTS-CARD P0 골든 — 공식 코드(RSC-Toolkit/BTS-CARD a9982a0)를 README 계보 환경(transformers 4.40.0, CPU)에서 실행.
+BTS-CARD official-code parity goldens — runs the official code (RSC-Toolkit/BTS-CARD a9982a0) in the README-lineage environment (transformers 4.40.0, CPU).
 
   .venv-ref-btscard/bin/python scripts/reproduction/dump_btscard_goldens.py \
       --repo outputs/reference/btscard --out tests/golden/btscard [--ckpt pretrained_models/upstream/btscard/best.pth]
 
-원본은 main 안에 .cuda() 가 하드코딩돼 있어(set_model/train) 여기서는 main 의 손실 조립(main:276-301, 416)을
-공식 함수(models/*, util/misc.py fusion_function·kl_loss_function·ReverseLayerF, util/icbhi_util.py
-get_meta_text_descriptions·randomly_mask_metadata)로 CPU 에서 그대로 재구성한다. HF 허브 접근 없이 로컬 사본을 쓴다
-(nlpie/tiny-clinicalbert → pretrained_models/upstream/hf/tiny-clinicalbert; CLAP 은 HF 캐시).
+The original hard-codes .cuda() inside main (set_model/train), so here the loss assembly of main (main:276-301, 416) is reconstructed
+as-is on CPU from the official functions (models/*, util/misc.py fusion_function·kl_loss_function·ReverseLayerF, util/icbhi_util.py
+get_meta_text_descriptions·randomly_mask_metadata). Local copies are used instead of HF Hub access
+(nlpie/tiny-clinicalbert → pretrained_models/upstream/hf/tiny-clinicalbert; CLAP from the HF cache).
 
-골든 (tests/golden/btscard/):
-- forward_golden.pt : 입력(training.pt 앞 N 배치 x/y/meta7), 랜덤 초기화 헤드 가중치(classifier, tinybert.classifier,
-                      판별기), CLAP/BERT 토큰 id, bert CLS, o_multi/o_text/o1/o2/loc/dev 로짓, 6항 손실,
-                      TIE(α 0/0.5/1) — fp32, eval 모드(dropout off)
-- text_golden.json  : CLAP 문장(마스킹 없음), 마스킹 dict·문장(random.seed 고정), 4.40.0 토큰 id
-- ckpt_forward_golden.pt (옵션): 저자 best.pth 로 같은 입력의 출력
-- record.json       : 버전·설정
+Goldens (tests/golden/btscard/):
+- forward_golden.pt : inputs (first N batches of training.pt x/y/meta7), randomly initialized head weights (classifier, tinybert.classifier,
+                      discriminators), CLAP/BERT token ids, bert CLS, o_multi/o_text/o1/o2/loc/dev logits, 6 loss terms,
+                      TIE (α 0/0.5/1) — fp32, eval mode (dropout off)
+- text_golden.json  : CLAP sentences (no masking), masking dicts and sentences (fixed random.seed), 4.40.0 token ids
+- ckpt_forward_golden.pt (optional): outputs for the same inputs with the authors' best.pth
+- record.json       : versions and settings
 """
 import argparse
 import json
@@ -42,7 +42,7 @@ def main():
 
     repo = pathlib.Path(args.repo).resolve()
     sys.path.insert(0, str(repo))
-    # 허브 이름 → 로컬 사본 (원본 tinybert.py 는 이름을 하드코딩)
+    # hub name → local copy (the original tinybert.py hard-codes the name)
     _orig_from_pretrained = transformers.AutoModel.from_pretrained.__func__
     bert_local = str(pathlib.Path(args.bert_local).resolve())
 
@@ -66,18 +66,18 @@ def main():
     a = types.SimpleNamespace(clap_final="concat", te_alpha=0.5, meta_mode="all", test_wrong_label=False,
                               test_drop_key=False, test_drop_key_prob=0.1, test_unknown_all=False, test_bmi=False)
 
-    # ---- 입력 ----
+    # ---- inputs ----
     items = torch.load(args.train_pt, map_location="cpu")[: args.n]
-    x = torch.stack([it[0] for it in items])                     # (N, 1, 1001, 64) — 원본 images.squeeze(1) 은 (1,1001,64) 에 무효(dim1=1001) → 4D 그대로
+    x = torch.stack([it[0] for it in items])                     # (N, 1, 1001, 64) — the original images.squeeze(1) is a no-op on (1,1001,64) (dim1=1001) → kept 4D
     y = torch.tensor([int(it[1]) for it in items])
     meta = torch.stack([it[2] for it in items]).float()
     loc, dev = meta[:, 5].long(), meta[:, 6].long()
 
-    # ---- 문장 (icbhi_dataset.py:36-45) ----
+    # ---- sentences (icbhi_dataset.py:36-45) ----
     clap_texts = [get_meta_text_descriptions(m, a, training=True, erasing=False) for m in meta]
     random.seed(args.mask_seed)
     bert_texts = [get_meta_text_descriptions(m, a, training=True, erasing=True) for m in meta]
-    # 같은 난수열을 다시 돌려 마스크를 기록 (erasing 경로는 샘플당 random() 4회만 소비)
+    # Replay the same random sequence to record the masks (the erasing path consumes only 4 random() calls per sample)
     random.seed(args.mask_seed)
     masks = []
     for m in meta:
@@ -86,7 +86,7 @@ def main():
         masks.append([md[k] is None for k in ("age", "sex", "loc", "dev")])
     unmasked_bert = [get_meta_text_descriptions(m, a, training=True, erasing=False) for m in meta]
     assert unmasked_bert == clap_texts
-    # 마스크 재적용 문장이 random 경로 문장과 같은지 (기록 무결성)
+    # check that re-applying the masks gives the same sentences as the random path (record integrity)
     from util.meta_description import generate_meta_description  # noqa: E402
     from util.icbhi_util import get_meta_text_descriptions as _g  # noqa: F401
     replay = []
@@ -106,7 +106,7 @@ def main():
     enc_c = Processor.tokenizer(text=clap_texts, return_tensors="pt", padding="max_length", max_length=64)
     enc_b = bert_tok(bert_texts, max_length=64, padding="max_length", truncation=True, return_tensors="pt")
 
-    # ---- 모델 (set_model) ----
+    # ---- model (set_model) ----
     torch.manual_seed(0)
     model = PretrainedCLAP("laion/clap-htsat-unfused", 512)
     classifier = nn.Linear(1024, 4)
@@ -156,7 +156,7 @@ def main():
     print("bert_texts", bert_texts)
 
     rec = {"transformers": transformers.__version__, "torch": torch.__version__, "repo": str(repo), "n": args.n,
-           "device": "cpu", "note": "fp32, eval 모드(dropout off). 원본 train() 은 CLAP 만 autocast 지만 골든은 fp32 로 통일"}
+           "device": "cpu", "note": "fp32, eval mode (dropout off). The original train() autocasts only CLAP, but the goldens use fp32 throughout"}
     if args.ckpt:
         ck = torch.load(args.ckpt, map_location="cpu")
         model.load_state_dict(ck["model"], strict=True)

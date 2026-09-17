@@ -1,4 +1,4 @@
-"""P2-6 — 스플릿 파서·인덱스 스키마의 단일 출처, 예전 이름들의 동일성, loaders.py deprecation."""
+"""Single source of split parsers and index schema, identity of the former names, loaders.py deprecation."""
 from __future__ import annotations
 
 import warnings

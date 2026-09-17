@@ -1,5 +1,5 @@
-# Lung-SRAD(팀) 를 SPRSound 표준 태스크(7-class)로 확장. **논문 목표치 없음** — ICBHI 레시피 그대로.
-# 16 kHz·8 s repeat_fade·bs16·per-sample 정규화·SpecAugment(icbhi_ast_sup)·50 epoch.
+# Lung-SRAD extended to the standard SPRSound task (7-class). **No paper-reported value** — ICBHI recipe unchanged.
+# 16 kHz · 8 s repeat_fade · bs 16 · per-sample normalization · SpecAugment (icbhi_ast_sup) · 50 epochs.
 name: sprsound_lungsrad
 params:
   datamodule_name: index

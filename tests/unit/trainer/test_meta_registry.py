@@ -1,9 +1,9 @@
-"""리팩토링 P1 7단계 — META_LABELS registry + batch[2](meta) 사이드채널의 선언·검사.
+"""META_LABELS registry + declaration and checking of the batch[2] (meta) side channel.
 
-7a: meta_label_mode 의 if 체인 → registry. 내장 4 mode 는 같은 함수·같은 이름(패리티 자명), 미지 mode 는
-    가용 목록과 함께 실패(기존 테스트가 기대하는 NotImplementedError 도 만족), 플러그인 mode 는 데코레이터로.
-7b: datamodule 의 `meta_kind` 와 모델의 `accepts_meta` 를 어댑터 setup 에서 1회 대조 — 미선언 조합은 통과(opt-in),
-    선언된 양쪽이 어긋나면 시작 전에 TypeError (AQS float 를 청진기 id 로 해석하는 식의 침묵 오학습 차단).
+(a) if-chain of meta_label_mode -> registry. The 4 built-in modes keep the same functions and names (parity is trivial); an unknown mode
+    fails with the list of available ones (also satisfying the NotImplementedError the existing tests expect); plugin modes use a decorator.
+(b) datamodule `meta_kind` and model `accepts_meta` are checked once in adapter setup — undeclared combinations pass (opt-in);
+    if both sides are declared and disagree, TypeError before start (blocks silent mis-training such as reading an AQS float as a stethoscope id).
 """
 from __future__ import annotations
 
@@ -46,7 +46,7 @@ def test_plugin_mode_via_decorator():
         META_LABELS.pop("_test_hospital", None)
 
 
-# ── 7b 선언 ────────────────────────────────────────────────────────────────────────────
+# ── (b) declarations ───────────────────────────────────────────────────────────────────
 def test_in_tree_datamodules_declare_meta_kind():
     from rsc_toolkit.datasets.amsd_data import AMSDDataModule
     from rsc_toolkit.datasets.bts_precomputed import BTSPrecomputedDataModule
@@ -64,7 +64,7 @@ def test_in_tree_datamodules_declare_meta_kind():
     assert AMSDDataModule.meta_kind == "amsd_sample_index"
     assert RespireNetDataModule.meta_kind == "respirenet_chunk_index"
     assert LungmixDataModule.meta_kind == "lungmix_valid_len"
-    # 범용 IndexDataModule 은 meta_label_mode 를 그대로 kind 로 쓴다 (꺼져 있으면 None)
+    # generic IndexDataModule uses meta_label_mode directly as kind (None when disabled)
     assert IndexDataModule.meta_kind.fget(SimpleNamespace(meta_label_mode="dev")) == "dev"
     assert IndexDataModule.meta_kind.fget(SimpleNamespace(meta_label_mode=None)) is None
 
@@ -85,7 +85,7 @@ def test_in_tree_models_declare_accepts_meta(model_name, kind):
     assert kind in MODELS.get(model_name).accepts_meta
 
 
-# ── 7b 검사 ────────────────────────────────────────────────────────────────────────────
+# ── (b) checks ─────────────────────────────────────────────────────────────────────────
 class _Model(nn.Module):
     def __init__(self, accepts=None):
         super().__init__()
@@ -103,12 +103,12 @@ def _dm(kind):
 
 
 def test_check_meta_contract_truth_table():
-    check_meta_contract(_Model(), _dm(None))                   # 둘 다 미선언
-    check_meta_contract(_Model(), _dm("dev"))                  # 모델 미선언 → 통과 (opt-in)
-    check_meta_contract(_Model(("dev",)), _dm(None))           # datamodule 이 meta 를 안 보냄 → 통과
-    check_meta_contract(_Model(("dev",)), _dm("dev"))          # 일치
+    check_meta_contract(_Model(), _dm(None))                   # neither declared
+    check_meta_contract(_Model(), _dm("dev"))                  # model undeclared -> pass (opt-in)
+    check_meta_contract(_Model(("dev",)), _dm(None))           # datamodule sends no meta -> pass
+    check_meta_contract(_Model(("dev",)), _dm("dev"))          # match
     check_meta_contract(_Model(("sa", "sa_sprs")), _dm("sa_sprs"))
-    check_meta_contract(_Model(("dev",)), None)                # datamodule 없음(스크립트 경로) → 통과
+    check_meta_contract(_Model(("dev",)), None)                # no datamodule (script path) -> pass
     with pytest.raises(TypeError, match="qlung_aqs"):
         check_meta_contract(_Model(("dev",)), _dm("qlung_aqs"))
 
@@ -121,5 +121,5 @@ def test_pl_adapter_setup_runs_the_check_against_trainer_datamodule():
         adapter.setup("fit")
     adapter._trainer = SimpleNamespace(datamodule=_dm("dev"))
     adapter.setup("fit")
-    adapter._trainer = None  # trainer 미부착(단위 테스트·스크립트) 도 죽지 않는다
+    adapter._trainer = None  # no trainer attached (unit tests, scripts) does not crash either
     adapter.setup("fit")

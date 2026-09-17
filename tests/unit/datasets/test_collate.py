@@ -1,4 +1,4 @@
-"""P2-6 — collate 5벌 → collate_xy_meta 하나. 예전 각 구현의 출력(모양·dtype·값)을 그대로 재현해야 한다."""
+"""Five collate implementations -> a single collate_xy_meta. It must reproduce the output (shape, dtype, values) of each former implementation exactly."""
 from __future__ import annotations
 
 import pickle
@@ -14,7 +14,7 @@ def _x(i):
 
 
 def test_tuple_collate_matches_former_index_datamodule_behavior():
-    # 예전 _tuple_collate: 4번째 원소가 있으면 long meta, 없으면 (x, y)
+    # former _tuple_collate: long meta if a 4th element is present, otherwise (x, y)
     x, y, meta = C.tuple_collate([(_x(1), 0, "id1", 2), (_x(2), 3, "id2", 1)])
     assert x.shape == (2, 2, 3) and y.tolist() == [0, 3] and y.dtype == torch.long
     assert meta.tolist() == [2, 1] and meta.dtype == torch.long
@@ -65,5 +65,5 @@ def test_none_label_is_a_clear_error():
     from rsc_toolkit.datasets.collate import collate_xy_meta
 
     batch = [(torch.zeros(2), 0), (torch.zeros(2), None)]
-    with pytest.raises(ValueError, match="label 이 None"):
+    with pytest.raises(ValueError, match="label None"):
         collate_xy_meta(batch)

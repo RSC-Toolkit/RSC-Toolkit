@@ -1,6 +1,6 @@
 # @package _global_
-# DDE-MAE 1단계(분리 FT): 평가 없음, 마지막 epoch 상태 저장(final_state.pth — E_R·E_I·디코더·q_θ 전부), 재개 지원
-# quirk: q_θ(vCLUB) 보조 Adam 의 optimizer 상태는 last.ckpt 에 없다 — 재개 시 q_θ 파라미터는 state_dict 로 복원되지만 Adam 모멘트는 초기화됨.
+# DDE-MAE stage 1 (disentangled FT): no evaluation, saves the last-epoch state (final_state.pth — all of E_R·E_I·decoder·q_θ), resumable
+# quirk: the optimizer state of the auxiliary Adam for q_θ (vCLUB) is not in last.ckpt — on resume the q_θ parameters are restored from state_dict but the Adam moments are reset.
 trainer:
   params:
     callbacks:

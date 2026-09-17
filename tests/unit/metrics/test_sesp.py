@@ -1,4 +1,4 @@
-"""P2-5 — Se/Sp/Score 단일 출처(sesp_score) 와 ICBHIScore 키 파라미터."""
+"""Single source of Se/Sp/Score (sesp_score) and ICBHIScore key parameters."""
 from __future__ import annotations
 
 import pytest
@@ -25,7 +25,7 @@ def test_sesp_score_normal_index_and_eps():
     hits, counts = [5, 90, 10], [10, 100, 20]
     sp, se, sc = sesp_score(hits, counts, normal_index=1)
     assert sp == pytest.approx(90.0, abs=1e-6) and se == pytest.approx(50.0, abs=1e-6) and sc == pytest.approx(70.0, abs=1e-6)
-    sp, se, _ = sesp_score([0, 0], [0, 0])  # 빈 클래스는 0 (분모 eps)
+    sp, se, _ = sesp_score([0, 0], [0, 0])  # empty class gives 0 (eps in denominator)
     assert sp == 0.0 and se == 0.0
     assert EPS == 1e-10
     with pytest.raises(ValueError):

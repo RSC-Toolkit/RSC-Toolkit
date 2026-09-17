@@ -1,7 +1,7 @@
-# RespireNet 데이터: librosa 4 kHz(kaiser_best) → cycle → 8초 청킹(자기 반복 패딩, seed) → magma 이미지(BRC) → Normalize.
-#   80/20 환자 fold (원본·배포 ckpt 기준): split_mode=fold, test_fold=4
-#   ICBHI 공식 60/40 (툴킷 표준, 원본에 코드 없음): data.params.split_mode=official
-# mean/std: null 이면 학습셋(증강 켠 상태, seed)에서 계산 (원본 get_mean_and_std) — 평가 전용이면 eval.py 상수 사용.
+# RespireNet data: librosa 4 kHz (kaiser_best) → cycle → 8 s chunks (self-repeat padding, seeded) → magma image (BRC) → Normalize.
+#   80/20 patient folds (official code and released ckpt): split_mode=fold, test_fold=4
+#   ICBHI official 60/40 split (toolkit standard, not in the official code): data.params.split_mode=official
+# mean/std: if null, computed from the training set (augmentation on, seeded) (official get_mean_and_std) — for evaluation only, use the eval.py constants.
 name: icbhi_respirenet
 params:
   datamodule_name: respirenet
@@ -14,12 +14,12 @@ params:
   desired_length: 8.0
   res_type: kaiser_best
   pad_seed: 0
-  augment: true                # nlpaug 5종(p .5) + roll(p .5), 학습만
+  augment: true                # 5 nlpaug augmentations (p .5) + roll (p .5), training only
   aug_seed: 0
-  mean: null                   # → 학습셋에서 계산
+  mean: null                   # → computed from the training set
   std: null
   batch_size: 64
   num_workers: 8
   weighted_sampler: true       # WeightedRandomSampler(1/class_prob) — train.py:114-118
-  aug_scale: null              # CBA(원본 --aug_scale). null = 끔(배포 ckpt 조건). 1 = 비정상 3클래스를 normal 수까지 증식(가정, 2026-09-08)
-  cba_seed: null               # CBA 표본 seed (null → aug_seed)
+  aug_scale: null              # CBA (official --aug_scale). null = off (released ckpt condition). 1 = oversample the 3 abnormal classes up to the normal count (assumption)
+  cba_seed: null               # CBA sampling seed (null → aug_seed)

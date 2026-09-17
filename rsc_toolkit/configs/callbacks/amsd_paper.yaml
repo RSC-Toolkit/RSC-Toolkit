@@ -1,7 +1,7 @@
 # @package _global_
-# AMS-D 학습 프로토콜: epoch 인식·버퍼 콜백, best-on-test (기본 판정 키 = 논문 이진 paper_score, Se 게이트 없음; best.json 에 표준 4-class 병기),
-# epoch 재개(last.ckpt 에 per-sample 버퍼 포함). MultiStepLR 은 optimizer/adam_amsd.yaml 의 lr_scheduler.
-# 표준 산식으로 best 를 고르려면: trainer.params.callbacks.1.score_key=icbhi_score ...se_key=S_e ...sp_key=S_p
+# AMS-D training protocol: epoch-aware buffer callback, best-on-test (default selection key = the paper's binary paper_score, no Se gate; best.json also records the standard 4-class metrics),
+# epoch resume (last.ckpt includes the per-sample buffers). MultiStepLR is the lr_scheduler in optimizer/adam_amsd.yaml.
+# To select best by the standard formula: trainer.params.callbacks.1.score_key=icbhi_score ...se_key=S_e ...sp_key=S_p
 trainer:
   params:
     callbacks:

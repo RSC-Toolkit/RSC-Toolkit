@@ -22,9 +22,9 @@ LOCATION_TO_ID = {
     "p4": 3,
 }
 
-# SPRSound 파일명은 <환자번호>_<나이>_<성별>_<위치>_<녹음번호> 형태라 나이 필드에
-# 소수점이 들어간다(예: 40138127_14.7_0_p3_139 = 14.7세). 따라서 "점이 있으면
-# 확장자" 라고 볼 수 없고, 알려진 확장자일 때만 떼어내야 한다.
+# SPRSound file names have the form <patient number>_<age>_<sex>_<location>_<recording number>, so the age field
+# can contain a decimal point (e.g. 40138127_14.7_0_p3_139 = 14.7 years). "Has a dot" therefore does not
+# mean "has an extension"; strip only known extensions.
 RECORDING_SUFFIXES = {".wav", ".flac", ".ogg", ".mp3", ".m4a", ".json", ".txt"}
 
 
@@ -71,7 +71,7 @@ def _pick_column(cols: Dict[str, str], candidates: Iterable[str]) -> Optional[st
 
 
 def normalize_recording_id(value: str) -> str:
-    """파일명/경로에서 recording id 를 뽑는다. 알려진 확장자만 떼어낸다."""
+    """Extract the recording id from a file name/path. Only known extensions are stripped."""
     name = pathlib.Path(str(value)).name
     suffix = pathlib.Path(name).suffix.lower()
     if suffix in RECORDING_SUFFIXES:

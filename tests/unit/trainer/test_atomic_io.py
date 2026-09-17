@@ -1,4 +1,4 @@
-"""best.pth/best.json 원자적 저장 — 쓰다 죽어도 이전 파일이 온전히 남고 tmp 잔재가 없다 (REVIEW 2026-09-10 §4 P2)."""
+"""Atomic save of best.pth/best.json — if the process dies mid-write the previous file stays intact and no tmp leftovers remain."""
 from __future__ import annotations
 
 import json

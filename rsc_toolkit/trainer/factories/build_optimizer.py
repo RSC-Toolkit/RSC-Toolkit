@@ -10,7 +10,7 @@ def build_optimizer(cfg: Dict[str, Any], parameters) -> optim.Optimizer:
     cfg example:
       {"name": "adam", "params": {"lr": 1e-3, "weight_decay": 0.0}}
 
-    lr_scheduler 는 PLAdapter.configure_optimizers 가 처리한다 (여기 cfg 에는 없어야 한다).
-    미지 name 은 가용 목록을 붙인 KeyError. params 는 복사해서 넘기므로 cfg 는 변하지 않는다.
+    lr_scheduler is handled by PLAdapter.configure_optimizers (it must not appear in this cfg).
+    An unknown name raises KeyError listing the available names. params is copied before use, so cfg is not modified.
     """
     return OPTIMIZERS.build(cfg, parameters)

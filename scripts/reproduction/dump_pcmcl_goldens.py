@@ -1,24 +1,24 @@
 """
-PC-MCL(wa976/PC-MCL 85a4e22) P0 골든 — 공식 코드를 최소 패치(스텁·PYTHONPATH=models·CPU 강제)로 실행해 tests/golden/pcmcl/ 에 저장.
+PC-MCL (wa976/PC-MCL 85a4e22) official-code parity goldens — runs the official code with minimal patches (stubs, PYTHONPATH=models, forced CPU) and saves to tests/golden/pcmcl/.
 
-  # (1) 데이터셋 샘플 열·cut_pad·fbank·SpecAugment·3→4 변환·손실  (툴킷 venv: torchaudio 필요, CUDA 숨김)
+  # (1) dataset sample sequence, cut_pad, fbank, SpecAugment, 3→4 conversion, loss  (toolkit venv: needs torchaudio, CUDA hidden)
   CUDA_VISIBLE_DEVICES= .venv/bin/python scripts/reproduction/dump_pcmcl_goldens.py --part data
-  # (2) BEATs 특징·3-logit·PM-logit·손실 (툴킷 venv; 공식 models/BEATs 코드 + 실제 iter3+ AS2M ckpt)
+  # (2) BEATs features, 3-logit, PM-logit, loss (toolkit venv; official models/BEATs code + real iter3+ AS2M ckpt)
   CUDA_VISIBLE_DEVICES= .venv/bin/python scripts/reproduction/dump_pcmcl_goldens.py --part beats
-  # (3) AST 특징·3-logit (timm 0.4.5 참조 venv, CPU; (1) 이 만든 fbank_input.pt 사용)
+  # (3) AST features, 3-logit (timm 0.4.5 reference venv, CPU; uses the fbank_input.pt produced by (1))
   CUDA_VISIBLE_DEVICES= .venv-ref-timm045/bin/python scripts/reproduction/dump_pcmcl_goldens.py --part ast
 
-공식 데이터 폴더 규약(args.data_folder/icbhi_dataset/{audio_test_data,official_split.txt}) 은 심볼릭 링크 폴더로 재현한다
-(원본 데이터 .datasets/icbhi 는 읽기만; wav/txt 쌍 920 개만 링크 — filename_*.txt 같은 부속 파일은 원본 get_annotations 를 깨뜨린다).
+The official data folder convention (args.data_folder/icbhi_dataset/{audio_test_data,official_split.txt}) is reproduced with a symlinked folder
+(the original data .datasets/icbhi is only read; only the 920 wav/txt pairs are linked — auxiliary files such as filename_*.txt break the original get_annotations).
 
-골든 (dataset.pt):
-- ConcatenationMultilabelDataset(train, seed 1, T=10 s, mixing_prob 1.0, PM on ssl_prob 0.3) 의 구성 통계(사이클 수·클래스/짧은 사이클 수·
-  patient(=녹음) 수), all_cycles 순서(파일명·라벨·길이), random.seed(1) 직후 고정 인덱스 열(원본 6·연결 30·PM 30)의
-  라벨/ssl_label/파형 요약(앞 1 s·합·절대합, 일부는 전체 파형), 테스트셋 사이클 4 개의 cut_pad 파형.
-- fbank_input.pt: generate_fbank(원본·연결 파형 2 개) (2, 998, 128) — AST 골든 입력 겸 툴킷 mel 대조
-- specaug.pt: 고정 seed 에서 SpecAugment(icbhi_ast_sup, mean) 배치 적용 결과
-- conversion.pt: 8 개 3-label 조합 → convert_original, get_score(hits, counts)
-- beats.pt / ast.pt: 특징·logit·손실 (난수 헤드는 det_fill 로 결정화)
+Goldens (dataset.pt):
+- construction statistics of ConcatenationMultilabelDataset(train, seed 1, T=10 s, mixing_prob 1.0, PM on ssl_prob 0.3) (number of cycles, per-class/short-cycle counts,
+  number of patients (=recordings)), all_cycles order (file name, label, length), label/ssl_label/waveform summaries (first 1 s, sum, abs sum; full waveform for some)
+  of a fixed index sequence right after random.seed(1) (6 original, 30 concatenated, 30 PM), and the cut_pad waveforms of 4 test-set cycles.
+- fbank_input.pt: generate_fbank(2 waveforms: original and concatenated) (2, 998, 128) — AST golden input and toolkit mel comparison
+- specaug.pt: result of applying SpecAugment(icbhi_ast_sup, mean) to a batch with a fixed seed
+- conversion.pt: the 8 3-label combinations → convert_original, get_score(hits, counts)
+- beats.pt / ast.pt: features, logits, losses (random heads made deterministic with det_fill)
 """
 import argparse
 import importlib.machinery
@@ -133,7 +133,7 @@ def part_data(args, out: pathlib.Path):
     raw_cycles = [ds.all_cycles[i]["audio"].clone() for i in range(6)]
 
     idx_list = list(SAMPLE_IDX_ORIG) + list(range(n, n + N_MIXED_GOLD)) + list(range(n + n_mixed, n + n_mixed + N_SSL_GOLD))
-    random.seed(args.seed)                      # 원본과 같은 python random 스트림 시작점 (샘플 열 대조 기준)
+    random.seed(args.seed)                      # same python random stream start as the original (reference for comparing the sample sequence)
     samples = []
     for k, i in enumerate(idx_list):
         wav, label, is_mixed, orig, ssl_label, ssl_task = ds[i]
@@ -154,22 +154,22 @@ def part_data(args, out: pathlib.Path):
     torch.save({"meta": meta, "raw_cycles": raw_cycles, "samples": samples, "test_samples": test_samples}, out / "dataset.pt")
     print("dataset.pt:", n, len(ds), meta["class_counts"], meta["short_counts"], "patients", meta["n_patients"])
 
-    # fbank (AST 입력) — 원본 generate_fbank → (T, F, 1) numpy
+    # fbank (AST input) — original generate_fbank → (T, F, 1) numpy
     w0 = samples[0]["wav"]
     w1 = next(s for s in samples if s["group"] == "mixed" and "wav" in s)["wav"]
     fb = torch.stack([torch.from_numpy(generate_fbank(w, 16000, 128)).squeeze(-1) for w in (w0, w1)])  # (2, 998, 128)
     torch.save({"wav": torch.stack([w0, w1]), "fbank": fb}, out / "fbank_input.pt")
     print("fbank_input.pt:", tuple(fb.shape))
 
-    # SpecAugment (배치 단위, p >= randn quirk)
+    # SpecAugment (batch-level, p >= randn quirk)
     aug = SpecAugment(a)
     random.seed(3); np.random.seed(3); torch.manual_seed(3)
-    x = fb.unsqueeze(1).clone()                   # (B, 1, T, F) — 원본 transforms 입력 규약
+    x = fb.unsqueeze(1).clone()                   # (B, 1, T, F) — input convention of the original transforms
     y = aug(x.clone())
     torch.save({"input": x, "output": y, "seed": 3, "policy": "icbhi_ast_sup", "mask": "mean"}, out / "specaug.pt")
     print("specaug.pt: changed frac", float((y != x).float().mean()))
 
-    # 3→4 변환 + Score
+    # 3→4 conversion + Score
     combos = [[i, j, k] for i in (0, 1) for j in (0, 1) for k in (0, 1)]
     conv = convert_original(a, np.array(combos))
     hits, counts = [10.0, 5.0, 3.0, 1.0], [20.0, 10.0, 6.0, 4.0]
@@ -230,7 +230,7 @@ def part_ast(args, out: pathlib.Path):
             return self.module(*a, **k)
 
     torch.nn.DataParallel = _CPUDataParallel
-    # 원본은 ./pretrained_models/audioset_10_10_0.4593.pth 를 cwd 기준으로 찾는다 (없으면 dropbox wget) → 심볼릭 링크 폴더에서 실행
+    # the original looks for ./pretrained_models/audioset_10_10_0.4593.pth relative to cwd (dropbox wget if missing) → run from a symlinked folder
     scratch = pathlib.Path(args.scratch) / "ast_cwd"
     (scratch / "pretrained_models").mkdir(parents=True, exist_ok=True)
     link = scratch / "pretrained_models" / "audioset_10_10_0.4593.pth"
@@ -241,7 +241,7 @@ def part_ast(args, out: pathlib.Path):
     from AST.ast import ASTModel  # noqa: E402
 
     g = torch.load(out / "fbank_input.pt", weights_only=False)
-    x = g["fbank"].unsqueeze(1)                                       # (2, 1, 998, 128) = ToTensor 후 배치 (같은 크기 bilinear Resize(998,128) 는 항등으로 보고 생략 — 수치 검증은 안 함)
+    x = g["fbank"].unsqueeze(1)                                       # (2, 1, 998, 128) = batch after ToTensor (the same-size bilinear Resize(998,128) is treated as identity and skipped — not verified numerically)
     torch.manual_seed(0)
     model = ASTModel(label_dim=3, fstride=10, tstride=10, input_fdim=998, input_tdim=128, imagenet_pretrain=True,
                      audioset_pretrain=True, model_size="base384", verbose=False)

@@ -1,13 +1,13 @@
 """
-M2D 미세조정 경로(nttcslab/m2d app/icbhi_sprs)의 P0 골든 — 공식 코드를 우리 venv 에서 실행 (nnAudio·einops 는 스크래치 pylib 를 PYTHONPATH 로).
+Official-code parity goldens for the M2D fine-tuning path (nttcslab/m2d app/icbhi_sprs) — runs the official code in our venv (nnAudio and einops from a scratch pylib via PYTHONPATH).
 
-  PYTHONPATH=<pylib> .venv/bin/python scripts/reproduction/dump_m2d_goldens.py --repo <m2d 클론> --ckpt <checkpoint-*.pth> --out tests/golden/m2d
+  PYTHONPATH=<pylib> .venv/bin/python scripts/reproduction/dump_m2d_goldens.py --repo <m2d clone> --ckpt <checkpoint-*.pth> --out tests/golden/m2d
 
-골든:
-- features.pt : tests/golden/sclmeta/audio.pt 파형(6개) → torchaudio mel 80(400/160, 50–8000) → dB (샘플별) ; val_transform (배치 min-max+Standardize 0.3671/0.2391) ;
-                seed 고정 train_transform(SpecAug scl) 두 뷰
-- encoder.pt  : 공식 RuntimeM2D(encoder_only, ckpt) 의 encode_lms(val 특징) → (6, 201, 3840) + state_dict 키/모양 + norm_stats + drop 키
-- head.pt     : det_fill Linear(3840,4) 로짓 (mean pool) + 가중 CE
+Goldens:
+- features.pt : tests/golden/sclmeta/audio.pt waveforms (6) → torchaudio mel 80 (400/160, 50–8000) → dB (per sample) ; val_transform (batch min-max + Standardize 0.3671/0.2391) ;
+                two views of the fixed-seed train_transform (SpecAug scl)
+- encoder.pt  : encode_lms(val features) of the official RuntimeM2D(encoder_only, ckpt) → (6, 201, 3840) + state_dict keys/shapes + norm_stats + dropped keys
+- head.pt     : det_fill Linear(3840,4) logits (mean pool) + weighted CE
 """
 import argparse
 import json
@@ -74,7 +74,7 @@ def main():
     y = torch.tensor([wv["label"] for wv in wav])
     loss = torch.nn.functional.cross_entropy(logits, y, weight=w)
     torch.save({"logits": logits.detach(), "labels": y, "loss": loss.detach()}, out / "head.pt")
-    print("head loss", float(loss), "완료:", out)
+    print("head loss", float(loss), "done:", out)
 
 
 if __name__ == "__main__":

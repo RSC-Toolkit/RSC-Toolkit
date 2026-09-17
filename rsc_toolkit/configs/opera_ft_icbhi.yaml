@@ -1,6 +1,6 @@
-# OPERA-CT 전체 미세조정, ICBHI 4-class — 툴킷 표준 태스크 (논문·저장소에 목표치 없음: OPERA 는 레코딩 단위 T7 만 보고).
-#   EMBC 동결 레시피에서 freeze_body 만 끄고 lr 5e-5(M2D TASLP 미세조정 값)·bs 64 로 낮춘 툴킷 정의 레시피. 나머지 동일(150ep, cosine T40, 가중 CE).
-#   실행: rsctk-train --config-name opera_ft_icbhi run.name=icbhi-operact-ft-s1 seed=1
+# Full fine-tuning of OPERA-CT, ICBHI 4-class — toolkit standard task (no target value in the paper or repository: OPERA reports only the recording-level T7).
+#   Toolkit-defined recipe: the EMBC frozen recipe with freeze_body off, lr lowered to 5e-5 (the M2D TASLP fine-tuning value) and bs 64. Everything else is the same (150 ep, cosine T40, weighted CE).
+#   Run: rsctk-train --config-name opera_ft_icbhi run.name=icbhi-operact-ft-s1 seed=1
 defaults:
   - model: opera_ct
   - data_defaults@data: base

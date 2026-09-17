@@ -1,22 +1,22 @@
 """
-patch-mix / SG-SCL 계열 논문의 SFT 백본 4종 — 공식 코드 충실 이식 (P0).
+Four SFT backbones of the patch-mix / SG-SCL family of papers — exact port of the official code.
 
-출처:
-- 공식 코드: https://github.com/kaen2891/stethoscope-guided_supervised_contrastive_learning
-  models/resnet.py, models/efficientnet.py, models/cnn.py (원류 일부는 PANN)
-- 수치 출처: Interspeech 2023 (patch-mix, https://arxiv.org/abs/2305.14032) Table 1 및
-  ICASSP 2024 (SG-SCL, https://arxiv.org/abs/2312.09603) Table 3 의 CE 행.
+Sources:
+- Official code: https://github.com/kaen2891/stethoscope-guided_supervised_contrastive_learning
+  models/resnet.py, models/efficientnet.py, models/cnn.py (partly derived from PANN)
+- Reported numbers: CE rows of Interspeech 2023 (patch-mix, https://arxiv.org/abs/2305.14032) Table 1 and
+  ICASSP 2024 (SG-SCL, https://arxiv.org/abs/2312.09603) Table 3.
 
-원본 그대로 유지한 것:
-- ResNet/EfficientNet: torchvision 모델 서브클래스, 첫 conv 를 1채널로 교체, fc/classifier 삭제.
-  ImageNet 가중치 로드 시 첫 conv 가중치는 **삭제하고 랜덤 초기화로 남긴다** (원본 동작).
-- CNN6: PANN ConvBlock5x5 4단 + (freq 축 mean) 후 (time 축 max+mean 합) 풀링.
-  AudioSet PANN ckpt(Cnn6_mAP=0.343)에서 겹치는 키만 로드.
-- forward 시그니처의 (args, alpha, training) 와 DA 분기 (SG-SCL/DAT 에서 사용).
+Kept as in the original code:
+- ResNet/EfficientNet: torchvision model subclasses, first conv replaced with a 1-channel conv, fc/classifier removed.
+  When loading ImageNet weights the first conv weights are **dropped and left randomly initialized** (original behavior).
+- CNN6: 4 PANN ConvBlock5x5 stages + pooling (mean over freq axis), then (max+mean sum over time axis).
+  Only overlapping keys are loaded from the AudioSet PANN ckpt (Cnn6_mAP=0.343).
+- (args, alpha, training) in the forward signature and the DA branch (used by SG-SCL/DAT).
 
-래퍼(등록 모델)는 원본 set_model 과 동일하게 backbone + nn.Linear(feat_dim, n_cls)
-분류기로 구성한다. 툴킷 datamodule 피처 (B, n_mels, frames) 는 input_layout="freq_time"
-으로 받아 원본 입력 (B, 1, frames, n_mels) 로 바꾼다.
+The wrappers (registered models) consist of backbone + nn.Linear(feat_dim, n_cls) classifier, same as the original set_model.
+Toolkit datamodule features (B, n_mels, frames) are accepted with input_layout="freq_time"
+and converted to the original input (B, 1, frames, n_mels).
 """
 from __future__ import annotations
 
@@ -40,11 +40,11 @@ logger = logging.getLogger(__name__)
 PANN_CNN6_URL = "https://zenodo.org/record/3960586/files/Cnn6_mAP%3D0.343.pth?download=1"
 PANN_CNN6_CANDIDATES = (
     "pretrained_models/upstream/Cnn6_mAP=0.343.pth",
-    "pretrained_models/Cnn6_mAP=0.343.pth",  # 원본 코드가 쓰는 위치
+    "pretrained_models/Cnn6_mAP=0.343.pth",  # location used by the original code
 )
 
 
-# ---------------------------------------------------------------- PANN 블록 (원문)
+# ---------------------------------------------------------------- PANN blocks (original)
 def init_layer(layer):
     """Initialize a Linear or Convolutional layer. """
     nn.init.xavier_uniform_(layer.weight)
@@ -87,7 +87,7 @@ class ConvBlock5x5(nn.Module):  # for CNN6
         return x
 
 
-# ------------------------------------------------------------------ 백본 4종 (원문)
+# ------------------------------------------------------------------ four backbones (original)
 class ResNet18SFT(torchvision.models.resnet.ResNet):
     def __init__(self, track_bn=True):
         def norm_layer(*args, **kwargs):
@@ -179,10 +179,10 @@ class CNN6SFT(nn.Module):
         self.dropout = nn.Dropout(0.2)
 
     def load_sl_official_weights(self):
-        """AudioSet 사전학습 PANN CNN6 (https://zenodo.org/record/3960586) — 겹치는 키만 로드 (원본 동작)."""
+        """AudioSet-pretrained PANN CNN6 (https://zenodo.org/record/3960586) — loads only overlapping keys (original behavior)."""
         from rsc_toolkit.paths import download_target, resolve_pretrained
 
-        ckpt = resolve_pretrained(PANN_CNN6_CANDIDATES)  # RSCTK_PRETRAINED_ROOT → cwd 순
+        ckpt = resolve_pretrained(PANN_CNN6_CANDIDATES)  # RSCTK_PRETRAINED_ROOT, then cwd
         if ckpt is None:
             from rsc_toolkit.datasets.download_utils import download_file, record_download_provenance
 
@@ -209,7 +209,7 @@ class CNN6SFT(nn.Module):
         if self.do_dropout:
             x = self.dropout(x)
 
-        x = torch.mean(x, dim=3)          # (원본 주석은 time 이라 하나 실제는 freq 축) — 원문 그대로
+        x = torch.mean(x, dim=3)          # (the original comment says time, but it is actually the freq axis) — kept as in the original
         (x1, _) = torch.max(x, dim=2)
         x2 = torch.mean(x, dim=2)
         x = x1 + x2
@@ -221,24 +221,24 @@ class CNN6SFT(nn.Module):
         return x
 
 
-# ------------------------------------------------------------- 등록 래퍼 (set_model 상당)
+# ------------------------------------------------------------- registered wrappers (equivalent to set_model)
 class _SFTClassifierModel(BaseRSCModel, nn.Module):
     """
-    backbone + nn.Linear 분류기 (원본 set_model 의 비-AST 구성).
+    backbone + nn.Linear classifier (non-AST configuration of the original set_model).
 
     method:
-    - "ce"    — SFT 기준선. SpecAugment 는 원본 train 루프처럼 배치 단위 1회.
-    - "dat"   — 도메인 적대 학습: nn.Linear(feat_dim, m_cls) 도메인 헤드 + GRL + 비가중 CE.
-    - "sgscl" — Projector(feat_dim, proj_dim) + MetaCL, 두 뷰(두 번째는 첫 뷰 위 누적 마스킹).
-    분기 구성과 손실은 rsc_toolkit/methods/sgscl.py (원본 main.py train() 이식) 공용.
+    - "ce"    — SFT baseline. SpecAugment is applied once per batch, as in the original train loop.
+    - "dat"   — domain adversarial training: nn.Linear(feat_dim, m_cls) domain head + GRL + unweighted CE.
+    - "sgscl" — Projector(feat_dim, proj_dim) + MetaCL, two views (the second masks cumulatively on top of the first).
+    Branch structure and losses are shared with rsc_toolkit/methods/sgscl.py (port of the original main.py train()).
 
-    specaug_policy=None 이면 학습 증강 없음 — 기존 SFT 골든/스모크와 datamodule 쪽
-    per-sample SpecAugment 구성을 그대로 유지하기 위한 기본값이다. 논문 프로토콜
-    재현 시에는 config 에서 policy 를 주고 datamodule 증강을 끈다.
+    specaug_policy=None means no training augmentation — this default keeps the existing SFT goldens/smoke tests and the
+    datamodule-side per-sample SpecAugment configuration unchanged. To reproduce the paper
+    protocol, set the policy in the config and disable datamodule augmentation.
     """
-    accepts_meta = ("dev",)  # batch[2] = ICBHI 청진기 id (sgscl_nonast 데이터; method=ce 는 받되 무시)
+    accepts_meta = ("dev",)  # batch[2] = ICBHI stethoscope id (sgscl_nonast data; method=ce accepts but ignores it)
 
-    backbone_cls = None  # 서브클래스에서 지정
+    backbone_cls = None  # set by subclasses
 
     def __init__(
         self,
@@ -274,11 +274,11 @@ class _SFTClassifierModel(BaseRSCModel, nn.Module):
         from rsc_toolkit.models.projector import Projector
 
         if method == "dat":
-            # 원본 main.py:244 — 비-AST 는 nn.Linear(final_feat_dim, m_cls)
+            # original main.py:244 — non-AST uses nn.Linear(final_feat_dim, m_cls)
             self.domain_classifier = nn.Linear(self.backbone.final_feat_dim, m_cls)
             self.metacl = None
         elif method == "sgscl":
-            # 원본 main.py:247 — Projector(final_feat_dim, proj_dim)
+            # original main.py:247 — Projector(final_feat_dim, proj_dim)
             self.domain_classifier = Projector(self.backbone.final_feat_dim, proj_dim)
             self.metacl = MetaCL(temperature=temperature)
         else:
@@ -296,14 +296,14 @@ class _SFTClassifierModel(BaseRSCModel, nn.Module):
         if x.dim() == 3:
             x = x.unsqueeze(1)  # (B, F, T) -> (B, 1, F, T)
         if self.input_layout == "freq_time":
-            x = x.transpose(-2, -1)  # -> (B, 1, T, F) = 원본 입력
+            x = x.transpose(-2, -1)  # -> (B, 1, T, F) = original input
         return x
 
     def forward_features(self, x: torch.Tensor) -> torch.Tensor:
         return self.backbone(self._to_paper_layout(x))
 
     def _paper_features(self, x_paper: torch.Tensor) -> torch.Tensor:
-        """(B, T, F) 페이퍼 레이아웃 3D → 특징 (methods/sgscl.py 공용 경로용)."""
+        """(B, T, F) paper-layout 3D → features (for the shared methods/sgscl.py path)."""
         return self.backbone(x_paper.unsqueeze(1))
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:

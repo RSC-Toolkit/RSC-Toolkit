@@ -1,8 +1,8 @@
-# BTS-CARD SPRSound OOD 평가용 (학습 미사용). 공식 노트북 data/Preprocessing_SPRSound.ipynb cell 5 등가:
-#   48 kHz 리샘플 → 녹음 전체 fade in/out(sr/16; IndexDataset fade=true) → event 구간 절단 → 8 s repeat 패딩 + fade_out
+# For BTS-CARD SPRSound OOD evaluation (not used for training). Equivalent to cell 5 of the official notebook data/Preprocessing_SPRSound.ipynb:
+#   resample to 48 kHz → fade in/out over the whole recording (sr/16; IndexDataset fade=true) → slice the event → 8 s repeat padding + fade_out
 #   (pad_type repeat_fade) → ClapProcessor log-mel (1, 1001, 64).
-# 기존 data/sprsound.yaml(pad_type repeat, fade_out 없음)과 다르므로 피처 캐시도 분리한다(캐시 키는 프로세서 설정만 포함).
-# 4-class 병합·meta3·문장은 rsc_toolkit/datasets/sprsound_ood.py 가 이 데이터모듈의 test 셋 위에서 만든다.
+# This differs from data/sprsound.yaml (pad_type repeat, no fade_out), so the feature cache is also separate (the cache key contains only the processor settings).
+# The 4-class merge, meta3 and sentences are built by rsc_toolkit/datasets/sprsound_ood.py on top of this datamodule's test set.
 name: index
 params:
   datamodule_name: index
@@ -11,7 +11,7 @@ params:
   index_dataset_cls: rsc_toolkit.datasets.index_dataset.IndexDataset
   project_root: ${hydra:runtime.cwd}
   data_dir: .datasets/sprsound
-  raw_data_subdir: Classification   # recording_path 는 Classification/ 기준 상대경로
+  raw_data_subdir: Classification   # recording_path is relative to Classification/
   index_filename: index_cycle.csv
 
   sampling_rate: 48000
@@ -22,7 +22,7 @@ params:
 
   train_splits: [train]
   val_splits: [test]
-  test_splits: [test]          # SPRSound 2022 inter-patient test = 논문의 'valid' OOD 셋 (1,429 events)
+  test_splits: [test]          # SPRSound 2022 inter-patient test = the paper's 'valid' OOD set (1,429 events)
 
   batch_size: 8
   num_workers: 4

@@ -4,6 +4,6 @@
   "sha256": "b8a547db36f67580a19b78c80f50c0c0e4522075eab2100e0b951f066936c664",
   "size": 194788746,
   "downloaded": "2026-08-26",
-  "downloaded_by": "정찰(2026-08-26) 시 scratchpad 로 내려받은 릴리스 파일을 outputs/reference/papers/lungsrad/ 경유로 복사 (2026-08-27)",
-  "notes": "DASS-medium (VMamba-S v2, AudioSet 증류) 492 키, 'module.v.' 접두어, patch_embed.0 (48,1,3,3) 단일채널, classifier.head (527,768). Lung-SRAD ast_models.py:350-359 로드 방식: 'module.v.' 제거·head 제외·strict=False (head 2키만 missing)."
+  "downloaded_by": "copied from the official release file",
+  "notes": "DASS-medium (VMamba-S v2, distilled from AudioSet) 492 keys, 'module.v.' prefix, patch_embed.0 (48,1,3,3) single-channel, classifier.head (527,768). Loading as in Lung-SRAD ast_models.py:350-359: strip 'module.v.', exclude head, strict=False (only the 2 head keys are missing)."
 }

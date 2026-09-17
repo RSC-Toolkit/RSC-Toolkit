@@ -1,5 +1,5 @@
-# PC-MCL SPRSound: 학습 배치 라벨이 6-속성 float 라 train 메트릭 없음.
-# 검증은 모델이 6-sigmoid → 복호 → 7-class one-hot (B,7) 을 돌려주므로 기존 ICBHIScore(argmax) 를 그대로 쓴다.
+# PC-MCL SPRSound: train batch labels are 6-attribute floats, so there are no train metrics.
+# For validation the model returns 6-sigmoid → decoding → 7-class one-hot (B,7), so the existing ICBHIScore (argmax) is used as is.
 train: []
 
 val:

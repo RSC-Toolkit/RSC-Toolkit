@@ -63,17 +63,17 @@ class ICBHIDatasetProcessor(BaseRSCDatasetProcessor):
 
     def _write_split_file(self) -> Optional[pathlib.Path]:
         """
-        패키지에 든 공식 split 을 인덱스 옆에 복사한다.
+        Copy the packaged official split next to the index.
 
-        ICBHI 인덱스는 split 컬럼을 채우지 않는다(공식 split 은 recording 단위라
-        행마다 넣기보다 별도 파일로 두는 편이 원본에 가깝다). sprsound·hflungv1
-        processor 는 이미 index_dir 에 official_split.txt 를 쓰고 있고,
-        IndexDataset 도 그 위치를 찾는다. ICBHI 만 빠져 있어서
-        `IndexDataset(csv, split="test")` 가 걸릴 곳이 없었다.
+        ICBHI indexes do not fill the split column (the official split is per recording, so
+        a separate file is closer to the original than per-row values). The sprsound and hflungv1
+        processors write official_split.txt to index_dir as well, and
+        IndexDataset looks for it there; without it
+        `IndexDataset(csv, split="test")` has nothing to filter on.
         """
         src = self._packaged_split_path
         if not src.exists():
-            logger.warning("패키지에 official_split.txt 가 없다: %s", src)
+            logger.warning("Packaged official_split.txt not found: %s", src)
             return None
         dst = self.index_dir_path / "official_split.txt"
         dst.parent.mkdir(parents=True, exist_ok=True)

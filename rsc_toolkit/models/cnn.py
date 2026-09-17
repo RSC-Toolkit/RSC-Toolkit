@@ -45,6 +45,6 @@ class CNNClassifier(BaseRSCModel, nn.Module):
         feats = self.backbone(x)
         return self.classifier_head(feats)
 
-    def training_forward(self, audio_batch, labels, loss_func, **kwargs):  # kwargs: base.py 계약 — meta 를 붙이는 데이터 config 와도 조합되게 열어 둔다
+    def training_forward(self, audio_batch, labels, loss_func, **kwargs):  # kwargs: base.py contract — kept open so it combines with data configs that attach meta
         logits = self.forward(audio_batch)
         return logits, loss_func(logits, labels)

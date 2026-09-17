@@ -1,7 +1,7 @@
-# SCL-metadata(ICASSP 2023) 재현 — 지도 학습 run (CE / Hybrid): 400ep, bs128, Adam 1e-4/wd 1e-4 + cosine(T_max 40), 가중 CE, 매 epoch test Sc 최고.
+# SCL-metadata (ICASSP 2023) reproduction — supervised run (CE / Hybrid): 400 ep, bs 128, Adam 1e-4/wd 1e-4 + cosine (T_max 40), weighted CE, best test Sc every epoch.
 #   CE     : rsctk-train --config-name sclmeta_icbhi model.params.method=ce run.name=icbhi-sclmeta-ce-s1 seed=1
 #   Hybrid : ... model.params.method=hybrid run.name=icbhi-sclmeta-hybrid-s1
-# SCL/M-SCL 은 sclmeta_icbhi_pretrain → sclmeta_icbhi_linear 두 run.
+# SCL/M-SCL take two runs: sclmeta_icbhi_pretrain → sclmeta_icbhi_linear.
 defaults:
   - model: cnn6_sclmeta
   - data_defaults@data: base

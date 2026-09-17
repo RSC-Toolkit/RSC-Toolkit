@@ -1,14 +1,14 @@
 """
 PyTorch Dataset and DataLoader integration for RSC datasets.
 
-**Deprecated (P2-6).** 학습 경로는 IndexDataset + IndexDataModule 이다 (rsc_toolkit/datasets/index_dataset.py,
-rsc_toolkit/trainer/data/index_datamodule.py). 이 모듈은 자기 단위 테스트 외에 아무도 쓰지 않는 병렬 스택이고,
-ICBHI Crackle/Wheeze 라벨 규칙이 'Base' 클래스에 박혀 있어 새 데이터셋의 기반으로 쓰면 안 된다. 다음 릴리스에서 제거한다.
+**Deprecated.** The training path is IndexDataset + IndexDataModule (rsc_toolkit/datasets/index_dataset.py,
+rsc_toolkit/trainer/data/index_datamodule.py). This module is a parallel stack used only by its own unit tests, and
+the ICBHI Crackle/Wheeze label rule is hard-coded in its 'Base' class, so it must not be used as the basis for new datasets. It will be removed in the next release.
 """
 import warnings as _warnings
 
 _warnings.warn(
-    "rsc_toolkit.datasets.loaders 는 deprecated 다 — IndexDataset/IndexDataModule 을 쓰라 (다음 릴리스에서 제거)",
+    "rsc_toolkit.datasets.loaders is deprecated -- use IndexDataset/IndexDataModule (to be removed in the next release)",
     DeprecationWarning, stacklevel=2,
 )
 from typing import Literal, Optional, Callable, List, Tuple, Any
@@ -104,8 +104,7 @@ class BaseRSCPyTorchDataset(Dataset, ABC):
     def _load_features(self, sample: Any, sample_id: str) -> torch.Tensor:
         """Load features for a sample, using cache if available"""
         # Check if cached features exist
-        # BaseAudioProcessor 의 캐시 속성 이름은 `feature_cache` 다.
-        # 예전 `_feature_cache`(밑줄) 는 존재하지 않아 캐시가 항상 무시됐다.
+        # The BaseAudioProcessor cache attribute is named `feature_cache`.
         if self.use_cached_features and self.feature_processor:
             if self.feature_processor.feature_cache:
                 if self.feature_processor.feature_cache.is_cached(sample_id):

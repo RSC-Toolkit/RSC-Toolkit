@@ -1,11 +1,11 @@
-# GaP-Aug(ICASSP 2024) — PANNs 원형 Cnn14 (AudioSet 16 kHz ckpt) + Algorithm 1. 논문 명세 재구현 (코드 없음).
-#   method: gapaug | gapaug_nomixup | naive | specaug | patchmask | mixup_only  (mixup: null=method 기본, true/false override)
-#   가정 플래그(저자 확인 전): norm_mode(#1: sample_minmax | sample_minmax_restore | batch_minmax | db_offset | none), mixup_alpha(#2),
-#   w_trip(1.0 = Algorithm 1 line 14 비가중 합(문면); 0.01 = 자매 논문 근거 의도적 이탈 플래그)/triplet_*(#3), feature_preset(#5: paper 400/100 vs panns16k 512/160),
-#   pretrained(#4: 16k|32k), window(hann=ckpt 학습 설정 | hamming=자매 논문 관례), head_input(#4: emb=공식 Transfer_Cnn14 post-dropout | feat),
-#   triplet_layer(#3: emb | feat | pooled), n_patches/max_*/gamma_per/aug_p(#7), specaug_*(PANNs 기본값),
-#   joint_forward(false = Algo. 1 line 13 문면 2회 forward | true = 결합 1회, 비문면), head_init
-#   특징 정의 = PANNs 식(파워 → slaney mel 50–8000 → 10·log10 dB) 가정(#5)
+# GaP-Aug (ICASSP 2024) — original PANNs Cnn14 (AudioSet 16 kHz ckpt) + Algorithm 1. Re-implementation from the paper specification (no code).
+#   method: gapaug | gapaug_nomixup | naive | specaug | patchmask | mixup_only  (mixup: null = method default, true/false override)
+#   Assumption flags (not confirmed by the authors): norm_mode (sample_minmax | sample_minmax_restore | batch_minmax | db_offset | none), mixup_alpha,
+#   w_trip (1.0 = unweighted sum as written in Algorithm 1 line 14; 0.01 = intentional deviation flag based on the sister paper)/triplet_*, feature_preset (paper 400/100 vs panns16k 512/160),
+#   pretrained (16k|32k), window (hann = ckpt training setting | hamming = sister-paper convention), head_input (emb = official Transfer_Cnn14 post-dropout | feat),
+#   triplet_layer (emb | feat | pooled), n_patches/max_*/gamma_per/aug_p, specaug_* (PANNs defaults),
+#   joint_forward (false = 2 forwards as written in Algo. 1 line 13 | true = 1 combined forward, not as written), head_init
+#   Feature definition = PANNs formula (power → slaney mel 50–8000 → 10·log10 dB), assumed
 name: cnn14_gapaug
 params:
   n_cls: 4
@@ -39,11 +39,11 @@ params:
   specaug_freq_stripes: 2
   mixup_alpha: 1.0
   mixup_loss: soft
-  w_trip: 1.0                      # Algo. 1 line 14 비가중 합(문면); 0.01 = 자매 논문 근거 이탈 플래그
+  w_trip: 1.0                      # unweighted sum as written in Algo. 1 line 14; 0.01 = deviation flag based on the sister paper
   triplet_margin: 1.0
   triplet_p: 2.0
   triplet_source: xa
   triplet_layer: emb
   head_input: emb
-  joint_forward: false             # 문면(M(X_mix)·M(X_a) 2회 forward). true = 결합 1회(속도)
+  joint_forward: false             # as written (2 forwards, M(X_mix)·M(X_a)). true = 1 combined forward (speed)
   head_init: xavier

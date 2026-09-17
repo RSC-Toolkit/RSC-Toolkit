@@ -1,30 +1,32 @@
 """
-VMamba VSSM (v2 계열, DASS-medium 설정) — Lung-SRAD 공식 코드 models_DASS/vmamba_patchmix.py 의 충실 이식 (P0).
+VMamba VSSM (v2 family, DASS-medium setting) — faithful port of the Lung-SRAD official code models_DASS/vmamba_patchmix.py
+(exact port of the official code, verified against goldens).
 
-출처: RSC-Toolkit/Lung-SRAD d28d783 models_DASS/vmamba_patchmix.py (상류 MzeroMiko/VMamba MIT, Saurabhbhati/DASS BSD-3).
-이식 범위 = DASS-medium 이 실제로 쓰는 경로만:
+Source: RSC-Toolkit/Lung-SRAD d28d783 models_DASS/vmamba_patchmix.py (upstream MzeroMiko/VMamba MIT, Saurabhbhati/DASS BSD-3).
+Port scope = only the paths DASS-medium actually uses:
   patchembed v2 · downsample v3 · LN2D(channel_first) · SS2D forward_type "v05_noz"(forwardv2/forward_corev2, no_einsum,
   force_fp32=False, oflex) · ssm_d_state 1 · ssm_ratio 1.0 · ssm_conv 3(bias False) · mlp_ratio 4 GELU · DropPath 0.3 ·
   classifier norm→avgpool→flatten→head.
-원본과의 비구조적 차이:
-  - einops.repeat → torch (A_log_init/D_init), timm DropPath/trunc_normal_ → torch 구현 (같은 정의).
-  - CrossScan/CrossMerge 는 triton 대신 순수 torch(csms6s 버전, 동일 배치). selective scan 은 커널이 있으면 커널, 없으면 torch 폴백.
-  - SS2Dv0/SS2Dv3(xv*), cascade2d, out_norm 변형(_onnone/_ondwconv3/...), posembed, use_checkpoint, flops 는 미사용이라 생략.
-  - patch-mix 3종(2d/time/freq) 은 코드 동작(as_code) 과 논문 정의(as_paper) 를 `mix_layout` 로 고른다 (아래 주석).
+Non-structural differences from the original:
+  - einops.repeat → torch (A_log_init/D_init), timm DropPath/trunc_normal_ → torch implementations (same definitions).
+  - CrossScan/CrossMerge use pure torch instead of triton (csms6s version, same layout). Selective scan uses the kernel if available, otherwise the torch fallback.
+  - SS2Dv0/SS2Dv3 (xv*), cascade2d, out_norm variants (_onnone/_ondwconv3/...), posembed, use_checkpoint, flops are unused and omitted.
+  - The three patch-mix modes (2d/time/freq) choose between the code behavior (as_code) and the paper definition (as_paper) via `mix_layout` (see below).
 
-Gaussian blur hook (Spectral-Aware Regularization): SS2D.forward_corev2 에서 in_proj→dwconv→SiLU 뒤, CrossScan 직전의 x(B,D,H,W) 에
-  x = strength · blur_separable(x; K, σ)  (ℓ1 정규화 1-D 가우시안을 세로·가로 depthwise conv, 파라미터 없음, 학습·평가 모두 항상 적용)
-  적용 블록 = stage ∈ blur_stage 이고 블록 index(0-based) ∈ blur_blocks (원본 _make_layer: blur_on = stage_id in blur_stage and d in blur_blocks).
+Gaussian blur hook (Spectral-Aware Regularization): in SS2D.forward_corev2, after in_proj→dwconv→SiLU and right before CrossScan, on x(B,D,H,W):
+  x = strength · blur_separable(x; K, σ)  (ℓ1-normalized 1-D Gaussian as vertical and horizontal depthwise convs, no parameters, always applied in training and evaluation)
+  Applied blocks = stage ∈ blur_stage and block index (0-based) ∈ blur_blocks (original _make_layer: blur_on = stage_id in blur_stage and d in blur_blocks).
 
-Patch-Mix (patch_embed 직후 텐서에서, 배치 randperm index 로 연속 구간 교체; np.random.beta(β,β) 로 λ):
-  텐서는 channel_first 라 실제 (B, C=96, F=32, T=256) 인데 원본 함수는 `B, H, W, C = x.shape` 로 (B,H,W,C) 를 가정한다.
-  - as_code (기본, P0): 원본 동작 그대로 —
-      'time': dim2(=주파수 32bin) 연속 구간 교체, num_mask = max(1, int(32·(1−λ))), λ ← 1 − num_mask/32
-      'freq': dim1(=채널 96)   연속 구간 교체, num_mask = max(1, int(96·(1−λ))), λ ← 1 − num_mask/96
-      '2d'  : (dim1×dim2)=3072 '토큰'(각 토큰 = 시간 256 벡터) 중 int(3072·(1−λ)) 개를 randperm 으로 교체, λ ← 1 − num_mask/3072
-      시간 축(256)은 어느 모드에서도 부분 교체되지 않는다.
-  - as_paper (Eq.6-7): 'time' 은 시간 축 dim3(W=256) 폭 max(1, int(W(1−λ))), 'freq' 는 주파수 축 dim2(H=32) 높이 max(1, int(H(1−λ))),
-      '2d' 는 (F×T)=8192 패치(각 패치 = 채널 96 벡터) 교체. 난수 호출 순서(beta → randperm(B) → randint/randperm)는 as_code 와 같다.
+Patch-Mix (on the tensor right after patch_embed, replacing a contiguous span with the batch randperm index; λ from np.random.beta(β,β)):
+  The tensor is channel_first, i.e. actually (B, C=96, F=32, T=256), but the original function assumes (B,H,W,C) via `B, H, W, C = x.shape`.
+  - as_code (default, matches the official code): original behavior as-is —
+      'time': replaces a contiguous span of dim2 (= frequency, 32 bins), num_mask = max(1, int(32·(1−λ))), λ ← 1 − num_mask/32
+      'freq': replaces a contiguous span of dim1 (= channels, 96), num_mask = max(1, int(96·(1−λ))), λ ← 1 − num_mask/96
+      '2d'  : of the (dim1×dim2)=3072 'tokens' (each token = a time vector of 256), int(3072·(1−λ)) are replaced via randperm, λ ← 1 − num_mask/3072
+      The time axis (256) is never partially replaced in any mode.
+  - as_paper (Eq.6-7): 'time' uses width max(1, int(W(1−λ))) on the time axis dim3 (W=256), 'freq' uses height max(1, int(H(1−λ))) on the
+      frequency axis dim2 (H=32), '2d' replaces (F×T)=8192 patches (each patch = a channel vector of 96). The RNG call order
+      (beta → randperm(B) → randint/randperm) is the same as as_code.
 """
 from __future__ import annotations
 
@@ -43,10 +45,10 @@ from .selective_scan import selective_scan
 
 
 # =====================================================================================
-# 작은 부품 (vmamba_patchmix.py:45-131)
+# small components (vmamba_patchmix.py:45-131)
 # =====================================================================================
 class Linear2d(nn.Linear):
-    """channel_first 텐서용 Linear — 1×1 conv 로 적용 (가중치는 nn.Linear 모양 그대로)."""
+    """Linear for channel_first tensors — applied as a 1×1 conv (weights keep the nn.Linear shape)."""
 
     def forward(self, x: torch.Tensor):
         return F.conv2d(x, self.weight[:, :, None, None], self.bias)
@@ -95,7 +97,7 @@ class Mlp(nn.Module):
 
 
 class DropPath(nn.Module):
-    """timm.layers.DropPath(scale_by_keep=True) 와 같은 정의: 샘플별 Bernoulli(keep) 마스크 / keep."""
+    """Same definition as timm.layers.DropPath(scale_by_keep=True): per-sample Bernoulli(keep) mask / keep."""
 
     def __init__(self, drop_prob: float = 0.0):
         super().__init__()
@@ -120,7 +122,7 @@ def trunc_normal_(tensor: torch.Tensor, mean: float = 0.0, std: float = 1.0, a: 
 
 
 # =====================================================================================
-# mamba 초기화 (vmamba_patchmix.py:168-224)
+# mamba initialization (vmamba_patchmix.py:168-224)
 # =====================================================================================
 class mamba_init:
     @staticmethod
@@ -164,7 +166,7 @@ class mamba_init:
 
 
 def gaussian_kernel1d(kernel_size: int, sigma: float, device=None, dtype=torch.float32) -> torch.Tensor:
-    """vmamba_patchmix.py:552-556 — ℓ1 정규화 1-D 가우시안 (K=5, σ=3 → [0.1782, 0.2105, 0.2225, 0.2105, 0.1782])."""
+    """vmamba_patchmix.py:552-556 — ℓ1-normalized 1-D Gaussian (K=5, σ=3 → [0.1782, 0.2105, 0.2225, 0.2105, 0.1782])."""
     ax = torch.arange(kernel_size, device=device, dtype=torch.float32) - (kernel_size - 1) / 2.0
     g = torch.exp(-(ax ** 2) / (2.0 * sigma ** 2))
     g = g / (g.sum() + 1e-12)
@@ -172,7 +174,7 @@ def gaussian_kernel1d(kernel_size: int, sigma: float, device=None, dtype=torch.f
 
 
 def blur_separable(x: torch.Tensor, kernel_size: int = 7, sigma: float = 1.5) -> torch.Tensor:
-    """vmamba_patchmix.py:558-566 — depthwise separable Gaussian blur (세로 → 가로), 파라미터 없음."""
+    """vmamba_patchmix.py:558-566 — depthwise separable Gaussian blur (vertical → horizontal), no parameters."""
     B, D, H, W = x.shape
     g = gaussian_kernel1d(kernel_size, sigma, x.device, x.dtype)
     w_h = g.view(1, 1, kernel_size, 1).expand(D, 1, kernel_size, 1).contiguous()
@@ -184,7 +186,7 @@ def blur_separable(x: torch.Tensor, kernel_size: int = 7, sigma: float = 1.5) ->
 
 
 # =====================================================================================
-# SS2D (v2 계열만: vmamba_patchmix.py:380-750)
+# SS2D (v2 family only: vmamba_patchmix.py:380-750)
 # =====================================================================================
 class SS2D(nn.Module, mamba_init):
     def __init__(
@@ -211,13 +213,13 @@ class SS2D(nn.Module, mamba_init):
         blur_kernel_size=5,
         blur_sigma=1.0,
         blur_strength=1.0,
-        # selective scan 경로
+        # selective scan path
         ssm_backend: str = "auto",
         **kwargs,
     ):
         super().__init__()
         if forward_type.startswith("xv") or forward_type in ("v0", "v0seq"):
-            raise NotImplementedError(f"forward_type {forward_type!r} 은 이식 범위 밖 (v2 계열만)")
+            raise NotImplementedError(f"forward_type {forward_type!r} is outside the port scope (v2 family only)")
         d_inner = int(ssm_ratio * d_model)
         dt_rank = math.ceil(d_model / 16) if dt_rank == "auto" else dt_rank
         self.channel_first = channel_first
@@ -243,10 +245,10 @@ class SS2D(nn.Module, mamba_init):
         for tag in ("_onnone", "_ondwconv3", "_oncnorm", "_onsoftmax", "_onsigmoid"):
             hit, forward_type = checkpostfix(tag, forward_type)
             if hit:
-                raise NotImplementedError(f"out_norm 변형 {tag} 은 이식 범위 밖")
+                raise NotImplementedError(f"out_norm variant {tag} is outside the port scope")
         self.out_norm = LayerNorm(d_inner)
 
-        # forward_type → forward_corev2 인자 (원본 FORWARD_TYPES; CrossScan 은 항상 torch 버전, SelectiveScan 은 backend 선택)
+        # forward_type → forward_corev2 arguments (original FORWARD_TYPES; CrossScan is always the torch version, SelectiveScan picks a backend)
         FORWARD_TYPES = dict(
             v01=dict(force_fp32=(not self.disable_force32), no_einsum=False),
             v02=dict(force_fp32=(not self.disable_force32), no_einsum=False),
@@ -257,7 +259,7 @@ class SS2D(nn.Module, mamba_init):
             v3=dict(force_fp32=False, no_einsum=False),
         )
         if forward_type not in FORWARD_TYPES:
-            raise NotImplementedError(f"forward_type {forward_type!r} 은 이식 범위 밖")
+            raise NotImplementedError(f"forward_type {forward_type!r} is outside the port scope")
         self.forward_type_tag = forward_type
         self._core_kwargs = FORWARD_TYPES[forward_type]
         self.forward_core = partial(self.forward_corev2, **self._core_kwargs)
@@ -320,7 +322,7 @@ class SS2D(nn.Module, mamba_init):
         K, D, R = dt_projs_weight.shape
         L = H * W
 
-        if self.blur_enable:  # vmamba_patchmix.py:682-684 — CrossScan 직전 (학습·평가 공통)
+        if self.blur_enable:  # vmamba_patchmix.py:682-684 — right before CrossScan (training and evaluation alike)
             x = self.blur_strength * self.blur_separable(x, kernel_size=self.blur_kernel_size, sigma=self.blur_sigma)
 
         xs = CrossScan.apply(x)
@@ -412,7 +414,7 @@ class VSSBlock(nn.Module):
     ):
         super().__init__()
         if gmlp or use_checkpoint:
-            raise NotImplementedError("gmlp / use_checkpoint 는 이식 범위 밖")
+            raise NotImplementedError("gmlp / use_checkpoint are outside the port scope")
         self.ssm_branch = ssm_ratio > 0
         self.mlp_branch = mlp_ratio > 0
         self.post_norm = post_norm
@@ -497,7 +499,7 @@ class VSSM(nn.Module):
     ):
         super().__init__()
         if posembed:
-            raise NotImplementedError("posembed 는 이식 범위 밖")
+            raise NotImplementedError("posembed is outside the port scope")
         if mix_layout not in MIX_LAYOUTS:
             raise ValueError(f"mix_layout must be one of {MIX_LAYOUTS}, got {mix_layout!r}")
         self.enable_patch_mix = enable_patch_mix
@@ -630,7 +632,7 @@ class VSSM(nn.Module):
         return float(np.random.beta(self.mix_beta, self.mix_beta)) if self.mix_beta > 0 else 1.0
 
     def _mix_axis(self, x: torch.Tensor, target, axis: int):
-        """축 `axis` 의 연속 구간을 x[index] 로 교체 (원본 time_only/freq_only 의 공통 뼈대; 난수 순서 beta→randperm(B)→randint)."""
+        """Replace a contiguous span of axis `axis` with x[index] (shared skeleton of the original time_only/freq_only; RNG order beta→randperm(B)→randint)."""
         lam = self._draw_lam()
         B = x.shape[0]
         size = x.shape[axis]
@@ -646,11 +648,11 @@ class VSSM(nn.Module):
         return x, target, target[index], lam, index
 
     def patch_mix_time_only(self, x, target):
-        # as_code: 원본 `B,H,W,C = x.shape` → W = dim2 (실제 주파수 32).  as_paper: 시간 축 dim3 (Eq.6)
+        # as_code: original `B,H,W,C = x.shape` → W = dim2 (actually frequency, 32).  as_paper: time axis dim3 (Eq.6)
         return self._mix_axis(x, target, axis=2 if self.mix_layout == "as_code" else 3)
 
     def patch_mix_freq_only(self, x, target):
-        # as_code: 원본 H = dim1 (실제 채널 96).  as_paper: 주파수 축 dim2 (Eq.7)
+        # as_code: original H = dim1 (actually channels, 96).  as_paper: frequency axis dim2 (Eq.7)
         return self._mix_axis(x, target, axis=1 if self.mix_layout == "as_code" else 2)
 
     def patch_mix_2d_ast_equiv(self, x, target):
@@ -659,7 +661,7 @@ class VSSM(nn.Module):
         B = x.shape[0]
         index = torch.randperm(B).to(device)
         if self.mix_layout == "as_code":
-            # 원본: B,H,W,C = x.shape 로 (채널×주파수)=N 토큰, 각 토큰 = 시간 벡터
+            # original: B,H,W,C = x.shape gives (channels×frequency)=N tokens, each token = a time vector
             _, H, W, C = x.shape
             N = H * W
             x_flat = x.reshape(B, N, C)
@@ -669,7 +671,7 @@ class VSSM(nn.Module):
             lam = 1.0 - num_mask / N
             x = x_flat.view(B, H, W, C)
         else:
-            # as_paper: (F×T) 패치, 각 패치 = 채널 벡터
+            # as_paper: (F×T) patches, each patch = a channel vector
             _, C, Fh, T = x.shape
             N = Fh * T
             x_flat = x.permute(0, 2, 3, 1).reshape(B, N, C)
@@ -682,18 +684,18 @@ class VSSM(nn.Module):
 
     def patch_mix_dual_axis(self, x, target):
         """
-        원본 `vmamba_patchmix.py:1524` 의 **죽은 코드** `patch_mix_dual_axis` 를 그대로 옮긴 것.
+        Verbatim port of the **dead code** `patch_mix_dual_axis` in the original `vmamba_patchmix.py:1524`.
 
-        forward 에서 `elif mix_type == "dual":` 분기가 `'''...'''` 로 주석 처리되고 그 앞에
-        `else: raise ValueError` 가 있어 **공개 코드로는 절대 실행되지 않는다**. 우리 기본 dual 경로는
-        `main.py:338-352` 의 실제 동작(시간·주파수 **독립 forward 2회 + 대조손실 2개**)을 따른다.
+        In forward, the `elif mix_type == "dual":` branch is commented out with `'''...'''` and preceded by
+        `else: raise ValueError`, so it **never runs in the public code**. The toolkit's default dual path
+        follows the actual behavior of `main.py:338-352` (**two independent forwards** for time and frequency **+ two contrastive losses**).
 
-        이 함수는 공개되지 않은 `main_v2.py` 가 이 죽은 코드를 되살렸을 가능성을 **검증하기 위한 변형**이다
-        (`cl_mode=dual_seq`). 원본 그대로의 특징 3가지를 유지한다:
-          - 시간축 mix 를 먼저 하고, **그 결과 위에** 주파수축 mix 를 새 무작위 짝으로 한 번 더 건다(순차).
-          - 유효 λ 는 두 λ 의 곱(`lam_t * lam_f`) — 원본 주석 "approximate effective mixing ratio".
-          - **라벨은 시간축 mix 것만 쓴다**(`target_a`, `target_b`, `index_t`). 주파수축 mix 의 짝
-            정보(`target_b2`, `index_f`)는 원본이 그냥 버린다 — 입력만 섞고 라벨은 반영하지 않는 quirk 다.
+        This function is a **variant for testing the possibility** that the unreleased `main_v2.py` revived this dead code
+        (`cl_mode=dual_seq`). It keeps three characteristics of the original:
+          - Time-axis mix is applied first, then frequency-axis mix is applied **on top of that result** with new random pairs (sequential).
+          - The effective λ is the product of the two λ (`lam_t * lam_f`) — original comment "approximate effective mixing ratio".
+          - **Only the time-axis mix labels are used** (`target_a`, `target_b`, `index_t`). The pairing information of the
+            frequency-axis mix (`target_b2`, `index_f`) is simply discarded by the original — a quirk where inputs are mixed but labels are not.
         """
         x, target_a, target_b, lam_t, index_t = self.patch_mix_time_only(x, target)
         x, _target_a2, _target_b2, lam_f, _index_f = self.patch_mix_freq_only(x, target)
@@ -719,7 +721,7 @@ class VSSM(nn.Module):
         return torch.flatten(x, 1)
 
     def forward_features(self, x, y=None, patch_mix: bool = False, mix_type: str = "none"):
-        """vmamba_patchmix.py:1541-1586 — patch_mix 면 (feat, y_a, y_b, lam, index), 아니면 (features, logits)."""
+        """vmamba_patchmix.py:1541-1586 — returns (feat, y_a, y_b, lam, index) with patch_mix, otherwise (features, logits)."""
         x = self.patch_embed(x)
         if patch_mix:
             x, y_a, y_b, lam, index = self.apply_patch_mix(x, y, mix_type)
@@ -736,7 +738,7 @@ class VSSM(nn.Module):
 
 
 # =====================================================================================
-# DASS-medium 구성 + ckpt 로드 (ast_models.py:313-336, 350-359)
+# DASS-medium setup + ckpt loading (ast_models.py:313-336, 350-359)
 # =====================================================================================
 DASS_MEDIUM_KWARGS = dict(
     drop_path_rate=0.3, embed_dim=96, depths=[2, 2, 20, 2], ssm_d_state=1, ssm_ratio=1.0, ssm_conv_bias=False,
@@ -747,7 +749,7 @@ DASS_MEDIUM_KWARGS = dict(
 def build_dass_medium_vssm(blur: bool = True, blur_blocks=(2, 3), blur_stage=(2,), kernel_size=5, sigma=3.0, blur_strength=1.0,
                            enable_patch_mix=False, mix_beta=1.0, mix_layout="as_code", ssm_backend="auto",
                            drop_path_rate: float = 0.3) -> VSSM:
-    """ast_models.py:313-317 의 VSSM(medium) — blur=False 면 blur_blocks=∅ (FT/plain DASS 와 동일 구조)."""
+    """VSSM(medium) of ast_models.py:313-317 — blur=False gives blur_blocks=∅ (same structure as FT/plain DASS)."""
     kw = dict(DASS_MEDIUM_KWARGS)
     kw["drop_path_rate"] = drop_path_rate
     embed = kw.pop("embed_dim")
@@ -761,7 +763,7 @@ def build_dass_medium_vssm(blur: bool = True, blur_blocks=(2, 3), blur_stage=(2,
 
 
 def strip_dass_state_dict(state_dict: dict) -> dict:
-    """ast_models.py:353-358 — 'module.v.' 접두어 제거, classifier.head 제외."""
+    """ast_models.py:353-358 — strip the 'module.v.' prefix, exclude classifier.head."""
     out = {}
     for k, v in state_dict.items():
         if "classifier.head" in k:
@@ -771,7 +773,7 @@ def strip_dass_state_dict(state_dict: dict) -> dict:
 
 
 def load_dass_checkpoint(vssm: VSSM, path: str, expect_missing: Sequence[str] = ("classifier.head.weight", "classifier.head.bias")):
-    """DASS_medium_v2.pth 로드 — 원본은 strict=False 지만 여기서는 head 2키 외 missing/unexpected 가 없는지 검사한다."""
+    """Load DASS_medium_v2.pth — the original uses strict=False, but here it checks that there are no missing/unexpected keys other than the 2 head keys."""
     raw = torch.load(path, map_location="cpu", weights_only=True)
     if isinstance(raw, dict) and "model" in raw and all(not k.startswith("module.") for k in raw):
         raw = raw["model"]
@@ -780,5 +782,6 @@ def load_dass_checkpoint(vssm: VSSM, path: str, expect_missing: Sequence[str] = 
     missing = sorted(result.missing_keys)
     unexpected = sorted(result.unexpected_keys)
     if missing != sorted(expect_missing) or unexpected:
-        raise RuntimeError(f"DASS ckpt 키 불일치: missing={missing}, unexpected={unexpected}")
+        raise RuntimeError(f"DASS ckpt key mismatch: missing={missing}, unexpected={unexpected}")
+
     return {"loaded": len(sd), "missing": missing, "unexpected": unexpected}

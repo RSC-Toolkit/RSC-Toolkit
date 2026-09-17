@@ -1,4 +1,4 @@
-# SPRSound 7-class: Sp = Normal 정확도, Se = 비정상 6클래스 합산 정확도, Score 평균 (sclmeta ce.py 와 동일 식)
+# SPRSound 7-class: Sp = Normal accuracy, Se = pooled accuracy over the 6 abnormal classes, Score = their mean (same formula as sclmeta ce.py)
 train:
   - name: topk_accuracy
     params:

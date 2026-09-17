@@ -1,16 +1,16 @@
 """
-BTS-CARD 체크포인트 평가 — ICBHI 공식 test(IND) α 스윕 + SPRSound 2022 inter-patient 4-class OOD.
+BTS-CARD checkpoint evaluation — ICBHI official test (IND) α sweep + SPRSound 2022 inter-patient 4-class OOD.
 
-  # 저자 배포 ckpt (README/Table 2 대조; 단일 ckpt 라 근접 여부만)
+  # authors' released ckpt (compared with README/Table 2; a single ckpt, so only closeness is checked)
   .venv/bin/python scripts/reproduction/eval_btscard_checkpoint.py --ckpt pretrained_models/upstream/btscard/best.pth \
       --ckpt_format author --sprsound author,toolkit --amp --device cuda:2 --out outputs/btscard/eval_author_ckpt.json
-  # 툴킷 학습 산출물 (ICBHIBestScoreCheckpoint best.pth) → OOD 평가 (런처 큐에서 학습 뒤 && 로 연결)
+  # toolkit training output (ICBHIBestScoreCheckpoint best.pth) → OOD evaluation (chained with && after training in the launcher queue)
   .venv/bin/python scripts/reproduction/eval_btscard_checkpoint.py --ckpt outputs/btscard/icbhi-btscard-s1/best.pth \
       --ckpt_format toolkit --sprsound author --out outputs/btscard/icbhi-btscard-s1/ood.json
 
-출력 json: icbhi[α] / sprsound_<source>[α] 의 (S_p, S_e, icbhi_score) + TE(o_multi)·NDE(o_text) 단독 점수 (α=0 행에서,
-원본 validate 로그와 동일). --amp 는 원본 validate 처럼 전 과정 autocast(fp16).
-프로토콜 표기: 툴킷 주 결과는 α=0 고정·ICHBI test 기준 best(Se>5) ckpt 하나로 IND/OOD 를 낸다; α 스윕은 참고용 병기.
+Output json: (S_p, S_e, icbhi_score) for icbhi[α] / sprsound_<source>[α] + standalone scores of TE(o_multi) and NDE(o_text) (in the α=0 row,
+same as the original validate log). --amp autocasts the whole pass (fp16) like the original validate.
+Protocol: the toolkit main result reports IND/OOD from one ckpt (α=0 fixed, best on the ICBHI test with Se>5); the α sweep is reported alongside for reference.
 """
 import argparse
 import json
@@ -26,7 +26,7 @@ from rsc_toolkit.models.bts_card import BTSCARDModel
 ALPHAS = [round(0.1 * i, 1) for i in range(11)]
 README = {"icbhi": {"S_p": 84.42, "S_e": 44.83, "icbhi_score": 64.63},
           "sprsound": {"S_p": 82.02, "S_e": 41.90, "icbhi_score": 61.96},
-          "note": "논문 Table 2 (5 runs mean; Full = α 스윕 중 최고값). 저자 best.pth 자체 best_acc 는 ckpt 안에 기록"}
+          "note": "paper Table 2 (5-run mean; Full = best value over the α sweep). The authors' best.pth records its own best_acc inside the ckpt"}
 
 
 def get_score(hits, counts):
@@ -71,8 +71,8 @@ def main():
     ap.add_argument("--ckpt_format", choices=["author", "toolkit"], default="toolkit")
     ap.add_argument("--icbhi_test", default="pretrained_models/upstream/bts/test.pt")
     ap.add_argument("--no_icbhi", action="store_true")
-    ap.add_argument("--sprsound", default="author", help="쉼표 구분: author, toolkit, none")
-    ap.add_argument("--rhonchi_stridor", default="drop", choices=["drop"], help="4-class 뷰: Rhonchi/Stridor 제외만 허용 (2026-09-16 결정; inter-test 엔 0 건)")
+    ap.add_argument("--sprsound", default="author", help="comma-separated: author, toolkit, none")
+    ap.add_argument("--rhonchi_stridor", default="drop", choices=["drop"], help="4-class view: only dropping Rhonchi/Stridor is allowed (the inter-test set has none)")
     ap.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
     ap.add_argument("--batch_size", type=int, default=8)
     ap.add_argument("--amp", action="store_true")
@@ -90,7 +90,7 @@ def main():
     model.to(args.device).eval()
 
     result = {"ckpt": args.ckpt, "ckpt_format": args.ckpt_format, "ckpt_info": info, "amp": args.amp,
-              "protocol": "툴킷 주 결과: α=0 고정, ICBHI 공식 test 기준 best(Se>5) ckpt 로 IND/OOD 평가; α 스윕은 참고",
+              "protocol": "toolkit main result: α=0 fixed, IND/OOD evaluated with the best ckpt on the ICBHI official test (Se>5); the α sweep is for reference",
               "reference_table2": README}
     if not args.no_icbhi:
         loader = DataLoader(BTSPrecomputedDataset(args.icbhi_test), batch_size=args.batch_size, shuffle=False,

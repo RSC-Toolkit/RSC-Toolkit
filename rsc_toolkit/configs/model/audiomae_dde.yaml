@@ -1,24 +1,24 @@
-# DDE-MAE 1단계(분리 FT) 모델 — 논문 명세 재구현 (rsc_toolkit/models/audiomae_dde.py DDEMAE). 백본 Audio-MAE 는 P0 골든.
-#   variant s3 = DDE-MAE (E_R + E_I + concat 디코더 + Siamese + vCLUB), s2 = 단일 인코더 재구성 FT (Table 1 S2)
-#   Table 2 ablation: use_mi=false (−MI), use_siamese=false (−Siamese), 둘 다 false (4행 추정 구성)
+# DDE-MAE stage 1 (disentangled FT) model — re-implementation from the paper specification (rsc_toolkit/models/audiomae_dde.py DDEMAE). The Audio-MAE backbone is verified against goldens.
+#   variant s3 = DDE-MAE (E_R + E_I + concat decoder + Siamese + vCLUB), s2 = single-encoder reconstruction FT (Table 1 S2)
+#   Table 2 ablation: use_mi=false (−MI), use_siamese=false (−Siamese), both false (inferred row-4 configuration)
 name: audiomae_dde
 params:
   variant: s3
   n_cls: 4
-  pretrained_path: pretrained_models/upstream/audiomae/pretrained.pth   # Audio-MAE ViT-B AS-2M (인코더+디코더, CC-BY-NC-4.0)
-  mask_ratio: 0.8            # 가정: 미기재 → Audio-MAE 사전학습 기본
-  norm_pix_loss: false       # 가정: 미기재 (식 5 는 원 스펙트로그램 MSE; 공개 ckpt 사전학습은 True 였음)
-  decoder_mode: 1            # 가정: 공개 ckpt 디코더(Swin x16) 와 키 일치 쪽; 0 = 전역 Block x8 (신규 초기화)
-  alpha_siamese: 0.5         # 논문 α1
-  alpha_mi: 0.02             # 논문 α2
+  pretrained_path: pretrained_models/upstream/audiomae/pretrained.pth   # Audio-MAE ViT-B AS-2M (encoder+decoder, CC-BY-NC-4.0)
+  mask_ratio: 0.8            # Assumption: not specified → Audio-MAE pretraining default
+  norm_pix_loss: false       # Assumption: not specified (Eq. 5 is MSE on the raw spectrogram; the public ckpt was pretrained with True)
+  decoder_mode: 1            # Assumption: the option whose keys match the public ckpt decoder (Swin x16); 0 = global Block x8 (newly initialized)
+  alpha_siamese: 0.5         # paper α1
+  alpha_mi: 0.02             # paper α2
   use_siamese: true
   use_mi: true
-  siamese_margin: 1.0        # 가정: margin 미기재
-  siamese_level: pooled      # 가정: 풀링 벡터(패치 토큰 평균) | token
-  mi_level: pooled           # 가정: vCLUB 입력 풀링 벡터
-  shuffle_unit: patch        # 가정: 패치 열(16 프레임) 단위 시간 셔플 | frame
-  shuffle_mask: same_physical  # 가정: E_I 두 입력에서 물리적으로 같은 패치를 마스킹 | same_index
-  club_hidden: 512           # 가정: q_θ MLP 768-512-768 (CLUB 공식 구현 형태)
-  club_lr: 1.0e-4            # 가정: q_θ 보조 Adam lr
-  club_steps: 1              # 가정: 매 스텝 q_θ 1회 갱신
-  recon_scope: masked        # 가정: 식 5 는 전체 스펙트로그램 MSE 로 쓰였으나 공식 MAE 관례대로 마스크 패치만 평균 | all (전 패치)
+  siamese_margin: 1.0        # Assumption: margin not specified
+  siamese_level: pooled      # Assumption: pooled vector (mean of patch tokens) | token
+  mi_level: pooled           # Assumption: pooled vector as the vCLUB input
+  shuffle_unit: patch        # Assumption: time shuffle per patch column (16 frames) | frame
+  shuffle_mask: same_physical  # Assumption: mask physically identical patches in the two E_I inputs | same_index
+  club_hidden: 512           # Assumption: q_θ MLP 768-512-768 (form of the official CLUB implementation)
+  club_lr: 1.0e-4            # Assumption: lr of the auxiliary Adam for q_θ
+  club_steps: 1              # Assumption: one q_θ update per step
+  recon_scope: masked        # Assumption: Eq. 5 is written as MSE over the whole spectrogram, but following the official MAE convention only masked patches are averaged | all (all patches)

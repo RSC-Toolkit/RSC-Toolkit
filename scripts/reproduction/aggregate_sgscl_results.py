@@ -1,6 +1,6 @@
 """
-sgscl P1 결과 집계: outputs/sgscl/<run>/best.json 을 모아
-방법별 seed 평균±표준편차(Sp/Se/Score)를 논문 보고치와 나란히 표로 찍는다.
+SG-SCL 5-seed reproduction check aggregation: collects outputs/sgscl/<run>/best.json and
+prints a table of the per-method seed mean±std (Sp/Se/Score) next to the paper-reported values.
 
   .venv/bin/python scripts/reproduction/aggregate_sgscl_results.py
 """
@@ -9,11 +9,11 @@ import pathlib
 import re
 import statistics
 
-PAPER = {  # SG-SCL 논문(2312.09603) Table 3 (5 seeds, ICBHI official 4-class)
+PAPER = {  # SG-SCL paper (2312.09603) Table 3 (5 seeds, ICBHI official 4-class)
     "icbhi-ast-sgscl": ("SG-SCL (AST)",    (79.87, 8.89), (43.55, 5.93), (61.71, 1.61)),
     "icbhi-ast-dat":   ("DAT (AST, dev)",  (77.11, 7.20), (41.99, 5.00), (59.81, 1.25)),
-    # 비-AST — SG-SCL 논문 Table 3 (같은 저장소 레시피 bs64/400ep 로 저자가 재실행한 값).
-    # patch-mix 논문 Table 1 의 값(ResNet18 53.84±1.26, EffB0 56.56±0.79)은 다른 실행이라 참고만.
+    # non-AST — SG-SCL paper Table 3 (values re-run by the authors with the same repository recipe, bs64/400ep).
+    # The values in Patch-Mix paper Table 1 (ResNet18 53.84±1.26, EffB0 56.56±0.79) come from different runs; reference only.
     "icbhi-resnet18-ce":       ("ResNet18 SFT",        (74.72, 3.43), (33.95, 3.88), (54.33, 0.91)),
     "icbhi-resnet18-sgscl":    ("ResNet18 + SG-SCL",   (75.58, 6.36), (34.63, 5.98), (55.10, 1.18)),
     "icbhi-effb0-ce":          ("EffNet-B0 SFT",       (73.48, 5.93), (39.24, 2.43), (57.46, 1.05)),
@@ -25,9 +25,9 @@ PAPER = {  # SG-SCL 논문(2312.09603) Table 3 (5 seeds, ICBHI official 4-class)
 
 def _completed(root: pathlib.Path, run: str) -> bool:
     """
-    런처가 학습 종료 시 쓰는 logs/<run>.done (EXIT=0) 이 있어야 완료로 본다.
-    best.json 은 매 best 갱신마다 쓰이므로 중간에 죽은 run 도 갖고 있다 —
-    그걸 완료본처럼 집계하면 안 된다 (2026-08-25 Slurm 잡 종료 사고).
+    A run counts as completed only if logs/<run>.done (EXIT=0), written by the launcher when training ends, exists.
+    best.json is written on every best update, so runs that died midway also have one —
+    they must not be aggregated as completed runs (e.g. when a Slurm job is terminated).
     """
     done = root / "logs" / f"{run}.done"
     return done.exists() and "EXIT=0" in done.read_text()
@@ -48,7 +48,7 @@ def main():
             d = json.loads(best.read_text())
             groups[base].append((seed, d["S_p"], d["S_e"], d["icbhi_score"], d.get("epoch")))
     if partial:
-        print("(미완료 run — 집계 제외: " + ", ".join(partial) + ")")
+        print("(incomplete runs — excluded from aggregation: " + ", ".join(partial) + ")")
 
     for base, rows in groups.items():
         if not rows:
@@ -63,12 +63,12 @@ def main():
                 vals = [r[i] for r in rows]
                 return statistics.mean(vals), statistics.stdev(vals)
             sp, se, sc = ms(1), ms(2), ms(3)
-            print(f"  우리 평균 : Sp {sp[0]:6.2f}±{sp[1]:.2f}  Se {se[0]:6.2f}±{se[1]:.2f}  Score {sc[0]:6.2f}±{sc[1]:.2f}")
+            print(f"  ours mean : Sp {sp[0]:6.2f}±{sp[1]:.2f}  Se {se[0]:6.2f}±{se[1]:.2f}  Score {sc[0]:6.2f}±{sc[1]:.2f}")
             if psc is not None:
-                print(f"  논문 보고 : Sp {psp[0]:6.2f}±{psp[1]:.2f}  Se {pse[0]:6.2f}±{pse[1]:.2f}  Score {psc[0]:6.2f}±{psc[1]:.2f}")
-                print(f"  Score 차이: {sc[0]-psc[0]:+.2f} (논문 ±{psc[1]:.2f})")
+                print(f"  paper     : Sp {psp[0]:6.2f}±{psp[1]:.2f}  Se {pse[0]:6.2f}±{pse[1]:.2f}  Score {psc[0]:6.2f}±{psc[1]:.2f}")
+                print(f"  Score diff: {sc[0]-psc[0]:+.2f} (paper ±{psc[1]:.2f})")
             else:
-                print("  논문 보고 : (자체 수치 없음 — 참고용)")
+                print("  paper     : (no paper value — reference only)")
 
 if __name__ == "__main__":
     main()

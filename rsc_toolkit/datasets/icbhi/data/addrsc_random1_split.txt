@@ -1,4 +1,4 @@
-# ADD-RSC util/icbhi_dataset.py 코드 스플릿: sorted stems → random.Random(1).shuffle → 앞 60% train (파일 단위). scripts/reproduction/make_addrsc_split.py
+# ADD-RSC util/icbhi_dataset.py code split: sorted stems -> random.Random(1).shuffle -> first 60% train (file level). scripts/reproduction/make_addrsc_split.py
 101_1b1_Al_sc_Meditron	train
 101_1b1_Pr_sc_Meditron	test
 102_1b1_Ar_sc_Meditron	test

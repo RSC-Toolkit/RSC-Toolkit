@@ -1,15 +1,15 @@
 """
-BTS 논문(kaen2891/bts)이 배포한 사전 전처리 ICBHI 텐서(training.pt / test.pt) 로더.
+Loader for the preprocessed ICBHI tensors (training.pt / test.pt) released with the BTS paper (kaen2891/bts).
 
-원본 util/icbhi_dataset.py 는 첫 실행 때 48 kHz 로 리샘플·8초 cut/pad 한 cycle 들을
-HF ClapProcessor 로 log-mel(1, 1001, 64) 로 바꿔 .pt 로 저장하고 이후엔 그것만 읽는다.
-저장소에는 이 .pt 만 배포되고(전처리 스크립트 없음), 같은 파일을 팀 논문 BTS-CARD 도
-쓴다. 논문 수치와 같은 입력을 보장하려고 이 파일을 그대로 읽는 경로를 둔다.
+The original util/icbhi_dataset.py, on first run, resamples cycles to 48 kHz with an 8 s cut/pad,
+converts them with the HF ClapProcessor to log-mel (1, 1001, 64), saves them as .pt and reads only those afterwards.
+Only these .pt files are released in the repository (no preprocessing script), and the BTS-CARD paper uses
+the same files. This path reads them as-is to guarantee the same inputs as the paper numbers.
 
-항목 = (log-mel Tensor(1, 1001, 64), label int, meta Tensor(7,) [age, sex, adult_BMI,
+Item = (log-mel Tensor(1, 1001, 64), label int, meta Tensor(7,) [age, sex, adult_BMI,
 child_weight, child_height, chest_location_id, device_id]).
-배치 = (x (B, 1, 1001, 64), y (B,), meta (B, 7)) — 검증 배치에도 meta 가 붙는다
-(BTS 는 평가 때도 텍스트 설명을 쓴다; 원본 validate 와 동일).
+Batch = (x (B, 1, 1001, 64), y (B,), meta (B, 7)) -- validation batches also carry meta
+(BTS uses the text description at evaluation too; same as the original validate).
 """
 from __future__ import annotations
 
@@ -28,9 +28,9 @@ class BTSPrecomputedDataset(Dataset):
     def __init__(self, path):
         self.path = pathlib.Path(path).expanduser()
         if not self.path.exists():
-            raise FileNotFoundError(f"BTS 전처리 텐서가 없다: {self.path} (README 의 Google Drive 링크)")
+            raise FileNotFoundError(f"BTS preprocessed tensor not found: {self.path} (Google Drive link in the README)")
         self.items = torch.load(self.path, map_location="cpu", weights_only=False)
-        logger.info("BTS 전처리 텐서 로드: %s (%d cycles)", self.path, len(self.items))
+        logger.info("Loaded BTS preprocessed tensor: %s (%d cycles)", self.path, len(self.items))
 
     def __len__(self):
         return len(self.items)
@@ -40,14 +40,14 @@ class BTSPrecomputedDataset(Dataset):
         return feat, int(label), meta.float()
 
 
-from rsc_toolkit.datasets import collate as _collate  # P2-6: collate 단일 구현
+from rsc_toolkit.datasets import collate as _collate  # single collate implementation
 
 # (x, y, meta7 stack)
 bts_collate = _collate.stack_meta_collate
 
 
 class BTSPrecomputedDataModule(L.LightningDataModule):
-    meta_kind = "bts_meta7"  # batch[2] = meta7 모양 float 벡터 (train·val 양쪽) — bts/bts_card/audioclap
+    meta_kind = "bts_meta7"  # batch[2] = meta7-shaped float vector (both train and val) -- bts/bts_card/audioclap
 
     def __init__(
         self,
@@ -56,7 +56,7 @@ class BTSPrecomputedDataModule(L.LightningDataModule):
         batch_size: int = 8,
         num_workers: int = 8,
         shuffle_train: bool = True,
-        drop_last_train: bool = True,   # 원본 train loader drop_last=True
+        drop_last_train: bool = True,   # original train loader drop_last=True
         pin_memory: bool = True,
         persistent_workers: bool = False,
     ):
@@ -89,7 +89,7 @@ class BTSPrecomputedDataModule(L.LightningDataModule):
         return self._loader(self.train_ds, shuffle=self.shuffle_train, drop_last=self.drop_last_train)
 
     def val_dataloader(self) -> DataLoader:
-        # 논문 프로토콜: 검증셋 없이 매 epoch 공식 test 평가 (best-on-test)
+        # Paper protocol: no validation set, official test evaluated every epoch (best-on-test)
         return self._loader(self.test_ds, shuffle=False, drop_last=False)
 
     def test_dataloader(self) -> DataLoader:

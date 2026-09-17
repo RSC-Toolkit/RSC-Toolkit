@@ -1,10 +1,10 @@
-# SCL-metadata 선형 평가 run: 동결 인코더(encoder_ckpt) + Linear, 100ep, Adam 0.1/wd 1e-4, 가중 CE, 매 epoch test Sc 최고.
+# SCL-metadata linear evaluation run: frozen encoder (encoder_ckpt) + Linear, 100 ep, Adam 0.1/wd 1e-4, weighted CE, best test Sc every epoch.
 #   rsctk-train --config-name sclmeta_icbhi_linear model.params.encoder_ckpt=outputs/sclmeta/sprs-sclmeta-mscl-pre-s1/final_state.pth run.name=sprs-sclmeta-mscl-s1 seed=1
 defaults:
   - model: cnn6_sclmeta
   - data_defaults@data: base
   - data: sprsound_sclmeta
-  - loss: cross_entropy            # SPRS 는 비가중 CE (main.py:105-106)
+  - loss: cross_entropy            # SPRS uses unweighted CE (main.py:105-106)
   - metrics: sprsound_metrics
   - optimizer: adam_sclmeta_linear
   - trainer: default

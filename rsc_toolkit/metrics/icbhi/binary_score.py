@@ -1,14 +1,14 @@
 """
-AMS-D 논문/공식 코드의 **이진(비표준)** Se/Sp/Score — utils/metric.py:18-34 calculate_stats 의 이식.
+**Binary (non-standard)** Se/Sp/Score of the AMS-D paper/official code — port of calculate_stats in utils/metric.py:18-34.
 
-  Se = #(y≠0 ∧ ŷ≠0) / #비정상     (비정상을 "아무 비정상 클래스"로 맞추면 정답)
-  Sp = #(y=0 ∧ ŷ=0) / #정상
+  Se = #(y≠0 ∧ ŷ≠0) / #abnormal    (an abnormal sample counts as correct if predicted as any abnormal class)
+  Sp = #(y=0 ∧ ŷ=0) / #normal
   Score = (Se + Sp) / 2            (main.py:416)
-  acc = 4-class accuracy           (참고용)
+  acc = 4-class accuracy           (for reference)
 
-논문 §3.1 "Sen./Spe. are computed in a binary setting by grouping all abnormal classes as positive" 이 이 산식이다.
-표준 ICBHI 4-class Score(rsc_toolkit/metrics/icbhi/score.py, 정확한 비정상 클래스만 정답) 와 **비교 불가** — 키 이름을
-"paper_S_e"/"paper_S_p"/"paper_score" 로 구분하고 표에는 "논문 지표(비표준)" 으로 표기한다. 값은 % 단위.
+This is the formula of paper §3.1, "Sen./Spe. are computed in a binary setting by grouping all abnormal classes as positive".
+It is **not comparable** with the standard ICBHI 4-class Score (rsc_toolkit/metrics/icbhi/score.py, only the exact abnormal class counts
+as correct) — the keys are named "paper_S_e"/"paper_S_p"/"paper_score" and tables label it "paper metric (non-standard)". Values are in %.
 """
 from typing import Dict
 
@@ -44,7 +44,7 @@ class PaperBinaryScore(Metric):
         self.total += target.numel()
 
     def compute(self) -> Dict[str, torch.Tensor]:
-        # 원본: num_pos/num_neg 가 0 이면 0 (utils/metric.py:30-31)
+        # original code: 0 if num_pos/num_neg is 0 (utils/metric.py:30-31)
         se = self.tp.float() / self.num_pos.float() * 100.0 if int(self.num_pos) else self.tp.float() * 0.0
         sp = self.tn.float() / self.num_neg.float() * 100.0 if int(self.num_neg) else self.tn.float() * 0.0
         acc = self.correct.float() / self.total.float().clamp_min(1) * 100.0

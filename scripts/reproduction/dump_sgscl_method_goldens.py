@@ -1,26 +1,26 @@
 """
-SG-SCL 방법(모델·손실·두 뷰 증강)의 P0 골든을 공식 저장소 코드에서 뜬다.
+Produces official-code parity goldens for the SG-SCL method (model, loss, two-view augmentation) from the official repository code.
 
-두 부분으로 나뉜다 (실행 환경이 다르다):
+It has two parts (with different run environments):
 
-  ref  — AST(audioset) state_dict/forward + MetaCL + Projector 합성 손실.
-         참조 환경(torch 1.13 + timm 0.4.5)에서 실행:
+  ref  — AST(audioset) state_dict/forward + MetaCL + Projector composite loss.
+         Runs in the reference environment (torch 1.13 + timm 0.4.5):
            .venv-ref-timm045/bin/python scripts/reproduction/dump_sgscl_method_goldens.py \
-               ref --repo <sgscl 클론> --out tests/golden/sgscl_method
+               ref --repo <sgscl clone> --out tests/golden/sgscl_method
 
-  pipeline — 배치 단위 SpecAugment 두 뷰(누적 마스킹) 골든. 원본 util/augmentation.py 는
-         nlpaug 를 임포트하므로 스텁을 끼우고 **우리 venv** 에서 실행한다
-         (RNG 소모는 numpy/python/torch 인덱싱뿐이라 버전 비의존; patch-mix 파이프라인
-         골든과 같은 방식):
+  pipeline — batch-level SpecAugment two-view (cumulative masking) goldens. The original util/augmentation.py
+         imports nlpaug, so a stub is inserted and it runs **in our venv**
+         (RNG consumption is only numpy/python/torch indexing, so it is version-independent; same approach as the
+         patch-mix pipeline goldens):
            .venv/bin/python scripts/reproduction/dump_sgscl_method_goldens.py \
-               pipeline --repo <sgscl 클론> --out tests/golden/sgscl_method
+               pipeline --repo <sgscl clone> --out tests/golden/sgscl_method
 
-주의:
-- MetaCL(method/mcl.py)은 .cuda() 를 하드코딩하므로 CPU 에서 identity 로 패치한다.
-- AST 는 ./pretrained_models/audioset_10_10_0.4593.pth (cwd 기준)를 찾는다 —
-  아카이브(pretrained_models/upstream/audioset_0.4593.pth)를 심볼릭 링크로 건다.
-- Projector 는 det_fill(linspace) 로 파라미터를 덮고 eval 모드(BN 러닝 통계 기본값)
-  에서 뜬다 — 양쪽에서 같은 조건이면 합성(projection→MetaCL) 대조로 충분하다.
+Notes:
+- MetaCL (method/mcl.py) hard-codes .cuda(), so it is patched to identity on CPU.
+- AST looks for ./pretrained_models/audioset_10_10_0.4593.pth (relative to cwd) —
+  the archive copy (pretrained_models/upstream/audioset_0.4593.pth) is symlinked there.
+- Projector parameters are overwritten with det_fill(linspace) and it runs in eval mode (default BN running statistics)
+  — with the same conditions on both sides, comparing the composition (projection→MetaCL) is sufficient.
 """
 import argparse
 import json
@@ -33,7 +33,7 @@ import types
 import numpy as np
 import torch
 
-# CPU 참조 환경 대비: .cuda() → identity, torch.load → CPU 강제
+# for the CPU reference environment: .cuda() → identity, torch.load → forced CPU
 torch.Tensor.cuda = lambda self, *a, **k: self  # type: ignore[assignment]
 _orig_load = torch.load
 torch.load = lambda *a, **k: _orig_load(*a, **{**k, "map_location": "cpu"})
@@ -45,7 +45,7 @@ def det_fill(t: torch.Tensor) -> None:
 
 
 def dump_ref(repo: pathlib.Path, out: pathlib.Path) -> None:
-    # AST audioset ckpt 링크 (원본이 cwd 기준 경로를 하드코딩)
+    # AST audioset ckpt link (the original hard-codes a cwd-relative path)
     link = pathlib.Path("pretrained_models/audioset_10_10_0.4593.pth")
     target = pathlib.Path("pretrained_models/upstream/audioset_0.4593.pth")
     if not link.exists() and target.exists():
@@ -60,7 +60,7 @@ def dump_ref(repo: pathlib.Path, out: pathlib.Path) -> None:
     json.dump({"torch": torch.__version__, "timm": timm.__version__},
               open(out / "reference_versions.json", "w"), indent=1)
 
-    # ---- 1) SG-SCL AST: 스크립트 설정 그대로 (뒤집힌 h/w quirk 포함) ----
+    # ---- 1) SG-SCL AST: script settings as-is (including the swapped h/w quirk) ----
     m = ASTModel(label_dim=4, fstride=10, tstride=10, input_fdim=798, input_tdim=128,
                  imagenet_pretrain=True, audioset_pretrain=True, model_size="base384",
                  verbose=False, domain_label_dim=527)
@@ -75,7 +75,7 @@ def dump_ref(repo: pathlib.Path, out: pathlib.Path) -> None:
               open(out / "ast_state_dict_shapes.json", "w"), indent=0, sort_keys=True)
     print(f"ast feats {tuple(feats.shape)} mean {float(feats.mean()):+.6f}")
 
-    # ---- 2) MetaCL 손실 (meta 있음/없음) ----
+    # ---- 2) MetaCL loss (with/without meta) ----
     torch.manual_seed(202)
     proj1 = torch.randn(6, 16)
     proj2 = torch.randn(6, 16)
@@ -88,7 +88,7 @@ def dump_ref(repo: pathlib.Path, out: pathlib.Path) -> None:
                out / "metacl_golden.pt")
     print(f"metacl loss_meta {float(loss_meta):.6f} loss_none {float(loss_none):.6f}")
 
-    # ---- 3) 합성: Projector + target_type='project1_project2block' + MetaCL ----
+    # ---- 3) composition: Projector + target_type='project1_project2block' + MetaCL ----
     proj = Projector(16, 16)
     for _, p in sorted(proj.named_parameters()):
         det_fill(p)
@@ -98,7 +98,7 @@ def dump_ref(repo: pathlib.Path, out: pathlib.Path) -> None:
     feat2 = torch.randn(6, 16)
     from copy import deepcopy
     p1 = proj(feat1)
-    p2 = deepcopy(proj(feat2).detach())  # 원본 main.py:409-411
+    p2 = deepcopy(proj(feat2).detach())  # original main.py:409-411
     comp_loss = mcl(p1, p2, meta)
     torch.save({"feat1": feat1, "feat2": feat2, "meta": meta,
                 "p1": p1.detach(), "p2": p2, "loss": comp_loss.detach()},
@@ -107,7 +107,7 @@ def dump_ref(repo: pathlib.Path, out: pathlib.Path) -> None:
 
 
 def dump_pipeline(repo: pathlib.Path, out: pathlib.Path) -> None:
-    # 원본 util/augmentation.py 의 무거운/불필요 임포트 스텁 (마스킹 경로엔 안 쓰임)
+    # stubs for heavy/unneeded imports in the original util/augmentation.py (not used on the masking path)
     nlpaug = types.ModuleType("nlpaug")
     nlpaug_a = types.ModuleType("nlpaug.augmenter")
     nlpaug_aa = types.ModuleType("nlpaug.augmenter.audio")
@@ -124,16 +124,16 @@ def dump_pipeline(repo: pathlib.Path, out: pathlib.Path) -> None:
     torch.manual_seed(11)
     np.random.seed(11)
     random.seed(11)
-    x = torch.randn(2, 1, 798, 128)  # [B, 1, time, freq] — 원본 train 배치
+    x = torch.randn(2, 1, 798, 128)  # [B, 1, time, freq] — original train batch
     torch.save(x.clone(), out / "twoview_input.pt")
 
-    # 원본 train(): 같은 배치 텐서에 transforms 2회 — in-place 라 마스크가 누적된다
+    # original train(): transforms applied twice to the same batch tensor — in-place, so the masks accumulate
     images = x.clone()
     v1 = transforms(images).clone()
     v2 = transforms(images).clone()
     torch.save({"v1": v1, "v2": v2}, out / "twoview_golden.pt")
-    print(f"twoview v1==v2 인 원소 비율 {float((v1 == v2).float().mean()):.4f} "
-          f"(마스크 누적이면 1.0 미만이되 v1 마스크 위치는 대부분 유지)")
+    print(f"twoview fraction of elements with v1==v2 {float((v1 == v2).float().mean()):.4f} "
+          f"(with cumulative masking below 1.0, while most v1 mask positions are kept)")
 
 
 def main():
@@ -151,7 +151,7 @@ def main():
         dump_ref(repo, out)
     else:
         dump_pipeline(repo, out)
-    print("완료:", out)
+    print("done:", out)
 
 
 if __name__ == "__main__":

@@ -1,8 +1,8 @@
 """
-GaP-Aug(ICASSP 2024) — 논문 명세 재구현 테스트.
+GaP-Aug (ICASSP 2024) — tests for a re-implementation from the paper description.
 
-백본(PANNs Cnn14) 만 골든(scripts/reproduction/dump_gapaug_goldens.py: 공식 audioset_tagging_cnn + torchlibrosa, 16k ckpt, 512/160)
-대조가 가능하다. GaP-Aug·mixup·triplet·균형 샘플러는 논문 명세(+가정) 의 성질 검사.
+Only the backbone (PANNs Cnn14) can be compared with goldens (scripts/reproduction/dump_gapaug_goldens.py: official audioset_tagging_cnn + torchlibrosa, 16k ckpt, 512/160).
+GaP-Aug, mixup, triplet and the balanced sampler are property checks against the paper description (+ assumptions).
 """
 import pathlib
 
@@ -18,14 +18,14 @@ def _repo_root() -> pathlib.Path:
     for c in pathlib.Path(__file__).resolve().parents:
         if (c / "pyproject.toml").exists():
             return c
-    raise RuntimeError("리포 루트를 찾지 못했다")
+    raise RuntimeError("repository root not found")
 
 
 REPO = _repo_root()
 GOLDEN = REPO / "tests" / "golden" / "gapaug" / "backbone.pt"
 CKPT = REPO / "pretrained_models" / "upstream" / "Cnn14_16k_mAP=0.438.pth"
-needs_golden = pytest.mark.skipif(not GOLDEN.exists(), reason="골든 없음")
-needs_ckpt = pytest.mark.skipif(not CKPT.exists(), reason="PANNs Cnn14 16k ckpt 없음")
+needs_golden = pytest.mark.skipif(not GOLDEN.exists(), reason="golden missing")
+needs_ckpt = pytest.mark.skipif(not CKPT.exists(), reason="PANNs Cnn14 16k ckpt missing")
 
 
 def _model(**kw):
@@ -35,7 +35,7 @@ def _model(**kw):
     return Cnn14GaPAug(**kw)
 
 
-# ------------------------------------------------------------------ 백본 골든
+# ------------------------------------------------------------------ backbone golden
 @needs_golden
 @needs_ckpt
 def test_backbone_matches_official_panns():
@@ -45,13 +45,13 @@ def test_backbone_matches_official_panns():
         lm = m.compute_logmel(g["wav"])
         assert lm.shape == g["logmel"].shape == (3, 1, 1001, 64)
         d = (lm - g["logmel"]).abs()
-        # STFT 구현 차(conv1d vs torch.stft) 의 float32 잡음: 최대 ~4e-3 dB, 평균 ~7e-5 dB (float64 재계산도 2e-3)
+        # float32 noise from the STFT implementation difference (conv1d vs torch.stft): max ~4e-3 dB, mean ~7e-5 dB (float64 recomputation also 2e-3)
         assert d.max() < 1e-2 and d.mean() < 1e-3, (d.max().item(), d.mean().item())
         out = m.forward_backbone(lm)
         assert torch.allclose(out["feat"], g["embedding"], atol=1e-4), (out["feat"] - g["embedding"]).abs().max().item()
-        assert torch.equal(out["emb"], out["feat"])                                # eval: dropout 없음 → emb == feat
+        assert torch.equal(out["emb"], out["feat"])                                # eval: no dropout -> emb == feat
         assert out["pooled"].shape == (3, 2048)
-        ck = torch.load(CKPT, map_location="cpu", weights_only=False)["model"]      # fc_audioset 은 골든에 없음(재배포 회피)
+        ck = torch.load(CKPT, map_location="cpu", weights_only=False)["model"]      # fc_audioset is not in the golden (avoids redistribution)
         fc = torch.nn.Linear(2048, 527)
         fc.weight.data.copy_(ck["fc_audioset.weight"]); fc.bias.data.copy_(ck["fc_audioset.bias"])
         assert torch.allclose(fc(out["emb"]), g["logits"], atol=1e-4)
@@ -64,7 +64,7 @@ def test_checkpoint_key_coverage_and_param_count():
     m = _model(method="gapaug")
     info = m.pretrained_info
     official = {k for k in g["state_keys"] if not k.startswith(("spectrogram_extractor.", "logmel_extractor.", "fc_audioset."))}
-    assert set(m.backbone.state_dict()) == official                   # 제외 키 외 전부 일치 (strict 로드)
+    assert set(m.backbone.state_dict()) == official                   # everything except the excluded keys matches (strict load)
     assert info["n_loaded"] == len(official)
     assert set(info["excluded"]) == {k for k in g["state_keys"] if k.startswith(("spectrogram_extractor.", "logmel_extractor.", "fc_audioset."))}
     for k, v in m.backbone.state_dict().items():
@@ -72,13 +72,13 @@ def test_checkpoint_key_coverage_and_param_count():
     assert sum(v.numel() for v in m.backbone.state_dict().values()) == g["n_params_wo_audioset_and_frontend"]
     n_params = sum(p.numel() for p in m.parameters())
     assert sum(p.numel() for p in m.fc.parameters()) == 2048 * 4 + 4
-    # PANNs Cnn14 파라미터(버퍼 제외) 80,753,615 − fc_audioset 1,079,823 = 79,673,792 ; + fc(4) 8,196 = 79,681,988
+    # PANNs Cnn14 parameters (excluding buffers) 80,753,615 − fc_audioset 1,079,823 = 79,673,792 ; + fc(4) 8,196 = 79,681,988
     assert n_params == 79_681_988
 
 
 def test_strict_load_rejects_missing_key(tmp_path):
     if not CKPT.exists():
-        pytest.skip("ckpt 없음")
+        pytest.skip("ckpt missing")
     state = torch.load(CKPT, map_location="cpu", weights_only=False)["model"]
     del state["fc1.weight"]
     torch.save({"model": state}, tmp_path / "bad.pth")
@@ -115,8 +115,8 @@ def test_gap_aug_patches_gamma_and_untouched_regions():
         for k in range(32):
             t0, t1, f0, f1 = (int(v) for v in p[k])
             mask[t0:t1, f0:f1] = True
-        assert torch.equal(out[b, 0][~mask], x[b, 0][~mask])          # 패치 밖은 불변
-        assert (out[b, 0][mask] <= x[b, 0][mask] + 1e-6).all()          # [0,1] 에서 γ>1 이면 값 감소(약한 신호 억제)
+        assert torch.equal(out[b, 0][~mask], x[b, 0][~mask])          # unchanged outside patches
+        assert (out[b, 0][mask] <= x[b, 0][mask] + 1e-6).all()          # on [0,1], γ>1 decreases values (suppresses weak signals)
         assert not torch.equal(out[b, 0][mask], x[b, 0][mask])
 
 
@@ -181,20 +181,20 @@ def test_triplet_loss_finite_and_valid_indices():
     loss = triplet_loss(emb, y, margin=1.0)
     assert torch.isfinite(loss) and loss >= 0
     loss.backward(); assert emb.grad is not None
-    # 양성이 없는 클래스는 제외, 전부 같은 클래스면 0
+    # classes without positives are excluded; all the same class gives 0
     assert triplet_loss(torch.randn(3, 8), torch.tensor([0, 0, 0])).item() == 0.0
     a2, _, _ = random_triplets(torch.tensor([0, 1, 2, 2]))
     assert a2.tolist() == [2, 3]
 
 
-# ------------------------------------------------------------------ 학습 forward
+# ------------------------------------------------------------------ training forward
 def _tiny(**kw):
     return _model(pretrained=None, **kw)
 
 
 def test_training_forward_methods_run():
     torch.manual_seed(0)
-    wav = torch.randn(8, 16000)  # 1 s 로 축소 (구조는 동일)
+    wav = torch.randn(8, 16000)  # shortened to 1 s (same structure)
     y = torch.tensor([0, 1, 2, 3, 0, 1, 2, 3])
     ce = torch.nn.CrossEntropyLoss()
     for method in ("gapaug", "gapaug_nomixup", "naive", "specaug", "patchmask", "mixup_only"):
@@ -208,7 +208,7 @@ def test_training_forward_methods_run():
 
 
 def test_naive_equals_no_augmentation():
-    """naive: 증강 없음 → 같은 seed 에서 augment() 가 항등이고 손실은 CE + w_trip·triplet."""
+    """naive: no augmentation -> with the same seed augment() is the identity and the loss is CE + w_trip·triplet."""
     torch.manual_seed(0)
     m = _tiny(method="naive", w_trip=0.0).train()
     x = torch.rand(4, 1, 50, 64)
@@ -229,7 +229,7 @@ def test_mixup_lambda_from_global_rng_is_reproducible():
     assert torch.equal(l1, l2)
 
 
-# ------------------------------------------------------------------ 균형 샘플러
+# ------------------------------------------------------------------ balanced sampler
 def test_balanced_sampler_batch_distribution():
     labels = [0] * 100 + [1] * 30 + [2] * 10 + [3] * 3
     s = BalancedBatchSampler(labels, per_class=4, steps_per_epoch=20, n_classes=4, seed=0)
@@ -241,9 +241,9 @@ def test_balanced_sampler_batch_distribution():
         assert len(b) == 16
         counts = torch.bincount(lab[b], minlength=4).tolist()
         assert counts == [4, 4, 4, 4], counts
-    # 클래스 3 은 3개뿐 → 복원 추출로 중복 허용
+    # class 3 has only 3 samples -> sampling with replacement allows duplicates
     assert any(len(set(i for i in b if labels[i] == 3)) < 4 for b in batches)
-    # epoch 마다 다른 열, seed 고정 시 재현
+    # a different sequence per epoch, reproducible with a fixed seed
     b2 = list(s)
     assert b2 != batches
     s2 = BalancedBatchSampler(labels, per_class=4, steps_per_epoch=20, n_classes=4, seed=0)
@@ -255,9 +255,9 @@ def test_sample_patches_bounds():
     assert (p[:, 1] <= 10).all() and (p[:, 1] - p[:, 0] >= 1).all() and (p[:, 3] - p[:, 2] <= 16).all()
 
 
-# ------------------------------------------------------------------ 수정 회차 1 플래그
+# ------------------------------------------------------------------ option flags (head input, triplet layer, window, normalization)
 def test_head_input_and_triplet_layer_flags():
-    """head_input(emb|feat), triplet_layer(emb|feat|pooled), window(hann|hamming) 플래그가 실제 경로를 바꾼다."""
+    """head_input(emb|feat), triplet_layer(emb|feat|pooled), window(hann|hamming) flags actually change the path."""
     torch.manual_seed(0)
     wav = torch.randn(4, 16000)
     x = _tiny(method="naive").make_input(wav)
@@ -265,11 +265,11 @@ def test_head_input_and_triplet_layer_flags():
     m_feat = _tiny(method="naive", head_input="feat").eval()
     m_feat.load_state_dict(m_emb.state_dict())
     with torch.no_grad():
-        assert torch.allclose(m_emb.forward_backbone(x)["logits"], m_feat.forward_backbone(x)["logits"])  # eval: dropout 없음 → 동일
+        assert torch.allclose(m_emb.forward_backbone(x)["logits"], m_feat.forward_backbone(x)["logits"])  # eval: no dropout -> identical
     m_emb.train(); m_feat.train()
     torch.manual_seed(5); le = m_emb.forward_backbone(x)["logits"]
     torch.manual_seed(5); lf = m_feat.forward_backbone(x)["logits"]
-    assert not torch.allclose(le, lf)                                                  # train: emb 는 dropout 마스크가 헤드 앞에 걸린다
+    assert not torch.allclose(le, lf)                                                  # train: emb has the dropout mask applied before the head
     for layer, dim in (("emb", 2048), ("feat", 2048), ("pooled", 2048)):
         m = _tiny(method="naive", triplet_layer=layer).train()
         out = m.forward_backbone(x)
@@ -292,7 +292,7 @@ def test_head_input_and_triplet_layer_flags():
 
 
 def test_gap_aug_norm_none_keeps_outside_patches():
-    """norm_mode=none(음수 입력) 에서도 패치 밖은 불변, 패치 안은 clamp(min=0)^γ."""
+    """With norm_mode=none (negative inputs) patches leave the outside unchanged too; inside, clamp(min=0)^γ."""
     torch.manual_seed(2)
     x = torch.randn(2, 1, 100, 64) * 20 - 30
     aug = GammaPatchAug(n_patches=8, gamma_range=(1.7, 2.0))
@@ -311,17 +311,17 @@ def test_mixup_lambda_is_beta_and_pretrained_spec_has_sha256():
     _, _, lam = mixup_pairs(torch.rand(2000, 1), torch.rand(2000, 1), torch.zeros(2000, dtype=torch.long), torch.ones(2000, dtype=torch.long), 4, alpha=1.0)
     assert abs(lam.mean().item() - 0.5) < 0.03 and abs(lam.var().item() - 1 / 12) < 0.01      # Beta(1,1) = U[0,1]
     _, _, lam2 = mixup_pairs(torch.rand(2000, 1), torch.rand(2000, 1), torch.zeros(2000, dtype=torch.long), torch.ones(2000, dtype=torch.long), 4, alpha=0.2)
-    assert lam2.var().item() > lam.var().item()                                                 # α<1 → 양극단 쏠림
+    assert lam2.var().item() > lam.var().item()                                                 # α<1 -> mass pushed to the extremes
     from rsc_toolkit.models.cnn14_gapaug import PANNS_CNN14
     assert PANNS_CNN14["16k"]["sha256"] == "e2ee543a27919542c2ea03eabaa70b24dcd4e6c8e05621de6b67a94e4c5058e6"
     assert PANNS_CNN14["16k"]["size"] == 358_668_570
     g = torch.load(GOLDEN, weights_only=False) if GOLDEN.exists() else {}
-    assert "fc_audioset.weight" not in g                                                        # 재배포 회피
+    assert "fc_audioset.weight" not in g                                                        # avoids redistribution
 
 
-# ------------------------------------------------------------------ 수정 회차 2 플래그
+# ------------------------------------------------------------------ defaults, normalization restore, provenance, sampler resume
 def test_defaults_follow_algorithm1_text():
-    """기본값 = 논문 문면: w_trip 1.0(Algo. 1 line 14 비가중 합), joint_forward False(line 13 두 번 forward). 0.01 은 플래그."""
+    """Defaults = paper text: w_trip 1.0 (Algo. 1 line 14, unweighted sum), joint_forward False (line 13, two forwards). 0.01 is a flag."""
     m = _tiny(method="gapaug")
     assert m.w_trip == 1.0 and m.joint_forward is False
     assert _tiny(method="gapaug", w_trip=0.01).w_trip == 0.01
@@ -337,7 +337,7 @@ def test_defaults_follow_algorithm1_text():
 
 
 def test_norm_mode_sample_minmax_restore():
-    """sample_minmax_restore: 평가 입력은 원 dB 스케일(=none), 학습 증강은 [0,1] 에서 γ 후 복원 → 패치 밖은 원 dB 값과 동일."""
+    """sample_minmax_restore: evaluation input stays on the original dB scale (=none); training augmentation applies γ on [0,1] then restores -> outside patches equal the original dB values."""
     from rsc_toolkit.augmentations.gap_aug import sample_minmax_restore, sample_minmax_split
 
     torch.manual_seed(0)
@@ -349,11 +349,11 @@ def test_norm_mode_sample_minmax_restore():
     wav = torch.randn(2, 16000)
     m = _tiny(method="gapaug", norm_mode="sample_minmax_restore").train()
     lm = m.compute_logmel(wav)
-    assert torch.equal(m.make_input(wav), lm)                          # 모델 입력(평가) = 원 dB
+    assert torch.equal(m.make_input(wav), lm)                          # model input (evaluation) = original dB
     torch.manual_seed(4); xa = m.make_augmented_input(wav)
-    assert xa.shape == lm.shape and (xa <= lm + 1e-3).all()            # γ>1 → 값이 min 쪽으로만 내려간다
-    changed = (xa - lm).abs() > 1e-2                                   # 복원 round-trip 의 float 잡음(~1e-5) 은 무시
-    assert 0 < changed.float().mean() < 0.5                            # 패치 안만 변함 (32 패치 ≤16×16 / 1601×64)
+    assert xa.shape == lm.shape and (xa <= lm + 1e-3).all()            # γ>1 -> values only move toward min
+    changed = (xa - lm).abs() > 1e-2                                   # ignore float noise (~1e-5) from the restore round trip
+    assert 0 < changed.float().mean() < 0.5                            # only inside patches changes (32 patches ≤16×16 / 1601×64)
     assert abs(xa.min().item() - lm.min().item()) < 1e-3
     with pytest.raises(ValueError):
         _tiny(norm_mode="bogus")
@@ -363,7 +363,7 @@ def test_golden_provenance_records_panns_commit():
     meta = pathlib.Path(GOLDEN).with_name("meta.json")
     prov = pathlib.Path(GOLDEN).with_name("provenance.json")
     if not meta.exists():
-        pytest.skip("골든 없음")
+        pytest.skip("golden missing")
     import json
     md = json.loads(meta.read_text())
     assert md.get("fc_audioset_in_golden") is False and md.get("panns_commit") and md.get("torchlibrosa")
@@ -375,8 +375,8 @@ def test_golden_provenance_records_panns_commit():
 def test_balanced_sampler_set_epoch_matches_sequential_epoch():
     labels = [0] * 40 + [1] * 30 + [2] * 20 + [3] * 10
     seq = BalancedBatchSampler(labels, per_class=4, steps_per_epoch=5, n_classes=4, seed=0)
-    ep = [list(seq) for _ in range(3)]  # epoch 0,1,2 를 순차 진행
+    ep = [list(seq) for _ in range(3)]  # run epochs 0,1,2 sequentially
     resumed = BalancedBatchSampler(labels, per_class=4, steps_per_epoch=5, n_classes=4, seed=0)
-    resumed.set_epoch(2)  # 재개: 콜백이 current_epoch=2 를 넣는다
+    resumed.set_epoch(2)  # resume: the callback sets current_epoch=2
     assert [b.tolist() if hasattr(b, "tolist") else list(b) for b in list(resumed)] == [b.tolist() if hasattr(b, "tolist") else list(b) for b in ep[2]]
-    assert ep[0] != ep[2]  # epoch 0 열 재생이 아님
+    assert ep[0] != ep[2]  # not a replay of the epoch-0 sequence

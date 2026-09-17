@@ -1,10 +1,10 @@
 """
-QLung 의 MA(--ma_update --ma_beta 0.6) — LiveWeightAveraging 에 **제외 접두어**를 더한 서브클래스.
+QLung MA (--ma_update --ma_beta 0.6): a LiveWeightAveraging subclass with **excluded prefixes**.
 
-train_qlung.py:383-393,490-499: 매 iteration 직전 state_dict 를 스냅샷해 optimizer.step 뒤
-  new = 0.6·prev + 0.4·cur 로 model·classifier·projector 만 덮어쓴다. criterion[1] = DFAM(AngularMarginLoss) 의 W_d 는
-  optimizer 에는 들어가지만(train_qlung.py:345) MA 는 받지 않는다. 툴킷은 DFAM 을 모델 서브모듈 `dfam` 으로 두므로
-  여기서 `dfam.` 접두어 키를 평균에서 제외한다(현재 값 유지). 제외 목록은 인자 또는 모델의 ma_exclude_prefixes 속성.
+train_qlung.py:383-393,490-499: snapshots the state_dict before every iteration and, after optimizer.step, overwrites
+  only model·classifier·projector with new = 0.6·prev + 0.4·cur. W_d of criterion[1] = DFAM(AngularMarginLoss) is
+  in the optimizer (train_qlung.py:345) but does not receive MA. The toolkit holds DFAM as the model submodule `dfam`, so
+  keys with the `dfam.` prefix are excluded from averaging here (current values kept). The exclusion list is the argument or the model's ma_exclude_prefixes attribute.
 """
 from typing import Optional, Sequence
 

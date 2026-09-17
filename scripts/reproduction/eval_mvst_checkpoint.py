@@ -1,6 +1,6 @@
 """
-MVST 저자 배포 뷰 체크포인트(best.pth)를 툴킷 MVSTViewAST 에 로드해 주어진 스플릿의 test 셋을 평가한다.
-저자 스플릿(seed-1, 폴더 구성 의존)을 재구성한 파일들로 Table 1 단일 뷰 행(16×16: 78.48/46.62/62.55)이 재현되는지 확인하는 앵커.
+Loads an MVST authors' released per-view checkpoint (best.pth) into the toolkit MVSTViewAST and evaluates the test set of the given split(s).
+Checks whether files that reconstruct the authors' split (seed-1, depends on folder layout) reproduce the Table 1 single-view row (16×16: 78.48/46.62/62.55).
 
   .venv/bin/python scripts/reproduction/eval_mvst_checkpoint.py --view 16 --split <split.txt> [--split ...]
 """

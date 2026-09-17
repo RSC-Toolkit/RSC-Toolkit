@@ -1,5 +1,5 @@
 # @package _global_
-# SCL/M-SCL 사전학습: 평가 없음, 마지막 epoch 상태 저장 (scl.py:51 final_state), 재개 지원
+# SCL/M-SCL pretraining: no evaluation, saves the last-epoch state (scl.py:51 final_state), resumable
 trainer:
   params:
     callbacks:

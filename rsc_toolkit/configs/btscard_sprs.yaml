@@ -1,39 +1,39 @@
-# BTS-CARD 를 **SPRSound 표준 태스크(2022 inter-patient, 7-class)로 직접 학습·검증** (SPR→SPR).
+# BTS-CARD **trained and evaluated directly on the standard SPRSound task (2022 inter-patient, 7-class)** (SPR→SPR).
 #
-# 왜 따로 있나 — §1 표 23행의 SPRSound 칸은 지금까지 **ICBHI 학습 → SPRSound 제로샷 OOD**(7→4 병합) 값뿐이라
-# "SPRSound 학습 → SPRSound 검증" 값이 없었다. 이 config 가 그 칸을 만든다.
-# OOD 값은 논문 앵커(61.96±1.50)가 있으므로 **그대로 보존**하고 병기한다.
+# Why a separate config — the ICBHI-trained model is evaluated on SPRSound only as **zero-shot OOD** (7→4 merge), which gives no
+# "train on SPRSound → evaluate on SPRSound" value. This config provides it.
+# The OOD value has a paper-reported value (61.96±1.50), so it is **kept as is** and reported alongside.
 #
-# 논문 앵커: 없음 — 논문은 SPRSound 를 OOD 로만 썼다. 따라서 재현 판정 대상이 아니라 **툴킷 확장 관찰값**이다.
+# Paper-reported value: none — the paper uses SPRSound only for OOD. This is therefore not a reproduction target but a **toolkit extension (no paper counterpart)**.
 #
-# ── SPRSound 로 옮기면서 불가피하게 달라지는 것 2가지 (해석할 때 반드시 감안할 것) ───────────────
-# ① **메타 텍스트가 사실상 죽는다 — 서로 다른 문장이 8개뿐이다(ICBHI 는 44개).**
-#    SPRSound 에는 adult_BMI·child_weight·child_height 가 아예 없다. 빈 자리는 원본의 결측 표기 -1 로 두고
-#    (값을 지어내지 않는다), 문장 생성은 저자 자신이 SPRSound OOD 용으로 쓴 방언
-#    (util/sprsound_util.py → meta_dialect=sprsound)을 쓴다. ICBHI 어휘를 그대로 쓰면 SPRSound 의
-#    p1~p4 를 "right anterior chest" 같은 없는 위치로, 없는 청진기까지 지어내 문장에 넣게 된다.
-#    **그런데 남은 3필드 중에서도 나이가 상수다.** 저자 함수의 나이 이분법이 `age >= 19 → adult` 인데
-#    (ICBHI 성인/소아 경계) SPRSound 는 소아 코호트라 실측 나이가 0.20~16.20 이고 **6,656건 전부 pediatric** 이다.
-#    청진기는 단일이라 문장에서 빠지므로, 실제로 변하는 것은 **성별·위치 둘뿐 → 2 x 4 = 8 문장**이다.
-#    BTS 계열은 텍스트 조건부 방법이고 NDE 분기는 **문장만으로 라벨을 예측**하므로, 그 분기가 가질 수 있는
-#    정보량 상한이 log2(8) = 3 bit 로 내려간다. 이 설정에서 나온 값은 "BTS-CARD 가 SPRSound 에서 잘 되나"
-#    가 아니라 "**메타 텍스트가 거의 없는 조건에서의 BTS-CARD**" 로 읽어야 한다.
-#    나이 이분법을 소아용으로 잘게 나누면 정보가 살아나지만, 그건 논문에도 저자 코드에도 없는 산식을
-#    우리가 새로 만드는 것이라(P0 위반) 기본값으로 두지 않았다 — 필요하면 사용자 결정으로 변형을 추가한다.
-# ② **청진기 적대적 항이 무력해진다.** SPRSound 는 전 8,085 이벤트가 단일 청진기(Yunting2) 라
-#    장치 판별기가 구분할 것이 없다. n_dev=1 · lambda_dev=0 으로 두어 **그 항이 꺼져 있음을 명시**한다.
-#    위치 판별기(n_loc=4, p1~p4)는 그대로 작동하므로 방법의 절반은 살아 있다.
-#    (같은 이유로 SG-SCL·RespireNet 은 SPRSound 확장 자체를 제외했다 — 그쪽은 청진기가 방법의 전부라서다.)
+# ── Two unavoidable differences when moving to SPRSound (take them into account when interpreting results) ───────────────
+# ① **The metadata text is effectively dead — there are only 8 distinct sentences (44 on ICBHI).**
+#    SPRSound has no adult_BMI·child_weight·child_height at all. The empty slots keep the official missing-value marker -1
+#    (no values are invented), and sentences are generated with the dialect the authors themselves used for SPRSound OOD
+#    (util/sprsound_util.py → meta_dialect=sprsound). Using the ICBHI vocabulary would put non-existent locations such as
+#    "right anterior chest" for SPRSound p1~p4, and even a non-existent stethoscope, into the sentence.
+#    **Moreover, among the remaining 3 fields, age is constant.** The authors' age split is `age >= 19 → adult`
+#    (the ICBHI adult/pediatric boundary), but SPRSound is a pediatric cohort with measured ages 0.20~16.20, so **all 6,656 are pediatric**.
+#    The stethoscope is single and drops out of the sentence, so only **sex and location vary → 2 x 4 = 8 sentences**.
+#    BTS-family methods are text-conditioned and the NDE branch **predicts the label from the sentence alone**, so the upper bound
+#    on the information that branch can carry drops to log2(8) = 3 bits. Values from this setting should be read not as "does BTS-CARD work on SPRSound"
+#    but as "**BTS-CARD with almost no metadata text**".
+#    Splitting the age into finer pediatric bins would restore information, but that would be a new formula found in neither the paper nor the authors' code
+#    (breaking official-code parity), so it is not the default — it can be added as a variant if needed.
+# ② **The stethoscope adversarial term becomes ineffective.** All 8,085 SPRSound events come from a single stethoscope (Yunting2), so
+#    the device discriminator has nothing to distinguish. n_dev=1 · lambda_dev=0 **make it explicit that the term is off**.
+#    The location discriminator (n_loc=4, p1~p4) still works, so half of the method remains active.
+#    (For the same reason SG-SCL and RespireNet are not extended to SPRSound at all — there the stethoscope is the whole method.)
 #
-# 레시피: BTS-CARD 의 ICBHI 공식 스크립트 그대로 (15 ep, bs 8 drop_last, adam 5e-5/wd 1e-6, cosine, MA 0.5, AMP, 비가중 CE).
+# Recipe: BTS-CARD's official ICBHI script unchanged (15 ep, bs 8 drop_last, adam 5e-5/wd 1e-6, cosine, MA 0.5, AMP, unweighted CE).
 #
 #   rsctk-train --config-name btscard_sprs seed=N run.name=sprs-btscard-sN
 defaults:
   - model: bts_card
   - data_defaults@data: base
   - data: sprsound_btscard_train
-  - loss: cross_entropy        # ICBHI BTS-CARD 가 비가중 CE → SPRS 도 비가중 유지
-  - metrics: sprsound_metrics  # 7-class Se/Sp/Score (icbhi_score 키 → btscard_paper 콜백 best 선정과 호환)
+  - loss: cross_entropy        # ICBHI BTS-CARD uses unweighted CE → SPRS stays unweighted
+  - metrics: sprsound_metrics  # 7-class Se/Sp/Score (icbhi_score key → compatible with best selection in the btscard_paper callback)
   - optimizer: adam_btscard
   - trainer: default
   - callbacks: btscard_paper
@@ -43,7 +43,7 @@ seed: 1
 
 trainer:
   params:
-    max_epochs: 15             # 공식 스크립트 (논문 30 — ICBHI A/B 에서 두 설정이 사실상 같음을 확인했다)
+    max_epochs: 15             # official script (paper: 30 — an ICBHI A/B check showed the two settings are practically equivalent)
     precision: 16-mixed
 
 run:
@@ -54,7 +54,7 @@ run:
 model:
   params:
     n_cls: 7
-    meta_dialect: sprsound     # 위 ①
-    n_loc: 4                   # SPRSound 녹음 위치 p1~p4
-    n_dev: 1                   # 단일 청진기(Yunting2)
-    lambda_dev: 0.0            # 위 ② — 장치 적대 항을 명시적으로 끈다
+    meta_dialect: sprsound     # see ① above
+    n_loc: 4                   # SPRSound recording locations p1~p4
+    n_dev: 1                   # single stethoscope (Yunting2)
+    lambda_dev: 0.0            # see ② above — explicitly disables the device adversarial term

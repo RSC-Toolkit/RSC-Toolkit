@@ -1,9 +1,9 @@
-# bts 계열 재현 실행 config (공식 스크립트: 50ep, bs8, adam 5e-5/wd 1e-6, cosine, MA 0.5, 비가중 CE, AMP).
+# bts-family reproduction run config (official script: 50 ep, bs 8, adam 5e-5/wd 1e-6, cosine, MA 0.5, unweighted CE, AMP).
 #
 #   BTS (meta all): rsctk-train --config-name bts_icbhi run.name=icbhi-bts-s1 seed=1
 #   Audio-CLAP    : ... model=audioclap run.name=icbhi-audioclap-s1 seed=1
 #
-# 데이터는 저자 배포 training.pt/test.pt (data_defaults 의 오디오 전처리 인자는 여기 해당 없음).
+# Data are the authors' released training.pt/test.pt (the audio preprocessing arguments of data_defaults do not apply here).
 defaults:
   - model: bts
   - data: bts_precomputed
@@ -18,7 +18,7 @@ seed: 1
 
 trainer:
   params:
-    precision: 16-mixed        # 원본 AMP(GradScaler+autocast)
+    precision: 16-mixed        # official AMP (GradScaler + autocast)
 
 run:
   name: icbhi-bts

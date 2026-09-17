@@ -1,30 +1,30 @@
 """
-Lung-SRAD(RSC-Toolkit/Lung-SRAD d28d783) P0 골든 — 공식 models_DASS/{ast_models,vmamba_patchmix,csms6s,csm_triton}.py +
-method/patchmix_cl.py + models/projector.py 를 **실 ckpt(DASS_medium_v2.pth)** 로 GPU 에서 실행해 저장한다.
+Lung-SRAD (RSC-Toolkit/Lung-SRAD d28d783) official-code parity goldens — runs the official models_DASS/{ast_models,vmamba_patchmix,csms6s,csm_triton}.py +
+method/patchmix_cl.py + models/projector.py with the **real ckpt (DASS_medium_v2.pth)** on GPU and saves the results.
 
-  # 커널(선택): outputs/reference/dass_upstream/kernels/selective_scan 을 scratch 에 빌드 (README 절차, .venv 에 설치하지 않음)
-  #   cp -r kernels/selective_scan $S/ss_src && (setup.py 의 wheel import 제거) && MAX_JOBS=6 .venv/bin/python setup.py build_ext --build-lib $S/pylib
+  # kernel (optional): build outputs/reference/dass_upstream/kernels/selective_scan into scratch (README procedure; not installed into .venv)
+  #   cp -r kernels/selective_scan $S/ss_src && (remove the wheel import from setup.py) && MAX_JOBS=6 .venv/bin/python setup.py build_ext --build-lib $S/pylib
   CUDA_VISIBLE_DEVICES=2 PYTHONPATH=$S/pylib:$S/shims .venv/bin/python scripts/reproduction/dump_lungsrad_goldens.py \
       --repo outputs/reference/lungsrad --ckpt pretrained_models/upstream/dass/DASS_medium_v2.pth --out tests/golden/lungsrad [--no-kernel]
 
-공개 코드는 그대로 실행되지 않는다. 이 스크립트는 main.py 를 import 하지 않고 모델·손실 모듈만 쓰므로 클론을 **수정하지 않는다**.
-main.py 로 학습까지 돌리려면 필요한 최소 패치 목록(문서화, 본 골든에는 불필요):
-  (P1) main.py:27   `from method import PatchMixLoss, PatchMixConLoss` → `from method.patchmix_cl import PatchMixConLoss` (PatchMixLoss 는 저장소에 없음)
-  (P2) util/icbhi_util.py:168  `args.meta_mode` → `getattr(args, "meta_mode", None)` (argparse 미정의)
-  (P3) FT 기준선(--gaussian_blur 없음): ast_models.py:278-283 이 고르는 plain vmamba.VSSM 은 forward(x) 만 받아 DASS.forward 의 kwargs 로 TypeError
-       → DASS(gaussian_blur=True, blur_blocks=set()) 로 vmamba_patchmix.VSSM 을 blur 블록 ∅ 로 경유 (구조·가중치 동일). 본 스크립트도 이 방식.
-  (P4) ckpt 경로 './pretrained_models/DASS_medium_v2.pth' 상대 하드코딩 → cwd 에 symlink (본 스크립트는 임시 cwd 로 처리)
-  (P5) 의존성: einops(repeat) · fvcore(import 만) · wget(import 만) → scratch shims (fvcore/wget 은 빈 스텁, einops 는 pip 패키지)
-  (P6) csm_triton/csms6s 는 CUDA 커널이 없으면 forward 에서 NameError → --no-kernel 이면 SelectiveScanOflex 를 툴킷 순수 torch 폴백으로 대체(monkeypatch)
+The public code does not run as-is. This script does not import main.py and uses only the model and loss modules, so the clone is **not modified**.
+Minimal patches needed to also train with main.py (documented; not needed for these goldens):
+  (P1) main.py:27   `from method import PatchMixLoss, PatchMixConLoss` → `from method.patchmix_cl import PatchMixConLoss` (PatchMixLoss does not exist in the repository)
+  (P2) util/icbhi_util.py:168  `args.meta_mode` → `getattr(args, "meta_mode", None)` (not defined in argparse)
+  (P3) FT baseline (no --gaussian_blur): the plain vmamba.VSSM selected by ast_models.py:278-283 accepts only forward(x), so the kwargs from DASS.forward raise TypeError
+       → route through vmamba_patchmix.VSSM with an empty blur block set via DASS(gaussian_blur=True, blur_blocks=set()) (same structure and weights). This script does the same.
+  (P4) the ckpt path './pretrained_models/DASS_medium_v2.pth' is hard-coded as a relative path → symlink in cwd (this script uses a temporary cwd)
+  (P5) dependencies: einops (repeat) · fvcore (import only) · wget (import only) → scratch shims (fvcore/wget are empty stubs, einops is the pip package)
+  (P6) csm_triton/csms6s raise NameError in forward without the CUDA kernel → with --no-kernel, SelectiveScanOflex is replaced by the toolkit's pure-torch fallback (monkeypatch)
 
-골든 (model.pt):
-- 입력: tests/golden/patchmix/features_input.pt (2,798,128) → torchvision Resize((1024,128)) (main.py:200-205) → 배치 4 로 확장 (4,1024,128)   [images]
-- ckpt 로드: 'module.v.' 제거·head 제외·strict=False 의 missing/unexpected 키
-- patch_embed 출력 (2,96,32,256), blur 커널(K5 σ3), eval fp32 전체 forward: features/logits (blur on = SAR 구조, blur off = FT 구조),
-  autocast fp16 forward(참고), CrossScanTriton vs torch CrossScan 일치
-- patch-mix 3종(time/freq/2d) as_code: seed 고정(np+torch) 후 patch_embed 출력에 적용 → 변경 축 index·lam·index·체크섬, 그리고 전체 forward 특징
-- patchmix_cl dual 총손실(CE + L_time + L_freq; projector det_fill, τ 0.2) 및 각 항, PatchMixConLoss 단독 값
-난수 파라미터: head 는 det_fill(linspace), projector 는 torch.manual_seed(0) 기본 초기화(툴킷 Projector 와 같은 모듈 순서). 골든은 모델을 **eval** 모드(DropPath 무효) 로 두고 만든다.
+Goldens (model.pt):
+- input: tests/golden/patchmix/features_input.pt (2,798,128) → torchvision Resize((1024,128)) (main.py:200-205) → expanded to batch 4 (4,1024,128)   [images]
+- ckpt load: missing/unexpected keys with 'module.v.' stripped, head excluded, strict=False
+- patch_embed output (2,96,32,256), blur kernel (K5 σ3), eval fp32 full forward: features/logits (blur on = SAR structure, blur off = FT structure),
+  autocast fp16 forward (reference), CrossScanTriton vs torch CrossScan agreement
+- 3 patch-mix types (time/freq/2d) as_code: applied to the patch_embed output after fixing the seeds (np+torch) → changed-axis indices, lam, index, checksum, and full-forward features
+- patchmix_cl dual total loss (CE + L_time + L_freq; projector det_fill, τ 0.2) and each term, standalone PatchMixConLoss value
+Random parameters: the head uses det_fill(linspace), the projector the default initialization after torch.manual_seed(0) (same module order as the toolkit Projector). The goldens are produced with the model in **eval** mode (DropPath disabled).
 """
 import argparse
 import json
@@ -49,7 +49,7 @@ def main():
     ap.add_argument("--ckpt", required=True)
     ap.add_argument("--out", default="tests/golden/lungsrad")
     ap.add_argument("--input", default="tests/golden/patchmix/features_input.pt")
-    ap.add_argument("--no-kernel", action="store_true", help="CUDA 커널 없이 원 코드도 툴킷 torch 폴백으로")
+    ap.add_argument("--no-kernel", action="store_true", help="without the CUDA kernel, run the original code with the toolkit torch fallback as well")
     ap.add_argument("--device", default="cuda")
     args = ap.parse_args()
     root = pathlib.Path.cwd()
@@ -60,7 +60,7 @@ def main():
     x_in = torch.load(root / args.input)
     sys.path.insert(0, str(repo))
 
-    # (P5) 스텁: fvcore / wget 은 import 만 된다
+    # (P5) stubs: fvcore / wget only need to be importable
     for name in ("fvcore", "fvcore.nn", "wget"):
         if name not in sys.modules:
             try:
@@ -74,7 +74,7 @@ def main():
     from models_DASS import csms6s  # noqa: E402
     kernel = hasattr(csms6s, "selective_scan_cuda_oflex")
     if args.no_kernel or not kernel:
-        # (P6) 원 코드도 툴킷 폴백으로
+        # (P6) the original code also uses the toolkit fallback
         from rsc_toolkit.models.backbone.vmamba.selective_scan import selective_scan_torch
 
         class _Fallback:
@@ -91,7 +91,7 @@ def main():
     from models_DASS.ast_models import DASS  # noqa: E402
     from models_DASS.csm_triton import CrossScanTriton, CrossMergeTriton  # noqa: E402
     from models_DASS.csms6s import CrossScan, CrossMerge  # noqa: E402
-    # models/__init__.py, method/__init__.py 는 다른 백본(timm 0.4 API 등)을 끌어오므로 파일 단위로 로드 (클론 무수정)
+    # models/__init__.py and method/__init__.py pull in other backbones (timm 0.4 API etc.), so load per file (clone unmodified)
     import importlib.util
 
     def _load(path, name):
@@ -105,12 +105,12 @@ def main():
     from torchvision import transforms  # noqa: E402
 
     dev = torch.device(args.device)
-    # 수치 재현성: cuDNN/matmul TF32 끔 (원본은 기본값 = conv TF32 허용; 골든은 fp32 정확 경로로 만들어 툴킷 1e-3 대조가 알고리즘 선택에 흔들리지 않게)
+    # numerical reproducibility: disable cuDNN/matmul TF32 (the original uses the defaults = conv TF32 allowed; the goldens use the exact fp32 path so the toolkit's 1e-3 comparison is not affected by algorithm selection)
     torch.backends.cudnn.allow_tf32 = False
     torch.backends.cuda.matmul.allow_tf32 = False
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
-    # (P4) ckpt 상대 경로: 임시 cwd
+    # (P4) relative ckpt path: temporary cwd
     cwd = pathlib.Path(os.environ.get("LUNGSRAD_GOLDEN_CWD", str(out / "_cwd")))
     (cwd / "pretrained_models").mkdir(parents=True, exist_ok=True)
     link = cwd / "pretrained_models" / "DASS_medium_v2.pth"
@@ -118,13 +118,13 @@ def main():
         link.symlink_to(ckpt)
     os.chdir(cwd)
 
-    # 입력: (2,798,128) → ToTensor 레이아웃 (1,798,128) → Resize((1024,128))
+    # input: (2,798,128) → ToTensor layout (1,798,128) → Resize((1024,128))
     if x_in.dim() == 3:
         x_in = x_in.unsqueeze(1)
     assert tuple(x_in.shape[1:]) == (1, 798, 128), tuple(x_in.shape)
     resize = transforms.Resize(size=(1024, 128))
     images = torch.stack([resize(xi) for xi in x_in]).squeeze(1)  # (2,1024,128)
-    # 배치 4 로 확장(대조 손실이 B=2 에선 자명해짐): 원본 2 + 시간 뒤집기 + 0.8 배 + 고정 잡음
+    # expand to batch 4 (the contrastive loss is trivial with B=2): original 2 + time flip + ×0.8 + fixed noise
     torch.manual_seed(1234)
     images = torch.cat([images, images[:1].flip(1), images[1:] * 0.8 + 0.05 * torch.randn_like(images[1:])], dim=0)  # (4,1024,128)
     labels = torch.tensor([0, 3, 1, 2])
@@ -139,7 +139,7 @@ def main():
         det_fill(m.v.classifier.head.bias)
         return m.to(dev).eval()
 
-    # ckpt 키 대조 (원본 로드 로직 그대로 재실행)
+    # ckpt key comparison (re-runs the original load logic as-is)
     raw = torch.load(ckpt, map_location="cpu")
     mod = {k.replace("module.v.", ""): v for k, v in raw.items() if "classifier.head" not in k}
     tmp = build(True, True)
@@ -149,9 +149,9 @@ def main():
     print("ckpt:", ckpt_info, flush=True)
     del tmp
 
-    # input_raw: 앞 2 샘플의 Resize 전 (2,798,128)
+    # input_raw: first 2 samples before Resize (2,798,128)
     golden = {"images": images.clone(), "labels": labels.clone(), "input_raw": x_in.squeeze(1).clone(), "ckpt": ckpt_info, "kernel": kernel}
-    x4 = images.to(dev).unsqueeze(1).transpose(2, 3)  # DASS.forward 의 (B,1,128,1024)
+    x4 = images.to(dev).unsqueeze(1).transpose(2, 3)  # (B,1,128,1024) as in DASS.forward
     golden["model_input_bchw"] = x4.cpu()
 
     with torch.no_grad():
@@ -169,24 +169,24 @@ def main():
         golden["crossscan_triton_vs_torch_maxdiff"] = float((xs_t - xs_p).abs().max())
         golden["crossmerge_triton_vs_torch_maxdiff"] = float((CrossMergeTriton.apply(ys) - CrossMerge.apply(ys)).abs().max())
 
-        # 전체 forward fp32 (blur on = SAR 구조)
+        # full forward fp32 (blur on = SAR structure)
         feats_on, logits_on = model.v(x4)
         golden["features_blur"] = feats_on.float().cpu()
         golden["logits_blur"] = logits_on.float().cpu()
-        # autocast fp16 (참고)
+        # autocast fp16 (reference)
         with torch.autocast(device_type="cuda", dtype=torch.float16, enabled=(dev.type == "cuda")):
             f16, l16 = model(images.to(dev))
         golden["features_blur_fp16"] = f16.float().cpu()
         golden["logits_blur_fp16"] = l16.float().cpu()
-        # 중간: stage 별 출력
+        # intermediate: per-stage outputs
         h = pe
         stage_out = []
         for layer in model.v.layers:
             h = layer(h)
             stage_out.append(h.float().cpu())
-        golden["stage_outputs_blur"] = {0: stage_out[0][:, :, :, :16].contiguous(), 3: stage_out[3]}   # 크기 절약: stage0 일부 + 최종 stage
+        golden["stage_outputs_blur"] = {0: stage_out[0][:, :, :, :16].contiguous(), 3: stage_out[3]}   # save space: part of stage0 + the final stage
 
-        # blur off (FT 구조)
+        # blur off (FT structure)
         model_off = build(False, False)
         assert not any(getattr(b.op, "blur_enable", False) for l in model_off.v.layers for b in l.blocks)
         feats_off, logits_off = model_off.v(x4)
@@ -194,7 +194,7 @@ def main():
         golden["logits_noblur"] = logits_off.float().cpu()
         del model_off
 
-        # patch-mix 3종 (as_code) — 난수 고정: np.random.seed / torch.manual_seed 를 각 호출 직전에
+        # 3 patch-mix types (as_code) — fixed randomness: np.random.seed / torch.manual_seed right before each call
         mixes = {}
         for mix_type, seed in (("time", 11), ("freq", 22), ("2d", 33)):
             np.random.seed(seed)
@@ -203,12 +203,12 @@ def main():
             fn = {"time": model.v.patch_mix_time_only, "freq": model.v.patch_mix_freq_only, "2d": model.v.patch_mix_2d_ast_equiv}[mix_type]
             xm, y_a, y_b, lam, index = fn(x_pe, labels.to(dev))
             changed = (xm != pe)
-            # 골든 크기 절약: 믹스된 patch_embed 텐서 대신 변경 축 index·(2d) 토큰 mask 만 저장 — 값 자체는 mixed_features 로 대조
+            # keep the golden small: store only the changed-axis indices and the (2d) token mask instead of the mixed patch_embed tensor — the values are compared via mixed_features
             mixes[mix_type] = {
                 "seed": seed, "lam": float(lam), "index": index.cpu(), "y_b": y_b.cpu(),
                 "changed_dims": {"dim1": changed.any(dim=(0, 2, 3)).nonzero().flatten().cpu(), "dim2": changed.any(dim=(0, 1, 3)).nonzero().flatten().cpu(),
                                  "dim3": changed.any(dim=(0, 1, 2)).nonzero().flatten().cpu()},
-                "changed_tokens_cf": changed.any(dim=(0, 3)).flatten().nonzero().flatten().cpu(),   # (채널×주파수) 토큰 index (2d as_code)
+                "changed_tokens_cf": changed.any(dim=(0, 3)).flatten().nonzero().flatten().cpu(),   # (channel×frequency) token index (2d as_code)
                 "mixed_patch_embed_sum": float(xm.float().sum()), "mixed_patch_embed_checksum": xm.float().cpu().flatten()[::997].clone(),
             }
             np.random.seed(seed)
@@ -218,9 +218,9 @@ def main():
             mixes[mix_type]["mixed_features"] = mf.float().cpu()
         golden["patchmix"] = mixes
 
-        # patchmix_cl dual 손실 (main.py:310-351), projector det_fill
+        # patchmix_cl dual loss (main.py:310-351), projector det_fill
         torch.manual_seed(0)
-        projector = Projector(768, 768).to(dev).eval()  # 기본 초기화(seed 0) — det_fill 은 값이 커져 정규화 후 손실이 ln B 로 퇴화
+        projector = Projector(768, 768).to(dev).eval()  # default init (seed 0) — det_fill makes the values large, so the loss degenerates to ln B after normalization
         crit = nn.CrossEntropyLoss()
         con = PatchMixConLoss(temperature=0.2)
         ns = types.SimpleNamespace(negative_pair="all")
@@ -237,7 +237,7 @@ def main():
         golden["loss"] = {"ce": float(class_loss), "time": float(loss_time), "freq": float(loss_freq), "total": float(total),
                           "lam_t": float(lam_t), "lam_f": float(lam_f), "index_t": idx_t.cpu(), "index_f": idx_f.cpu(),
                           "proj1": proj1.float().cpu()}
-        # PatchMixConLoss 단독 (고정 입력)
+        # PatchMixConLoss standalone (fixed inputs)
         torch.manual_seed(5)
         p1, p2 = torch.randn(4, 768), torch.randn(4, 768)
         idx = torch.tensor([2, 3, 0, 1])
@@ -253,7 +253,7 @@ def main():
     import timm, torchvision
     prov = {"repo": str(repo), "ckpt": str(ckpt), "torch": torch.__version__, "timm": timm.__version__, "torchvision": torchvision.__version__,
             "device": str(dev), "gpu": (torch.cuda.get_device_name(0) if dev.type == "cuda" else None), "selective_scan_kernel": kernel,
-            "patches": ["P1..P6 in docstring (클론 무수정; P3 blur_blocks=∅, P4 symlink cwd, P5 shims, P6 fallback only if --no-kernel)"]}
+            "patches": ["P1..P6 in docstring (clone unmodified; P3 blur_blocks=∅, P4 symlink cwd, P5 shims, P6 fallback only if --no-kernel)"]}
     (out / "provenance.json").write_text(json.dumps(prov, indent=1, ensure_ascii=False))
     print("saved", out / "model.pt", flush=True)
     print({k: (v if not torch.is_tensor(v) else tuple(v.shape)) for k, v in golden.items() if k in ("ckpt", "kernel", "blur_blocks", "crossscan_triton_vs_torch_maxdiff", "crossmerge_triton_vs_torch_maxdiff", "loss", "n_params")}, flush=True)

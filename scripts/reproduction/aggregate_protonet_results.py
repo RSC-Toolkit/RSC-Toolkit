@@ -1,8 +1,8 @@
 """
-Prototype(Ren et al., ICASSP 2022) P1 집계: outputs/protonet/<run>/best.json → 논문 Table 3(Test 열) 대비.
+Prototype (Ren et al., ICASSP 2022) 5-seed reproduction check aggregation: outputs/protonet/<run>/best.json → compared with paper Table 3 (Test column).
 
-논문 프로토콜: 10,000 iteration **최종 iterate** 로 test 평가(별도 best 선택 없음) → `final_*` 를 주 판정으로 쓰고,
-툴킷 기본 best-on-test 도 참고로 병기한다. 논문은 단일 run(± 없음).
+Paper protocol: test evaluation of the **last iterate** at 10,000 iterations (no separate best selection) → `final_*` is the primary check,
+and the toolkit default best-on-test is reported alongside for reference. The paper reports a single run (no ±).
 
   .venv/bin/python scripts/reproduction/aggregate_protonet_results.py
 """
@@ -11,10 +11,10 @@ import pathlib
 import re
 import statistics
 
-# 논문 Table 3 Test 열 (SE, SP, AS=Score)
+# paper Table 3 Test column (SE, SP, AS=Score)
 PAPER = {
-    "icbhi-protonet-cnn8": ("CNN-8 기준선 (Table 3 1행)", 39.42, 59.72, 49.57),
-    "icbhi-protonet":      ("ProtoNet Pt-2D-EleSim-Van w/ BN (논문 'Ours')", 27.78, 72.96, 50.37),
+    "icbhi-protonet-cnn8": ("CNN-8 baseline (Table 3 row 1)", 39.42, 59.72, 49.57),
+    "icbhi-protonet":      ("ProtoNet Pt-2D-EleSim-Van w/ BN (paper 'Ours')", 27.78, 72.96, 50.37),
 }
 
 
@@ -25,8 +25,8 @@ def _completed(root, run):
 
 def main():
     root = pathlib.Path("outputs/protonet")
-    print("Prototype Learning for Interpretable Respiratory Sound Analysis (ICASSP 2022) — ICBHI 공식 60/40, 4-class")
-    print("※ 논문은 단일 run(± 없음). 판정은 **최종 iterate(final_*)** — 공식이 10,000 iteration 모델로만 평가하기 때문.")
+    print("Prototype Learning for Interpretable Respiratory Sound Analysis (ICASSP 2022) — ICBHI official 60/40 split, 4-class")
+    print("※ The paper reports a single run (no ±). The check uses the **last iterate (final_*)** because the official code evaluates only the 10,000-iteration model.")
     partial = []
     for base, (name, psе, psp, pas) in PAPER.items():
         rows = []
@@ -56,11 +56,11 @@ def main():
             ms = lambda i: (statistics.mean([r[i] for r in rows]), statistics.stdev([r[i] for r in rows]))  # noqa: E731
             se, sp, sc = ms(1), ms(2), ms(3)
             bsc = ms(6)
-            print(f"  우리 평균(final)      : Se {se[0]:6.2f}±{se[1]:.2f}  Sp {sp[0]:6.2f}±{sp[1]:.2f}  Score {sc[0]:6.2f}±{sc[1]:.2f}")
-            print(f"  우리 평균(best-on-test): Score {bsc[0]:6.2f}±{bsc[1]:.2f} (참고)")
-            print(f"  논문 보고             : Se {psе:6.2f}  Sp {psp:6.2f}  Score {pas:6.2f} (단일 run)   Score 차이: {sc[0]-pas:+.2f}")
+            print(f"  ours mean (final)       : Se {se[0]:6.2f}±{se[1]:.2f}  Sp {sp[0]:6.2f}±{sp[1]:.2f}  Score {sc[0]:6.2f}±{sc[1]:.2f}")
+            print(f"  ours mean (best-on-test): Score {bsc[0]:6.2f}±{bsc[1]:.2f} (reference)")
+            print(f"  paper                   : Se {psе:6.2f}  Sp {psp:6.2f}  Score {pas:6.2f} (single run)   Score diff: {sc[0]-pas:+.2f}")
     if partial:
-        print("\n(미완료 run — 집계 제외: " + ", ".join(sorted(partial)) + ")")
+        print("\n(incomplete runs — excluded from aggregation: " + ", ".join(sorted(partial)) + ")")
 
 
 if __name__ == "__main__":

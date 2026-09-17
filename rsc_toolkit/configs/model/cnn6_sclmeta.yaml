@@ -1,10 +1,10 @@
-# SCL-metadata(ICASSP 2023) CNN6 — 공식 코드 충실 이식.
-#   method: ce | hybrid | scl | mscl | linear  (scl/mscl 는 사전학습, linear 는 encoder_ckpt 필요)
+# SCL-metadata (ICASSP 2023) CNN6 — faithful port of the official code.
+#   method: ce | hybrid | scl | mscl | linear  (scl/mscl are pretraining; linear requires encoder_ckpt)
 name: cnn6_sclmeta
 params:
   n_cls: 4
   method: mscl
-  from_sl_official: true       # PANN AudioSet Cnn6 부분 로드 (--scratch 면 false + lr 1e-3)
+  from_sl_official: true       # partial load of PANN AudioSet Cnn6 (with --scratch: false + lr 1e-3)
   out_dim: 128
   temperature: 0.06
   alpha: 0.5

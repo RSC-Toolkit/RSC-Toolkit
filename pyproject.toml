@@ -1,6 +1,6 @@
 [build-system]
-# `license = "MIT"`(PEP 639 SPDX 문자열)·`license-files` 는 setuptools 77 부터 인정된다 —
-# 그 아래 버전으로 --no-build-isolation 빌드하면 "project.license must be valid exactly by one definition" 로 실패한다.
+# `license = "MIT"` (PEP 639 SPDX string) and `license-files` are accepted from setuptools 77 on;
+# a --no-build-isolation build with an older version fails with "project.license must be valid exactly by one definition".
 requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
@@ -36,26 +36,26 @@ trainer = [
 models = [
     "timm>=0.4.5",
     "transformers",
-    # RespireNet 특징 파이프라인 (cv2 resize/컬러 변환, librosa kaiser_best 리샘플)
+    # RespireNet feature pipeline (cv2 resize/color conversion, librosa kaiser_best resampling)
     "opencv-python-headless",
     "resampy",
-    # Prototype(protonet) 의 log-mel 프런트엔드. models/protonet.py:43 에서 모듈 최상단 import 라
-    # 없으면 모델 등록 자체가 조용히 건너뛰어진다(ModelFactory.register_models 가 ImportError 를 경고로 삼킨다).
+    # Log-mel front end of Prototype (protonet). models/protonet.py:43 imports it at module top level, so
+    # without it the model registration is silently skipped (ModelFactory.register_models turns the ImportError into a warning).
     "torchlibrosa",
 ]
-# ResNet50 SimCLR(SSL) 가중치를 쓸 때만 필요하다.
-# models/backbone/resnet.py:129-133 이 함수 안에서 지연 import 하고 없으면 RuntimeError 로 안내하므로
-# 다른 경로에는 영향이 없다 — 그래서 models 가 아니라 별도 extra 로 둔다.
+# Needed only for the ResNet50 SimCLR (SSL) weights.
+# models/backbone/resnet.py:129-133 imports it lazily inside the function and raises a RuntimeError with guidance if missing,
+# so no other code path is affected; hence a separate extra instead of `models`.
 ssl-weights = [
     "lightning-bolts",
 ]
-# 튜토리얼 노트북(notebooks/tutorial.ipynb) 실행·CI 검증용.
+# For running the tutorial notebook (notebooks/tutorial.ipynb) and its CI check.
 notebook = [
     "jupyter",
     "nbconvert",
     "nbformat",
     "ipykernel",
-    "gdown",          # scripts/download_paper_weights.py (공개 논문 weight)
+    "gdown",          # scripts/download_paper_weights.py (public paper weights)
 ]
 dev = [
     "pytest",
@@ -78,8 +78,8 @@ where = ["."]
 include = ["rsc_toolkit*"]
 
 [tool.setuptools.package-data]
-# 런타임 코드가 읽는 번들 데이터. 글롭은 각 패키지 디렉토리 기준 상대 경로다.
-# (tests/unit/test_packaging.py 가 이 글롭들이 실제 파일과 맞는지 검사한다)
+# Bundled data read by runtime code. Globs are relative to each package directory.
+# (tests/unit/test_packaging.py checks that these globs match actual files)
 rsc_toolkit = ["configs/**/*.yaml", "configs/**/*.yml"]
 "rsc_toolkit.datasets.icbhi" = ["data/*.txt"]
 "rsc_toolkit.processors" = ["data/*.npy"]

@@ -1,9 +1,9 @@
 """
-모델 구현 모음.
+Model implementations.
 
-모델은 각 모듈에서 `@ModelFactory.register_model_class("<이름>")` 로 등록하고,
-이 패키지를 import 하는 순간 모든 모듈이 import 되어 등록이 끝난다.
-조회는 ModelFactory / create_model / build_model(trainer) 로 한다.
+Each module registers its models with `@ModelFactory.register_model_class("<name>")`;
+importing this package imports every module, which completes registration.
+Look models up via ModelFactory / create_model / build_model(trainer).
 """
 from rsc_toolkit.models.factory import ModelFactory, create_model
 

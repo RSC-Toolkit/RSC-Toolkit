@@ -1,33 +1,33 @@
 """
-SPRSound → ICBHI 4-class OOD 평가 전용 로더 (BTS-CARD; 학습 미사용).
+SPRSound -> ICBHI 4-class loader for OOD evaluation only (BTS-CARD; not used for training).
 
-**비표준 사용 주의**: SPRSound 의 원래 목적은 7-class event 분류(2022 inter-patient test)다. BTS-CARD 논문은
-2022 inter-patient valid 세트(1,429 event)를 ICBHI 4-class 로 병합해 OOD 테스트로만 쓴다. 여기서 만드는 것은
-그 파생 뷰이며 원본 데이터·인덱스는 바꾸지 않는다.
+**Non-standard use**: SPRSound is intended for 7-class event classification (2022 inter-patient test). The BTS-CARD paper
+merges the 2022 inter-patient valid set (1,429 events) into ICBHI 4 classes and uses it only as an OOD test. What is built here is
+that derived view; the original data and index are unchanged.
 
-라벨 병합 (공식 노트북 data/Preprocessing_SPRSound.ipynb cell 2/5):
-  Normal → 0, Fine Crackle / Coarse Crackle → 1(Crackle), Wheeze → 2, Both(Wheeze+Crackle) → 3,
-  Rhonchi / Stridor → **제거**(노트북 map_annotation_type → None). 툴킷 4-class 규칙(2026-09-16 사용자 최종 확정: 병합 근거 검토 후에도 배제):
-                       논문 §3.1 의 wheeze 병합은 지원하지 않는다 — rhonchi_stridor="wheeze" 를 넘기면 ValueError.
-  2022 inter-test 에는 Rhonchi/Stridor 가 0건이라 OOD 셋은 어느 쪽이든 1040/83/305/1 로 같다.
-  (노트북 quirk: 'wheeze + crackle' 분기는 원본 문자열 'Wheeze+Crackle' 과 매치되지 않아 else 로 통과한 뒤
-   _get_lungsound_label('Wheeze+Crackle') → 3 으로 동작 — 결과는 같다.)
+Label merge (official notebook data/Preprocessing_SPRSound.ipynb cells 2/5):
+  Normal -> 0, Fine Crackle / Coarse Crackle -> 1 (Crackle), Wheeze -> 2, Both (Wheeze+Crackle) -> 3,
+  Rhonchi / Stridor -> **dropped** (notebook map_annotation_type -> None). Toolkit 4-class rule (excluded even after reviewing the case for merging):
+                       the paper's Sec. 3.1 merge into wheeze is not supported -- passing rhonchi_stridor="wheeze" raises ValueError.
+  The 2022 inter-test has 0 Rhonchi/Stridor events, so the OOD set is 1040/83/305/1 either way.
+  (Notebook quirk: the 'wheeze + crackle' branch does not match the original string 'Wheeze+Crackle', falls through to else, and
+   _get_lungsound_label('Wheeze+Crackle') -> 3 -- the result is the same.)
 
-메타 3필드 (노트북 cell 7): [age(float, 파일명), gender(int; 0=male, 1=female), loc p1..p4 → 0..3]
-문장 템플릿 (util/sprsound_util.py): "This sound was recorded from the {loc} of a {sex} pediatric patient."
-  loc: 0 left posterior / 1 left lateral / 2 right posterior / 3 right lateral (SPRSound README 정의와 일치;
-  논문 Table 1 의 'L/R Anterior' 표기가 데이터셋 문서와 어긋남). age ≥ 19 만 'adult' — valid 는 전원 소아.
-  CLAP·tiny-bert 모두 같은 문장, 마스킹 없음 (sprsound_dataset.py:35-41).
+3 meta fields (notebook cell 7): [age (float, from file name), gender (int; 0=male, 1=female), loc p1..p4 -> 0..3]
+Sentence template (util/sprsound_util.py): "This sound was recorded from the {loc} of a {sex} pediatric patient."
+  loc: 0 left posterior / 1 left lateral / 2 right posterior / 3 right lateral (matches the SPRSound README definition;
+  the 'L/R Anterior' notation in the paper's Table 1 disagrees with the dataset documentation). Only age >= 19 is 'adult' -- the valid set is all pediatric.
+  CLAP and tiny-bert use the same sentence, no masking (sprsound_dataset.py:35-41).
 
-두 경로:
-  (A) 저자 배포 valid_spr.pt (Google Drive 1zGR…; pretrained_models/upstream/btscard/valid_spr.pt)
-      항목 = (log-mel (1,1001,64), label 0-3, meta3, 파일 경로 문자열)
-  (B) 툴킷 자체 파이프라인: configs/data/sprsound_btscard.yaml 인자로 IndexDataset( 48 kHz, 녹음 전체 fade in/out
-      sr/16 → 구간 절단 → 8 s repeat 패딩 + fade_out(pad_type repeat_fade) → CLAPProcessor log-mel) 의 test 셋을
-      4-class 로 변환. 노트북 cell 5 순서와 동일. 기존 sprsound.yaml(pad_type repeat, fade_out 없음)과는 다르다.
-  둘의 특징·라벨·문장 일치는 scripts/reproduction/check_btscard_sprsound_parity.py (tests/golden/btscard/sprsound_parity.json) 로 기록한다:
-  1,429 event 전수 라벨·meta3·문장 일치, log-mel max|diff| 6.7e-3 (24건 > 1e-3; 비트 일치 아님 — **원인 미확인**(추정: 저자 환경 torch 2.0.1/Windows 의
-  Resample·numpy 수치 차이; 실측 미수행). 구간 산술은 _NotebookSliceIndexDataset 로 노트북과 동일하게 맞춤).
+Two paths:
+  (A) valid_spr.pt released by the authors (Google Drive 1zGR…; pretrained_models/upstream/btscard/valid_spr.pt)
+      item = (log-mel (1,1001,64), label 0-3, meta3, file path string)
+  (B) The toolkit's own pipeline: builds the test set of IndexDataset (48 kHz, fade in/out sr/16 over the whole recording
+      -> segment crop -> 8 s repeat padding + fade_out (pad_type repeat_fade) -> CLAPProcessor log-mel) from the configs/data/sprsound_btscard.yaml arguments and
+      converts it to 4 classes. Same order as notebook cell 5. Differs from the existing sprsound.yaml (pad_type repeat, no fade_out).
+  Feature/label/sentence agreement between the two is recorded by scripts/reproduction/check_btscard_sprsound_parity.py (tests/golden/btscard/sprsound_parity.json):
+  labels, meta3 and sentences match for all 1,429 events; log-mel max|diff| 6.7e-3 (24 events > 1e-3; not bit-identical -- **cause unconfirmed** (presumably numeric differences in
+  Resample/numpy in the authors' torch 2.0.1/Windows environment; not measured). Segment arithmetic matches the notebook via _NotebookSliceIndexDataset).
 """
 from __future__ import annotations
 
@@ -50,7 +50,7 @@ CLASS_NAMES_4 = ("normal", "crackle", "wheeze", "both")
 
 
 def sprsound_label_to_4class(label: str, rhonchi_stridor: str = "drop") -> Optional[int]:
-    """7-class 이름 → ICBHI 4-class id. Rhonchi/Stridor 는 제외(None). rhonchi_stridor 는 "drop" 만 허용(2026-09-16 확정)."""
+    """7-class name -> ICBHI 4-class id. Rhonchi/Stridor are excluded (None). rhonchi_stridor only accepts "drop"."""
     name = str(label).strip().lower()
     if name == "normal":
         return 0
@@ -63,13 +63,13 @@ def sprsound_label_to_4class(label: str, rhonchi_stridor: str = "drop") -> Optio
     if name in ("rhonchi", "stridor"):
         if rhonchi_stridor == "drop":
             return None
-        raise ValueError(f"rhonchi_stridor={rhonchi_stridor!r}: 4-class 뷰에서 Rhonchi/Stridor 는 제외만 허용한다 "
-                         "(2026-09-16 사용자 결정; 논문 §3.1 의 wheeze 병합은 지원하지 않는다)")
-    raise KeyError(f"알 수 없는 SPRSound 라벨 {label!r}")
+        raise ValueError(f"rhonchi_stridor={rhonchi_stridor!r}: Rhonchi/Stridor can only be excluded in the 4-class view "
+                         "(the paper's Sec. 3.1 merge into wheeze is not supported)")
+    raise KeyError(f"unknown SPRSound label {label!r}")
 
 
 def generate_meta_description_sprsound(age: str, sex: str, loc: str) -> str:
-    """util/sprsound_util.py:1-24 그대로."""
+    """Same as util/sprsound_util.py:1-24."""
     loc_phrase = "from an unknown region" if loc == "unknown" else f"from the {loc}"
     if age == "unknown" and sex == "unknown":
         age_sex_phrase = "a patient of unknown age and sex"
@@ -86,7 +86,7 @@ def generate_meta_description_sprsound(age: str, sex: str, loc: str) -> str:
 
 
 def describe_meta3_sprsound(meta3) -> str:
-    """util/sprsound_util.py get_meta_text_descriptions_sprsound: [age, sex, loc] → 문장."""
+    """util/sprsound_util.py get_meta_text_descriptions_sprsound: [age, sex, loc] -> sentence."""
     age, sex, loc = int(meta3[0]), int(meta3[1]), int(meta3[2])
     age_str = "adult" if age >= 19 else "pediatric"
     sex_str = "male" if sex == 0 else "female"
@@ -95,12 +95,12 @@ def describe_meta3_sprsound(meta3) -> str:
 
 def meta_fields_from_meta7_sprsound(meta7):
     """
-    SPRSound 방언: BTS 계열의 7필드 벡터에서 age/sex/loc 만 읽어 문장 필드로 만든다.
+    SPRSound dialect: reads only age/sex/loc from the BTS-family 7-field vector and turns them into sentence fields.
 
-    ICBHI 판(`meta_fields_from_meta7`)과 두 가지가 다르다:
-      · loc 어휘가 SPRSound 의 p1~p4(LOC_ID_TO_STR) 다 — ICBHI 흉부 위치 7종을 쓰면 없는 위치를 지어내게 된다.
-      · dev 를 쓰지 않는다(None). SPRSound 는 전 8,085 이벤트가 단일 청진기(Yunting2) 라 구분 정보가 없다.
-    나머지 세 자리(BMI·체중·신장)는 -1(결측)이고 여기서도 읽지 않는다.
+    Two differences from the ICBHI version (`meta_fields_from_meta7`):
+      · the loc vocabulary is SPRSound's p1~p4 (LOC_ID_TO_STR) -- using ICBHI's 7 chest locations would invent locations that do not exist.
+      · dev is not used (None). All 8,085 SPRSound events come from a single stethoscope (Yunting2), so it carries no information.
+    The other three slots (BMI, weight, height) are -1 (missing) and are not read here either.
     """
     age, sex, loc = int(meta7[0]), int(meta7[1]), int(meta7[5])
     return {
@@ -112,36 +112,36 @@ def meta_fields_from_meta7_sprsound(meta7):
 
 
 def meta3_from_index_meta(meta: Dict[str, Any]) -> List[float]:
-    """툴킷 SPRSound 인덱스 meta dict → 노트북 cell 7 의 [age, gender, loc_id]."""
+    """Toolkit SPRSound index meta dict -> [age, gender, loc_id] of notebook cell 7."""
     loc = meta.get("location_id")
     if loc is None:
         loc = LOC_CODE_TO_ID[str(meta["recording_location"])]
     return [float(meta["age"]), float(int(float(meta["gender"]))), float(int(loc))]
 
 
-from rsc_toolkit.datasets import collate as _collate  # P2-6: collate 단일 구현
+from rsc_toolkit.datasets import collate as _collate  # single collate implementation
 
 # (x, y, meta7 stack)
 sprsound_ood_collate = _collate.stack_meta_collate
 
 
-# --------------------------------------------------------------------------- (A) 저자 배포
+# --------------------------------------------------------------------------- (A) released by the authors
 class SPRSoundOODAuthorDataset(Dataset):
-    """valid_spr.pt 로더. 항목 → (feat (1,1001,64), label, meta3 float(3), recording_id)."""
+    """valid_spr.pt loader. item -> (feat (1,1001,64), label, meta3 float(3), recording_id)."""
 
     def __init__(self, path: str = AUTHOR_PT_DEFAULT):
         self.path = pathlib.Path(path).expanduser()
         if not self.path.exists():
-            raise FileNotFoundError(f"저자 valid_spr.pt 가 없다: {self.path} (README Google Drive 1zGR…)")
+            raise FileNotFoundError(f"authors' valid_spr.pt not found: {self.path} (README Google Drive 1zGR…)")
         self.items = torch.load(self.path, map_location="cpu", weights_only=False)
-        logger.info("SPRSound 저자 OOD 텐서 로드: %s (%d events)", self.path, len(self.items))
+        logger.info("Loaded the authors' SPRSound OOD tensor: %s (%d events)", self.path, len(self.items))
 
     def __len__(self):
         return len(self.items)
 
     @staticmethod
     def recording_id(path_str: str) -> str:
-        # 노트북 Windows 경로 ('...\\40512331_8.1_1_p1_3548.wav')
+        # Windows path from the notebook ('...\\40512331_8.1_1_p1_3548.wav')
         return path_str.replace("\\", "/").rsplit("/", 1)[-1].replace(".wav", "")
 
     def __getitem__(self, i):
@@ -149,12 +149,12 @@ class SPRSoundOODAuthorDataset(Dataset):
         return feat, int(label), meta.float(), self.recording_id(rid)
 
 
-# --------------------------------------------------------------------------- (B) 툴킷 파이프라인
+# --------------------------------------------------------------------------- (B) toolkit pipeline
 class SPRSoundOOD4ClassDataset(Dataset):
     """
-    IndexFeatureDataset(툴킷 SPRSound test split, CLAP 특징) → 4-class 파생 뷰.
-    라벨 이름은 인덱스 label id 가 아니라 번들 metadata.csv(Filename, Start, End → Label)에서 sample_id 로 찾는다
-    (LabelEncoder 의 id 순서에 의존하지 않기 위해).
+    IndexFeatureDataset (toolkit SPRSound test split, CLAP features) -> derived 4-class view.
+    Label names are looked up by sample_id in the bundled metadata.csv (Filename, Start, End -> Label), not from the index label id
+    (so as not to depend on the LabelEncoder id order).
     """
 
     def __init__(self, feature_ds, rhonchi_stridor: str = "drop", metadata_csv: Optional[str] = None):
@@ -175,7 +175,7 @@ class SPRSoundOOD4ClassDataset(Dataset):
         for i, row in enumerate(df.itertuples()):
             sid = str(row.sample_id)
             if sid not in name_by_sid:
-                raise KeyError(f"metadata.csv 에서 {sid} 의 라벨을 찾지 못했다")
+                raise KeyError(f"label for {sid} not found in metadata.csv")
             label7 = name_by_sid[sid]
             y4 = sprsound_label_to_4class(label7, rhonchi_stridor)
             if y4 is None:
@@ -185,7 +185,7 @@ class SPRSoundOOD4ClassDataset(Dataset):
             if isinstance(meta, str):
                 meta = json.loads(meta)
             self.rows.append((i, y4, meta3_from_index_meta(meta), sid, label7))
-        logger.info("SPRSound OOD 4-class 뷰: %d events (Rhonchi/Stridor %s: %d)", len(self.rows), rhonchi_stridor, dropped)
+        logger.info("SPRSound OOD 4-class view: %d events (Rhonchi/Stridor %s: %d)", len(self.rows), rhonchi_stridor, dropped)
 
     def __len__(self):
         return len(self.rows)
@@ -206,9 +206,9 @@ class SPRSoundOOD4ClassDataset(Dataset):
 
 class _NotebookSliceIndexDataset(Dataset):
     """
-    IndexDataset 위에서 노트북 cell 5 의 구간 산술을 그대로 재현한다:
-      start = int(float(ms) * 0.001 * sr) — 인덱스 CSV 의 t0(초, float) 만 쓰면 int(9.274 * 48000) = 445151 처럼 1 샘플이
-      어긋나는 event 가 있다(대조 시 73/1429 건 log-mel max|diff| > 1e-3). ms 정수는 round(t0 * 1000) 으로 복원한다.
+    Reproduces the segment arithmetic of notebook cell 5 on top of IndexDataset:
+      start = int(float(ms) * 0.001 * sr) -- using only the index CSV t0 (seconds, float) gives off-by-one-sample events such as
+      int(9.274 * 48000) = 445151 (73/1429 events with log-mel max|diff| > 1e-3 in the comparison). Integer ms is recovered as round(t0 * 1000).
     """
 
     def __init__(self, index_ds, sampling_rate: int, preprocessor):
@@ -236,9 +236,9 @@ class _NotebookSliceIndexDataset(Dataset):
 
 class _CLAPFeatureDataset(Dataset):
     """
-    IndexDataset(48 kHz, fade, repeat_fade) 항목 → HF ClapProcessor log-mel (1, 1001, 64), FeatureCache 캐시.
-    processors/clap.py CLAPProcessor 와 같은 프로세서·캐시 키(model_name, sampling_rate)를 쓰되 입력을 numpy 1-D 로 넘긴다
-    (transformers 5.15.1 의 ClapFeatureExtractor 는 torch 1-D 텐서를 2-D 로 취급해 MemoryError 를 낸다 — 공용 파일 미수정).
+    IndexDataset (48 kHz, fade, repeat_fade) item -> HF ClapProcessor log-mel (1, 1001, 64), cached with FeatureCache.
+    Uses the same processor and cache key (model_name, sampling_rate) as processors/clap.py CLAPProcessor but passes the input as a numpy 1-D array
+    (ClapFeatureExtractor in transformers 5.15.1 treats a torch 1-D tensor as 2-D and raises MemoryError -- the shared processor file is left unchanged).
     """
 
     def __init__(self, index_ds, sampling_rate: int, model_name: str, cache_dir: pathlib.Path, audio_chain=None):
@@ -249,8 +249,8 @@ class _CLAPFeatureDataset(Dataset):
         self.index_ds = index_ds
         self.processor = ClapProcessor.from_pretrained(model_name, sampling_rate=sampling_rate)
         self.cache = FeatureCache(cache_dir)
-        # audio_chain: 이 경로의 앞단 전처리(48 kHz·fade·repeat_fade 8 s·노트북식 ms 반올림 절단)를 체인 대장에 남긴다
-        # (dataset_name="sprsound_ood" — 툴킷 sprsound_bts 경로와는 캐시 dir 도, 대장 키도 다르다).
+        # audio_chain: records the upstream preprocessing of this path (48 kHz, fade, repeat_fade 8 s, notebook-style ms-rounded crop) in the chain ledger
+        # (dataset_name="sprsound_ood" -- both the cache dir and the ledger key differ from the toolkit sprsound_bts path).
         self.cache.configure({"model_name": model_name, "sampling_rate": sampling_rate}, processor_name="CLAPProcessor",
                              audio_chain=audio_chain)
 
@@ -270,7 +270,7 @@ class _CLAPFeatureDataset(Dataset):
 
 def build_toolkit_ood_dataset(data_config: str = DATA_CONFIG_DEFAULT, rhonchi_stridor: str = "drop",
                               project_root: Optional[str] = None) -> SPRSoundOOD4ClassDataset:
-    """configs/data/sprsound_btscard.yaml 의 전처리 인자로 IndexDataset(test = 2022 inter-patient) 을 세워 4-class 뷰로."""
+    """Build IndexDataset (test = 2022 inter-patient) with the preprocessing arguments of configs/data/sprsound_btscard.yaml and wrap it in the 4-class view."""
     from omegaconf import OmegaConf
 
     from rsc_toolkit.datasets.index_dataset import IndexDataset
@@ -278,13 +278,13 @@ def build_toolkit_ood_dataset(data_config: str = DATA_CONFIG_DEFAULT, rhonchi_st
 
     from rsc_toolkit.paths import project_root_from
 
-    root = project_root_from(project_root)  # 인자 → RSCTK_PROJECT_ROOT → cwd(저장소 표지) → 개발 checkout (설치본의 parents[2] 추정 대체)
+    root = project_root_from(project_root)  # argument -> RSCTK_PROJECT_ROOT -> cwd (repository marker) -> development checkout (replaces the parents[2] guess for installed copies)
     cfg = OmegaConf.to_container(OmegaConf.load(root / data_config), resolve=False)["params"]
     data_dir = root / cfg["data_dir"]
     sr = int(cfg["sampling_rate"])
     pre = AudioPreprocessor(sr, AudioPreprocessConfig(float(cfg["desired_length_sec"]), str(cfg["pad_type"])))
     splits = list(cfg["test_splits"])
-    assert len(splits) == 1, "SPRSound OOD 는 단일 test split 만 지원"
+    assert len(splits) == 1, "SPRSound OOD supports a single test split only"
     index_ds = IndexDataset(
         index_csv=data_dir / "index" / cfg.get("index_filename", "index_cycle.csv"),
         data_root=data_dir / cfg.get("raw_data_subdir", ""), sampling_rate=sr, sample_level=cfg["sample_level"],
@@ -295,7 +295,7 @@ def build_toolkit_ood_dataset(data_config: str = DATA_CONFIG_DEFAULT, rhonchi_st
     audio_chain = {
         "dataset_name": "sprsound_ood", "sampling_rate": sr, "sample_level": str(cfg["sample_level"]),
         "desired_length_sec": float(cfg["desired_length_sec"]), "pad_type": str(cfg["pad_type"]),
-        "fade": bool(cfg.get("fade", True)), "time_unit": "ood_ms_round",  # _NotebookSliceIndexDataset 의 절단 규칙
+        "fade": bool(cfg.get("fade", True)), "time_unit": "ood_ms_round",  # crop rule of _NotebookSliceIndexDataset
     }
     feature_ds = _CLAPFeatureDataset(sliced, sr, feats["clap_model_name"], root / feats["cache_dir"], audio_chain=audio_chain)
     return SPRSoundOOD4ClassDataset(feature_ds, rhonchi_stridor=rhonchi_stridor)

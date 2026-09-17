@@ -1,5 +1,5 @@
 """
-M2D 미세조정 P1 집계: outputs/m2d/<run>/best.json (+ logs/<run>.done EXIT=0) → TASLP Table XIII.
+M2D fine-tuning 5-seed reproduction check aggregation: outputs/m2d/<run>/best.json (+ logs/<run>.done EXIT=0) → TASLP Table XIII.
 
   .venv/bin/python scripts/reproduction/aggregate_m2d_results.py
 """
@@ -8,11 +8,11 @@ import pathlib
 import re
 import statistics
 
-PAPER = {  # TASLP(2404.06095) Table XIII, ICBHI 4-class, 4 사전학습 시드 x 5 미세조정 = 20 평균 ±95% CI
-    "icbhi-m2d-base": ("M2D/0.7 (16x4, 230529 공개 ckpt)",      (79.48, 1.47), (44.38, 1.55), (61.93, 0.25)),
-    "icbhi-m2dx-s5":  ("M2D-X/0.7 η=0.3 (공개 ckpt = seed 5 만)", (81.51, 1.03), (45.08, 1.10), (63.29, 0.22)),
-    # M2D-Resp(AS+Resp400K, 80x608 패치 16x16, Interspeech'25 2505.15307): 논문은 OPERA 7 태스크만 보고 → ICBHI 목표치 없음(참고용)
-    "icbhi-m2dresp":  ("M2D-Resp (AS+Resp400K, 16x16, 250826 공개 ckpt) — 논문 목표치 없음", None, None, None),
+PAPER = {  # TASLP (2404.06095) Table XIII, ICBHI 4-class, 4 pre-training seeds x 5 fine-tuning runs = mean of 20 ±95% CI
+    "icbhi-m2d-base": ("M2D/0.7 (16x4, public ckpt 230529)",      (79.48, 1.47), (44.38, 1.55), (61.93, 0.25)),
+    "icbhi-m2dx-s5":  ("M2D-X/0.7 η=0.3 (public ckpt = seed 5 only)", (81.51, 1.03), (45.08, 1.10), (63.29, 0.22)),
+    # M2D-Resp (AS+Resp400K, 80x608, 16x16 patches, Interspeech'25 2505.15307): the paper reports only the 7 OPERA tasks → no ICBHI paper-reported value (reference only)
+    "icbhi-m2dresp":  ("M2D-Resp (AS+Resp400K, 16x16, public ckpt 250826) — no paper-reported value", None, None, None),
 }
 
 
@@ -35,7 +35,7 @@ def main():
             d = json.loads(best.read_text())
             groups[base].append((seed, d["S_p"], d["S_e"], d["icbhi_score"], d.get("epoch")))
     if partial:
-        print("(미완료 run — 집계 제외: " + ", ".join(partial) + ")")
+        print("(incomplete runs — excluded from aggregation: " + ", ".join(partial) + ")")
     for base, rows in groups.items():
         if not rows:
             continue
@@ -49,12 +49,12 @@ def main():
                 vals = [r[i] for r in rows]
                 return statistics.mean(vals), statistics.stdev(vals)
             sp, se, sc = ms(1), ms(2), ms(3)
-            print(f"  우리 평균 : Sp {sp[0]:6.2f}±{sp[1]:.2f}  Se {se[0]:6.2f}±{se[1]:.2f}  Score {sc[0]:6.2f}±{sc[1]:.2f}")
+            print(f"  ours mean : Sp {sp[0]:6.2f}±{sp[1]:.2f}  Se {se[0]:6.2f}±{se[1]:.2f}  Score {sc[0]:6.2f}±{sc[1]:.2f}")
             if psc is None:
-                print("  논문 목표치 없음 (M2D-Resp 논문은 OPERA 7 태스크 AUROC 만 보고 — 참고용; 대조: M2D/0.7 base 61.93±0.25)")
+                print("  no paper-reported value (the M2D-Resp paper reports only AUROC on the 7 OPERA tasks — reference only; compare: M2D/0.7 base 61.93±0.25)")
             else:
-                print(f"  논문 보고 : Sp {psp[0]:6.2f}±{psp[1]:.2f}  Se {pse[0]:6.2f}±{pse[1]:.2f}  Score {psc[0]:6.2f}±{psc[1]:.2f} (20 run, 95% CI)")
-                print(f"  Score 차이: {sc[0]-psc[0]:+.2f}")
+                print(f"  paper     : Sp {psp[0]:6.2f}±{psp[1]:.2f}  Se {pse[0]:6.2f}±{pse[1]:.2f}  Score {psc[0]:6.2f}±{psc[1]:.2f} (20 runs, 95% CI)")
+                print(f"  Score diff: {sc[0]-psc[0]:+.2f}")
 
 
 if __name__ == "__main__":

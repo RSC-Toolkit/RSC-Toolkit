@@ -1,8 +1,8 @@
 """
-EpochResumeCheckpoint + ICBHIBestScoreCheckpoint 의 재개 동작.
+Resume behavior of EpochResumeCheckpoint + ICBHIBestScoreCheckpoint.
 
-시나리오: 4 epoch 짜리 학습이 2 epoch 뒤 죽었다 → 같은 설정으로 다시 띄우면
-last.ckpt 에서 epoch 3 부터 이어가고, best 기준(이전 구간의 최고 Score)도 이어진다.
+Scenario: a 4-epoch run dies after 2 epochs -> relaunching with the same settings
+continues from epoch 3 using last.ckpt, and the best criterion (best Score of the earlier segment) carries over too.
 """
 import json
 import pathlib
@@ -17,7 +17,7 @@ from rsc_toolkit.trainer.callbacks.resume_checkpoint import EpochResumeCheckpoin
 
 
 class _Toy(L.LightningModule):
-    """epoch 마다 정해진 가짜 Score 를 로그한다 (epoch 2 가 최고, 이후 하락)."""
+    """Logs a fixed fake Score per epoch (epoch 2 is best, then it drops)."""
 
     SCORES = [50.0, 70.0, 60.0, 55.0]
 
@@ -61,7 +61,7 @@ def _trainer(tmp, max_epochs, **kw):
 def test_interrupted_run_resumes_from_last_epoch_and_keeps_best(tmp_path: pathlib.Path):
     train, val = _loaders()
 
-    # 1) 2 epoch 만 돌고 "죽은" 것으로 가정 (정상 종료 삭제를 끄고 last.ckpt 를 남긴다)
+    # 1) assume the run "died" after only 2 epochs (disable deletion on normal exit so last.ckpt remains)
     m1 = _Toy()
     _trainer(tmp_path, max_epochs=2, delete_on_finish=False).fit(m1, train, val)
     assert m1.epochs_trained == [0, 1]
@@ -69,7 +69,7 @@ def test_interrupted_run_resumes_from_last_epoch_and_keeps_best(tmp_path: pathli
     best_before = json.load(open(tmp_path / "best.json"))
     assert best_before["epoch"] == 2 and best_before["icbhi_score"] == 70.0
 
-    # 2) 같은 설정으로 재발사 → epoch 3·4 만 돈다
+    # 2) relaunch with the same settings -> only epochs 3 and 4 run
     m2 = _Toy()
     t2 = _trainer(tmp_path, max_epochs=4)
     ckpt = find_resume_path(t2)
@@ -77,11 +77,11 @@ def test_interrupted_run_resumes_from_last_epoch_and_keeps_best(tmp_path: pathli
     t2.fit(m2, train, val, ckpt_path=str(ckpt))
     assert m2.epochs_trained == [2, 3]
 
-    # best 는 재개 전 구간(epoch 2, 70.0)이 유지돼야 한다 — 60/55 로 덮이면 프로토콜 위반
+    # best must keep the pre-resume segment (epoch 2, 70.0) — being overwritten by 60/55 would violate the protocol
     best_after = json.load(open(tmp_path / "best.json"))
     assert best_after == best_before
 
-    # 3) 정상 종료했으니 재개 파일은 지워진다
+    # 3) normal exit, so the resume file is deleted
     assert not (tmp_path / "last.ckpt").exists()
     assert find_resume_path(t2) is None
 

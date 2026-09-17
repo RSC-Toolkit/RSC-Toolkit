@@ -1,11 +1,11 @@
 """
-BTS-CARD SPRSound OOD 입력 대조 — 저자 배포 valid_spr.pt vs 툴킷 자체 파이프라인(configs/data/sprsound_btscard.yaml).
+BTS-CARD SPRSound OOD input comparison — the authors' released valid_spr.pt vs the toolkit's own pipeline (configs/data/sprsound_btscard.yaml).
 
   .venv/bin/python scripts/reproduction/check_btscard_sprsound_parity.py [--out tests/golden/btscard/sprsound_parity.json]
 
-대조 항목: (1) 녹음별 event 수·순서, (2) 4-class 라벨 일치, (3) meta3 일치, (4) 문장 일치,
-(5) log-mel 특징 max|diff| (ICBHI 대조 선례 tests/golden/bts/pipeline_parity_test_split.json: 7.6e-6).
-툴킷 특징은 처음 실행 때 1,429 event 의 CLAP log-mel 을 계산해 캐시한다(CPU 수 분).
+Compared: (1) per-recording event count and order, (2) 4-class label agreement, (3) meta3 agreement, (4) text agreement,
+(5) log-mel feature max|diff| (precedent from the ICBHI comparison tests/golden/bts/pipeline_parity_test_split.json: 7.6e-6).
+On the first run the toolkit computes and caches the CLAP log-mel features of the 1,429 events (a few minutes on CPU).
 """
 import argparse
 import collections

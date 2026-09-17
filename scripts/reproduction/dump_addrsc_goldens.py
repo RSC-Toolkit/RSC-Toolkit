@@ -1,15 +1,15 @@
 """
-ADD-RSC(deegy666/ADD-RSC e2b0f82) P0 골든 — 공식 models/{adapt_diff_denoise,ast,bias_denoise_loss}.py 를 timm 0.4.5 참조 venv 에서 실행.
-(데이터 파이프라인은 patch-mix 와 동일해 tests/golden/patchmix* 골든으로 이미 대조됨; 여기서는 모델·손실만.)
+ADD-RSC (deegy666/ADD-RSC e2b0f82) official-code parity goldens — runs the official models/{adapt_diff_denoise,ast,bias_denoise_loss}.py in the timm 0.4.5 reference venv.
+(The data pipeline is identical to Patch-Mix and is already compared via the tests/golden/patchmix* goldens; only the model and loss are dumped here.)
 
   CUDA_VISIBLE_DEVICES= .venv-ref-timm045/bin/python scripts/reproduction/dump_addrsc_goldens.py \
       --repo outputs/reference/addrsc --ckpt pretrained_models/upstream/audioset_0.4593.pth --out tests/golden/addrsc
 
-골든 (model.pt):
-- 입력: tests/golden/patchmix/features_input.pt (2, 798, 128) fbank → transforms.Resize((1024,256)) (원본 main.py:176-181) → (2,1024,256)
-- 공식 DiffTransformerLayer(256,8,6) + ASTModel(fstride=tstride=16, input_fdim=1024, input_tdim=256, audioset_pretrain, ckpt) + classifier=deepcopy(mlp_head)
-  난수 초기화 파라미터(잡음제거 층 전체, classifier, v.pos_embed) 는 det_fill(linspace) 로 결정화 → eval fp32 forward:
-  denoise_images, aux_logits, features, output + LabelSmoothing/CE/총 손실. AudioSet 로드 결과(로드 키·모양 불일치 키), state_dict 키/모양.
+Goldens (model.pt):
+- input: tests/golden/patchmix/features_input.pt (2, 798, 128) fbank → transforms.Resize((1024,256)) (original main.py:176-181) → (2,1024,256)
+- official DiffTransformerLayer(256,8,6) + ASTModel(fstride=tstride=16, input_fdim=1024, input_tdim=256, audioset_pretrain, ckpt) + classifier=deepcopy(mlp_head)
+  randomly initialized parameters (the whole denoising layer, classifier, v.pos_embed) are made deterministic with det_fill(linspace) → eval fp32 forward:
+  denoise_images, aux_logits, features, output + LabelSmoothing/CE/total loss. AudioSet load result (loaded keys, shape-mismatched keys), state_dict keys/shapes.
 """
 import argparse
 import json
@@ -36,11 +36,11 @@ def main():
     out = pathlib.Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
     sys.path.insert(0, str(pathlib.Path(args.repo).resolve()))
-    # 참조 venv 의 torch(cu130) 는 이 서버 드라이버로 CUDA 초기화가 안 된다 → 공식 코드의 cuda 분기(DataParallel/map_location) 를 CPU 로 강제
+    # The torch (cu130) in the reference venv cannot initialize CUDA with this server's driver → force the official code's cuda branches (DataParallel/map_location) to CPU
     torch.cuda.is_available = lambda: False
     torch.cuda.device_count = lambda: 0
 
-    class _CPUDataParallel(nn.Module):  # DataParallel 대체: state_dict 키 'module.*' 접두어와 .module 만 재현 (GPU 없이)
+    class _CPUDataParallel(nn.Module):  # DataParallel replacement: reproduces only the 'module.*' state_dict key prefix and .module (no GPU needed)
         def __init__(self, module, *a, **k):
             super().__init__()
             self.module = module
@@ -49,7 +49,7 @@ def main():
             return self.module(*a, **k)
 
     torch.nn.DataParallel = _CPUDataParallel
-    # 원본 차분 어텐션 forward 의 죽은 코드 `nn.LayerNorm(N).to('cuda:0')` (결과 미사용) — GPU 없이 돌리기 위해 그 .to 만 무시
+    # Dead code in the original differential-attention forward: `nn.LayerNorm(N).to('cuda:0')` (result unused) — ignore only that .to so it runs without a GPU
     _orig_to = nn.Module.to
 
     def _to(self, *a, **k):
@@ -76,7 +76,7 @@ def main():
     denoise = DiffTransformerLayer(d_model=256, num_heads=8, depth=6)
     model = ASTModel(input_fdim=1024, input_tdim=256, label_dim=4, audioset_pretrain=True, pretrained_path=args.ckpt)
     classifier = deepcopy(model.mlp_head)
-    # 난수 파라미터 결정화
+    # make the random parameters deterministic
     for p in denoise.parameters():
         det_fill(p)
     for p in classifier.parameters():
@@ -94,7 +94,7 @@ def main():
         class_loss = crit_ce(output, labels)
         loss = 0.5 * denoise_loss + 0.5 * class_loss
 
-    # AudioSet 로드 결과 재현 기록 (ast.py 130-137 로직을 같은 ckpt 로 다시 돌려 기록)
+    # Record the AudioSet load result (re-run the ast.py 130-137 logic with the same ckpt)
     weights = torch.load(args.ckpt, map_location="cpu")
     skeleton = ASTModel(input_fdim=1024, input_tdim=256, label_dim=527, audioset_pretrain=False, verbose=False)
     cur = torch.nn.DataParallel(skeleton).state_dict()

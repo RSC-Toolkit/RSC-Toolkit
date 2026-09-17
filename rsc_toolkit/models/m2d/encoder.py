@@ -1,17 +1,17 @@
 """
-M2D 인코더(ViT-Base, 오디오 로그멜 패치) — nttcslab/m2d `M2DEncoderViT` 와 동일한 연산을 timm ViT 위에 재구현.
+M2D encoder (ViT-Base, audio log-mel patches) — re-implements the same computation as nttcslab/m2d `M2DEncoderViT` on top of timm ViT.
 
-참조(코드는 옮기지 않고 동작만 재현): nttcslab/m2d m2d/models_mae.py M2DEncoderViT·PatchEmbed·forward_encoder,
+References (behavior reproduced, code not copied): nttcslab/m2d m2d/models_mae.py M2DEncoderViT·PatchEmbed·forward_encoder,
 m2d/pos_embed.py get_2d_sincos_pos_embed, m2d/runtime_audio.py get_backbone/encode_lms.
 
-동작:
-- 입력 (B, 1, 80, T): Conv2d(1, 768, kernel=stride=(16, 4)) 패치화 (grid 5 x T/4, f-major 평탄화)
-- 고정 2D sin-cos pos_embed (grid 5 x 50 = 250 + cls) — 짧은 입력은 시간축 앞부분만 슬라이스(adjust_short)
-- cls_token + pos_embed[:, :1] 을 앞에 붙여 timm Block x12 (768, heads 12, mlp 4, qkv_bias, LayerNorm eps 1e-6) → norm
-- encode_lms: T 를 패치 배수로 zero-pad 후 200 프레임 단위 청크로 forward, cls 제거,
-  'b (f t) d -> b t (f d)' 로 주파수 5 패치를 concat (3840), 청크를 시간축으로 concat
-- norm_stats 버퍼(ckpt 값 보존; TASLP ICBHI 경로에서는 미사용)
-체크포인트: ckpt['model'] 에서 이 모듈의 파라미터/버퍼 이름에 있는 키만 로드 (decoder_*, target_* 등 drop).
+Behavior:
+- Input (B, 1, 80, T): Conv2d(1, 768, kernel=stride=(16, 4)) patchify (grid 5 x T/4, f-major flattening)
+- Fixed 2D sin-cos pos_embed (grid 5 x 50 = 250 + cls) — for short inputs only the leading part of the time axis is sliced (adjust_short)
+- cls_token + pos_embed[:, :1] prepended, then timm Block x12 (768, heads 12, mlp 4, qkv_bias, LayerNorm eps 1e-6) → norm
+- encode_lms: zero-pad T to a multiple of the patch size, forward in 200-frame chunks, drop cls,
+  concat the 5 frequency patches with 'b (f t) d -> b t (f d)' (3840), concat chunks along time
+- norm_stats buffer (ckpt value preserved; unused in the TASLP ICBHI path)
+Checkpoint: only keys of ckpt['model'] that match this module's parameter/buffer names are loaded (decoder_*, target_* etc. are dropped).
 """
 from __future__ import annotations
 
@@ -28,7 +28,7 @@ from timm.models.vision_transformer import Block
 logger = logging.getLogger(__name__)
 
 
-# --------------------------------------------------------------- sin-cos pos embed (MAE 공식)
+# --------------------------------------------------------------- sin-cos pos embed (MAE formula)
 def _sincos_1d(embed_dim: int, pos: np.ndarray) -> np.ndarray:
     omega = np.arange(embed_dim // 2, dtype=float)
     omega /= embed_dim / 2.0
@@ -39,7 +39,7 @@ def _sincos_1d(embed_dim: int, pos: np.ndarray) -> np.ndarray:
 
 def get_2d_sincos_pos_embed(embed_dim: int, grid_size: Sequence[int], cls_token: bool = False) -> np.ndarray:
     gH, gW = int(grid_size[0]), int(grid_size[1])
-    grid = np.meshgrid(np.arange(gW, dtype=np.float32), np.arange(gH, dtype=np.float32))  # w 가 먼저 (MAE 관례)
+    grid = np.meshgrid(np.arange(gW, dtype=np.float32), np.arange(gH, dtype=np.float32))  # w first (MAE convention)
     grid = np.stack(grid, axis=0).reshape([2, 1, gH, gW])
     emb_h = _sincos_1d(embed_dim // 2, grid[0])
     emb_w = _sincos_1d(embed_dim // 2, grid[1])
@@ -50,7 +50,7 @@ def get_2d_sincos_pos_embed(embed_dim: int, grid_size: Sequence[int], cls_token:
 
 
 class PatchEmbed(nn.Module):
-    """크기 assert 없는 Conv 패치화 (timm 0.4.12 PatchEmbed 상당)."""
+    """Conv patchify without a size assert (equivalent to timm 0.4.12 PatchEmbed)."""
 
     def __init__(self, img_size, patch_size, in_chans=1, embed_dim=768):
         super().__init__()
@@ -86,7 +86,7 @@ class M2DEncoder(nn.Module):
         return self.patch_embed.grid_size
 
     def forward_encoder(self, x: torch.Tensor) -> torch.Tensor:
-        """(B, 1, 80, T≤200) → (B, 1 + 5*T/4, D). 짧은 입력은 pos_embed 시간축을 앞에서 자른다."""
+        """(B, 1, 80, T≤200) → (B, 1 + 5*T/4, D). For short inputs the pos_embed time axis is truncated from the front."""
         x = self.patch_embed(x)
         pos_embed = self.pos_embed[:, 1:, :]
         if x.shape[1] < pos_embed.shape[1]:
@@ -112,7 +112,7 @@ class M2DEncoder(nn.Module):
             x = torch.nn.functional.pad(x, (0, pad_frames))
         embeddings = []
         for i in range(chunks):
-            emb = self.forward_encoder(x[..., i * unit_frames:(i + 1) * unit_frames])[:, 1:, :]  # cls 제거
+            emb = self.forward_encoder(x[..., i * unit_frames:(i + 1) * unit_frames])[:, 1:, :]  # drop cls
             B, N, D = emb.shape
             emb = emb.reshape(B, fbins, N // fbins, D).permute(0, 2, 1, 3).reshape(B, N // fbins, fbins * D)
             embeddings.append(emb)
@@ -120,7 +120,7 @@ class M2DEncoder(nn.Module):
 
 
 def load_m2d_checkpoint(encoder: M2DEncoder, path) -> dict:
-    """ckpt['model'] 에서 인코더 파라미터/버퍼 이름에 있는 키만 strict 로드 (runtime_audio.drop_non_model_weights)."""
+    """Strictly loads only the keys of ckpt['model'] that match encoder parameter/buffer names (runtime_audio.drop_non_model_weights)."""
     ckpt = torch.load(pathlib.Path(path), map_location="cpu", weights_only=False)
     state = ckpt["model"] if "model" in ckpt else ckpt
     state = {k[len("backbone."):] if k.startswith("backbone.") else k: v for k, v in state.items()}
@@ -128,11 +128,11 @@ def load_m2d_checkpoint(encoder: M2DEncoder, path) -> dict:
     kept = {k: v for k, v in state.items() if k in names}
     dropped = sorted(k for k in state if k not in names)
     if "norm_stats" not in kept:
-        # 구 ckpt(예: 230529)에는 norm_stats 가 없다 — runtime_audio 는 기본값 [-7.1, 4.2] 를 넣는다
+        # older ckpts (e.g. 230529) have no norm_stats — runtime_audio fills in the default [-7.1, 4.2]
         kept["norm_stats"] = encoder.norm_stats.detach().clone()
     missing = sorted(names - set(kept))
     if missing:
-        raise RuntimeError(f"M2D ckpt 에 인코더 키가 없다: {missing[:5]}")
+        raise RuntimeError(f"M2D ckpt is missing encoder keys: {missing[:5]}")
     encoder.load_state_dict(kept, strict=True)
-    logger.info("M2D ckpt 로드 %s: 사용 %d 키, drop %d 키 (예: %s)", path, len(kept), len(dropped), dropped[:3])
+    logger.info("Loaded M2D ckpt %s: used %d keys, dropped %d keys (e.g. %s)", path, len(kept), len(dropped), dropped[:3])
     return {"used": sorted(kept), "dropped": dropped, "args": ckpt.get("args")}

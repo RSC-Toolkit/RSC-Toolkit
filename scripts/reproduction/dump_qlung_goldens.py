@@ -1,18 +1,18 @@
 """
-QLung(RSC-Toolkit/QLung 46408dd) P0 골든 — 공식 코드를 그대로 실행해 tests/golden/qlung/ 에 뜬다.
+QLung (RSC-Toolkit/QLung 46408dd) official-code parity goldens — runs the official code as-is and saves the results to tests/golden/qlung/.
 
-부분별 실행 환경이 다르다:
-  aqs     — util/get_acoustic_features.py (librosa/scipy/matplotlib 필요) → 툴킷 .venv (librosa 0.11):
+Each part runs in a different environment:
+  aqs     — util/get_acoustic_features.py (needs librosa/scipy/matplotlib) → toolkit .venv (librosa 0.11):
               .venv/bin/python scripts/reproduction/dump_qlung_goldens.py aqs --repo outputs/reference/qlung
-            파형은 툴킷 IndexDataset(16 kHz, 8 s repeat_fade — patchmix_pipeline 골든으로 공식 cut_pad 와 동일 확인) 의 ICBHI train 사이클.
-            rms / 스펙트럼 엔트로피 / AQS 세 변형(코드 그대로 (rms,rms) · 코드식+(entropy,rms) · 논문식) 을 기록.
-  specaug — util/augmentation.py SpecAugment(icbhi_ast_sup) 배치 게이트·마스킹 (nlpaug 스텁) → .venv:
+            Waveforms are ICBHI train cycles from the toolkit IndexDataset (16 kHz, 8 s repeat_fade — confirmed identical to the official cut_pad via the patchmix_pipeline goldens).
+            Records rms / spectral entropy / three AQS variants (code as-is (rms,rms) · code formula + (entropy,rms) · paper formula).
+  specaug — util/augmentation.py SpecAugment(icbhi_ast_sup) batch gate and masking (nlpaug stub) → .venv:
               .venv/bin/python scripts/reproduction/dump_qlung_goldens.py specaug --repo outputs/reference/qlung
-  loss    — method/loss.py AngularClassifier / AngularMarginLoss(DFAM) 고정 텐서 (det_fill W) → 참조 venv(timm 0.4.5, CPU):
+  loss    — method/loss.py AngularClassifier / AngularMarginLoss(DFAM) on fixed tensors (det_fill W) → reference venv (timm 0.4.5, CPU):
               CUDA_VISIBLE_DEVICES= .venv-ref-timm045/bin/python scripts/reproduction/dump_qlung_goldens.py loss --repo outputs/reference/qlung
-  model   — models/ast.py ASTModel(798/128 quirk, AudioSet ckpt) 전체 forward + det_fill 헤드 로짓·총손실 → 참조 venv:
+  model   — models/ast.py ASTModel (798/128 quirk, AudioSet ckpt) full forward + det_fill head logits and total loss → reference venv:
               CUDA_VISIBLE_DEVICES= .venv-ref-timm045/bin/python scripts/reproduction/dump_qlung_goldens.py model --repo outputs/reference/qlung
-공식 코드의 .cuda() 하드코딩(loss.py:39,55,60,64-75)은 identity 로 패치한다 (참조 venv 의 torch 는 이 서버에서 CUDA 초기화 불가).
+The hard-coded .cuda() calls in the official code (loss.py:39,55,60,64-75) are patched to identity (the torch in the reference venv cannot initialize CUDA on this server).
 """
 import argparse
 import json
@@ -27,7 +27,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-# CPU 패치: .cuda() → identity, torch.load → CPU
+# CPU patches: .cuda() → identity, torch.load → CPU
 torch.Tensor.cuda = lambda self, *a, **k: self  # type: ignore[assignment]
 nn.Module.cuda = lambda self, *a, **k: self  # type: ignore[assignment]
 torch.cuda.is_available = lambda: False
@@ -44,7 +44,7 @@ def det_fill(t: torch.Tensor) -> None:
 
 
 def _fixed_loss_inputs(dim: int = 768, n: int = 8):
-    """고정 특징·라벨·AQS. 마지막 두 행은 W_d[y] 와 반대 방향(cos≈−1) 으로 만들어 easy_margin=False 의 cos−mm 분기를 강제한다."""
+    """Fixed features, labels and AQS. The last two rows are made opposite to W_d[y] (cos≈−1) to force the cos−mm branch of easy_margin=False."""
     g = torch.Generator().manual_seed(2026)
     feats = torch.randn(n, dim, generator=g)
     labels = torch.tensor([0, 1, 2, 3, 1, 0, 2, 3])
@@ -60,7 +60,7 @@ def _anti_aligned(feats, labels, weight):
 
 
 def dump_aqs(repo: pathlib.Path, out: pathlib.Path) -> None:
-    # get_acoustic_features.py:4 의 matplotlib import 는 __main__ 그림용 — 툴킷 venv 에 없어 스텁 (계산 경로 미사용)
+    # the matplotlib import at get_acoustic_features.py:4 is for plotting in __main__ — missing from the toolkit venv, so stubbed (unused on the computation path)
     for name in ("matplotlib", "matplotlib.pyplot"):
         sys.modules.setdefault(name, types.ModuleType(name))
     sys.path.insert(0, str(repo))
@@ -94,10 +94,10 @@ def dump_aqs(repo: pathlib.Path, out: pathlib.Path) -> None:
         y = wave.numpy().astype(np.float32)
         rms = compute_rms_energy(y)
         ent = compute_spectral_entropy(y)
-        q_code_rms = compute_quality_score_entropy_rms(rms, rms, alpha=0.7, beta=0.3)          # icbhi_dataset.py:177 그대로
-        q_code_entropy = compute_quality_score_entropy_rms(ent, rms, alpha=0.7, beta=0.3)      # 코드식 + 진짜 엔트로피
+        q_code_rms = compute_quality_score_entropy_rms(rms, rms, alpha=0.7, beta=0.3)          # icbhi_dataset.py:177 as-is
+        q_code_entropy = compute_quality_score_entropy_rms(ent, rms, alpha=0.7, beta=0.3)      # code formula + actual entropy
         rms_score = float(np.clip((rms - 0.001) / (0.8 - 0.001), 0.0, 1.0))
-        q_paper = float(np.clip(1.0 - 0.7 * ent + 0.3 * rms_score, 0.0, 1.0))                 # 논문 식 (5)
+        q_paper = float(np.clip(1.0 - 0.7 * ent + 0.3 * rms_score, 0.0, 1.0))                 # paper Eq. (5)
         golden.append({"sample_id": sid, "wave": wave, "rms": rms, "entropy": ent,
                        "aqs_code_rms": q_code_rms, "aqs_code_entropy": q_code_entropy, "aqs_paper": q_paper})
         print(f"{sid:45s} rms {rms:.6f} ent {ent:.6f} aqs(rms,rms) {q_code_rms:.6f} aqs(ent,rms) {q_code_entropy:.6f} paper {q_paper:.6f}")
@@ -115,10 +115,10 @@ def dump_specaug(repo: pathlib.Path, out: pathlib.Path) -> None:
     torch.manual_seed(11)
     np.random.seed(11)
     random.seed(11)
-    x = torch.randn(4, 1, 798, 128)  # [B, 1, time, freq] — 원본 train 배치 (bs 8 대신 4)
+    x = torch.randn(4, 1, 798, 128)  # [B, 1, time, freq] — original train batch (4 instead of bs 8)
     torch.save(x.clone(), out / "specaug_input.pt")
     outs = []
-    for _ in range(6):  # 게이트(p ≥ randn) 통과/미통과가 섞이도록 여러 번
+    for _ in range(6):  # several calls so that the gate (p ≥ randn) both passes and fails
         outs.append(transforms(x.clone()).clone())
     torch.save({"outs": outs}, out / "specaug_golden.pt")
     applied = [not torch.equal(o, x) for o in outs]
@@ -133,7 +133,7 @@ def dump_loss(repo: pathlib.Path, out: pathlib.Path) -> None:
     clf = AngularClassifier(768, 4, s=37)
     dfam = AngularMarginLoss(768, 4, s=15, m=0.5, gamma=0.5, m_target=0.2, class_nums=CLASS_NUMS, easy_margin=False)
     det_fill(clf.weight)
-    # W_d 는 classifier 와 다른 값으로
+    # W_d gets values different from the classifier
     with torch.no_grad():
         dfam.weight.copy_(torch.linspace(0.5, -0.5, dfam.weight.numel()).reshape(dfam.weight.shape).roll(97, dims=1))
     feats = _anti_aligned(feats0, labels, dfam.weight)
@@ -213,7 +213,7 @@ def main():
     out.mkdir(parents=True, exist_ok=True)
     repo = pathlib.Path(args.repo).resolve()
     {"aqs": dump_aqs, "specaug": dump_specaug, "loss": dump_loss, "model": dump_model}[args.part](repo, out)
-    print("완료:", out)
+    print("done:", out)
 
 
 if __name__ == "__main__":

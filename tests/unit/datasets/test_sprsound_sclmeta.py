@@ -1,6 +1,6 @@
 """
-SPRSound(2022 inter-patient) 을 SCL-metadata 경로로 읽는 P0 테스트 — 공식 dataset.py SPRS 와 대조.
-골든: scripts/reproduction/dump_sclmeta_sprs_goldens.py (audio.pt 8 이벤트 파형, rows.json 8085 행 라벨·meta).
+Official-code parity test reading SPRSound (2022 inter-patient) through the SCL-metadata path, compared with SPRS in the official dataset.py.
+Goldens: scripts/reproduction/dump_sclmeta_sprs_goldens.py (audio.pt: 8 event waveforms; rows.json: labels and meta of 8085 rows).
 """
 import json
 import pathlib
@@ -16,13 +16,13 @@ def _repo_root() -> pathlib.Path:
     for c in pathlib.Path(__file__).resolve().parents:
         if (c / "pyproject.toml").exists():
             return c
-    raise RuntimeError("리포 루트를 찾지 못했다")
+    raise RuntimeError("repository root not found")
 
 
 REPO = _repo_root()
 GOLDEN = REPO / "tests" / "golden" / "sclmeta_sprs"
 DATA = REPO / ".datasets" / "sprsound"
-needs = pytest.mark.skipif(not ((GOLDEN / "audio.pt").exists() and (DATA / "index" / "index_cycle.csv").exists()), reason="골든/데이터 없음")
+needs = pytest.mark.skipif(not ((GOLDEN / "audio.pt").exists() and (DATA / "index" / "index_cycle.csv").exists()), reason="golden/data missing")
 
 SPRS_CLASS_DICT = {"Normal": 0, "Fine Crackle": 1, "Wheeze": 2, "Coarse Crackle": 3, "Wheeze+Crackle": 4, "Rhonchi": 5, "Stridor": 6}
 

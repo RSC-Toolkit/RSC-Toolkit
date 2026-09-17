@@ -1,16 +1,16 @@
 """
-RespireNet(EMBC 2021)의 CNN 모델 — 공식 코드 충실 이식 (P0).
+CNN model of RespireNet (EMBC 2021) — exact port of the official code.
 
-출처:
-- 논문: RespireNet: A Deep Neural Network for Accurately Detecting Abnormal Lung Sounds in
+Sources:
+- Paper: RespireNet: A Deep Neural Network for Accurately Detecting Abnormal Lung Sounds in
   Limited Data Setting (https://arxiv.org/abs/2011.00196)
-- 공식 코드: https://github.com/microsoft/RespireNet nets/network_cnn.py (MIT)
+- Official code: https://github.com/microsoft/RespireNet nets/network_cnn.py (MIT)
 
-구조 (원본 그대로): torchvision resnet34(ImageNet) 의 fc 를
-Dropout(0.5)-Linear(512,128)-ReLU-Dropout(0.5)-Linear(128,128)-ReLU 로 교체 + cls_fc Linear(128, n_cls).
-입력은 3채널 magma 컬러맵 스펙트로그램 이미지 (B, 3, 192, 753) (processors/respirenet_image.py).
-속성명 model_ft / cls_fc 를 유지해 저자 배포 models/ckpt_best.pkl 을 strict 로드한다.
-fine_tune(block_layer): 원본은 eval.py 에서만 호출(train.py 에서는 주석) — 재현 시 미사용.
+Architecture (same as the original code): the fc of torchvision resnet34 (ImageNet) is replaced by
+Dropout(0.5)-Linear(512,128)-ReLU-Dropout(0.5)-Linear(128,128)-ReLU + cls_fc Linear(128, n_cls).
+Input is a 3-channel magma-colormap spectrogram image (B, 3, 192, 753) (processors/respirenet_image.py).
+The attribute names model_ft / cls_fc are kept so the authors' released models/ckpt_best.pkl loads strictly.
+fine_tune(block_layer): the original calls it only in eval.py (commented out in train.py) — not used for reproduction.
 """
 from __future__ import annotations
 
@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 
 @ModelFactory.register_model_class("respirenet")
 class RespireNetCNN(BaseRSCModel, nn.Module):
-    accepts_meta = ("respirenet_chunk_index",)  # RespireNetDataModule 이 청크 인덱스를 붙인다 (모델은 무시)
+    accepts_meta = ("respirenet_chunk_index",)  # RespireNetDataModule attaches the chunk index (ignored by the model)
 
     def __init__(self, n_cls: int = 4, drop_prob: float = 0.5, imagenet_pretrain: bool = True):
         super().__init__()
@@ -45,7 +45,7 @@ class RespireNetCNN(BaseRSCModel, nn.Module):
         return self.cls_fc(self.model_ft(x))
 
     def fine_tune(self, block_layer: int = 5) -> None:
-        """원본 network_cnn.py:26-32 — children 0..block_layer 동결."""
+        """Original network_cnn.py:26-32 — freezes children 0..block_layer."""
         for idx, child in enumerate(self.model_ft.children()):
             if idx > block_layer:
                 break
@@ -57,7 +57,7 @@ class RespireNetCNN(BaseRSCModel, nn.Module):
         return logits, loss_func(logits, labels)
 
     def load_reference_checkpoint(self, path) -> None:
-        """저자 ckpt_best.pkl (model_ft.* / cls_fc.* 222 키) 를 strict 로드."""
+        """Strictly loads the authors' ckpt_best.pkl (model_ft.* / cls_fc.* 222 keys)."""
         state = torch.load(path, map_location="cpu", weights_only=True)
         self.load_state_dict(state, strict=True)
-        logger.info("RespireNet 저자 체크포인트 로드: %s", path)
+        logger.info("Loaded RespireNet authors' checkpoint: %s", path)

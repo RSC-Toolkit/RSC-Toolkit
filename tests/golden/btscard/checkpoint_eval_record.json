@@ -1,5 +1,5 @@
 {
- "checkpoint": "pretrained_models/upstream/btscard/best.pth (README Google Drive 1Pn6…; ckpt 내부 alpha=0.0, epoch=-1, best_acc=[87.27,41.80,64.54])",
+ "checkpoint": "pretrained_models/upstream/btscard/best.pth (README Google Drive 1Pn6…; inside ckpt alpha=0.0, epoch=-1, best_acc=[87.27,41.80,64.54])",
  "icbhi_test": "pretrained_models/upstream/bts/test.pt (2756 cycles)",
  "sprsound_ood": "pretrained_models/upstream/btscard/valid_spr.pt (1429 events, 4-class)",
  "date": "2026-08-27",
@@ -63,5 +63,5 @@
    61.96
   ]
  },
- "note": "ICBHI α=0 이 ckpt 의 best_acc 와 소수점까지 일치(저자 validate 재현). scripts/reproduction/eval_btscard_checkpoint.py --ckpt_format author --amp 로 재현. 논문 값은 5 runs 평균·α 스윕 최고값이라 단일 ckpt 는 근접 비교만."
+ "note": "ICBHI alpha=0 matches the ckpt best_acc to the decimal (reproduces the authors' validate). Reproduce with scripts/reproduction/eval_btscard_checkpoint.py --ckpt_format author --amp. The paper-reported value is a 5-run mean and the best of an alpha sweep, so a single ckpt allows only an approximate comparison."
 }

@@ -1,20 +1,20 @@
 """
-Domain Transfer(Wang & Wang, ICASSP 2022) 의 ICBHI 데이터 경로 — **논문 명세 재구현** (코드 없음, 등급 C).
+ICBHI data path for Domain Transfer (Wang & Wang, ICASSP 2022) -- **re-implementation from the paper description** (no code released, grade C).
 
-논문 §2.1 · §3.2 가 명시한 것:
-- 전 오디오를 **8 kHz 로 리샘플**, **약 8 초**로 길이 통일. 긴 것은 자르고 짧은 것은 채운다.
-- 채우는 방식은 zero padding 이 아니라 **circular padding** 이며 **test set 에도 적용**한다("This padding is
+Stated in the paper (Sec. 2.1, Sec. 3.2):
+- All audio is **resampled to 8 kHz** and unified to **about 8 s**. Longer clips are cropped, shorter ones padded.
+- Padding is **circular padding**, not zero padding, and is **applied to the test set too** ("This padding is
   applied to all audio, which means that the test set is also affected").
-- **Splicing**: 같은 클래스의 짧은 샘플들을 이어붙여 학습 샘플을 늘린다. "Each category is assigned the same
-  number of spliced samples" → 클래스마다 같은 개수를 만들어 불균형을 줄인다.
-- 전통 증강(학습만): 잡음 추가(백색 + 환경, SNR 1–10), time stretching, pitch shifting.
+- **Splicing**: short samples of the same class are concatenated to add training samples. "Each category is assigned the same
+  number of spliced samples" -> the same count per class, reducing imbalance.
+- Traditional augmentation (training only): added noise (white + environmental, SNR 1-10), time stretching, pitch shifting.
 
-가정(논문 미기재 — 전부 config 인자, AUTHOR_QUESTIONS 참조):
-- **환경잡음 미적용, 백색잡음만**(사용자 결정 2026-08-30 "가장 단순한 형태로"). 표에 병기한다.
-- **splice 개수**: "같은 개수" 라고만 하고 몇 개인지 없다 → `splice_per_class` 기본 500.
-- **splice 대상**: "shorter samples" 의 기준이 없다 → 목표 길이(8 s) 미만인 사이클로 해석.
-- **증강 적용 확률**: 미기재 → 각 파형 증강을 `aug_prob` (기본 0.5) 로 독립 적용.
-- time stretch 0.9–1.1 · pitch shift ±2 semitone (범위 미기재).
+Assumptions (not specified in the paper -- all exposed as config arguments):
+- **No environmental noise, white noise only** (simplest form).
+- **Number of splices**: the paper only says "the same number" -> `splice_per_class` default 500.
+- **Splice candidates**: no criterion for "shorter samples" -> interpreted as cycles shorter than the target length (8 s).
+- **Augmentation probability**: not specified -> each waveform augmentation is applied independently with `aug_prob` (default 0.5).
+- time stretch 0.9-1.1, pitch shift +/-2 semitones (ranges not specified).
 """
 from __future__ import annotations
 
@@ -42,10 +42,10 @@ logger = logging.getLogger(__name__)
 
 class DTIndexDataset(IndexDataset):
     """
-    IndexDataset + (8 kHz 사이클 → circular padding 8 s) + 학습 시 파형 증강 + splice 샘플.
+    IndexDataset + (8 kHz cycle -> circular padding to 8 s) + waveform augmentation during training + splice samples.
 
-    splice 샘플은 `extra` 목록으로 들고 있다가 `__getitem__` 이 원 데이터셋 뒤 인덱스로 돌려준다
-    (원본 인덱스 CSV 는 건드리지 않는다 — 원본 데이터 불변 원칙).
+    Splice samples are kept in the `extra` list and `__getitem__` returns them at indices after the base dataset
+    (the original index CSV is left untouched -- raw data stays immutable).
     """
 
     def __init__(self, *args, target_len: int = 64000, is_train: bool = False,
@@ -60,17 +60,17 @@ class DTIndexDataset(IndexDataset):
         self.snr_low, self.snr_high = float(snr_low), float(snr_high)
         self.stretch_range = tuple(stretch_range)
         self.pitch_semitones = float(pitch_semitones)
-        self.stretch_impl = str(stretch_impl)   # linear(기존) | phase_vocoder (2026-09-07 재실행 변형)
-        self.extra: List[Dict[str, Any]] = []   # splice 로 만든 추가 학습 샘플 (label, source row 목록)
+        self.stretch_impl = str(stretch_impl)   # linear (default) | phase_vocoder (variant)
+        self.extra: List[Dict[str, Any]] = []   # extra training samples built by splicing (label, list of source rows)
 
-    # ------------------------------------------------------------ 원 사이클 로드
+    # ------------------------------------------------------------ load a base cycle
     def _load_cycle(self, row) -> torch.Tensor:
         wav_path = self._resolve_recording_path(str(row["recording_path"]))
         wav = load_audio(wav_path, target_sampling_rate=self.sampling_rate, fade=self.fade)
         return slice_audio(wav, t0=float(row["t0"]), t1=float(row["t1"]), sampling_rate=self.sampling_rate)
 
     def _augment(self, audio: torch.Tensor) -> torch.Tensor:
-        """학습 시 파형 증강 — 논문 §2.1 의 traditional augmentation (환경잡음은 미적용)."""
+        """Waveform augmentation during training -- the paper's traditional augmentation (Sec. 2.1), without environmental noise."""
         if self.use_stretch and random.random() < self.aug_prob:
             audio = time_stretch(audio, random.uniform(*self.stretch_range), impl=self.stretch_impl)
         if self.use_pitch and random.random() < self.aug_prob:
@@ -79,9 +79,9 @@ class DTIndexDataset(IndexDataset):
             audio = add_white_noise(audio, sample_snr_db(self.snr_low, self.snr_high))
         return audio
 
-    # ------------------------------------------------------------ splice 준비
+    # ------------------------------------------------------------ splice preparation
     def build_splices(self, per_class: int, seed: int = 0) -> None:
-        """클래스마다 `per_class` 개의 splice 샘플을 만든다(짧은 사이클만 이어붙임)."""
+        """Build `per_class` splice samples per class (concatenating short cycles only)."""
         rng = random.Random(seed)
         target_sec = self.target_len / self.sampling_rate
         short_by_class: Dict[int, List[int]] = {}
@@ -96,9 +96,9 @@ class DTIndexDataset(IndexDataset):
             if not idxs:
                 continue
             for _ in range(per_class):
-                k = rng.randint(2, 4)  # 몇 개를 이어붙일지 (미기재 → 2–4 가정)
+                k = rng.randint(2, 4)  # number of cycles to concatenate (not specified -> 2-4 assumed)
                 self.extra.append({"label": lab, "rows": [rng.choice(idxs) for _ in range(k)]})
-        logger.info("splice 샘플 생성: 클래스당 %d개, 총 %d개 (원 %d개에 추가)", per_class, len(self.extra), len(self.df))
+        logger.info("Built splice samples: %d per class, %d total (added to %d base samples)", per_class, len(self.extra), len(self.df))
 
     def __len__(self) -> int:
         return len(self.df) + len(self.extra)
@@ -110,7 +110,7 @@ class DTIndexDataset(IndexDataset):
             audio = self._load_cycle(row)
             if self.is_train:
                 audio = self._augment(audio)
-            audio = circular_pad(audio, self.target_len)   # test 에도 동일 적용(논문 명시)
+            audio = circular_pad(audio, self.target_len)   # applied to test as well (stated in the paper)
             label = row["label"]
             return {
                 "audio": audio,
@@ -121,7 +121,7 @@ class DTIndexDataset(IndexDataset):
                 "t0": float(row["t0"]),
                 "t1": float(row["t1"]),
             }
-        # splice 샘플
+        # splice sample
         item = self.extra[idx - n]
         clips = []
         for r in item["rows"]:
@@ -135,7 +135,7 @@ class DTIndexDataset(IndexDataset):
 
 
 class DomainTransferDataModule(IndexDataModule):
-    """IndexDataModule + DT 데이터셋 교체 + splice 생성 + balanced class weight."""
+    """IndexDataModule + DT dataset replacement + splice generation + balanced class weight."""
 
     def __init__(self, *args, target_len: int = 64000, splice_per_class: int = 500,
                  aug_prob: float = 0.5, use_noise: bool = True, use_stretch: bool = True,
@@ -146,9 +146,9 @@ class DomainTransferDataModule(IndexDataModule):
                                stretch_impl=stretch_impl)
         self.train_class_weight: Optional[list] = None
         super().__init__(*args, **kwargs)
-        # P2-8: 예전엔 super().setup() 뒤 `DTIndexDataset.__new__` + `__dict__.update` 로 바꿔치기했다. 이제 생성 시점에
-        # DTIndexDataset 을 쓰고 전용 인자는 `_index_dataset_kwargs` 훅으로, splice 는 학습용 데이터셋 생성 직후에 만든다.
-        # (snr 1–10 dB · stretch 0.9–1.1 · pitch ±2 반음은 DTIndexDataset 기본값 — 바꿔치기가 넣던 값과 같다.)
+        # DTIndexDataset is used at construction time: its specific arguments go through the `_index_dataset_kwargs` hook,
+        # and splices are built right after the training dataset is created.
+        # (snr 1-10 dB, stretch 0.9-1.1 and pitch +/-2 semitones are DTIndexDataset defaults.)
         if not (isinstance(self.index_dataset_cls, type) and issubclass(self.index_dataset_cls, DTIndexDataset)):
             self.index_dataset_cls = DTIndexDataset
 
@@ -168,7 +168,7 @@ class DomainTransferDataModule(IndexDataModule):
         self._compute_class_weight()
 
     def _compute_class_weight(self) -> None:
-        """논문 §2.1 '소수 클래스 가중치 ↑' — sklearn balanced (splice 포함 후 분포 기준)."""
+        """Paper Sec. 2.1 'higher weight for minority classes' -- sklearn balanced (distribution after adding splices)."""
         ds = getattr(self, "train_ds", None)
         base = getattr(ds, "index_ds", ds)
         if base is None:
@@ -179,4 +179,4 @@ class DomainTransferDataModule(IndexDataModule):
         y = np.asarray(y)
         classes = np.sort(np.unique(y))
         self.train_class_weight = compute_class_weight(class_weight="balanced", classes=classes, y=y).tolist()
-        logger.info("Domain Transfer class weight(splice 포함): %s", [round(w, 4) for w in self.train_class_weight])
+        logger.info("Domain Transfer class weight (splices included): %s", [round(w, 4) for w in self.train_class_weight])

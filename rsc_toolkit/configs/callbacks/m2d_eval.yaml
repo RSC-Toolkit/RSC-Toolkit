@@ -1,5 +1,5 @@
 # @package _global_
-# M2D 미세조정 평가 프로토콜: 매 epoch test Score 최고 (strict >, Se 게이트 없음), 재개 지원
+# M2D fine-tuning evaluation protocol: best test Score every epoch (strict >, no Se gate), resumable
 trainer:
   params:
     callbacks:

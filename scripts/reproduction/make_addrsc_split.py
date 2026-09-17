@@ -1,8 +1,8 @@
 """
-ADD-RSC 코드 스플릿 재구성 — util/icbhi_dataset.py:35-45:
+Reconstructs the ADD-RSC code split — util/icbhi_dataset.py:35-45:
   filenames = sorted({stem of *.wav/*.txt in data_folder}); indices = range(920); random.Random(1).shuffle(indices);
-  train = 앞 int(920*0.6)=552 파일, test = 나머지 368 (파일 단위, 환자·공식 스플릿 무관).
-데이터 폴더에 녹음(920 wav+txt)만 있다는 전제(그 외 txt 가 있으면 원본은 wav 로드에서 죽는다). 툴킷 인덱스의 recording_path stem 으로 같은 집합을 만든다.
+  train = first int(920*0.6)=552 files, test = remaining 368 (file-level, independent of patients and the official split).
+Assumes the data folder contains only recordings (920 wav+txt) (with any other txt the original code fails when loading the wav). The same set is built from the recording_path stems of the toolkit index.
 
   .venv/bin/python scripts/reproduction/make_addrsc_split.py [--index .datasets/icbhi/index/index_cycle.csv] [--out rsc_toolkit/datasets/icbhi/data/addrsc_random1_split.txt]
 """
@@ -26,7 +26,7 @@ def main():
     train_size = int(len(indices) * 0.6)
     train = {filenames[i] for i in indices[:train_size]}
     out = pathlib.Path(args.out)
-    lines = ["# ADD-RSC util/icbhi_dataset.py 코드 스플릿: sorted stems → random.Random(1).shuffle → 앞 60% train (파일 단위). scripts/reproduction/make_addrsc_split.py"]
+    lines = ["# ADD-RSC util/icbhi_dataset.py code split: sorted stems -> random.Random(1).shuffle -> first 60% train (file level). scripts/reproduction/make_addrsc_split.py"]
     lines += [f"{f}\t{'train' if f in train else 'test'}" for f in filenames]
     out.write_text("\n".join(lines) + "\n")
     n_cycles = df["recording_path"].map(lambda p: pathlib.Path(p).stem in train).sum()

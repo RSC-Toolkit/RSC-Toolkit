@@ -20,8 +20,8 @@ class SimpleTestProcessor(BaseAudioProcessor):
     """Simple processor for testing - computes mean features"""
 
     def __init__(self, feature_dim: int = 128, **kwargs):
-        # BaseAudioProcessor 는 pydantic 모델이 아니라 평범한 ABC 다.
-        # 클래스 어노테이션만 적어두면 생성자 인자로 받아지지 않는다.
+        # BaseAudioProcessor is a plain ABC, not a pydantic model.
+        # Class annotations alone are not accepted as constructor arguments.
         super().__init__(**kwargs)
         self.feature_dim = feature_dim
 
@@ -50,24 +50,23 @@ class SimpleTestProcessor(BaseAudioProcessor):
 
 
 def _repo_root() -> pathlib.Path:
-    """pyproject.toml 이 있는 디렉토리를 리포 루트로 본다."""
+    """The directory containing pyproject.toml is taken as the repository root."""
     for candidate in pathlib.Path(__file__).resolve().parents:
         if (candidate / "pyproject.toml").exists():
             return candidate
-    raise RuntimeError("리포 루트를 찾지 못했다 (pyproject.toml 없음)")
+    raise RuntimeError("repository root not found (no pyproject.toml)")
 
 
 @pytest.fixture
 def toy_dataset_path():
     """
-    번들된 toy 데이터셋 경로.
+    Path of the bundled toy dataset.
 
-    이전에는 parent 를 한 번 덜 올라가 tests/sample_data/... 를 찾았고,
-    없으니 pytest.skip 으로 빠져 3건이 조용히 넘어갔다. 데이터는 리포에
-    항상 들어 있으므로 없으면 skip 이 아니라 실패로 다뤄야 한다.
+    The data is always bundled in the repository, so a missing dataset
+    is treated as a failure rather than a skip.
     """
     toy_path = _repo_root() / "sample_data" / "toy_dataset" / "files"
-    assert toy_path.exists(), f"번들된 toy 데이터셋이 없다: {toy_path}"
+    assert toy_path.exists(), f"bundled toy dataset missing: {toy_path}"
     return toy_path
 
 
@@ -94,8 +93,8 @@ def test_toy_dataset_preprocessing(tmp_path, toy_dataset_path):
         processor=processor
     )
     
-    # process_dataset() 은 인덱스만 만들고 피처 전처리는 하지 않는다.
-    # 전처리는 preprocess_all_features() 가 담당하므로 직접 부른다.
+    # process_dataset() only builds the index and does not preprocess features.
+    # Feature preprocessing is done by preprocess_all_features(), so call it directly.
     dataset.process()
     processor.preprocess_all_features(processor._discover_recordings())
     
@@ -112,7 +111,7 @@ def test_toy_dataset_preprocessing(tmp_path, toy_dataset_path):
     # Verify cache directory structure
     cache_features_dir = pathlib.Path(cache_stats["cache_dir"])
     assert cache_features_dir.exists()
-    # FeatureCache 는 metadata 파일을 두지 않고 디렉토리를 스캔한다.
+    # FeatureCache keeps no metadata file and scans the directory.
     assert list(cache_features_dir.glob("*.pt"))
 
 

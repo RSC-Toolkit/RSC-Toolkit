@@ -1,6 +1,6 @@
-# SG-SCL 저장소의 비-AST 백본(ResNet18/34·EfficientNet-B0·CNN6) SFT 기준선을 SPRSound 표준 태스크(7-class)로 확장.
-# **논문 목표치 없음** — ICBHI 레시피(16 kHz·8 s repeat_fade·bs64·per-sample 정규화·400 epoch) 그대로 옮긴 관찰.
-# 캐시는 per_sample_stats=true 라 프로세서 키가 달라 patchmix 계열과 겹치지 않는다.
+# SFT baselines with the non-AST backbones (ResNet18/34 · EfficientNet-B0 · CNN6) of the SG-SCL repository, extended to the standard SPRSound task (7-class).
+# **No paper-reported value** — the ICBHI recipe (16 kHz · 8 s repeat_fade · bs 64 · per-sample normalization · 400 epochs) carried over unchanged.
+# With per_sample_stats=true the processor key differs, so the cache does not overlap with the patchmix family.
 name: sprsound_sgscl_nonast
 params:
   datamodule_name: index

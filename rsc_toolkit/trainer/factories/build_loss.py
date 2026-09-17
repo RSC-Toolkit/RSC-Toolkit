@@ -10,6 +10,6 @@ def build_loss(cfg: Dict[str, Any]) -> nn.Module:
     cfg example:
       {"name": "cross_entropy", "params": {"label_smoothing": 0.0}}
 
-    미지 name 은 가용 목록을 붙인 KeyError. params 는 복사해서 넘기므로 cfg 는 변하지 않는다.
+    An unknown name raises KeyError listing the available names. params is copied before use, so cfg is not modified.
     """
     return LOSSES.build(cfg)

@@ -1,10 +1,11 @@
 """
-CrossScan / CrossMerge — VMamba 의 4 방향 스캔 (csms6s.py:4-45 의 순수 torch 버전 그대로).
+CrossScan / CrossMerge — VMamba 4-direction scan (verbatim pure-torch version of csms6s.py:4-45).
 
-원본 v05 forward 는 triton 커널(csm_triton.CrossScanTriton/CrossMergeTriton)을 쓰지만 결과 배치는 아래 torch 버전과
-동일하다 (같은 파일의 torch 대체물; GPU 골든에서 triton 경로 출력과 대조). 툴킷은 torch 버전만 둔다.
+The original v05 forward uses triton kernels (csm_triton.CrossScanTriton/CrossMergeTriton), but the output layout is
+identical to the torch version below (the torch fallback from the same file; compared against the triton path on GPU goldens).
+The toolkit keeps only the torch version.
 
-  xs[:,0] = x 를 행 우선(H,W→L) 으로, xs[:,1] = 전치(W,H) 순, xs[:,2:4] = 앞 둘의 뒤집기.
+  xs[:,0] = x in row-major order (H,W→L), xs[:,1] = transposed (W,H) order, xs[:,2:4] = flips of the first two.
 """
 import torch
 

@@ -1,16 +1,16 @@
-# QLung 을 **SPRSound 표준 태스크(2022 inter-patient, 7-class)로 직접 학습**할 때 쓰는 데이터 설정 (SPR→SPR).
+# Data config for **training QLung directly on the standard SPRSound task (2022 inter-patient, 7-class)** (SPR→SPR).
 #
-# 기존 sprsound_qlung_ood.yaml 과의 차이 — 그쪽은 ICBHI 로 학습한 ckpt 를 SPRSound 에 제로샷으로 얹는
-# **평가 전용 뷰**라 label_map(7→4 병합, Rhonchi·Stridor 제외)을 걸고 train 셔플도 끄지만, 이 config 는 SPRSound 로 **학습**하므로
-#   · label_map 없음 → 7-class 원 라벨 그대로 (SPRSound 를 주 태스크로 쓴 논문들의 공식 정의)
-#   · shuffle_train/drop_last_train 켜짐 (ICBHI QLung 의 train loader 와 동일)
+# Difference from sprsound_qlung_ood.yaml — that one is an **evaluation-only view** that applies an ICBHI-trained ckpt to SPRSound zero-shot,
+# so it sets label_map (7→4 merge, Rhonchi·Stridor excluded) and disables train shuffling; this config **trains** on SPRSound, so
+#   · no label_map → original 7-class labels (the official definition used by papers with SPRSound as the main task)
+#   · shuffle_train/drop_last_train on (same as the ICBHI QLung train loader)
 #
-# 레시피 원칙(2026-08-30 사용자 결정): 각 논문이 ICBHI 에서 쓴 레시피를 그대로 옮긴다.
-# 따라서 오디오·특징 체인은 icbhi_qlung.yaml 과 동일하다 — 16 kHz, 8 s, repeat_fade, fbank 128×798, AQS 부착.
+# Recipe principle: carry over the recipe each paper used on ICBHI unchanged.
+# Hence the audio/feature chain is identical to icbhi_qlung.yaml — 16 kHz, 8 s, repeat_fade, fbank 128×798, AQS attached.
 #
-# time_unit: SPRSound 인덱스의 t0/t1 은 ms 정밀도(소수 3자리)라 's' 와 'ms_int' 가 같은 샘플 오프셋을 낸다
-#   ('s' → int(t*sr), 'ms_int' → int(round(t*1000))*int(sr/1000); t=1.079·sr=16000 이면 둘 다 17264).
-#   QLung 자신의 ICBHI 체인이 's'(기본)이므로 그대로 두어 OOD 뷰와도 동일한 파형을 쓴다.
+# time_unit: t0/t1 in the SPRSound index have ms precision (3 decimals), so 's' and 'ms_int' give the same sample offsets
+#   ('s' → int(t*sr), 'ms_int' → int(round(t*1000))*int(sr/1000); for t=1.079·sr=16000 both give 17264).
+#   QLung's own ICBHI chain uses 's' (default), so it is kept, which also yields the same waveforms as the OOD view.
 name: sprsound_qlung
 params:
   datamodule_name: qlung
@@ -19,33 +19,33 @@ params:
   index_dataset_cls: rsc_toolkit.datasets.qlung_data.QLungAQSIndexDataset
   project_root: ${hydra:runtime.cwd}
   data_dir: .datasets/sprsound
-  raw_data_subdir: Classification   # recording_path 는 Classification/ 기준 상대경로
+  raw_data_subdir: Classification   # recording_path is relative to Classification/
   index_filename: index_cycle.csv
-  # label_map 없음 — 7-class 원 라벨 (OOD 뷰의 sprsound_7to4 와 다른 지점)
+  # no label_map — original 7-class labels (the point where this differs from sprsound_7to4 in the OOD view)
 
   sampling_rate: 16000
   sample_level: cycle
   desired_length_sec: 8.0
-  pad_type: repeat_fade          # ICBHI QLung 과 동일 (녹음 fade in/out + 8 s repeat + fade_out)
+  pad_type: repeat_fade          # same as ICBHI QLung (recording fade in/out + 8 s repeat + fade_out)
   fade: true
-  resample_after_slice: false    # 녹음 전체를 16 kHz 로 리샘플한 뒤 구간 절단 (ICBHI 체인)
+  resample_after_slice: false    # resample the whole recording to 16 kHz, then slice segments (ICBHI chain)
   time_unit: s
 
   train_splits: [train]
-  val_splits: [test]             # 논문 프로토콜: 매 epoch test 평가 (best-on-test) — 다른 30행과 동일
+  val_splits: [test]             # paper protocol: test evaluation every epoch (best-on-test) — same as the other rows
   test_splits: [test]
 
   batch_size: 8
   num_workers: 8
   shuffle_train: true
-  drop_last_train: true          # 원본 train loader drop_last=True
+  drop_last_train: true          # official train loader uses drop_last=True
   pin_memory: true
 
   features:
     enabled: true
     kind: fbank
-    # OOD 뷰와 파형 체인은 같지만 캐시는 나눈다 — 캐시 키에 오디오 체인이 안 들어가므로
-    # 이름으로 용도를 분리해 두는 편이 사고를 막는다(피처 캐시 충돌은 실제로 한 번 났다).
+    # same waveform chain as the OOD view, but a separate cache — the audio chain is not part of the cache key,
+    # so separating caches by name according to purpose prevents feature-cache collisions.
     cache_dir: downloaded_datasets/features_cache_qlung_sprs
     n_mels: 128
     target_frames: 798
@@ -59,14 +59,14 @@ params:
   feature_precompute_num_workers: 0
 
   specaugment:
-    enabled: false               # 모델(ast_qlung)이 배치 단위로 적용한다
+    enabled: false               # applied per batch by the model (ast_qlung)
 
   qlung:
     alpha: 0.7                   # --quality_alpha
     beta: 0.3                    # --quality_beta
-    entropy_source: rms          # 주 결과 = 코드 그대로(icbhi_dataset.py:177 의 rms 중복 전달 버그 포함)
+    entropy_source: rms          # main result = code as is (including the bug in icbhi_dataset.py:177 that passes rms twice)
     formula: code
-    cache_dir: downloaded_datasets/aqs_cache_sprs   # AQS 는 파형에서 계산 — 데이터셋별로 분리
+    cache_dir: downloaded_datasets/aqs_cache_sprs   # AQS is computed from the waveform — separate per dataset
     precompute: true
     precompute_num_workers: 8
-    attach_val: true             # 검증 배치에도 AQS 부착 (ICBHI 와 동일)
+    attach_val: true             # attach AQS to validation batches too (same as ICBHI)

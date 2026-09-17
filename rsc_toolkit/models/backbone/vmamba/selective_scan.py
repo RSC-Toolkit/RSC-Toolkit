@@ -1,18 +1,18 @@
 """
-Selective scan (Mamba S6 recurrence) — VMamba/DASS `csms6s.py` 의 SelectiveScanOflex 와 같은 인터페이스.
+Selective scan (Mamba S6 recurrence) — same interface as SelectiveScanOflex in VMamba/DASS `csms6s.py`.
 
-두 경로:
-- ``torch``: 순수 torch 참조 구현(느리지만 정확; CPU/GPU 모두). Hillis-Steele 병렬 스캔으로 L 방향 순환
-  h_l = exp(Δ_l·A)·h_{l-1} + Δ_l·B_l·u_l 을 계산하고 y_l = C_l·h_l + D·u_l. 수식은 mamba 의 selective_scan_ref
-  (DASS kernels/selective_scan/test_selective_scan.py:168-236) 와 동일하며, fp32 로 계산해 fp32 를 돌려준다
-  (oflex 커널의 `oflex=True` 출력 dtype 과 동일).
-- ``cuda_oflex``: DASS/VMamba 의 CUDA 확장 ``selective_scan_cuda_oflex`` (선택 의존성; kernels/selective_scan 빌드,
-  README §커널 빌드 참고). import 되고 입력이 CUDA 면 기본으로 이 경로를 쓴다.
+Two paths:
+- ``torch``: pure-torch reference implementation (slow but exact; CPU and GPU). Computes the recurrence along L,
+  h_l = exp(Δ_l·A)·h_{l-1} + Δ_l·B_l·u_l, with a Hillis-Steele parallel scan, and y_l = C_l·h_l + D·u_l. The math is identical to mamba's
+  selective_scan_ref (DASS kernels/selective_scan/test_selective_scan.py:168-236); it computes in fp32 and returns fp32
+  (same output dtype as the oflex kernel with `oflex=True`).
+- ``cuda_oflex``: the DASS/VMamba CUDA extension ``selective_scan_cuda_oflex`` (optional dependency; build kernels/selective_scan
+  following the DASS README). Used by default when it can be imported and the input is on CUDA.
 
-선택: ``backend='auto'`` (기본) → 커널 import 가능·CUDA 텐서면 커널, 아니면 torch. 환경변수 RSC_SELECTIVE_SCAN=torch 로 강제 폴백.
-두 경로의 수치 일치는 tests/unit/models/test_dass_lungsrad.py 에서 검사한다.
+Selection: ``backend='auto'`` (default) → kernel if importable and the tensor is on CUDA, otherwise torch. Set the environment variable
+RSC_SELECTIVE_SCAN=torch to force the fallback. Numerical agreement of the two paths is checked in tests/unit/models/test_dass_lungsrad.py.
 
-텐서 규약 (csms6s.forward_corev2 호출부 그대로):
+Tensor conventions (as at the csms6s.forward_corev2 call site):
   u, delta: (B, K·D, L)   A: (K·D, N)   Bs, Cs: (B, K, N, L)   Ds, delta_bias: (K·D,)
 """
 from __future__ import annotations
@@ -24,9 +24,9 @@ import torch
 import torch.nn.functional as F
 import torch.utils.checkpoint as _ckpt
 
-try:  # 선택 의존성 — 없으면 순수 torch 폴백
+try:  # optional dependency — falls back to pure torch when absent
     import selective_scan_cuda_oflex as _ss_oflex  # type: ignore
-except Exception:  # pragma: no cover - 커널이 없을 때
+except Exception:  # pragma: no cover - when the kernel is unavailable
     _ss_oflex = None
 
 
@@ -35,7 +35,7 @@ def cuda_kernel_available() -> bool:
 
 
 def _parallel_scan(a: torch.Tensor, b: torch.Tensor) -> torch.Tensor:
-    """h_l = a_l·h_{l-1} + b_l (h_{-1}=0), 스캔 축 = dim 2. a, b: (B, D, L, N). Hillis-Steele, ⌈log2 L⌉ 단계."""
+    """h_l = a_l·h_{l-1} + b_l (h_{-1}=0), scan axis = dim 2. a, b: (B, D, L, N). Hillis-Steele, ⌈log2 L⌉ steps."""
     L = a.shape[2]
     s = 1
     while s < L:
@@ -57,7 +57,7 @@ def _selective_scan_torch_impl(u, delta, A, Bs, Cs, Ds, delta_bias, delta_softpl
     K = Bs.shape[1]
     d = KD // K
     A = A.float()
-    # 그룹 B/C (B,K,N,L) → 채널로 확장 (B,K·D,N,L) : 그룹 k 가 d 개 채널을 담당 (csms6s.selective_scan_ref 의 with_Group)
+    # expand group B/C (B,K,N,L) to channels (B,K·D,N,L): group k covers d channels (with_Group in csms6s.selective_scan_ref)
     Bx = Bs.float().unsqueeze(2).expand(Bsz, K, d, N, L).reshape(Bsz, KD, N, L)
     Cx = Cs.float().unsqueeze(2).expand(Bsz, K, d, N, L).reshape(Bsz, KD, N, L)
     deltaA = torch.exp(delta.unsqueeze(-1) * A[None, :, None, :])              # (B, KD, L, N)
@@ -71,7 +71,7 @@ def _selective_scan_torch_impl(u, delta, A, Bs, Cs, Ds, delta_bias, delta_softpl
 
 def selective_scan_torch(u, delta, A, Bs, Cs, Ds=None, delta_bias=None, delta_softplus=True,
                          oflex: bool = True, use_checkpoint: Optional[bool] = None) -> torch.Tensor:
-    """순수 torch 경로. oflex=True 면 fp32 출력, 아니면 입력 dtype. 학습 중(grad 필요) 기본으로 activation checkpoint."""
+    """Pure-torch path. oflex=True gives fp32 output, otherwise the input dtype. Uses activation checkpointing by default during training (when grad is required)."""
     if use_checkpoint is None:
         use_checkpoint = torch.is_grad_enabled() and (u.requires_grad or delta.requires_grad)
     args = (u, delta, A, Bs, Cs, Ds, delta_bias, delta_softplus)
@@ -83,7 +83,7 @@ def selective_scan_torch(u, delta, A, Bs, Cs, Ds=None, delta_bias=None, delta_so
 
 
 class SelectiveScanOflex(torch.autograd.Function):
-    """csms6s.SelectiveScanOflex 그대로 (CUDA 확장 selective_scan_cuda_oflex)."""
+    """csms6s.SelectiveScanOflex as-is (CUDA extension selective_scan_cuda_oflex)."""
 
     @staticmethod
     @torch.amp.custom_fwd(device_type="cuda")
@@ -106,7 +106,7 @@ class SelectiveScanOflex(torch.autograd.Function):
 
 
 def resolve_backend(backend: str, device: torch.device) -> str:
-    """'auto' | 'torch' | 'cuda_oflex' → 실제 경로 이름."""
+    """'auto' | 'torch' | 'cuda_oflex' → actual path name."""
     env = os.environ.get("RSC_SELECTIVE_SCAN", "").strip().lower()
     if env in {"torch", "cuda_oflex"}:
         backend = env
@@ -114,9 +114,10 @@ def resolve_backend(backend: str, device: torch.device) -> str:
         return "cuda_oflex" if (_ss_oflex is not None and device.type == "cuda") else "torch"
     if backend == "cuda_oflex":
         if _ss_oflex is None:
-            raise RuntimeError("selective_scan_cuda_oflex 커널이 import 되지 않는다 (kernels/selective_scan 빌드 필요)")
+            raise RuntimeError("selective_scan_cuda_oflex kernel cannot be imported (build kernels/selective_scan)")
         if device.type != "cuda":
-            raise RuntimeError("cuda_oflex 경로는 CUDA 텐서에서만 쓸 수 있다")
+            raise RuntimeError("the cuda_oflex path is only available for CUDA tensors")
+
         return "cuda_oflex"
     if backend == "torch":
         return "torch"

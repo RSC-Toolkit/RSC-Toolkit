@@ -79,8 +79,8 @@ def test_sprsound_processor_builds_indices(tmp_path: pathlib.Path):
 @pytest.mark.parametrize(
     "value, expected",
     [
-        # SPRSound 실제 파일명: <환자번호>_<나이>_<성별>_<위치>_<녹음번호>.
-        # 나이가 소수라 이름 중간에 점이 있다. 이걸 확장자로 오인해 자르면 안 된다.
+        # Real SPRSound file name: <patient id>_<age>_<sex>_<location>_<recording id>.
+        # Age is a decimal, so a dot appears mid-name. It must not be mistaken for an extension and stripped.
         ("40138127_14.7_0_p3_139", "40138127_14.7_0_p3_139"),
         ("40138127_14.7_0_p3_139.wav", "40138127_14.7_0_p3_139"),
         ("40138127_14.7_0_p3_139.json", "40138127_14.7_0_p3_139"),
@@ -95,10 +95,10 @@ def test_normalize_recording_id_keeps_dots_inside_name(value, expected):
 
 def test_processor_resolves_filenames_with_decimal_age(tmp_path: pathlib.Path):
     """
-    나이에 소수점이 든 실제 형식의 파일명으로 인덱스가 채워지는지 확인한다.
+    Checks that the index is populated from file names in the real format, whose age contains a decimal point.
 
-    이 결함이 있을 때는 metadata 전 행이 'Skipping missing audio file' 로 빠져
-    인덱스가 헤더만 남은 채 build-index 가 성공(exit 0)했다.
+    With this defect, every metadata row was dropped as 'Skipping missing audio file'
+    and build-index succeeded (exit 0) with an index holding only the header.
     """
     data_root = tmp_path / "raw"
     class_root = data_root / "Classification"

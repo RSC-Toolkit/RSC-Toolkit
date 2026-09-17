@@ -1,6 +1,6 @@
-# Domain Transfer 를 SPRSound 표준 태스크(7-class)로 확장. **논문 목표치 없음** — ICBHI 레시피 그대로.
-# 8 kHz → 이벤트 분할 → circular padding 8 s(test 포함) + 학습만 클래스별 splice·파형 증강 3종.
-# class weight 는 DomainTransferDataModule 이 SPRSound train 분포(splice 포함)로 자동 계산한다.
+# Domain Transfer extended to the standard SPRSound task (7-class). **No paper-reported value** — ICBHI recipe unchanged.
+# 8 kHz → event segmentation → circular padding to 8 s (including test) + per-class splice · 3 waveform augmentations for training only.
+# DomainTransferDataModule computes the class weights automatically from the SPRSound train distribution (including splices).
 name: sprsound_domaintransfer
 params:
   datamodule_name: domaintransfer

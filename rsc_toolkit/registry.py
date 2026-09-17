@@ -1,20 +1,20 @@
-"""공용 컴포넌트 등록소(Registry).
+"""Shared component registry.
 
-ModelFactory 가 검증해 온 세 가지 등록 경로 — 패키지 스캔 · 엔트리포인트 · `RSC_TOOLKIT_PLUGINS`
-환경변수 — 를 모델뿐 아니라 datamodule/loss/metric/optimizer/adapter/processor 등 모든 컴포넌트
-종류에 같은 방식으로 적용한다. (2026-09-01 심층 리뷰의 통합 설계 §3-1, 리팩토링 P1 1단계.)
+Applies the three registration paths that ModelFactory established — package scan, entry points, and the
+`RSC_TOOLKIT_PLUGINS` environment variable — uniformly to every component kind, not only models:
+datamodule/loss/metric/optimizer/adapter/processor, etc.
 
-원칙
-- 등록은 데코레이터(`@REG.register("name")`), 내장 항목은 `REG.register_lazy("name", "pkg.mod:Attr")`
-  로 **선언만** 하고 import 는 첫 조회 때 한다. 한 항목의 선택 의존성이 빠져도 그 항목만 실패한다.
-- 같은 이름에 다른 객체를 다시 등록하면 ValueError. 같은 객체(모듈 재로드 등)는 멱등.
-- 미지 이름은 가용 목록을 붙인 KeyError. `build(cfg)` 는 `{"name": ..., "params": {...}}` 규약의
-  단일 구현이고 cfg 를 파괴하지 않는다.
-- `Mapping` 을 구현하므로 기존 dict 소비 코드(`name in REG`, `REG[name]`, `sorted(REG)`,
-  argparse `choices=REG.keys()`)가 무수정으로 동작한다. 테스트가 쓰는 `pop` 도 지원한다.
+Principles
+- Registration uses a decorator (`@REG.register("name")`); built-in entries are only **declared** with
+  `REG.register_lazy("name", "pkg.mod:Attr")` and imported on first lookup. If one entry's optional dependency is missing, only that entry fails.
+- Registering a different object under an existing name raises ValueError. Re-registering the same object (module reload, etc.) is idempotent.
+- Unknown names raise a KeyError listing the available names. `build(cfg)` is the single implementation of the
+  `{"name": ..., "params": {...}}` convention and does not mutate cfg.
+- Implements `Mapping`, so existing dict-consuming code (`name in REG`, `REG[name]`, `sorted(REG)`,
+  argparse `choices=REG.keys()`) works unchanged. `pop`, used by tests, is supported too.
 
-플러그인은 엔트리포인트 그룹 `rsc_toolkit.plugins` 하나로 통일한다. 기존 모델 전용 그룹
-`rsc_toolkit.models` 는 하위호환으로 계속 읽는다.
+Plugins use a single entry-point group, `rsc_toolkit.plugins`. The older model-only group
+`rsc_toolkit.models` is still read for backward compatibility.
 """
 from __future__ import annotations
 
@@ -27,11 +27,11 @@ from typing import Any, Callable, Dict, Iterator, Mapping, Optional, Sequence
 
 logger = logging.getLogger(__name__)
 
-# 패키징 없이 로컬 모듈을 붙일 때 쓰는 환경변수 (쉼표 구분). models/factory.py 와 같은 값.
+# Environment variable for attaching local modules without packaging (comma-separated). Same value as in models/factory.py.
 PLUGIN_ENV_VAR = "RSC_TOOLKIT_PLUGINS"
-# 모든 종류의 컴포넌트를 등록하는 통합 엔트리포인트 그룹.
+# Unified entry-point group that registers components of every kind.
 PLUGIN_ENTRY_POINT_GROUP = "rsc_toolkit.plugins"
-# 하위호환: 예전 모델 전용 그룹. 값은 import 하면 데코레이터가 실행되는 모듈이다.
+# Backward compatibility: the older model-only group. Values are modules whose import runs the decorators.
 LEGACY_ENTRY_POINT_GROUPS = ("rsc_toolkit.models",)
 
 _PLUGINS_LOADED = False
@@ -39,10 +39,10 @@ _MISSING = object()
 
 
 def load_plugins(*, force: bool = False) -> None:
-    """엔트리포인트·환경변수 플러그인 모듈을 import 한다. 기본은 프로세스당 1회.
+    """Import plugin modules from entry points and the environment variable. By default once per process.
 
-    한 플러그인이 실패해도 나머지는 살린다 (ModelFactory._register_plugins 의 원칙 유지).
-    `force=True` 면 이미 로드했어도 다시 훑는다 — 테스트가 환경변수를 바꾼 뒤 재등록할 때 쓴다.
+    A failing plugin does not affect the others (same principle as ModelFactory._register_plugins).
+    `force=True` rescans even if already loaded — used by tests that re-register after changing the environment variable.
     """
     global _PLUGINS_LOADED
     if _PLUGINS_LOADED and not force:
@@ -51,8 +51,8 @@ def load_plugins(*, force: bool = False) -> None:
 
     try:
         entry_points = importlib.metadata.entry_points()
-    except Exception as exc:  # pragma: no cover - 메타데이터가 깨진 환경
-        logger.warning("엔트리포인트 목록을 읽지 못했다: %s", exc)
+    except Exception as exc:  # pragma: no cover - environment with broken metadata
+        logger.warning("failed to read entry points: %s", exc)
         entry_points = None
 
     if entry_points is not None:
@@ -64,19 +64,19 @@ def load_plugins(*, force: bool = False) -> None:
             for entry_point in found:
                 try:
                     entry_point.load()
-                    logger.info("플러그인 등록: %s (엔트리포인트 %s/%s)", entry_point.value, group, entry_point.name)
+                    logger.info("registered plugin: %s (entry point %s/%s)", entry_point.value, group, entry_point.name)
                 except Exception as exc:
                     logger.warning(
-                        "플러그인 '%s' (%s) 을 불러오지 못해 건너뛴다: %s", entry_point.name, entry_point.value, exc
+                        "skipping plugin '%s' (%s): failed to load: %s", entry_point.name, entry_point.value, exc
                     )
 
     raw = os.environ.get(PLUGIN_ENV_VAR, "")
     for module_path in [part.strip() for part in raw.split(",") if part.strip()]:
         try:
             importlib.import_module(module_path)
-            logger.info("플러그인 등록: %s (%s)", module_path, PLUGIN_ENV_VAR)
+            logger.info("registered plugin: %s (%s)", module_path, PLUGIN_ENV_VAR)
         except Exception as exc:
-            logger.warning("%s 가 가리키는 모듈 '%s' 을 불러오지 못해 건너뛴다: %s", PLUGIN_ENV_VAR, module_path, exc)
+            logger.warning("%s: skipping module '%s': failed to load: %s", PLUGIN_ENV_VAR, module_path, exc)
 
 
 def _qualified_name(obj: Any) -> str:
@@ -84,7 +84,7 @@ def _qualified_name(obj: Any) -> str:
 
 
 class Registry(Mapping):
-    """이름 -> 클래스/호출가능 등록소. 종류(kind)마다 하나씩 만든다 (rsc_toolkit.registries 참조)."""
+    """Name -> class/callable registry. One instance per kind (see rsc_toolkit.registries)."""
 
     def __init__(
         self,
@@ -95,33 +95,33 @@ class Registry(Mapping):
     ) -> None:
         self.kind = kind
         self._objs: Dict[str, Any] = {}
-        self._lazy: Dict[str, str] = {}  # name -> "pkg.mod:Attr" (첫 get 때 import)
+        self._lazy: Dict[str, str] = {}  # name -> "pkg.mod:Attr" (imported on first get)
         self._scan_packages = tuple(scan_packages)
         self._scan_exclude = set(scan_exclude)
         self._scanned = False
-        self._failed: Dict[str, str] = {}  # 스캔 중 import 에 실패한 모듈 -> 원인 (KeyError 메시지에 덧붙인다)
+        self._failed: Dict[str, str] = {}  # modules that failed to import during the scan -> cause (appended to KeyError messages)
 
-    # ── 등록 ────────────────────────────────────────────────────────────────
+    # ── registration ────────────────────────────────────────────────────────
     def register(self, name: str) -> Callable[[Any], Any]:
-        """클래스/함수 데코레이터. 같은 이름에 다른 객체를 다시 등록하면 ValueError."""
+        """Class/function decorator. Registering a different object under an existing name raises ValueError."""
         key = str(name).strip()
         if not key:
-            raise ValueError(f"{self.kind} 이름이 비어 있다")
+            raise ValueError(f"{self.kind} name is empty")
 
         def decorator(obj: Any) -> Any:
             existing = self._objs.get(key)
             if existing is not None and existing is not obj:
                 raise ValueError(
-                    f"{self.kind} 이름 '{key}' 은 이미 {_qualified_name(existing)} 에 등록돼 있다. "
-                    f"다른 이름을 쓰거나 기존 등록을 정리하라."
+                    f"{self.kind} name '{key}' is already registered to {_qualified_name(existing)}. "
+                    f"Use a different name or remove the existing registration."
                 )
             lazy_target = self._lazy.get(key)
             if lazy_target is not None and lazy_target != _qualified_name(obj):
-                # 내장 lazy 선언과 다른 객체가 같은 이름을 요구한다. import 를 유발하지 않고
-                # (자기 자신을 import 중인 모듈일 수 있다) 경로 문자열로만 비교한다.
+                # A different object claims the name of a built-in lazy declaration. Compare path strings only,
+                # without triggering an import (this may be the very module currently being imported).
                 raise ValueError(
-                    f"{self.kind} 이름 '{key}' 은 내장 항목 {lazy_target} 으로 선언돼 있다. "
-                    f"다른 이름을 쓰라."
+                    f"{self.kind} name '{key}' is declared as built-in entry {lazy_target}. "
+                    f"Use a different name."
                 )
             self._objs[key] = obj
             self._lazy.pop(key, None)
@@ -130,21 +130,21 @@ class Registry(Mapping):
         return decorator
 
     def register_lazy(self, name: str, target: str) -> None:
-        """내장 항목 선언. `target` 은 "pkg.module:Attr". import 는 첫 조회 때 일어난다."""
+        """Declare a built-in entry. `target` is "pkg.module:Attr". The import happens on first lookup."""
         key = str(name).strip()
         if not key:
-            raise ValueError(f"{self.kind} 이름이 비어 있다")
+            raise ValueError(f"{self.kind} name is empty")
         if ":" not in target:
-            raise ValueError(f"{self.kind} '{key}' 의 lazy 대상은 'pkg.module:Attr' 꼴이어야 한다: {target!r}")
+            raise ValueError(f"{self.kind} '{key}': lazy target must have the form 'pkg.module:Attr': {target!r}")
         if key in self._objs:
-            raise ValueError(f"{self.kind} 이름 '{key}' 은 이미 {_qualified_name(self._objs[key])} 에 등록돼 있다")
+            raise ValueError(f"{self.kind} name '{key}' is already registered to {_qualified_name(self._objs[key])}")
         existing = self._lazy.get(key)
         if existing is not None and existing != target:
-            raise ValueError(f"{self.kind} 이름 '{key}' 은 이미 {existing} 으로 선언돼 있다 (요청: {target})")
+            raise ValueError(f"{self.kind} name '{key}' is already declared as {existing} (requested: {target})")
         self._lazy[key] = target
 
     def unregister(self, name: str) -> None:
-        """등록 해제. 없는 이름은 KeyError. (테스트 정리용 — 학습 코드는 쓰지 않는다.)"""
+        """Unregister a name. Unknown names raise KeyError. (For test cleanup; training code does not use it.)"""
         if name in self._objs:
             del self._objs[name]
         elif name in self._lazy:
@@ -153,7 +153,7 @@ class Registry(Mapping):
             raise KeyError(name)
 
     def pop(self, name: str, default: Any = _MISSING) -> Any:
-        """dict.pop 호환 (기존 테스트가 `registry().pop(name, None)` 으로 정리한다)."""
+        """dict.pop-compatible (tests clean up with `registry().pop(name, None)`)."""
         if name in self._objs:
             return self._objs.pop(name)
         if name in self._lazy:
@@ -163,9 +163,9 @@ class Registry(Mapping):
             raise KeyError(name)
         return default
 
-    # ── 조회 ────────────────────────────────────────────────────────────────
+    # ── lookup ──────────────────────────────────────────────────────────────
     def get(self, name: str, default: Any = _MISSING) -> Any:  # type: ignore[override]
-        """이름으로 객체를 찾는다. 미지 이름은 가용 목록을 붙인 KeyError (default 를 주면 그것을 반환)."""
+        """Look up an object by name. Unknown names raise a KeyError listing the available names (or return `default` if given)."""
         self._discover()
         if name in self._objs:
             return self._objs[name]
@@ -176,12 +176,12 @@ class Registry(Mapping):
         hint = ""
         if self._failed:
             failed = "; ".join(f"{m}: {why}" for m, why in sorted(self._failed.items()))
-            hint = f" 스캔 중 import 에 실패해 등록되지 못한 모듈이 있다 — {failed}"
+            hint = f" Some modules failed to import during the scan and were not registered — {failed}"
         raise KeyError(f"Unknown {self.kind} '{name}'. Available: {sorted(self)}.{hint}")
 
     @property
     def failed_modules(self) -> Dict[str, str]:
-        """패키지 스캔에서 import 에 실패한 모듈과 원인 (진단용 읽기 전용 사본)."""
+        """Modules that failed to import during the package scan, with causes (read-only copy for diagnostics)."""
         self._discover()
         return dict(self._failed)
 
@@ -192,48 +192,48 @@ class Registry(Mapping):
             module = importlib.import_module(module_path)
         except ImportError as exc:
             raise ImportError(
-                f"{self.kind} '{name}' ({target}) 의 의존성이 없어 쓸 수 없다: {exc}. "
-                f"이 항목만의 문제이며 다른 {self.kind} 는 영향이 없다."
+                f"{self.kind} '{name}' ({target}) is unavailable because a dependency is missing: {exc}. "
+                f"Only this entry is affected; other {self.kind} entries still work."
             ) from exc
         try:
             obj = getattr(module, attr)
         except AttributeError as exc:
-            raise ImportError(f"{self.kind} '{name}': {module_path} 에 {attr} 가 없다") from exc
+            raise ImportError(f"{self.kind} '{name}': {module_path} has no attribute {attr}") from exc
         self._objs[name] = obj
         self._lazy.pop(name, None)
         return obj
 
     def build(self, cfg: Mapping[str, Any], *args: Any, key: str = "name", **extra: Any) -> Any:
-        """`{"name": ..., "params": {...}}` 규약의 단일 구현. params 를 복사하므로 cfg 를 파괴하지 않는다."""
+        """Single implementation of the `{"name": ..., "params": {...}}` convention. Copies params, so cfg is not mutated."""
         if not isinstance(cfg, Mapping):
-            raise TypeError(f"{self.kind} config 는 매핑이어야 한다: {type(cfg).__name__}")
+            raise TypeError(f"{self.kind} config must be a mapping: {type(cfg).__name__}")
         name = cfg.get(key)
         if name is None:
-            raise KeyError(f"{self.kind} config 에 '{key}' 가 없다. 받은 키: {sorted(cfg)}")
+            raise KeyError(f"{self.kind} config has no '{key}'. Got keys: {sorted(cfg)}")
         params = dict(cfg.get("params") or {})
         params.update(extra)
         return self.get(name)(*args, **params)
 
-    # ── 자동 발견: 패키지 스캔(1회) + 플러그인(프로세스 1회) ────────────────
+    # ── discovery: package scan (once) + plugins (once per process) ─────────
     def _discover(self) -> None:
         if not self._scanned:
-            # 아래 import 가 다시 이 registry 를 건드리는 재귀를 막기 위해 먼저 표시한다.
+            # Mark first to prevent recursion when the imports below touch this registry again.
             self._scanned = True
             try:
                 for package_name in self._scan_packages:
                     self._scan_package(package_name)
             except BaseException:
-                # 스캔이 중간에 끊기면 "다 됐다" 표시가 남아 뒤쪽 모듈이 영구 미등록이 된다 — 되돌려 다음 조회가 다시 훑게 한다.
+                # If the scan is interrupted, the "done" flag would leave later modules permanently unregistered — reset it so the next lookup rescans.
                 self._scanned = False
                 raise
-        # 플러그인은 내장 스캔이 끝난 뒤에 읽는다 — 이름 충돌 시 내장 쪽이 아니라 플러그인 쪽이 실패해야 한다.
+        # Plugins load after the built-in scan, so on a name conflict the plugin fails rather than the built-in entry.
         load_plugins()
 
     def _scan_package(self, package_name: str) -> None:
         try:
             package = importlib.import_module(package_name)
         except ImportError as exc:
-            logger.warning("%s 스캔 패키지 %s 를 불러오지 못했다: %s", self.kind, package_name, exc)
+            logger.warning("%s: failed to import scan package %s: %s", self.kind, package_name, exc)
             return
         for _, module_name, is_pkg in pkgutil.iter_modules(package.__path__):
             if is_pkg or module_name.startswith("_") or module_name in self._scan_exclude:
@@ -242,25 +242,25 @@ class Registry(Mapping):
             try:
                 importlib.import_module(full)
             except Exception as exc:
-                # 예전엔 ImportError 만 삼켜서: 선택 의존성 누락은 조용히 사라지고(경고 한 줄), 내부 오타(NameError·
-                # AttributeError·등록 이름 충돌 ValueError)는 스캔 전체를 중단시켜 알파벳순 뒤 모듈이 통째로 빠졌다
-                # (REVIEW 2026-09-10 §1 P2). 모듈 단위로 격리하고 실패를 기록해 KeyError 가 원인을 지목하게 한다.
+                # Catch every exception, not only ImportError: an internal error (NameError, AttributeError, a
+                # ValueError from a name conflict) would otherwise abort the whole scan and drop all later modules.
+                # Isolate per module and record the failure so the KeyError can point to the cause.
                 self._failed[full] = f"{type(exc).__name__}: {exc}"
                 level = logging.WARNING if isinstance(exc, ImportError) else logging.ERROR
                 logger.log(
                     level,
-                    "%s 모듈 %s 을 불러오지 못해 등록에서 제외한다 (%s): %s",
-                    self.kind, full, "선택 의존성 누락?" if isinstance(exc, ImportError) else "모듈 내부 오류", exc,
+                    "%s: module %s failed to import and is excluded from registration (%s): %s",
+                    self.kind, full, "missing optional dependency?" if isinstance(exc, ImportError) else "error inside the module", exc,
                 )
 
     def rescan(self) -> None:
-        """패키지 스캔과 플러그인 로드를 다시 한다 (멱등; 테스트·REPL 용)."""
+        """Redo the package scan and plugin loading (idempotent; for tests and the REPL)."""
         self._scanned = False
         self._failed.clear()
         self._discover()
         load_plugins(force=True)
 
-    # ── Mapping 프로토콜 ────────────────────────────────────────────────────
+    # ── Mapping protocol ────────────────────────────────────────────────────
     def __getitem__(self, name: str) -> Any:
         return self.get(name)
 

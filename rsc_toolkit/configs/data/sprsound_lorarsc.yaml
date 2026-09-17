@@ -1,6 +1,6 @@
-# LoRA-RSC 를 SPRSound 표준 태스크(7-class)로 확장. ICBHI 레시피 그대로:
-# 16 kHz 리샘플(구간 로드 후) → sclmeta 8 s 순환 패딩+fade_out → kaldi fbank 128 × 500 프레임(앞 5 s) → bs16, drop_last False.
-# 파형 잡음은 공개 코드 기준(스칼라 DC = 무효)이라 ICBHI 기본과 동일하게 적용하지 않는다.
+# LoRA-RSC extended to the standard SPRSound task (7-class). ICBHI recipe unchanged:
+# resample to 16 kHz (after loading the segment) → sclmeta 8 s circular padding + fade_out → kaldi fbank 128 × 500 frames (first 5 s) → bs 16, drop_last False.
+# Waveform noise follows the public code (scalar DC = no effect), so, as in the ICBHI default, it is not applied.
 name: sprsound_lorarsc
 params:
   datamodule_name: index

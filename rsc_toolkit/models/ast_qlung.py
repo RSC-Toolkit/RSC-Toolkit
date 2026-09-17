@@ -1,24 +1,24 @@
 """
-QLung(Interspeech 2026)의 AST — 공식 코드(RSC-Toolkit/QLung 46408dd) 충실 이식 (P0).
+AST of QLung (Interspeech 2026) — faithful port of the official code (RSC-Toolkit/QLung 46408dd) (exact port of the official code, verified against goldens).
 
-출처: train_qlung.py set_model()/train()/validate(), method/loss.py, models/ast.py (= sgscl 클론 models/ast.py 와 바이트 동일;
-비-patch-mix forward 경로는 PatchMixAST 와 기능 동일 — 골든 tests/golden/qlung/model_golden.pt 로 고정).
+Sources: train_qlung.py set_model()/train()/validate(), method/loss.py, models/ast.py (= byte-identical to models/ast.py of the sgscl clone;
+the non-patch-mix forward path is functionally identical to PatchMixAST — pinned by the golden tests/golden/qlung/model_golden.pt).
 
-구조 (method="aqm", 기본):
-  AST(IN+AS, 뒤집힌 798×128 quirk) → (cls+dist)/2 특징 → F.normalize → AngularClassifier(s_a=37) 로짓 (float64 로 CE)
-                                                   └→ DFAM AngularMarginLoss(s_d=15, κ=0.5, γ=0.5, m_target=0.2, π_y=ICBHI train 개수)
-  총손실 = CE(로짓.float64) + λ(0.4)·CE(DFAM 로짓).  평가도 정규화 특징 → AngularClassifier (validate :541-543).
-  DFAM 가중치 W_d 는 서브모듈 `dfam` 으로 등록 → optimizer 에 포함(train_qlung.py:345). MA(0.6) 에서는 제외해야 한다
-  (train_qlung.py:490-499 는 model·classifier·projector 만) → callbacks/qlung_ma_update.py.
-  미사용 mlp_head 는 원본처럼 잔존(state_dict·optimizer 에 있고 gradient 없음).
+Architecture (method="aqm", default):
+  AST (IN+AS, swapped 798×128 quirk) → (cls+dist)/2 features → F.normalize → AngularClassifier(s_a=37) logits (CE in float64)
+                                                   └→ DFAM AngularMarginLoss(s_d=15, κ=0.5, γ=0.5, m_target=0.2, π_y=ICBHI train counts)
+  Total loss = CE(logits.float64) + λ(0.4)·CE(DFAM logits).  Evaluation also uses normalized features → AngularClassifier (validate :541-543).
+  The DFAM weight W_d is registered as the submodule `dfam` → included in the optimizer (train_qlung.py:345). It must be excluded from MA(0.6)
+  (train_qlung.py:490-499 covers only model, classifier, projector) → callbacks/qlung_ma_update.py.
+  The unused mlp_head remains as in the original (present in state_dict and optimizer, receives no gradient).
 
-method="ce" (코드의 CE 경로 quirk 그대로, Patch-Mix 원 코드와 다름):
-  train: classifier(features)  — 정규화 없음 (train_qlung.py:459)
-  eval : classifier(F.normalize(features)) — 정규화 (train_qlung.py:541-542), loss 는 output.to(float64)
+method="ce" (CE-path quirk of the code kept as-is; differs from the original Patch-Mix code):
+  train: classifier(features)  — no normalization (train_qlung.py:459)
+  eval : classifier(F.normalize(features)) — normalized (train_qlung.py:541-542), loss uses output.to(float64)
   classifier = deepcopy(mlp_head) (LayerNorm+Linear).
 
-SpecAugment: 원본 train() 은 args.transforms(images) 를 배치 전체에 1회 적용(icbhi_ast_sup, p ≥ torch.randn(1) 게이트) — 평가 없음.
-training_forward 의 meta_labels 자리로 AQS(float, (B,)) 가 온다 (datasets/qlung_data.py).
+SpecAugment: the original train() applies args.transforms(images) once to the whole batch (icbhi_ast_sup, p ≥ torch.randn(1) gate) — not in evaluation.
+AQS (float, (B,)) arrives in the meta_labels slot of training_forward (datasets/qlung_data.py).
 """
 from __future__ import annotations
 
@@ -42,11 +42,11 @@ from rsc_toolkit.methods.sgscl import apply_specaug_paper
 
 @ModelFactory.register_model_class("ast_qlung")
 class QLungAST(PatchMixAST):
-    """원본 ASTModel + set_model(method aqm|ce) 구성."""
+    """Original ASTModel + set_model (method aqm|ce) setup."""
 
     accepts_meta = ("qlung_aqs",)  # batch[2] = AQS float (QLungDataModule)
 
-    # MA(live weight averaging) 에서 제외할 state_dict 접두어 — 원본은 criterion[1](DFAM) 을 MA 하지 않는다.
+    # state_dict prefixes excluded from MA (live weight averaging) — the original does not apply MA to criterion[1] (DFAM).
     ma_exclude_prefixes = ("dfam.",)
 
     def __init__(
@@ -54,21 +54,21 @@ class QLungAST(PatchMixAST):
         n_cls: int = 4,
         fstride: int = 10,
         tstride: int = 10,
-        input_fdim: int = 798,           # 일부러 뒤집힌 quirk (ast_patchmix.py docstring)
+        input_fdim: int = 798,           # intentionally swapped quirk (see ast_patchmix.py docstring)
         input_tdim: int = 128,
         imagenet_pretrain: bool = True,
         audioset_pretrain: bool = True,
         model_size: str = "base384",
         pretrained_path: Optional[str] = None,
         verbose: bool = False,
-        # ---- QLung 인자 (train_qlung.py / scripts/train_qlung_icbhi.sh) ----
+        # ---- QLung arguments (train_qlung.py / scripts/train_qlung_icbhi.sh) ----
         method: str = "aqm",             # "aqm" | "ce"
         s_a: float = 37.0,               # AngularClassifier scale (train_qlung.py:271)
         s_d: float = 15.0,               # DFAM scale (train_qlung.py:328)
-        kappa: float = 0.5,              # DFAM m (품질 마진 계수, train_qlung.py:328 m=0.5)
+        kappa: float = 0.5,              # DFAM m (quality margin coefficient, train_qlung.py:328 m=0.5)
         gamma: float = 0.5,              # --gamma
         m_target: float = 0.2,           # --m_target
-        lambda_aqm: float = 0.4,         # --alpha (DFAM CE 가중)
+        lambda_aqm: float = 0.4,         # --alpha (DFAM CE weight)
         class_nums: Sequence[float] = ICBHI_TRAIN_CLASS_NUMS,
         easy_margin: bool = False,
         specaug_policy: str = "icbhi_ast_sup",
@@ -88,19 +88,19 @@ class QLungAST(PatchMixAST):
         self.lambda_aqm = float(lambda_aqm)
         self.n_cls = n_cls
         if method == "aqm":
-            # set_model: classifier = AngularClassifier(final_feat_dim, n_cls, s=37) — mlp_head 복사본은 버려진다
+            # set_model: classifier = AngularClassifier(final_feat_dim, n_cls, s=37) — the mlp_head copy is discarded
             self.classifier = AngularClassifier(self.final_feat_dim, n_cls, s=s_a)
             self.dfam = AngularMarginLoss(self.final_feat_dim, n_cls, s=s_d, m=kappa, gamma=gamma, m_target=m_target,
                                           class_nums=list(class_nums), easy_margin=easy_margin)
         else:
-            # 부모가 만든 classifier = deepcopy(mlp_head) 그대로
+            # keep the parent's classifier = deepcopy(mlp_head)
             self.dfam = None
-        # 원본 train(): args.transforms = SpecAugment(args) 를 배치에 적용 (평가 제외)
+        # original train(): applies args.transforms = SpecAugment(args) to the batch (not in evaluation)
         self.specaug = SpecAugment(policy=specaug_policy, mask=specaug_mask)
 
-    # ------------------------------------------------------------------ 경로
+    # ------------------------------------------------------------------ paths
     def eval_logits(self, x_paper: torch.Tensor) -> torch.Tensor:
-        """validate(): features → F.normalize → classifier (aqm·ce 공통, train_qlung.py:540-542)."""
+        """validate(): features → F.normalize → classifier (shared by aqm and ce, train_qlung.py:540-542)."""
         return self.classifier(F.normalize(self.forward_features(x_paper)))
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -108,8 +108,8 @@ class QLungAST(PatchMixAST):
 
     def training_forward(self, audio_batch, labels, loss_func, meta_labels=None):
         """
-        meta_labels = AQS float (B,) — aqm 학습에 필수. loss_func = 비가중 CE(criterion[0]).
-        반환 (logits, loss). 평가 모드는 원본 validate 경로(정규화 특징, loss = CE(logits.float64)).
+        meta_labels = AQS float (B,) — required for aqm training. loss_func = unweighted CE (criterion[0]).
+        Returns (logits, loss). Eval mode follows the original validate path (normalized features, loss = CE(logits.float64)).
         """
         x = self._to_paper_layout(audio_batch)  # (B, 798, 128) = (B, time, freq)
 
@@ -121,14 +121,15 @@ class QLungAST(PatchMixAST):
         features = self.forward_features(x)
 
         if self.method == "ce":
-            logits = self.classifier(features)          # quirk: 학습은 비정규화 특징 (train_qlung.py:459)
+            logits = self.classifier(features)          # quirk: training uses unnormalized features (train_qlung.py:459)
             return logits, loss_func(logits, labels)
 
         if meta_labels is None:
-            raise ValueError("ast_qlung(method=aqm) 학습에는 meta_labels 자리에 AQS float 텐서가 필요하다 (data=icbhi_qlung)")
+            raise ValueError("ast_qlung(method=aqm) training requires an AQS float tensor in the meta_labels slot (data=icbhi_qlung)")
         quality = meta_labels.to(features.device)
         if quality.dtype not in (torch.float16, torch.float32, torch.float64):
-            raise TypeError(f"AQS 는 float 텐서여야 한다: {quality.dtype}")
+            raise TypeError(f"AQS must be a float tensor: {quality.dtype}")
+
         logits, loss, _, _ = qlung_dual_loss(features, labels, quality, self.classifier, self.dfam, loss_func,
                                              lambda_aqm=self.lambda_aqm)
         return logits, loss

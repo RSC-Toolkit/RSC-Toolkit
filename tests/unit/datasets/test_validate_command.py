@@ -1,15 +1,15 @@
 """
-`rsctk datasets validate` 의 판정/종료 코드 동작 테스트.
+Tests for the verdict/exit-code behavior of `rsctk datasets validate`.
 
-이전에는 검증 함수의 반환값을 버리고 무조건 "✅ passed" 를 찍어서,
-wav 가 0 개인 디렉토리도 통과로 보고했다.
+Previously the return value of the validation function was discarded and "✅ passed" was always printed,
+so even a directory with 0 wav files was reported as passing.
 """
 import argparse
 import pathlib
 
 import pytest
 
-from rsc_toolkit.datasets import cli as datasets_cli  # monkeypatch 대상은 CLI 모듈 (P1-8 분리)
+from rsc_toolkit.datasets import cli as datasets_cli  # monkeypatch target is the CLI module
 
 
 class _Downloader:
@@ -21,7 +21,7 @@ class _Downloader:
 
 
 class _Processor:
-    """raw_data_directory 를 가져야 CLI 가 경로를 주입한다."""
+    """The CLI injects the path only if raw_data_directory exists."""
 
     def __init__(self, result):
         self._result = result
@@ -55,7 +55,7 @@ def _run_validate(monkeypatch, tmp_path, *, downloaded_ok, processed_result):
 
 
 def test_validate_fails_when_download_invalid(monkeypatch, tmp_path):
-    """다운로드 검증이 False 면 실패(0 이 아닌 종료 코드)여야 한다."""
+    """If download validation is False it must fail (non-zero exit code)."""
     rc = _run_validate(
         monkeypatch, tmp_path, downloaded_ok=False, processed_result=None
     )
@@ -71,10 +71,10 @@ def test_validate_passes_when_download_valid(monkeypatch, tmp_path):
 
 def test_unimplemented_processed_check_is_not_a_failure(monkeypatch, tmp_path):
     """
-    validate_processed_files 가 None(미구현) 이면 실패로 치지 않는다.
+    validate_processed_files returning None (not implemented) does not count as a failure.
 
-    현재 icbhi/sprsound/hflungv1 processor 는 모두 미구현 스텁이므로,
-    이걸 실패로 처리하면 정상 데이터셋도 전부 실패로 뜬다.
+    The icbhi/sprsound/hflungv1 processors are all unimplemented stubs now,
+    so treating it as a failure would make every valid dataset fail.
     """
     rc = _run_validate(
         monkeypatch, tmp_path, downloaded_ok=True, processed_result=None
@@ -83,7 +83,7 @@ def test_unimplemented_processed_check_is_not_a_failure(monkeypatch, tmp_path):
 
 
 def test_validate_fails_when_processed_invalid(monkeypatch, tmp_path):
-    """미구현(None) 과 달리 명시적 False 는 실패로 처리한다."""
+    """Unlike not implemented (None), an explicit False counts as a failure."""
     rc = _run_validate(
         monkeypatch, tmp_path, downloaded_ok=True, processed_result=False
     )
@@ -93,9 +93,9 @@ def test_validate_fails_when_processed_invalid(monkeypatch, tmp_path):
 @pytest.mark.parametrize("dataset_name", ["icbhi", "sprsound", "hflungv1"])
 def test_processors_report_none_when_nothing_processed(dataset_name, tmp_path):
     """
-    아직 build-index 를 안 한 빈 출력 디렉토리에서는 None(검사할 것 없음)이어야 한다.
+    An empty output directory where build-index has not run yet must give None (nothing to check).
 
-    False 를 돌려주면 위 로직에서 '검증 실패' 로 잘못 보고된다.
+    Returning False would be misreported as a 'validation failure' by the logic above.
     """
     from rsc_toolkit.datasets.factory import DatasetFactory
 
@@ -105,19 +105,19 @@ def test_processors_report_none_when_nothing_processed(dataset_name, tmp_path):
 
 
 # ---------------------------------------------------------------------------
-# 인덱스 산출물 실제 검증 (base 기본 구현 + 데이터셋 훅)
+# Actual validation of index outputs (base default implementation + dataset hooks)
 # ---------------------------------------------------------------------------
 
 def _repo_root():
     for c in pathlib.Path(__file__).resolve().parents:
         if (c / "pyproject.toml").exists():
             return c
-    raise RuntimeError("리포 루트를 찾지 못했다")
+    raise RuntimeError("repository root not found")
 
 
 @pytest.fixture
 def icbhi_processor_with_index(tmp_path):
-    """번들 toy 원본(ICBHI 형식)으로 실제 cycle 인덱스를 만든 ICBHI processor."""
+    """ICBHI processor with a real cycle index built from the bundled toy raw data (ICBHI format)."""
     from rsc_toolkit.datasets.icbhi.processor import ICBHIDatasetProcessor
 
     proc = ICBHIDatasetProcessor(
@@ -134,8 +134,8 @@ def test_real_index_validates_true(icbhi_processor_with_index):
 
 def test_index_with_zero_rows_is_invalid(icbhi_processor_with_index, tmp_path):
     """
-    build-index 가 exit 0 으로 끝나도 행이 0 이면 학습이 불가능하다.
-    (SPRSound 에서 실제로 겪었다 — 문서 §5 신규 B)
+    Even if build-index exits 0, training is impossible with 0 rows.
+    (This actually happened with SPRSound.)
     """
     index_csv = tmp_path / "index" / "index_cycle.csv"
     header = index_csv.read_text().splitlines()[0]
@@ -153,7 +153,7 @@ def test_index_missing_required_column_is_invalid(icbhi_processor_with_index, tm
 
 
 def test_stale_stats_file_is_invalid(icbhi_processor_with_index, tmp_path):
-    """stats 의 total_samples 와 행수가 다르면 인덱스와 stats 가 따로 논다는 뜻이다."""
+    """If total_samples in stats differs from the row count, the index and stats are out of sync."""
     import json
 
     stats = tmp_path / "index" / "index_cycle_stats.json"
@@ -164,7 +164,7 @@ def test_stale_stats_file_is_invalid(icbhi_processor_with_index, tmp_path):
 
 
 def test_only_existing_levels_are_checked(icbhi_processor_with_index):
-    """cycle 만 만들고 clip 은 안 만들어도 실패가 아니다 (존재하는 레벨만 검사)."""
+    """Building only cycle and not clip is not a failure (only existing levels are checked)."""
     assert icbhi_processor_with_index.validate_processed_files() is True
 
 
@@ -179,7 +179,7 @@ def test_cycle_index_with_missing_labels_is_invalid(icbhi_processor_with_index, 
 
 
 def test_sprsound_requires_official_split_next_to_index(tmp_path):
-    """데이터셋별 보조 산출물 훅: sprsound 는 index 옆에 official_split.txt 가 있어야 한다."""
+    """Per-dataset auxiliary output hook: sprsound needs official_split.txt next to the index."""
     from rsc_toolkit.datasets.sprsound.processor import SPRSoundDatasetProcessor
 
     index_dir = tmp_path / "index"
@@ -190,7 +190,7 @@ def test_sprsound_requires_official_split_next_to_index(tmp_path):
     )
     proc = SPRSoundDatasetProcessor(outputs_directory=str(tmp_path))
 
-    assert proc.validate_processed_files() is False  # 보조 파일 없음
+    assert proc.validate_processed_files() is False  # auxiliary file missing
 
     (index_dir / "official_split.txt").write_text("a train\n")
     assert proc.validate_processed_files() is True
@@ -198,8 +198,8 @@ def test_sprsound_requires_official_split_next_to_index(tmp_path):
 
 def test_feature_cache_validate_entries_is_shape_agnostic(tmp_path):
     """
-    피처 캐시 검증은 모양을 가정하지 않는다 — 모델/피처 종류마다 다르기 때문이다.
-    존재·로드 가능 여부만 본다.
+    Feature cache validation does not assume a shape — it differs per model/feature kind.
+    Only existence and loadability are checked.
     """
     import torch
     from rsc_toolkit.datasets.feature_cache import FeatureCache

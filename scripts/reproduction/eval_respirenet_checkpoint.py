@@ -1,6 +1,6 @@
 """
-RespireNet 저자 ckpt_best.pkl 을 툴킷 RespireNetCNN + RespireNetChunkDataset 으로 평가 (fold-4 test,
-cycle 다수결). 같은 pad_seed/res_type 이면 tests/golden/respirenet/ckpt_eval.json 과 청크 예측까지 일치해야 한다.
+Evaluates the RespireNet authors' ckpt_best.pkl with the toolkit RespireNetCNN + RespireNetChunkDataset (fold-4 test,
+cycle majority vote). With the same pad_seed/res_type it must match tests/golden/respirenet/ckpt_eval.json down to the chunk predictions.
 
   .venv/bin/python scripts/reproduction/eval_respirenet_checkpoint.py [--split official]
 """
@@ -33,7 +33,7 @@ def vote(preds, identifiers, cycle_ids):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--ckpt", default=os.environ.get("RSCTK_RESPIRENET_REF_CKPT", "outputs/reference/respirenet/models/ckpt_best.pkl"),
-                    help="저자 fine-tuned ckpt (microsoft/RespireNet models/ckpt_best.pkl); 기본은 저장소 안 저자 코드 사본, RSCTK_RESPIRENET_REF_CKPT 로 지정")
+                    help="the authors' fine-tuned ckpt (microsoft/RespireNet models/ckpt_best.pkl); defaults to the copy in the authors' code checkout, override with RSCTK_RESPIRENET_REF_CKPT")
     ap.add_argument("--data", default=".datasets/icbhi")
     ap.add_argument("--split", default="fold", choices=["fold", "official"])
     ap.add_argument("--test_fold", type=int, default=4)
@@ -43,7 +43,7 @@ def main():
     ap.add_argument("--golden", default="tests/golden/respirenet/ckpt_eval.json")
     args = ap.parse_args()
     if not os.path.exists(args.ckpt):
-        raise SystemExit(f"저자 ckpt 가 없다: {args.ckpt} — microsoft/RespireNet 의 models/ckpt_best.pkl 을 두거나 --ckpt / RSCTK_RESPIRENET_REF_CKPT 로 지정하라")
+        raise SystemExit(f"authors' ckpt not found: {args.ckpt} — place models/ckpt_best.pkl from microsoft/RespireNet there or specify it with --ckpt / RSCTK_RESPIRENET_REF_CKPT")
 
     ds = RespireNetChunkDataset(args.data, train_flag=False, split_mode=args.split, test_fold=args.test_fold,
                                 folds_file="rsc_toolkit/datasets/icbhi/data/patient_list_foldwise.txt",
@@ -63,7 +63,7 @@ def main():
         try:
             g = json.load(open(args.golden))
             same = int(np.sum(np.array(g["chunk_preds"]) == np.array(preds)))
-            print(f"골든 대비 청크 예측 일치 {same}/{len(preds)} | 골든 Score {g['icbhi_score']:.2f} conf 동일={g['conf']==conf.tolist()}")
+            print(f"chunk predictions matching the golden {same}/{len(preds)} | golden Score {g['icbhi_score']:.2f} conf identical={g['conf']==conf.tolist()}")
         except FileNotFoundError:
             pass
 

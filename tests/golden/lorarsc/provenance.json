@@ -6,8 +6,8 @@
   "transformers": "4.28.1",
   "numpy": "1.26.4",
   "notes": [
-    "original_waveform 은 dataset/icbhi.py ICBHI.get_sample/get_dataset(circular) 체인을 재타이핑한 것(metadata.csv·하드코딩 경로 때문에 클래스 직접 실행 안 함); 줄 단위 대조로 구간 로드·mono·Resample·Fade(sr/16)·순환·fade_out 동일. 특징 추출기(4.28.1 ASTFeatureExtractor)·모델(AST_LoRA/AST 클래스) 은 원본 코드 실제 실행.",
-    "noise 비교(max|diff| 6.4e-5) 는 toy 4 cycle, 공개 코드의 스칼라 DC 오프셋 가정하 결과. orig_2d_call ok=False 가 보여주듯 공개 코드 (1,N) 호출은 실행 불가 → 저자 실행의 잡음 형태는 미상(1D 해석은 rsc_toolkit/datasets/lorarsc_noise.py).",
-    "6898 cycle 경계: metadata.csv 부동소수 잔재 vs index_cycle.csv 3자리 — int(t*sr) 기준 시작 18건·길이 35건 최대 1 샘플 차이."
+    "original_waveform re-types the dataset/icbhi.py ICBHI.get_sample/get_dataset(circular) chain (the class is not run directly because of metadata.csv and hard-coded paths); line-by-line comparison confirms identical segment loading, mono, Resample, Fade(sr/16), circular padding and fade_out. The feature extractor (4.28.1 ASTFeatureExtractor) and models (AST_LoRA/AST classes) are the original code, actually executed.",
+    "noise comparison (max|diff| 6.4e-5) uses 4 toy cycles, assuming the scalar DC offset of the public code. As orig_2d_call ok=False shows, the (1,N) call in the public code cannot run, so the noise shape in the authors' runs is unknown (1D interpretation in rsc_toolkit/datasets/lorarsc_noise.py).",
+    "6898 cycle boundaries: float residue in metadata.csv vs 3 decimals in index_cycle.csv; by int(t*sr), 18 starts and 35 lengths differ by at most 1 sample."
   ]
 }

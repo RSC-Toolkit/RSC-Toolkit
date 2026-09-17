@@ -1,5 +1,5 @@
 """
-학습 손실 구현 모음 (loss_registry 에 등록되는 것들).
+Training loss implementations (registered in loss_registry).
 """
 from typing import Sequence
 
@@ -9,13 +9,13 @@ import torch.nn as nn
 
 class WeightedCrossEntropyFromCounts(nn.Module):
     """
-    클래스 표본 수로부터 가중치를 만드는 CE — patch-mix 계열 --weighted_loss 재현.
+    CE with weights derived from per-class sample counts: the patch-mix family --weighted_loss.
 
-    출처: raymin0223/patch-mix main.py:264-269
+    Source: raymin0223/patch-mix main.py:264-269
       weights = 1 / (counts / counts.sum());  weights /= weights.sum()
 
-    class_nums 예 (ICBHI 공식 train, 4-class): [2063, 1215, 501, 363]
-    — .datasets/icbhi 인덱스 + 공식 split 로 재검증한 값 (합 4,142).
+    class_nums example (ICBHI official train, 4-class): [2063, 1215, 501, 363]
+    (re-checked against the .datasets/icbhi index + official split; total 4,142).
     """
 
     def __init__(self, class_nums: Sequence[float], **ce_kwargs):
@@ -32,7 +32,7 @@ class WeightedCrossEntropyFromCounts(nn.Module):
 
 class WeightedCrossEntropyFromPrior(nn.Module):
     """
-    RespireNet train.py:140-146 의 가중 CE:
+    Weighted CE from RespireNet train.py:140-146:
       w = prior / prior.sum();  w = 1 / w;  w = w / w.sum()
     prior [3, 1, 1, 1] → [0.1, 0.3, 0.3, 0.3].
     """

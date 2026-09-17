@@ -1,15 +1,15 @@
-"""체크포인트 재평가 — `rsc-toolkit-eval` (리팩토링 P2-3).
+"""Checkpoint re-evaluation — `rsc-toolkit-eval`.
 
-학습 run 디렉터리(`outputs/<group>/<run>/best.pth`)를 그 run 의 설정 스냅샷(`outputs/YYYY-MM-DD/HH-MM-SS/.hydra/config.yaml`,
-없으면 run 로그에 찍힌 resolved config)으로 **학습 때와 같은 팩토리**로 다시 세우고, state_dict 를 strict 로 로드한 뒤
-검증 스플릿을 `trainer.validate` 로 평가해 지표를 돌려준다.
+Rebuilds a training run directory (`outputs/<group>/<run>/best.pth`) from that run's config snapshot
+(`outputs/YYYY-MM-DD/HH-MM-SS/.hydra/config.yaml`, or else the resolved config printed in the run log) with **the same
+factories as in training**, loads the state_dict strictly, evaluates the validation split with `trainer.validate`, and returns the metrics.
 
-원칙
-- 학습 산출물은 **읽기만 한다**: 프로세스 CWD 를 샌드박스로 옮기고(입력 디렉터리만 심링크), 체크포인트·json 을 쓰는
-  콜백은 버리거나 샌드박스로 돌리며, 로거는 끈다. 피처 캐시의 체인 대장(`_chain.json`)도 읽기만 한다.
-- 설정은 스냅샷 그대로 쓰되 `--override k=v`(OmegaConf dotlist) 로 덮어쓸 수 있다 — 예: 다른 배치 크기, 다른 split.
+Principles
+- Training outputs are **read only**: the process CWD moves to a sandbox (only input directories are symlinked), callbacks
+  that write checkpoints/json are dropped or redirected to the sandbox, and loggers are disabled. The feature cache's chain ledger (`_chain.json`) is only read too.
+- The snapshot config is used as is, but can be overridden with `--override k=v` (OmegaConf dotlist) — e.g. a different batch size or split.
 
-    rsc-toolkit-eval outputs/patchmix/icbhi-patchmix-ce-s1                 # best.json 과 자동 대조
+    rsc-toolkit-eval outputs/patchmix/icbhi-patchmix-ce-s1                 # compared against best.json automatically
     rsc-toolkit-eval outputs/qlung/icbhi-qlung-s1 --override data.params.batch_size=16 --out eval.json
 """
 from __future__ import annotations
@@ -28,21 +28,21 @@ from typing import Any, Dict, Iterable, Iterator, List, Optional, Sequence, Tupl
 
 logger = logging.getLogger(__name__)
 
-# 입력으로만 쓰는 최상위 디렉터리 — 샌드박스에 심링크로 노출한다. outputs/ 는 일부러 뺀다.
+# Top-level directories used only as inputs — exposed in the sandbox as symlinks. outputs/ is deliberately excluded.
 READ_ONLY_ROOTS: Tuple[str, ...] = ("rsc_toolkit", ".datasets", "downloaded_datasets", "pretrained_models", "sample_data")
-# config 안의 상대 경로를 절대 경로로 바꿀 접두사 (outputs/ 는 encoder_ckpt 같은 **입력** 에만 등장한다 —
-# 콜백 dirpath 는 sanitize_config 가 따로 처리한다).
+# Prefixes of relative paths in the config to make absolute (outputs/ appears only in **inputs** such as encoder_ckpt;
+# callback dirpaths are handled separately by sanitize_config).
 ABS_PREFIXES: Tuple[str, ...] = tuple(f"{r}/" for r in READ_ONLY_ROOTS) + ("outputs/",)
-# validate 에서 살려 두는 콜백 — 지표·손실 재현에 필요하거나 무해한 것만. 나머지(체크포인트·json 저장, MA/EMA,
-# LR 스케줄, 샘플러 epoch 등)는 전부 버린다.
+# Callbacks kept for validate — only those needed to reproduce metrics/loss, or harmless ones. All others (checkpoint/json
+# saving, MA/EMA, LR schedules, sampler epochs, etc.) are dropped.
 KEEP_CALLBACKS = frozenset({"AMSDEpochCallback", "DomainTransferStages", "ProtoNetClassWeight", "RespireNetVoteEval"})
 STD_KEYS: Tuple[str, ...] = ("S_p", "S_e", "icbhi_score")
 VOTE_MAP = {"S_p": "vote/S_p", "S_e": "vote/S_e", "icbhi_score": "vote/icbhi_score", "cycle_acc": "vote/cycle_acc"}
 
 
-# ----------------------------------------------------------------------------- 설정 복구
+# ----------------------------------------------------------------------------- config recovery
 def load_snapshot_config(hydra_dir: pathlib.Path, project_root: pathlib.Path) -> dict:
-    """`<hydra_dir>/.hydra/config.yaml` 을 읽는다. `${hydra:runtime.cwd}` 는 hydra 런타임 밖에서 못 푸므로 project_root 로 치환."""
+    """Read `<hydra_dir>/.hydra/config.yaml`. `${hydra:runtime.cwd}` cannot be resolved outside the hydra runtime, so it is replaced with project_root."""
     import yaml
     from omegaconf import OmegaConf
 
@@ -58,7 +58,7 @@ def find_run_log(run_name: str, project_root: pathlib.Path) -> Optional[pathlib.
 
 
 def load_log_config(log_path: pathlib.Path) -> Optional[dict]:
-    """train.py 가 시작 직후 찍는 `OmegaConf.to_yaml(cfg, resolve=True)` 블록을 파싱한다 (마지막 블록)."""
+    """Parse the `OmegaConf.to_yaml(cfg, resolve=True)` block that train.py prints at startup (the last block)."""
     import yaml
     from omegaconf import OmegaConf
 
@@ -68,7 +68,7 @@ def load_log_config(log_path: pathlib.Path) -> Optional[dict]:
         return None
     block = []
     for ln in lines[starts[-1]:]:
-        # 최상위 키(소문자 key:) 또는 들여쓰기 줄만 YAML 블록에 속한다. 로그 줄·경고·Lightning 출력에서 멈춘다.
+        # Only top-level keys (lowercase key:) or indented lines belong to the YAML block. Stop at log lines, warnings, or Lightning output.
         if ln.startswith((" ", "-")) or re.match(r"^[a-z_]+:( .*)?$", ln):
             block.append(ln)
         else:
@@ -80,7 +80,7 @@ def load_log_config(log_path: pathlib.Path) -> Optional[dict]:
 
 
 def _snapshot_run_name(config_yaml: pathlib.Path) -> Optional[str]:
-    """스냅샷의 run.name (해석 없이). 기본값 `${data.name}-${model.name}` 이면 두 이름으로 조립한다."""
+    """run.name of the snapshot (unresolved). If it is the default `${data.name}-${model.name}`, assemble it from the two names."""
     from omegaconf import OmegaConf
 
     try:
@@ -98,7 +98,7 @@ def _snapshot_run_name(config_yaml: pathlib.Path) -> Optional[str]:
 
 
 def find_snapshot_dirs(run_name: str, project_root: pathlib.Path) -> List[pathlib.Path]:
-    """`outputs/*/*/.hydra/config.yaml` 중 run.name 이 같은 스냅샷 디렉터리들 (경로 사전순)."""
+    """Snapshot directories under `outputs/*/*/.hydra/config.yaml` with the same run.name (sorted by path)."""
     outputs = pathlib.Path(project_root) / "outputs"
     found = []
     for cfg_yaml in sorted(outputs.glob("*/*/.hydra/config.yaml")):
@@ -108,7 +108,7 @@ def find_snapshot_dirs(run_name: str, project_root: pathlib.Path) -> List[pathli
 
 
 def pick_snapshot(snapshot_dirs: Sequence[pathlib.Path], best_pth: pathlib.Path) -> Optional[pathlib.Path]:
-    """같은 run.name 의 스냅샷이 여럿이면 **best.pth 가 저장되기 직전** 것(디렉터리명 = 시작 시각). 없으면 마지막 것."""
+    """With several snapshots of the same run.name, pick the latest one **started before best.pth was saved** (directory name = start time); otherwise the last one."""
     if not snapshot_dirs:
         return None
     try:
@@ -128,7 +128,7 @@ def pick_snapshot(snapshot_dirs: Sequence[pathlib.Path], best_pth: pathlib.Path)
 
 def resolve_run_config(run_dir: pathlib.Path, project_root: pathlib.Path, *, hydra_dir: Optional[pathlib.Path] = None,
                        ckpt_name: str = "best.pth") -> Tuple[Optional[dict], str]:
-    """run 디렉터리의 설정을 복구한다: 지정 hydra_dir → run_dir/.hydra → run.name 이 같은 스냅샷 → run 로그. (cfg, 출처)"""
+    """Recover the config of a run directory: given hydra_dir → run_dir/.hydra → snapshot with the same run.name → run log. Returns (cfg, source)."""
     run_dir = pathlib.Path(run_dir)
     if hydra_dir is not None:
         return load_snapshot_config(pathlib.Path(hydra_dir), project_root), f"hydra:{hydra_dir}"
@@ -147,7 +147,7 @@ def resolve_run_config(run_dir: pathlib.Path, project_root: pathlib.Path, *, hyd
 
 
 def absolutize(obj: Any, project_root: pathlib.Path, skip_keys: Iterable[str] = ()) -> Any:
-    """상대 경로 문자열(READ_ONLY_ROOTS·outputs 접두사)을 project_root 기준 절대 경로로. skip_keys 서브트리는 건너뛴다."""
+    """Turn relative path strings (READ_ONLY_ROOTS / outputs prefixes) into absolute paths under project_root. skip_keys subtrees are skipped."""
     skip = set(skip_keys)
     if isinstance(obj, dict):
         return {k: (v if k in skip else absolutize(v, project_root, skip)) for k, v in obj.items()}
@@ -160,7 +160,7 @@ def absolutize(obj: Any, project_root: pathlib.Path, skip_keys: Iterable[str] = 
 
 def sanitize_config(cfg: dict, sandbox: pathlib.Path, run_name: str, project_root: pathlib.Path,
                     keep_callbacks: Iterable[str] = KEEP_CALLBACKS) -> Tuple[dict, List[str]]:
-    """평가 전용 설정으로 바꾼다: resume 제거, 경로 절대화, 쓰기 콜백 제거(유지 목록의 dirpath 는 샌드박스로), 로거·체크포인팅 끔."""
+    """Convert to an evaluation-only config: drop resume, make paths absolute, drop writing callbacks (kept ones get a sandbox dirpath), disable loggers and checkpointing."""
     keep = set(keep_callbacks)
     cfg = copy.deepcopy(cfg)
     cfg.pop("resume", None)
@@ -175,7 +175,7 @@ def sanitize_config(cfg: dict, sandbox: pathlib.Path, run_name: str, project_roo
         name = str(cb.get("_target_", "")).rsplit(".", 1)[-1]
         if name in keep:
             cb = dict(cb)
-            if "dirpath" in cb:  # RespireNetVoteEval — best.pth/best.json 을 쓰므로 샌드박스로
+            if "dirpath" in cb:  # RespireNetVoteEval — writes best.pth/best.json, so redirect to the sandbox
                 cb["dirpath"] = str(pathlib.Path(sandbox) / "callback_out" / run_name)
             kept.append(cb)
         else:
@@ -190,7 +190,7 @@ def sanitize_config(cfg: dict, sandbox: pathlib.Path, run_name: str, project_roo
 
 
 def apply_overrides(cfg: dict, overrides: Sequence[str]) -> dict:
-    """`k.sub=v` dotlist 를 OmegaConf 로 병합한다 (값은 YAML 로 해석: 8 → int, true → bool)."""
+    """Merge a `k.sub=v` dotlist with OmegaConf (values parsed as YAML: 8 → int, true → bool)."""
     if not overrides:
         return cfg
     from omegaconf import OmegaConf
@@ -199,7 +199,7 @@ def apply_overrides(cfg: dict, overrides: Sequence[str]) -> dict:
     return OmegaConf.to_container(merged, resolve=True)
 
 
-# ----------------------------------------------------------------------------- 샌드박스·캐시 대장
+# ----------------------------------------------------------------------------- sandbox and cache ledger
 def make_sandbox(path: pathlib.Path, project_root: pathlib.Path) -> None:
     path = pathlib.Path(path)
     path.mkdir(parents=True, exist_ok=True)
@@ -208,7 +208,7 @@ def make_sandbox(path: pathlib.Path, project_root: pathlib.Path) -> None:
         if not src.exists():
             continue
         if dst.is_symlink() and dst.resolve() != src.resolve():
-            dst.unlink()                      # 다른 checkout 이 남긴 샌드박스를 재사용할 때 조용히 그쪽을 읽지 않도록 다시 잇는다
+            dst.unlink()                      # relink so that a sandbox left by another checkout does not silently read from there
         if not dst.exists():
             dst.symlink_to(src, target_is_directory=True)
     (path / "lightning").mkdir(exist_ok=True)
@@ -216,11 +216,11 @@ def make_sandbox(path: pathlib.Path, project_root: pathlib.Path) -> None:
 
 
 def install_readonly_chain_guard(notes: list):
-    """FeatureCache._check_audio_chain 을 읽기 전용으로 바꾼다. 되돌리는 함수를 돌려준다.
+    """Make FeatureCache._check_audio_chain read-only. Returns a function that restores it.
 
-    원본은 대장(_chain.json)이 없으면 **실제 캐시 디렉터리에 새로 쓰고**, 어긋나면 예외를 던진다.
-    평가는 캐시를 읽기만 해야 하므로 쓰기를 없애고, 어긋남은 예외 대신 `notes` 에 기록한다
-    (waveform 종류는 캐시를 아예 안 쓰므로 어긋나도 평가에 영향이 없다 — 그 사실도 기록에 담긴다)."""
+    The original **writes a new ledger (_chain.json) into the real cache directory** if none exists, and raises on a mismatch.
+    Evaluation must only read the cache, so writing is removed and mismatches are recorded in `notes` instead of raising
+    (the waveform kind uses no cache at all, so a mismatch does not affect evaluation — the record shows that as well)."""
     from rsc_toolkit.datasets import feature_cache as fc_mod
 
     original = fc_mod.FeatureCache._check_audio_chain
@@ -249,7 +249,7 @@ def install_readonly_chain_guard(notes: list):
 
 @contextlib.contextmanager
 def readonly_chain_guard(notes: Optional[list] = None) -> Iterator[list]:
-    """`install_readonly_chain_guard` 의 with-블록 형태 — 블록을 나가면 원래 동작으로 되돌린다."""
+    """With-block form of `install_readonly_chain_guard` — restores the original behavior on exit."""
     notes = [] if notes is None else notes
     restore = install_readonly_chain_guard(notes)
     try:
@@ -268,15 +268,14 @@ def _chdir(path: pathlib.Path) -> Iterator[None]:
         os.chdir(prev)
 
 
-# ----------------------------------------------------------------------------- 로드·평가
-# 학습 샘플 수에 따라 크기가 정해지는 버퍼(AMS-D 의 per-sample 상태) — 이 이름들만 ckpt 모양으로 맞춘다.
-# 그 밖의 모양 불일치(BN running stat·pos_embed 등)는 모델 구성이 다르다는 뜻이므로 strict 로드가 실패해야 한다
-# (예전엔 이름 불문 전부 0 으로 바꿔 "strict_ok" 로 통과시켰다 — REVIEW 2026-09-10 §4 P3).
+# ----------------------------------------------------------------------------- load and evaluate
+# Buffers whose size depends on the number of training samples (AMS-D per-sample state) — only these names are reshaped to the ckpt.
+# Any other shape mismatch (BN running stats, pos_embed, etc.) means a different model configuration, so the strict load must fail.
 ADAPTABLE_BUFFER_SUFFIXES = ("all_predictions", "ids_masked")
 
 
 def adapt_buffer_shapes(model, sd: dict) -> List[str]:
-    """ckpt 의 버퍼 모양이 새 모델과 다르면(AMSD 의 per-sample 버퍼) 그 버퍼만 ckpt 모양으로 바꾼다."""
+    """If a ckpt buffer shape differs from the new model (AMSD per-sample buffers), reshape only that buffer to the ckpt shape."""
     import torch
 
     changed = []
@@ -295,7 +294,7 @@ def adapt_buffer_shapes(model, sd: dict) -> List[str]:
 
 
 def load_checkpoint(model, ckpt_path: pathlib.Path) -> dict:
-    """best.pth(`{"model": state_dict}` 또는 state_dict 자체)를 strict 로 로드한다. 결과는 info dict (load: strict_ok|strict_fail)."""
+    """Strictly load best.pth (`{"model": state_dict}` or a bare state_dict). Returns an info dict (load: strict_ok|strict_fail)."""
     import torch
 
     info: Dict[str, Any] = {}
@@ -313,13 +312,13 @@ def load_checkpoint(model, ckpt_path: pathlib.Path) -> dict:
             info["load_missing"] = list(res.missing_keys)[:20]
             info["load_unexpected"] = list(res.unexpected_keys)[:20]
         except RuntimeError as exc2:
-            # 모양 불일치(버퍼·가중치)는 strict=False 로도 못 싣는다 — 부분 로드 정보 없이 실패로 남긴다
+            # Shape mismatches (buffers/weights) cannot be loaded even with strict=False — record a failure without partial-load info
             info["load_error"] = str(exc2)[:500]
     return info
 
 
 def build_and_validate(cfg: dict, ckpt_path: pathlib.Path, sandbox: pathlib.Path, run_name: str) -> dict:
-    """설정(sanitize 된 것)으로 모델·손실·지표·datamodule·trainer 를 세우고 ckpt 를 로드해 validate. 반환: info(load, metrics…)."""
+    """Build model, loss, metrics, datamodule, and trainer from the (sanitized) config, load the ckpt, and validate. Returns info (load, metrics…)."""
     import lightning as L
 
     from rsc_toolkit.trainer.factories.build_adapter import build_adapter
@@ -346,7 +345,7 @@ def build_and_validate(cfg: dict, ckpt_path: pathlib.Path, sandbox: pathlib.Path
     pl_module = build_adapter(cfg.get("adapter"), rsc_model=model, loss_func=loss_func, optimizer_cfg=cfg["optimizer"],
                               train_metric_fns=train_fns, val_metric_fns=val_fns)
 
-    # Lightning 은 validate 에 setup("validate") 를 부르는데 툴킷 datamodule 들은 fit/test 만 안다 → None(전부) 로 매핑.
+    # Lightning calls setup("validate") for validate, but toolkit datamodules only know fit/test → map to None (all).
     orig_setup = datamodule.setup
     datamodule.setup = lambda stage=None: orig_setup(None if stage == "validate" else stage)  # type: ignore[assignment]
 
@@ -360,8 +359,8 @@ def build_and_validate(cfg: dict, ckpt_path: pathlib.Path, sandbox: pathlib.Path
 
 
 def compare(expected: dict, metrics: dict, tol: float) -> Tuple[str, dict, Optional[float]]:
-    """best.json(expected) 과 재평가 지표를 대조 — PASS(|Δ| ≤ tol) · MISMATCH · ERROR(대조할 키 없음)."""
-    if "cycle_acc" in expected:  # RespireNet — 사이클 투표 지표
+    """Compare best.json (expected) with re-evaluated metrics — PASS (|Δ| ≤ tol) · MISMATCH · ERROR (no keys to compare)."""
+    if "cycle_acc" in expected:  # RespireNet — cycle-vote metrics
         pairs = {k: (expected.get(k), metrics.get(v)) for k, v in VOTE_MAP.items()}
     else:
         keys = list(STD_KEYS) + [k for k in ("paper_S_p", "paper_S_e", "paper_score", "paper_acc") if k in expected]
@@ -389,26 +388,26 @@ def evaluate_run(run_dir: pathlib.Path, *, project_root: Optional[pathlib.Path] 
                  hydra_dir: Optional[pathlib.Path] = None, ckpt_name: str = "best.pth",
                  overrides: Sequence[str] = (), sandbox: Optional[pathlib.Path] = None,
                  tol: float = 0.05) -> dict:
-    """run 디렉터리 하나를 재평가한다. 반환 dict: run, config_source, dropped_callbacks, load, metrics, (best.json 있으면) status·diffs."""
+    """Re-evaluate one run directory. Returned dict: run, config_source, dropped_callbacks, load, metrics, and (if best.json exists) status and diffs."""
     project_root = pathlib.Path(project_root or os.getcwd()).resolve()
     run_dir = pathlib.Path(run_dir)
     if not run_dir.is_absolute():
         run_dir = (project_root / run_dir).resolve()
     ckpt_path = run_dir / ckpt_name
     if not ckpt_path.exists():
-        raise FileNotFoundError(f"체크포인트가 없다: {ckpt_path}")
+        raise FileNotFoundError(f"checkpoint not found: {ckpt_path}")
     rec: Dict[str, Any] = {"run": run_dir.name, "run_dir": str(run_dir), "ckpt": str(ckpt_path)}
 
     cfg, source = resolve_run_config(run_dir, project_root, hydra_dir=hydra_dir, ckpt_name=ckpt_name)
     rec["config_source"] = source
     if cfg is None:
         rec["status"] = "SKIP"
-        rec["note"] = "설정 스냅샷도 run 로그도 없다 — --hydra-dir 로 지정하라"
+        rec["note"] = "no config snapshot and no run log — specify --hydra-dir"
         return rec
 
     sandbox = pathlib.Path(sandbox) if sandbox else pathlib.Path(project_root) / ".rsc_eval_sandbox"
     if (project_root / "outputs") in sandbox.resolve().parents:
-        raise ValueError(f"샌드박스 {sandbox} 가 outputs/ 안이다 — 콜백 산출물이 결과 디렉터리에 섞인다")
+        raise ValueError(f"sandbox {sandbox} is inside outputs/ — callback outputs would mix into the results directory")
     make_sandbox(sandbox, project_root)
     cfg, dropped = sanitize_config(cfg, sandbox, run_dir.name, project_root)
     cfg = apply_overrides(cfg, overrides)
@@ -428,8 +427,8 @@ def evaluate_run(run_dir: pathlib.Path, *, project_root: Optional[pathlib.Path] 
     if best_json.exists():
         expected = json.loads(best_json.read_text())
         status, diffs, worst = compare(expected, info["metrics"], tol)
-        # override 가 있으면 프로토콜이 바뀌었을 수 있으므로 판정(PASS/MISMATCH)은 내리지 않고 "OK" 로 두되,
-        # 대조 결과(diffs·max_abs_diff)는 참고용으로 함께 돌려준다 — 경로만 바꾼 평가(튜토리얼의 공개 weight 재평가)가 이를 쓴다.
+        # With overrides the protocol may have changed, so no PASS/MISMATCH verdict is given ("OK"), but the
+        # comparison (diffs, max_abs_diff) is returned for reference — used by path-only overrides (the tutorial's public-weight re-evaluation).
         rec.update({"status": status if not overrides else "OK", "diffs": diffs, "max_abs_diff": worst,
                     "compared_with_overrides": bool(overrides)})
     else:
@@ -440,14 +439,14 @@ def evaluate_run(run_dir: pathlib.Path, *, project_root: Optional[pathlib.Path] 
 # ----------------------------------------------------------------------------- CLI
 def main(argv: Optional[Sequence[str]] = None) -> int:
     ap = argparse.ArgumentParser(prog="rsc-toolkit-eval", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("run_dir", help="outputs/<group>/<run> — best.pth(또는 --ckpt) 와 best.json 이 있는 디렉터리")
-    ap.add_argument("--project-root", default=None, help="상대 경로의 기준 (기본: 현재 디렉터리)")
-    ap.add_argument("--hydra-dir", default=None, help="설정 스냅샷 디렉터리 (기본: run.name 이 같은 outputs/<날짜>/<시각> 자동 탐색)")
-    ap.add_argument("--ckpt", default="best.pth", help="run_dir 안의 체크포인트 파일명")
-    ap.add_argument("--override", action="append", default=[], help="OmegaConf dotlist, 예: data.params.batch_size=16 (반복 가능)")
-    ap.add_argument("--sandbox", default=None, help="쓰기가 떨어질 디렉터리 (기본: <project-root>/.rsc_eval_sandbox; outputs/ 밖이어야 한다)")
-    ap.add_argument("--tol", type=float, default=0.05, help="best.json 대조 PASS 허용 |Δ| (%% 단위 지표)")
-    ap.add_argument("--out", default=None, help="결과 JSON 경로 (기본: 표준출력만)")
+    ap.add_argument("run_dir", help="outputs/<group>/<run> — directory containing best.pth (or --ckpt) and best.json")
+    ap.add_argument("--project-root", default=None, help="base for relative paths (default: current directory)")
+    ap.add_argument("--hydra-dir", default=None, help="config snapshot directory (default: auto-detect outputs/<date>/<time> with the same run.name)")
+    ap.add_argument("--ckpt", default="best.pth", help="checkpoint file name inside run_dir")
+    ap.add_argument("--override", action="append", default=[], help="OmegaConf dotlist, e.g. data.params.batch_size=16 (repeatable)")
+    ap.add_argument("--sandbox", default=None, help="directory that receives all writes (default: <project-root>/.rsc_eval_sandbox; must be outside outputs/)")
+    ap.add_argument("--tol", type=float, default=0.05, help="allowed |Δ| for PASS when comparing with best.json (metrics in %%)")
+    ap.add_argument("--out", default=None, help="result JSON path (default: stdout only)")
     ap.add_argument("--quiet", action="store_true")
     args = ap.parse_args(argv)
 

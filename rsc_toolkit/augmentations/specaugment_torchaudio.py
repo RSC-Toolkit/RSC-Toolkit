@@ -1,8 +1,8 @@
 """
-SCL-metadata 저장소의 SpecAugment — augmentations.py 그대로 (torchaudio iid 마스킹, 값 0).
+SpecAugment from the SCL-metadata repository, ported as-is from augmentations.py (torchaudio iid masking, fill value 0).
 
-quirk 유지: `if self.p > torch.randn(1)` 게이트 — p=1.0 이면 실제 적용률 ≈ 84% (patch-mix 계열과 같은 버그).
-입력 (B, 1, F, T); FrequencyMasking(20)×2 + TimeMasking(40)×2, iid_masks=True → 샘플별 독립 마스크.
+Quirk kept: the `if self.p > torch.randn(1)` gate means p=1.0 gives an actual application rate of about 84% (same bug as the patch-mix family).
+Input (B, 1, F, T); FrequencyMasking(20)×2 + TimeMasking(40)×2, iid_masks=True → independent masks per sample.
 """
 import torch
 import torch.nn as nn

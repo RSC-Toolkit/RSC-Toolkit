@@ -1,16 +1,16 @@
 """
-OPERA 배치 멜 전처리 — eval-audio-repr evar/ar_opera.py get_entire_signal_librosa (OPERA src/util.py 인용) 의 torch 재현.
+OPERA batch mel preprocessing — torch re-implementation of get_entire_signal_librosa in eval-audio-repr evar/ar_opera.py (quoting OPERA src/util.py).
 
-원본(EMBC'25 동결 평가 경로)은 **배치 전체**를 numpy 로 내려 librosa 로 처리한다:
-  1) librosa.effects.trim(batch, frame_length=sr/10, hop=sr/20) — 배치 (B,T) 를 다채널로 보고 모든 샘플이 무음(배치 최대 프레임
-     파워 대비 -60 dB 미만)인 앞·뒤 프레임만 자른다.
-  2) 잘린 길이가 input_sec(8 s) 미만이면 split_pad_sample 로 패딩하려 하지만, 2-D 배열에서는 len()=B 라 원본이 예외로 죽는다
-     → 실제로 trim 이 한 프레임이라도 잘리면 원본 실행이 불가능하다. 여기서는 같은 상황에서 RuntimeError 를 낸다.
+The original code (EMBC'25 frozen evaluation path) moves the **whole batch** to numpy and processes it with librosa:
+  1) librosa.effects.trim(batch, frame_length=sr/10, hop=sr/20) — treats the batch (B,T) as multichannel and trims only leading/trailing
+     frames where every sample is silent (below -60 dB relative to the batch's maximum frame power).
+  2) If the trimmed length is below input_sec (8 s), it tries to pad with split_pad_sample, but on a 2-D array len()=B, so the original crashes
+     → in practice the original cannot run if trim removes even one frame. Here the same situation raises RuntimeError.
   3) librosa.feature.melspectrogram(n_mels 64, n_fft 1024, hop 512, 50–8000 Hz, power 2, center, pad 'constant')
-     → power_to_db(ref=np.max: **배치** 최대, top_db 80) → **배치** 전체 min-max → (B, 64, T).
-  배치 구성에 따라 값이 달라지는 quirk 이며(배치 의존 정규화), 그대로 유지한다.
+     → power_to_db(ref=np.max: **batch** maximum, top_db 80) → min-max over the whole **batch** → (B, 64, T).
+  Values depend on the batch composition (batch-dependent normalization); this quirk is kept as is.
 
-멜 계산은 GPU(torch.stft + librosa.filters.mel 필터뱅크)로 하고 librosa 결과와 골든으로 대조한다 (tests/golden/opera).
+The mel computation runs on the GPU (torch.stft + librosa.filters.mel filterbank) and is compared against librosa goldens (tests/golden/opera).
 """
 from __future__ import annotations
 
@@ -22,7 +22,7 @@ import torch.nn as nn
 
 
 def librosa_trim_indices(y: torch.Tensor, frame_length: int, hop_length: int, top_db: float = 60.0) -> Tuple[int, int]:
-    """librosa.effects.trim(y (B,T) or (T,), frame_length, hop_length) 의 (start, end) 샘플 인덱스를 torch 로 계산."""
+    """Compute the (start, end) sample indices of librosa.effects.trim(y (B,T) or (T,), frame_length, hop_length) in torch."""
     if y.dim() == 1:
         y = y.unsqueeze(0)
     T = y.shape[-1]
@@ -43,7 +43,7 @@ def librosa_trim_indices(y: torch.Tensor, frame_length: int, hop_length: int, to
 
 
 class OperaBatchMel(nn.Module):
-    """(B, T) 16 kHz 파형 배치 → (B, n_mels, frames) 배치 정규화 멜 (위 설명의 3 단계)."""
+    """(B, T) 16 kHz waveform batch → (B, n_mels, frames) batch-normalized mel (the 3 steps described above)."""
 
     def __init__(self, sample_rate: int = 16000, n_mels: int = 64, f_min: float = 50.0, f_max: float = 8000.0,
                  n_fft: int = 1024, hop_length: int = 512, input_sec: float = 8.0, top_db: float = 80.0):
@@ -63,8 +63,8 @@ class OperaBatchMel(nn.Module):
         if (start, end) != (0, wave.shape[-1]):
             if (end - start) / self.sample_rate < self.input_sec:
                 raise RuntimeError(
-                    f"배치 단위 trim 이 [{start}:{end}] 로 잘려 {self.input_sec}s 미만이 됐다 — 원본(ar_opera.get_entire_signal_librosa) 은 "
-                    "이 경우 2-D 배열 패딩에서 예외로 죽으므로 재현 대상 밖이다. 배치 구성(무음 가장자리)을 확인할 것.")
+                    f"batch-level trim cut the batch to [{start}:{end}], shorter than {self.input_sec}s — the original code (ar_opera.get_entire_signal_librosa) "
+                    "crashes on 2-D array padding in this case, so it is outside the reproduction scope. Check the batch composition (silent edges).")
             wave = wave[..., start:end]
         return wave
 

@@ -1,36 +1,36 @@
 """
-Prototype Learning for Interpretable Respiratory Sound Analysis (Ren·Nguyen·Nejdl, ICASSP 2022) — 공식 코드 충실 이식 (P0).
+Prototype Learning for Interpretable Respiratory Sound Analysis (Ren·Nguyen·Nejdl, ICASSP 2022) — exact port of the official code.
 
-출처:
-- 논문: https://arxiv.org/abs/2110.03536 (ICASSP 2022, pp.9087–9091)
-- 공식 코드: https://github.com/L3S/PrototypeSound (MIT, HEAD 5116de7)
+Sources:
+- Paper: https://arxiv.org/abs/2110.03536 (ICASSP 2022, pp.9087–9091)
+- Official code: https://github.com/L3S/PrototypeSound (MIT, HEAD 5116de7)
   baseline_cnn/pytorch/models_pytorch.py (DecisionLevelMaxPooling / ProtoNet / CNN_encoder / PrototypeLayer),
   baseline_cnn/utils/config.py (sr 4000, cycle_len 16000, win 256, hop 128, mel 128)
 
-구조(공식과 동일):
-  파형 (B, 16000) @4 kHz
+Architecture (same as official):
+  waveform (B, 16000) @4 kHz
   → torchlibrosa Spectrogram(n_fft 256, hop 128, win 256, hann, center, reflect)
   → LogmelFilterBank(sr 4000, 128 mel, fmin 20, fmax 2000, ref 1.0, amin 1e-10, top_db None)   → (B,1,126,128)
-  → Δ, ΔΔ 를 채널로 이어붙임(torch.diff, append=마지막 프레임)                                    → (B,3,126,128)
-  → CNN_encoder: BatchNorm2d(128)(멜 축) + ConvBlock 3→64→128→256→512 (각 max-pool 2×2, dropout 0.2) → (B,512,7,8)
+  → Δ, ΔΔ concatenated as channels (torch.diff, append=last frame)                               → (B,3,126,128)
+  → CNN_encoder: BatchNorm2d(128)(mel axis) + ConvBlock 3→64→128→256→512 (each max-pool 2×2, dropout 0.2) → (B,512,7,8)
   → dropout 0.5
   → [ProtoNet] PrototypeLayer(cosine, proto_form) → similarity (B, n_proto) → Linear(n_proto, 4, bias=False) → log_softmax
-    [CNN-8 기준선] max-pool 전체 → (B,512) → Linear(512, 4) → log_softmax
+    [CNN-8 baseline] global max-pool → (B,512) → Linear(512, 4) → log_softmax
 
-**torchlibrosa 를 그대로 쓴다**(.venv 에 설치, MIT, 무의존). PANNs 계열(cnn14_gapaug)의 torchaudio 재현본과는
-max|diff| 8.9e-3 dB 차이가 있어, 이 논문은 공식과 비트 단위로 맞추기 위해 원 라이브러리를 사용한다.
+**torchlibrosa is used as is** (installed in .venv, MIT, no dependencies). The torchaudio reproduction used for the PANNs family (cnn14_gapaug)
+differs by max|diff| 8.9e-3 dB, so this paper uses the original library to match the official code bit for bit.
 
-원본 그대로 유지하는 quirk:
-- **`np.float` 사용(공식 코드는 현대 numpy 에서 실행 불가)**: PrototypeLayer 가 `np.zeros(..., dtype=np.float)` 로
-  버퍼를 만든 뒤 GPU 로 옮긴다. numpy≥1.24 에서 `np.float` 는 제거돼 AttributeError 가 난다. 여기서는 동일 결과를
-  주는 `torch.zeros` 로 만들되 **연산 순서·수식은 그대로** 둔다(골든으로 고정).
-- **배치·프로토타입 이중 루프**: 공식은 파이썬 루프로 코사인 유사도를 계산한다. 여기서는 수치가 동일함을
-  골든으로 확인한 뒤 벡터화한다(루프판은 `_loop=True` 로 남겨 대조 가능).
-- **`sim_lowbound` 하한 1e-8**: 코사인 분모를 `max(‖a‖‖b‖, 1e-8)` 로 클램프 — F.cosine_similarity(eps 1e-8 를
-  각 노름에 더함)와 다른 동작이라 그대로 유지.
-- **vector2d_maxp 는 BN 이 주석 처리**되어 있다(공식 코드 그대로). 논문 Table 3 의 "w/ BN" 행은 vector2d(EleSim)
-  기준이며, MaxSim w/ BN 행은 Sp 0.00 으로 붕괴한 결과를 논문도 그대로 싣고 있다.
-- diverse_loss 는 프로토타입이 1개/클래스일 때 internal 항이 0 이 되도록 분기한다(공식 `proto_per_class == 1`).
+Quirks kept from the original code:
+- **`np.float` (the official code does not run on modern numpy)**: PrototypeLayer builds a buffer with `np.zeros(..., dtype=np.float)`
+  and moves it to the GPU. `np.float` was removed in numpy≥1.24, which raises AttributeError. Here it is built with `torch.zeros`,
+  which gives the same result, while **the order of operations and formulas are unchanged** (pinned by goldens).
+- **Double loop over batch and prototypes**: the official code computes cosine similarity in Python loops. Here it is vectorized
+  after confirming identical numbers against goldens.
+- **`sim_lowbound` lower bound 1e-8**: the cosine denominator is clamped as `max(‖a‖‖b‖, 1e-8)` — this differs from F.cosine_similarity
+  (which applies eps 1e-8 to each norm), so it is kept.
+- **BN is commented out for vector2d_maxp** (as in the official code). The "w/ BN" row of paper Table 3 refers to vector2d (EleSim),
+  and the paper itself reports the MaxSim w/ BN row collapsing to Sp 0.00.
+- diverse_loss branches so that the internal term is 0 when there is one prototype per class (official `proto_per_class == 1`).
 """
 from __future__ import annotations
 
@@ -52,7 +52,7 @@ PROTO_FORMS = ("vector1d", "vector2d", "vector2d_att", "vector2d_avgp", "vector2
 
 
 class ProtoLogMel(nn.Module):
-    """공식 config 그대로의 torchlibrosa 특징 추출 + Δ/ΔΔ 채널 결합."""
+    """torchlibrosa feature extraction with the official config + Δ/ΔΔ channel concatenation."""
 
     def __init__(self, sample_rate: int = 4000, win_length: int = 256, hop_length: int = 128, mel_bins: int = 128,
                  fmin: int = 20, fmax: int = 2000):
@@ -67,7 +67,7 @@ class ProtoLogMel(nn.Module):
         )
 
     def forward(self, wav: torch.Tensor) -> torch.Tensor:
-        """(B, L) → (B, 3, T, mel) — 원본 forward 앞부분과 동일."""
+        """(B, L) → (B, 3, T, mel) — same as the first part of the original forward."""
         x = self.logmel_extractor(self.spectrogram_extractor(wav))  # (B,1,T,M)
         b, c, _, m = x.shape
         x_diff1 = torch.diff(x, n=1, dim=2, append=x[:, :, -1, :].view((b, c, 1, m)))
@@ -76,7 +76,7 @@ class ProtoLogMel(nn.Module):
 
 
 class CNNEncoder(nn.Module):
-    """원본 CNN_encoder — bn0(멜 축) + ConvBlock ×4, 각 max-pool 2×2 + dropout 0.2."""
+    """Original CNN_encoder — bn0 (mel axis) + ConvBlock ×4, each max-pool 2×2 + dropout 0.2."""
 
     def __init__(self, mel_bins: int = 128):
         super().__init__()
@@ -98,14 +98,14 @@ class CNNEncoder(nn.Module):
 
 
 def _cos(a: torch.Tensor, b: torch.Tensor, dim: int, lowbound: float = 1e-8) -> torch.Tensor:
-    """원본의 코사인: sum(a*b)/max(‖a‖·‖b‖, 1e-8) — F.cosine_similarity 와 클램프 방식이 다르다."""
+    """Original cosine: sum(a*b)/max(‖a‖·‖b‖, 1e-8) — clamps differently from F.cosine_similarity."""
     num = torch.sum(a * b, dim=dim)
     den = torch.norm(a, p=2, dim=dim) * torch.norm(b, p=2, dim=dim)
     return num / torch.clamp(den, min=lowbound)
 
 
 class PrototypeLayer(nn.Module):
-    """원본 PrototypeLayer(distance='cosine') — 6개 proto_form 전부 이식."""
+    """Original PrototypeLayer(distance='cosine') — all 6 proto_forms ported."""
 
     def __init__(self, n_proto: int, proto_form: str, emb_ch: int = 512, emb_t: int = 7, emb_f: int = 8):
         super().__init__()
@@ -122,7 +122,7 @@ class PrototypeLayer(nn.Module):
         else:
             self.prototype = nn.Parameter(torch.empty((n_proto, emb_ch, emb_t, emb_f), dtype=torch.float), requires_grad=True)
 
-        self.ones = nn.Parameter(torch.ones(self.prototype.shape), requires_grad=False)  # 원본에 있으나 미사용
+        self.ones = nn.Parameter(torch.ones(self.prototype.shape), requires_grad=False)  # present in the original but unused
         if "att" in proto_form:
             self.fc = nn.Linear(emb_ch, 1)
         self.bn = nn.BatchNorm2d(n_proto)
@@ -140,7 +140,7 @@ class PrototypeLayer(nn.Module):
         p = self.prototype
 
         if f == "vector1d":
-            # (B,512,T,F) → max-pool 전체 → (B,512,1,1) → flatten
+            # (B,512,T,F) → global max-pool → (B,512,1,1) → flatten
             v = F.max_pool2d(x, kernel_size=x.shape[2:]).flatten(start_dim=1)      # (B,512)
             sim = _cos(v.unsqueeze(1), p.flatten(start_dim=1).unsqueeze(0), dim=2)  # (B,n_proto)
             return self.ln(sim), p
@@ -161,7 +161,7 @@ class PrototypeLayer(nn.Module):
             return sim, p
 
         if f in ("vector2d_avgp", "vector2d_maxp"):
-            # 모든 (t,f) × (t',f') 쌍의 코사인 → 평균/최대로 축약 (원본 dim 5 → dim 4 순서 유지)
+            # cosine for every (t,f) × (t',f') pair → reduced by mean/max (original dim 5 → dim 4 order kept)
             a = x.unsqueeze(1).unsqueeze(-1).unsqueeze(-1)                          # (B,1,512,T,F,1,1)
             b = p.unsqueeze(0).unsqueeze(3).unsqueeze(4)                            # (1,n,512,1,1,T,F)
             sim_all = _cos(a, b, dim=2)                                             # (B,n,T,F,T,F)
@@ -169,7 +169,7 @@ class PrototypeLayer(nn.Module):
                 sim = torch.mean(torch.mean(sim_all, 5), 4)
                 sim = self.bn(sim)
             else:
-                sim = torch.max(torch.max(sim_all, 5)[0], 4)[0]                     # 원본은 BN 주석 처리
+                sim = torch.max(torch.max(sim_all, 5)[0], 4)[0]                     # BN commented out in the original
             sim = F.avg_pool2d(sim, kernel_size=sim.shape[2:]).view(sim.shape[0:2])
             return sim, p
 
@@ -180,7 +180,7 @@ class PrototypeLayer(nn.Module):
         sim_all = _cos(a, b, dim=2)                                                 # (B,n,56,56)
         att, ind = torch.max(sim_all, 3)                                            # (B,n,56)
         att = F.softmax(att, dim=-1)
-        # 원본: prototype[j][:, ind[i,j,:]] — 배치·프로토타입별로 뽑은 열
+        # original: prototype[j][:, ind[i,j,:]] — columns selected per batch item and prototype
         p_sel = torch.gather(
             p.unsqueeze(0).expand(xf.shape[0], -1, -1, -1), 3,
             ind.unsqueeze(2).expand(-1, -1, self.emb_ch, -1),
@@ -191,7 +191,7 @@ class PrototypeLayer(nn.Module):
 
 
 def diverse_loss(proto: torch.Tensor, classes_num: int) -> torch.Tensor:
-    """원본 ProtoNet.diverse_loss — 프로토타입 간 코사인 유사도로 다양성 페널티."""
+    """Original ProtoNet.diverse_loss — diversity penalty from cosine similarity between prototypes."""
     pt_flat = proto if proto.dim() == 2 else torch.flatten(proto, start_dim=1)
     n = pt_flat.shape[0]
     proto_per_class = int(n / classes_num)
@@ -203,7 +203,7 @@ def diverse_loss(proto: torch.Tensor, classes_num: int) -> torch.Tensor:
     external = torch.sum(sim) - internal
     diag = torch.sum(sim * torch.eye(n, device=sim.device, dtype=sim.dtype))
     if proto_per_class == 1:
-        # 원본: 클래스당 1개면 internal 항이 대각뿐이라 external 만 남긴다
+        # original: with one prototype per class the internal term is only the diagonal, so only external remains
         internal_mean = pt_flat.new_zeros(())
     else:
         internal = internal - diag
@@ -215,17 +215,17 @@ def diverse_loss(proto: torch.Tensor, classes_num: int) -> torch.Tensor:
 @ModelFactory.register_model_class("protonet")
 class ProtoNetModel(BaseRSCModel, nn.Module):
     """
-    ICASSP 2022 Prototype 논문 모델. method:
-      "cnn8"  = DecisionLevelMaxPooling 기준선 (논문 Table 3 첫 행)
-      "proto" = ProtoNet (proto_form 으로 변형 선택; 논문 "Ours" = vector2d)
-    학습 손실은 가중 NLL(+ proto 일 때 0.1·diverse) — training_forward 가 돌려준다.
+    Model of the ICASSP 2022 Prototype paper. method:
+      "cnn8"  = DecisionLevelMaxPooling baseline (first row of paper Table 3)
+      "proto" = ProtoNet (variant selected by proto_form; paper "Ours" = vector2d)
+    The training loss is weighted NLL (+ 0.1·diverse for proto) — returned by training_forward.
     """
 
     def __init__(
         self,
         n_cls: int = 4,
         method: str = "proto",              # "cnn8" | "proto"
-        proto_form: str = "vector2d",       # 논문 "Ours" = vector2d (EleSim-Van w/ BN)
+        proto_form: str = "vector2d",       # paper "Ours" = vector2d (EleSim-Van w/ BN)
         n_proto_per_class: int = 1,
         sample_rate: int = 4000,
         win_length: int = 256,
@@ -234,8 +234,8 @@ class ProtoNetModel(BaseRSCModel, nn.Module):
         fmin: int = 20,
         fmax: int = 2000,
         cycle_len: int = 16000,
-        diverse_weight: float = 0.1,        # 원본 main: loss + 0.1 * loss_diverse
-        class_weight: Optional[list] = None,  # None 이면 datamodule 이 계산한 값을 주입받는다
+        diverse_weight: float = 0.1,        # original main: loss + 0.1 * loss_diverse
+        class_weight: Optional[list] = None,  # if None, the value computed by the datamodule is injected
     ):
         super().__init__()
         if method not in {"cnn8", "proto"}:
@@ -247,7 +247,7 @@ class ProtoNetModel(BaseRSCModel, nn.Module):
         self.logmel = ProtoLogMel(sample_rate, win_length, hop_length, mel_bins, fmin, fmax)
         self.cnn_encoder = CNNEncoder(mel_bins)
 
-        # 임베딩 격자 크기(공식 config 에서 (7, 8)) — 4번의 2×2 max-pool
+        # embedding grid size ((7, 8) with the official config) — four 2×2 max-pools
         t = (cycle_len // hop_length + 1) // 16
         f = mel_bins // 16
         if method == "proto":
@@ -262,12 +262,12 @@ class ProtoNetModel(BaseRSCModel, nn.Module):
         self._class_weight_set = class_weight is not None
 
     def set_class_weight(self, w) -> None:
-        """datamodule 의 balanced class weight 주입(원본 generator.calculate_class_weight)."""
+        """Injects the balanced class weight from the datamodule (original generator.calculate_class_weight)."""
         self._class_weight = torch.as_tensor(w, dtype=torch.float, device=self._class_weight.device)
         self._class_weight_set = True
 
     def forward(self, wav: torch.Tensor) -> torch.Tensor:
-        """(B, L) 또는 (B, 1, L) → log-softmax 로짓."""
+        """(B, L) or (B, 1, L) → log-softmax logits."""
         if wav.dim() == 3:
             wav = wav.squeeze(1)
         x = self.logmel(wav)
@@ -280,7 +280,7 @@ class ProtoNetModel(BaseRSCModel, nn.Module):
         return F.log_softmax(self.fc_final(sim), dim=-1)
 
     def training_forward(self, audio_batch, labels, loss_func, meta_labels=None):
-        """원본 main_pytorch{,_prototype}.py 학습 루프 — 가중 NLL (+ proto 는 0.1·diverse)."""
+        """Training loop of the original main_pytorch{,_prototype}.py — weighted NLL (+ 0.1·diverse for proto)."""
         logits = self.forward(audio_batch)
         w = self._class_weight.to(logits.device)
         loss = F.nll_loss(logits, labels, weight=w)

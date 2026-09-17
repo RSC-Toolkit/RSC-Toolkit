@@ -1,10 +1,10 @@
-# BTS(CLAP+TinyBERT) SPRSound 확장 — Audio-CLAP 은 model=audioclap 오버라이드
-# **논문 목표치 없음** — 논문은 ICBHI 만 실험했다. SPRSound 표준 태스크(2022 inter-patient, 7-class)로 확장한
-# 툴킷 자체 관찰이며 재현 판정 대상이 아니다. 레시피는 각 논문의 ICBHI 것을 그대로 쓴다(사용자 결정 2026-08-30).
+# BTS (CLAP+TinyBERT) SPRSound extension — Audio-CLAP via the model=audioclap override
+# **No paper-reported value** — the paper evaluates ICBHI only. This extends it to the standard SPRSound task (2022 inter-patient, 7-class)
+# as a toolkit extension (no paper counterpart), not a reproduction target. The recipe is the paper's ICBHI recipe, unchanged.
 defaults:
   - model: bts
   - data_defaults@data: base
-  - data: sprsound_btscard_train   # SPR→SPR 배선: meta7 을 train·val 양쪽에 붙인다 (index 경로는 val 에 안 붙여 EXIT=1)
+  - data: sprsound_btscard_train   # SPR→SPR wiring: attaches meta7 to both train and val (the index path does not attach it to val, so BTS-family models crash in validation_step)
   - loss: cross_entropy
   - metrics: sprsound_metrics
   - optimizer: adam
@@ -22,7 +22,7 @@ run:
 model:
   params:
     n_cls: 7
-    meta_dialect: sprsound     # **변형**: SPRSound 가 가진 4필드(age·gender·location·device)만으로 메타 문장 — adult_BMI·child_weight·child_height 부재 (2026-09-07 사용자 결정)
+    meta_dialect: sprsound     # **variant**: metadata sentences from only the 4 fields SPRSound has (age·gender·location·device) — adult_BMI·child_weight·child_height are absent
 
 trainer:
   params:

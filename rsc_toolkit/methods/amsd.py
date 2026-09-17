@@ -1,16 +1,16 @@
 """
-AMS-D(ICASSP 2026, CcnNnn/AMS-D) 의 학습 손실 — 공식 custom_loss.py Custom_Loss 의 충실 이식 (P0).
+Training loss of AMS-D (ICASSP 2026, CcnNnn/AMS-D): a faithful port of Custom_Loss in the official custom_loss.py (official-code parity).
 
-    L = L_task + α·L_distill + β·L_mask + γ·L_recon                (논문 식 4; custom_loss.py:45)
-      L_task    = (-y_onehot · log_softmax(s)).mean(0).sum()      = 비가중 CE (custom_loss.py:27-28)
-      L_mask    = 같은 식을 TWM 보조 로짓에 (weighted_output None 이면 0)  (custom_loss.py:31-35)
+    L = L_task + α·L_distill + β·L_mask + γ·L_recon                (paper Eq. 4; custom_loss.py:45)
+      L_task    = (-y_onehot · log_softmax(s)).mean(0).sum()      = unweighted CE (custom_loss.py:27-28)
+      L_mask    = same formula on the TWM auxiliary logits (0 if weighted_output is None)  (custom_loss.py:31-35)
       L_distill = KLDivLoss(batchmean)(log_softmax(s/τ), softmax(t/τ)) · τ²  (custom_loss.py:38-41, 'soft')
-                  ※ t_output 은 main.py:322/348 이 저장한 **이미 softmax 된 확률(epoch 0 은 one-hot)** 이라 teacher 에 softmax 가
-                    두 번 걸린다(이중 softmax; epoch 0 실효 teacher = [0.475, 0.175, 0.175, 0.175]). 공식 동작이므로 기본값으로 유지하고,
-                    논문 식 1(KL(q_t ∥ q_{t-1}), q 는 softmax 출력) 의 문자 그대로 해석은 teacher_is_prob=True 플래그 뒤에 둔다
-                    (가정 — 저자 확인 전).
-      L_recon   = 호출측이 계산한 MSE 스칼라 (epoch 0 은 0)
-    'hard' 는 CE(s, argmax t) (custom_loss.py:42-43) — 공식 실행은 'soft'.
+                  Note: t_output is the **already-softmaxed probability (one-hot at epoch 0)** saved by main.py:322/348, so softmax is
+                    applied to the teacher twice (double softmax; effective teacher at epoch 0 = [0.475, 0.175, 0.175, 0.175]). This is the official
+                    behavior and is kept as the default; the literal reading of paper Eq. 1 (KL(q_t ∥ q_{t-1}), q = softmax output) is behind the
+                    teacher_is_prob=True flag (Assumption: not confirmed by the authors).
+      L_recon   = MSE scalar computed by the caller (0 at epoch 0)
+    'hard' is CE(s, argmax t) (custom_loss.py:42-43); the official run uses 'soft'.
 """
 from __future__ import annotations
 
@@ -39,7 +39,7 @@ class AMSDLoss(nn.Module):
         self.alpha = float(alpha)
         self.beta = float(beta)
         self.gamma = float(gamma)
-        # False(기본, 공식): softmax(t/τ) 를 한 번 더 적용. True(가정): t 를 확률로 보고 그대로 KL 타깃으로 쓴다.
+        # False (default, official): apply softmax(t/τ) once more. True (assumption): treat t as probabilities and use it directly as the KL target.
         self.teacher_is_prob = bool(teacher_is_prob)
         self.kldivloss = nn.KLDivLoss(reduction="batchmean")
 

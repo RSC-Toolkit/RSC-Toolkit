@@ -1,13 +1,13 @@
 """
-MVST(ICASSP 2024)의 게이티드 융합 — 공식 gated_fusion.py / fusion.py 충실 이식.
+Gated fusion of MVST (ICASSP 2024), a faithful port of the official gated_fusion.py / fusion.py.
 
-FuseMLP: 뷰별 768x768 게이트 행렬 W_i(kaiming_normal_), G_i = sigmoid(x_i @ W_i), F = Σ G_i * x_i, fc Linear(768, n_cls)
-(weight N(0, 0.01), bias 0). 논문 식 (5)는 시그모이드 안에 전 뷰 합·토큰 단위지만 코드는 뷰별 독립 게이트·풀링 특징 — P0 는 코드 기준.
+FuseMLP: per-view 768x768 gate matrix W_i (kaiming_normal_), G_i = sigmoid(x_i @ W_i), F = Σ G_i * x_i, fc Linear(768, n_cls)
+(weight N(0, 0.01), bias 0). Paper Eq. (5) sums all views inside the sigmoid at token level, but the code uses independent per-view gates on pooled features; the official-code parity port follows the code.
 
-fusion.py 프로토콜: seed 1 · 특징은 save_features.py 로 덤프한 (train: 셔플·drop_last·SpecAugment 켠 1 pass / test: 순서대로)
-768-d 뷰 특징 · CE 가중치 = 클래스 빈도 **비율**(counts/sum; train·test 각각) · AdamW(lr 1e-3, wd 1e-4) ·
-CosineAnnealingLR(T_max=5, eta_min=1e-15) epoch step · 100 ep · bs 8 shuffle · autocast(GradScaler 없음) ·
-best = test Score 최고 && Se > 5. 원본은 best 모델을 저장하지 않는다(출력만) — 여기서는 저장한다.
+fusion.py protocol: seed 1 · 768-d view features dumped by save_features.py (train: one pass with shuffle, drop_last, SpecAugment on / test: in order)
+· CE weights = class frequency **ratios** (counts/sum; train and test separately) · AdamW(lr 1e-3, wd 1e-4) ·
+CosineAnnealingLR(T_max=5, eta_min=1e-15) stepped per epoch · 100 ep · bs 8 shuffle · autocast (no GradScaler) ·
+best = highest test Score && Se > 5. The original code does not save the best model (prints only); it is saved here.
 """
 from __future__ import annotations
 
@@ -31,7 +31,7 @@ class FuseMLP(nn.Module):
             W = torch.empty(representation_size, representation_size, requires_grad=True)
             nn.init.kaiming_normal_(W)
             ws.append(nn.Parameter(W))
-        # 원본 속성명 W1..W5 유지
+        # keep the original attribute names W1..W5
         for i, W in enumerate(ws, start=1):
             setattr(self, f"W{i}", W)
         self.num_views = num_views
@@ -55,7 +55,7 @@ def get_score(hits, counts):
 
 
 def class_ratio_weights(labels: torch.Tensor, n_cls: int = 4) -> torch.Tensor:
-    """fusion.py:249-251 — counts / counts.sum() (다수 클래스가 큰 가중; 원본 quirk)."""
+    """fusion.py:249-251: counts / counts.sum() (majority classes get larger weights; quirk of the original code)."""
     counts = torch.bincount(labels, minlength=n_cls).float()
     return counts / counts.sum()
 
@@ -65,7 +65,7 @@ def train_fusion(train_feats: Sequence[torch.Tensor], train_labels: torch.Tensor
                  epochs: int = 100, batch_size: int = 8, lr: float = 1e-3, weight_decay: float = 1e-4,
                  t_max: int = 5, eta_min: float = 1e-15, seed: int = 1, min_se: float = 5.0,
                  device: str = "cuda", amp: bool = True) -> Dict:
-    """fusion.py main() 의 학습·평가 루프. 반환: best {S_p, S_e, icbhi_score, epoch, state_dict}."""
+    """Training and evaluation loop of fusion.py main(). Returns best {S_p, S_e, icbhi_score, epoch, state_dict}."""
     torch.manual_seed(seed); np.random.seed(seed)
     import random
     random.seed(seed)

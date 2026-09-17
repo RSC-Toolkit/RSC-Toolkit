@@ -1,20 +1,20 @@
-# Lungmix(ICASSP 2025, Ge et al.) ICBHI 재현 — **논문 명세 재구현·가정 런** (공식 코드는 증강 함수뿐).
-#   non-linear(주)   : rsctk-train --config-name lungmix_icbhi run.name=icbhi-lungmix-nonlinear-s1 seed=1
-#                      (= apply_loudness_mask=true, 논문 식 3 블렌딩, mix_stage=raw(원 구간 믹싱 후 9 s) → Table I 'Lungmix (non-linear)' 53.35)
+# Lungmix (ICASSP 2025, Ge et al.) ICBHI reproduction — **re-implementation from the paper specification (assumption run)** (the official code contains only the augmentation function).
+#   non-linear (main): rsctk-train --config-name lungmix_icbhi run.name=icbhi-lungmix-nonlinear-s1 seed=1
+#                      (= apply_loudness_mask=true, paper Eq. 3 blending, mix_stage=raw (mix original segments, then 9 s) → Table I 'Lungmix (non-linear)' 53.35)
 #   w/o loudness     : ... model.params.apply_loudness_mask=false run.name=icbhi-lungmix-woloudness-s1
-#                      (= 공식 lungmix() 출력 그대로, random mask 만 → Table I 'Lungmix (w/o loudness)' 58.53; §III-C)
-#   기준선 w/o Mixup : ... model.params.variant=none run.name=icbhi-lungmix-none-s1
-#   그 외 variant    : model.params.variant={linear|combined|label_preservation|vanilla_mixup|lungmix_patchmix}
-#   padded 믹싱 대안 : ... model.params.mix_stage=padded run.name=icbhi-lungmix-padded-s1 (9 s 패딩 후 믹싱; 선택 런)
-# 앵커: Fig.1 AST SFT 61.35(선택 기준 미기재; Fig.1 HF(Test) 열이 Table I 'w/o Mixup' HF 행 58.24/62.19/75.34 와 동일 → 같은 run/선택 기준일
-#       가능성), Table I(COMB 기준 best) non-linear 53.35 / w/o loudness 58.53 / w/o Mixup 52.88 — 상대 비교용.
-#       어느 행이 공개 함수 출력인지는 저자 질문 #1 미확인 — 행 매핑은 논문 §III-C 의 정의(random mask 만 = w/o loudness) 를 따른다.
-# 가정: epochs 50(미기재), wd 0, cosine T_max 50, AMP 없음, bs 4 × accumulate 8, 원 구간 믹싱 후 9 s(mix_stage raw; 식 3 maxlen 표기 근거).
+#                      (= official lungmix() output as is, random mask only → Table I 'Lungmix (w/o loudness)' 58.53; §III-C)
+#   baseline w/o Mixup: ... model.params.variant=none run.name=icbhi-lungmix-none-s1
+#   other variants   : model.params.variant={linear|combined|label_preservation|vanilla_mixup|lungmix_patchmix}
+#   padded mixing alt: ... model.params.mix_stage=padded run.name=icbhi-lungmix-padded-s1 (mix after 9 s padding; optional run)
+# Paper-reported: Fig.1 AST SFT 61.35 (selection criterion not specified; the Fig.1 HF (Test) column equals the Table I 'w/o Mixup' HF row 58.24/62.19/75.34 → likely the same
+#       run/selection criterion), Table I (best by COMB) non-linear 53.35 / w/o loudness 58.53 / w/o Mixup 52.88 — for relative comparison.
+#       Which row is the public function's output is unconfirmed — the row mapping follows the definition in paper §III-C (random mask only = w/o loudness).
+# Assumptions: 50 epochs (not specified), wd 0, cosine T_max 50, no AMP, bs 4 × accumulate 8, mix original segments then 9 s (mix_stage raw; based on the maxlen notation in Eq. 3).
 defaults:
   - model: ast_lungmix
   - data_defaults@data: base
   - data: icbhi_lungmix
-  - loss: cross_entropy          # 비가중 CE (논문 가중 언급 없음)
+  - loss: cross_entropy          # unweighted CE (the paper does not mention weighting)
   - metrics: icbhi_metrics
   - optimizer: adamw_lungmix
   - trainer: default
@@ -25,12 +25,12 @@ seed: 1
 
 model:
   params:
-    apply_loudness_mask: true    # 주 런 = 논문 식 3 ('non-linear' 행). false = 공식 코드 출력('w/o loudness' 행)
+    apply_loudness_mask: true    # main run = paper Eq. 3 ('non-linear' row). false = official code output ('w/o loudness' row)
 
 trainer:
   params:
-    max_epochs: 50               # 가정 (미기재)
-    accumulate_grad_batches: 8   # 논문 §III-B
+    max_epochs: 50               # assumption (not specified)
+    accumulate_grad_batches: 8   # paper §III-B
     precision: 32
 
 run:

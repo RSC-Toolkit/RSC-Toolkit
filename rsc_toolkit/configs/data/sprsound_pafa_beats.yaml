@@ -1,5 +1,5 @@
-# PAFA(BEATs) 를 SPRSound 표준 태스크(2022 inter-patient, 7-class)로 확장할 때 쓰는 데이터 설정.
-# **논문 목표치 없음** — ICBHI 레시피(16 kHz 파형·5 s repeat_fade·bs32·SpecAug 없음·patient meta)를 그대로 옮긴다.
+# Data config for extending PAFA (BEATs) to the standard SPRSound task (2022 inter-patient, 7-class).
+# **No paper-reported value** — the ICBHI recipe (16 kHz waveform · 5 s repeat_fade · bs 32 · no SpecAug · patient meta) is carried over unchanged.
 name: sprsound_pafa_beats
 params:
   datamodule_name: index

@@ -1,123 +1,241 @@
 # RSC-Toolkit
 
-Respiratory Sound Classification Toolkit — **ICBHI 2017** 과 **SPRSound** 위에서
-호흡음 분류 논문을 같은 파이프라인·같은 프로토콜로 재현하고 비교하기 위한 툴킷이다.
+**Respiratory Sound Classification Toolkit** — re-implementations of respiratory sound classification methods
+on **ICBHI 2017** and **SPRSound**, trained and evaluated through one shared data, feature and evaluation pipeline.
 
-핵심은 **공식 스플릿 위의 공정 비교**다. 논문마다 다른 스플릿·지표·모델 선택 규칙을
-하나의 데이터·특징·평가 경로에 올려, "방법이 실제로 얼마나 기여하는가" 를 잴 수 있게 한다.
+Published methods often differ in data split, metric and checkpoint-selection rule, which makes their numbers hard to
+compare. RSC-Toolkit runs every method on the **official splits** with the same scoring code, so the contribution of a
+method can be measured on equal terms.
 
-현재 **모델 34종**이 등록돼 있고(SFT 기준선부터 대조학습·어댑터·파운데이션 모델까지),
-논문별 골든 텐서 회귀 테스트로 이식 충실도를 고정한다.
+- **34 registered models** — fine-tuning baselines (AST, BEATs, CNN6, ResNet, EfficientNet, CLAP), augmentation,
+  contrastive/auxiliary objectives, foundation models and parameter-efficient fine-tuning.
+- **Official protocols** — ICBHI 2017 official 60/40 split (4-class, respiratory cycles) and SPRSound 2022
+  inter-patient test (7-class, events), plus ICBHI → SPRSound zero-shot evaluation.
+- **Faithful ports** — golden-tensor regression tests pin each port to the authors' official code where it exists.
+- **Released weights** — 340 trained runs (68 model families × 5 seeds) that can be downloaded and re-evaluated.
+- **Extensible** — add your own model, loss, metric, feature processor or dataset without forking.
 
-## 처음이라면 — 튜토리얼
+---
 
-설치 → toy 데이터 학습 → 재평가 → **자기 모델 등록**(CPU, 수 분) → ICBHI 실데이터 1 epoch → **공개 논문 weight 재평가**(GPU) 를
-한 번에 따라 하는 최소 경로: [`TUTORIAL.md`](TUTORIAL.md) (노트북 판 [`notebooks/tutorial.ipynb`](notebooks/tutorial.ipynb),
-자동 실행 `scripts/tutorial/run_tutorial.sh`). 공개 weight 목록은 [`weights_manifest.csv`](weights_manifest.csv).
+## Contents
 
-## 설치
+1. [Installation](#installation)
+2. [Quick start (CPU, a few minutes)](#quick-start-cpu-a-few-minutes)
+3. [Datasets](#datasets)
+4. [Training](#training)
+5. [Evaluating a checkpoint](#evaluating-a-checkpoint)
+6. [Released paper weights](#released-paper-weights)
+7. [Reproducing a method](#reproducing-a-method)
+8. [Adding your own model](#adding-your-own-model)
+9. [Configuration reference](#configuration-reference)
+10. [Testing](#testing)
+11. [Known limitations](#known-limitations)
+12. [License](#license)
+
+---
+
+## Installation
+
+Python ≥ 3.9 (3.11 recommended).
 
 ```bash
+git clone https://github.com/RSC-Toolkit/RSC-Toolkit.git
+cd RSC-Toolkit
+python3.11 -m venv .venv && source .venv/bin/activate
 pip install -e ".[trainer,models]"
 ```
 
-| extra | 무엇이 들어오나 |
+| extra | what it installs |
 |---|---|
-| `trainer` | Hydra · Lightning · TensorBoard — 학습을 돌리려면 필요하다 |
-| `models` | timm · transformers 등 모델 백본 의존성 |
-| `ssl-weights` | ResNet50 SimCLR 가중치를 쓸 때만 |
-| `dev` | pytest · black · flake8 · isort |
+| `trainer` | Hydra, Lightning, TensorBoard — required for training |
+| `models` | timm, transformers, OpenCV, resampy, torchlibrosa — model backbones and feature front ends |
+| `notebook` | Jupyter, nbconvert, gdown — tutorial notebook and weight download |
+| `ssl-weights` | lightning-bolts — only for the ResNet50 SimCLR weights |
+| `dev` | pytest, black, flake8, isort |
 
-## 데이터 준비
+To reproduce the exact environment used for the released weights:
 
 ```bash
-rsctk datasets download    icbhi --data_dir .datasets/icbhi
-rsctk datasets build-index icbhi --data_dir .datasets/icbhi --sample_level cycle
-rsctk datasets validate    icbhi --data_dir .datasets/icbhi
+pip install -r requirements-lock.txt
+pip install -e . --no-deps
 ```
 
-원본 데이터는 **불변**으로 다룬다 — 스플릿·인덱스는 전부 파생 파일로만 만든다.
-
-## 학습
+For CPU-only use, install the CPU build of PyTorch first (about 1 GB instead of 6 GB):
 
 ```bash
-rsc-toolkit-train --config-name patchmix_icbhi seed=1 run.name=my-first-run
+pip install --index-url https://download.pytorch.org/whl/cpu torch==2.7.0 torchaudio==2.7.0 torchvision==0.22.0
 ```
 
-설정은 Hydra 구성이라 CLI 에서 그대로 덮어쓸 수 있다:
+Check the installation:
 
 ```bash
-rsc-toolkit-train --config-name patchmix_icbhi \
-  model.params.method=ce trainer.params.max_epochs=10 seed=3
+rsctk --help          # dataset utilities and component listing
+rsctk list models     # registered components by kind
 ```
 
-결과는 `outputs/<계열>/<run.name>/` 에 쌓이고, `best.json` 이 최종 지표를 담는다
-(`{"epoch", "S_p", "S_e", "icbhi_score"}` — `icbhi_score = (S_e + S_p) / 2`).
-셸에서는 `scripts/train.sh <config> [overrides]` 가 같은 일을 한다(`GPU=` 로 카드 선택, 스레드 캡 기본).
+The console scripts are `rsc-toolkit-train` (training), `rsc-toolkit-eval` (re-evaluation) and `rsctk` / `rsc-toolkit`
+(datasets and listing).
 
-## 평가 (학습된 weight 재평가)
+## Quick start (CPU, a few minutes)
+
+The repository ships a small toy subset of ICBHI (`sample_data/`). This trains a CNN6 for one epoch on the CPU and
+re-evaluates the saved checkpoint:
 
 ```bash
-rsc-toolkit-eval outputs/patchmix/icbhi-patchmix-ce-s1                 # 스냅샷 자동 탐색 → strict 로드 → test → best.json 대조
+rsctk datasets build-index toy --data_dir .datasets/toy --sample_level cycle
+
+rsc-toolkit-train --config-name default data=toy_fbank model=cnn model.params.backbone=cnn6 callbacks=best_checkpoint \
+  data.params.data_dir=.datasets/toy data.params.num_workers=0 \
+  trainer.params.max_epochs=1 trainer.params.accelerator=cpu run.group=quickstart run.name=toy-cnn
+
+rsc-toolkit-eval outputs/quickstart/toy-cnn --sandbox /tmp/rsc_eval_sandbox
+```
+
+[`TUTORIAL.md`](TUTORIAL.md) walks through the full path — toy data, registering your own model, one epoch on real
+ICBHI data, and re-evaluating a released weight. The same content is available as a notebook,
+[`notebooks/tutorial.ipynb`](notebooks/tutorial.ipynb), and can be run end to end with `scripts/tutorial/run_tutorial.sh`.
+
+## Datasets
+
+| dataset | task | split used |
+|---|---|---|
+| ICBHI 2017 | 4-class respiratory cycles (normal / crackle / wheeze / both) | official 60/40 train/test split |
+| SPRSound (2022) | 7-class events | 2022 inter-patient test set |
+| SPRSound (4-class view) | ICBHI label space, used for ICBHI → SPRSound zero-shot evaluation | 2022 inter-patient test set |
+
+Download, index and validate:
+
+```bash
+rsctk datasets download    icbhi    --data_dir .datasets/icbhi
+rsctk datasets build-index icbhi    --data_dir .datasets/icbhi --sample_level cycle
+rsctk datasets validate    icbhi    --data_dir .datasets/icbhi
+
+rsctk datasets download    sprsound --data_dir .datasets/sprsound
+rsctk datasets build-index sprsound --data_dir .datasets/sprsound --sample_level cycle
+rsctk datasets validate    sprsound --data_dir .datasets/sprsound
+```
+
+The configs expect the datasets under `.datasets/icbhi` and `.datasets/sprsound` relative to the working directory;
+override `data.params.data_dir=...` to use another location. Raw recordings are never modified — splits, indices and
+label mappings are written as derived files. In the SPRSound 4-class view, Rhonchi and Stridor events are excluded rather
+than merged into wheeze (the 2022 inter-patient test set contains neither class).
+
+Features are computed once and cached (`downloaded_datasets/features_cache` by default, or `RSCTK_FEATURE_CACHE_ROOT`).
+The cache key includes every setting that affects the features, and each cache directory keeps a chain ledger
+(`_chain.json`) so that a different preprocessing chain never silently reuses stale features.
+
+## Training
+
+Every experiment is one Hydra config plus optional overrides:
+
+```bash
+rsc-toolkit-train --config-name patchmix_icbhi seed=1 run.name=icbhi-patchmix-ce-s1
+rsc-toolkit-train --config-name patchmix_icbhi model.params.method=patchmix_cl loss=cross_entropy \
+  trainer.params.max_epochs=10 seed=3 run.name=my-run-s3
+```
+
+Outputs are written to `outputs/<group>/<run.name>/`:
+
+- `best.pth` — weights of the selected checkpoint
+- `best.json` — its metrics, e.g. `{"epoch", "S_p", "S_e", "icbhi_score"}` with `icbhi_score = (S_p + S_e) / 2`
+- the Hydra snapshot of the resolved config (`outputs/<date>/<time>/.hydra/config.yaml`), used for re-evaluation
+
+`scripts/train.sh <config> [overrides]` is a shell wrapper that selects the GPU (`GPU=<n>`) and caps per-worker
+BLAS/OpenCV threads. A run refuses to start if `best.pth`/`best.json` already exist for the same `run.name`; choose a
+new name or add `+run.overwrite=true`.
+
+Smoke test (1 epoch, 2 batches):
+
+```bash
+scripts/train.sh patchmix_icbhi trainer.params.max_epochs=1 \
+  ++trainer.params.limit_train_batches=2 ++trainer.params.limit_val_batches=2 run.name=smoke-patchmix
+```
+
+## Evaluating a checkpoint
+
+```bash
+rsc-toolkit-eval outputs/patchmix/icbhi-patchmix-ce-s1
 rsc-toolkit-eval outputs/qlung/icbhi-qlung-s1 --override data.params.batch_size=16 --out eval.json
-scripts/eval.sh outputs/bts/icbhi-bts-s1                               # 셸 래퍼 (GPU=, 샌드박스)
+scripts/eval.sh outputs/bts/icbhi-bts-s1          # shell wrapper (GPU=<n>, sandbox)
 ```
 
-run 디렉터리의 hydra 스냅샷으로 학습 때와 같은 팩토리에서 모델·데이터를 다시 세운다. 학습 산출물은 읽기만 하고
-(쓰기는 샌드박스), `best.json` 이 있으면 PASS/MISMATCH 를 판정한다.
+`rsc-toolkit-eval` finds the run's config snapshot, rebuilds the model and data through the same factories used in
+training, loads `best.pth` strictly and evaluates the test split. Training outputs are read-only (all writes go to the
+sandbox, which must be outside `outputs/`). If `best.json` exists, the result is compared with it (PASS when |Δ| ≤ 0.05).
 
-## 논문 재현 레시피 — 모델·데이터별 실행법
+## Released paper weights
 
-모든 재현은 `scripts/train.sh <config> [override…]` 한 줄이다. `<config>` 가 논문(모델 계열)과 데이터셋을 정하고,
-같은 config 안의 변형(백본·method·뷰)은 override 로 고른다. 결과는 `outputs/<계열>/<run.name>/best.pth·best.json`,
-재평가는 `scripts/eval.sh outputs/<계열>/<run.name>`. 아래 표의 run.name 은 논문 표가 쓰는
-이름이며 `-s<seed>` 로 끝난다(seed 1–5). `GPU=<n>` 으로 카드를 고른다.
+The weights behind the benchmark tables are released as run bundles (`best.pth`, `best.json`, `.hydra/config.yaml`,
+`sha256.txt`). [`weights_manifest.csv`](weights_manifest.csv) lists every run with its metrics, checksum and download link.
 
 ```bash
-# 예: Patch-Mix CL 을 ICBHI 에서 seed 1 로 학습하고, 끝나면 그 weight 를 다시 평가
+pip install -e ".[notebook]"                                   # gdown
+python scripts/download_paper_weights.py --list
+python scripts/download_paper_weights.py --run icbhi-cnn6-ce-s1 --out paper_weights/
+rsc-toolkit-eval paper_weights/icbhi-cnn6-ce-s1 --sandbox /tmp/rsc_eval_sandbox \
+  --override data.params.data_dir=.datasets/icbhi
+```
+
+The downloader verifies every file against the bundle's `sha256.txt` and the manifest. Bundles carry their own config
+snapshot, so no `outputs/` directory is needed.
+
+Weights inherit the licence terms of the pre-trained backbone they were fine-tuned from (for example, OPERA-CT weights are
+CC BY-NC). Weights built on backbones whose licence does not allow redistribution (the M2D family) are not released.
+
+## Reproducing a method
+
+Each method is one config; variants within a method (backbone, loss, view) are selected by overrides. Always add
+`seed=N` and a matching `run.name=<name>-sN` (seeds 1–5 were used for the released weights).
+
+```bash
+# Example: Patch-Mix CL on ICBHI with seed 1, then re-evaluate the checkpoint
 GPU=0 scripts/train.sh patchmix_icbhi model.params.method=patchmix_cl loss=cross_entropy seed=1 run.name=icbhi-patchmix-cl-s1
 GPU=0 scripts/eval.sh  outputs/patchmix/icbhi-patchmix-cl-s1
 ```
 
-| 모델 (등록 이름) | ICBHI 2017 (공식 60/40, 4-class) | SPRSound 2022 (inter-patient, 7-class) |
+| method (registered model) | ICBHI 2017 (official 60/40, 4-class) | SPRSound 2022 (inter-patient, 7-class) |
 |---|---|---|
-| AST fine-tuning (`ast_patchmix`) | `patchmix_icbhi model.params.method=ce` | `patchmix_sprs` (기본 ce) |
+| AST fine-tuning (`ast_patchmix`) | `patchmix_icbhi model.params.method=ce` | `patchmix_sprs` (default `ce`) |
 | Patch-Mix CE / CL (`ast_patchmix`) | `patchmix_icbhi model.params.method=patchmix` / `…=patchmix_cl` (+`loss=cross_entropy`) | `patchmix_sprs model.params.method=patchmix_cl` |
-| SG-SCL / DAT (`ast_sgscl`) | `sgscl_icbhi` (기본 sgscl; `model.params.con_feat=feat1` 이 표의 행) / `model.params.method=dat` | — (SPRSound 는 단일 청진기라 청진기 도메인 대조항이 정의되지 않는다; 표 2 n/a) |
-| ResNet18/34·EfficientNet-B0·CNN6 SFT (`resnet18_sft` 등) | `sgscl_nonast_icbhi model.name=resnet18_sft` (`resnet34_sft`, `efficientnet_b0_sft`, `cnn6_sft`) | `sgscl_nonast_sprs model.name=…` |
-| SG-SCL on non-AST (`*_sft`) | `sgscl_nonast_icbhi model.name=cnn6_sft model.params.method=sgscl loss=cross_entropy` | — |
-| SCL w/ metadata: CE / Hybrid / M-SCL (`cnn6_sclmeta`) | `sclmeta_icbhi model.params.method=ce` / `…=hybrid` / 2단계: `sclmeta_icbhi_pretrain` → `sclmeta_icbhi_linear model.params.encoder_ckpt=<pretrain 의 final_state.pth>` | `sclmeta_sprs …` / `sclmeta_sprs_pretrain` → `sclmeta_sprs_linear` |
+| SG-SCL / DAT (`ast_sgscl`) | `sgscl_icbhi` (default `sgscl`; benchmark rows use `model.params.con_feat=feat1`) / `model.params.method=dat` | — (SPRSound uses a single stethoscope, so the device-domain contrastive term is undefined) |
+| ResNet18/34, EfficientNet-B0, CNN6 fine-tuning (`resnet18_sft`, …) | `sgscl_nonast_icbhi model.name=resnet18_sft` (`resnet34_sft`, `efficientnet_b0_sft`, `cnn6_sft`) | `sgscl_nonast_sprs model.name=…` |
+| SG-SCL on non-AST backbones (`*_sft`) | `sgscl_nonast_icbhi model.name=cnn6_sft model.params.method=sgscl loss=cross_entropy` | — |
+| SCL with metadata: CE / Hybrid / M-SCL (`cnn6_sclmeta`) | `sclmeta_icbhi model.params.method=ce` / `…=hybrid` / two stages: `sclmeta_icbhi_pretrain` → `sclmeta_icbhi_linear model.params.encoder_ckpt=<final_state.pth of the pretraining run>` | `sclmeta_sprs …` / `sclmeta_sprs_pretrain` → `sclmeta_sprs_linear` |
 | Audio-CLAP fine-tuning (`audioclap`) | `bts_icbhi model=audioclap` | `bts_sprs model=audioclap` |
 | BTS (`bts`) | `bts_icbhi` | `bts_sprs` |
-| BTS-CARD (`bts_card`) | `btscard_icbhi trainer.params.max_epochs=30 optimizer.name=adamw` (논문 설정) / `btscard_icbhi` (스크립트 설정) | `btscard_sprs` |
-| BEATs fine-tuning / PAFA (`beats`) | `pafa_icbhi model.params.method=ce` / `pafa_icbhi` (pafa) | `pafa_sprs model.params.method=ce` / `pafa_sprs` |
-| PC-MCL (`beats_pcmcl`, `ast_pcmcl`) | `pcmcl_icbhi` / `pcmcl_ast_icbhi` | `pcmcl_sprs` (BEATs) / `pcmcl_ast_sprs` (AST) — 6-속성 라벨 공간 재정의(우리 확장, 논문 방법 아님; 표 2 에 툴킷 변형으로 수록) |
+| BTS-CARD (`bts_card`) | `btscard_icbhi trainer.params.max_epochs=30 optimizer.name=adamw` (paper setting) / `btscard_icbhi` (official-script setting) | `btscard_sprs` |
+| BEATs fine-tuning / PAFA (`beats`) | `pafa_icbhi model.params.method=ce` / `pafa_icbhi` | `pafa_sprs model.params.method=ce` / `pafa_sprs` |
+| PC-MCL (`beats_pcmcl`, `ast_pcmcl`) | `pcmcl_icbhi` / `pcmcl_ast_icbhi` | `pcmcl_sprs` (BEATs) / `pcmcl_ast_sprs` (AST) — toolkit extension with a 6-attribute label space |
 | Lung-SRAD: FT / SAR / dual-axis (`dass_lungsrad`) | `lungsrad_icbhi model.params.method=ce` / `…=ce_blur` / `…=patchmix_cl model.params.cl_mode=dual model.params.mix_layout=as_paper` | `lungsrad_sprs …` |
-| QLung AST / Audio-CLAP (`ast_qlung`, `clap_qlung`) | `qlung_icbhi` / `qlung_clap_icbhi` | `qlung_sprs` (AST) / `qlung_clap_sprs` (Audio-CLAP; 논문 앵커 없음, 툴킷 확장) |
-| AMS-D (`ast_amsd`) | `amsd_icbhi` (기준선 `model.params.method=baseline`) | `amsd_sprs` |
-| ADD-RSC (`ast_addrsc`) | `addrsc_icbhi` (저자 스플릿 재현: `data.params.split_file=rsc_toolkit/datasets/icbhi/data/addrsc_random1_split.txt`) | `addrsc_sprs` |
-| LungAdapter (`ast_lungadapter`) | `lungadapter_icbhi` (ablation `model.params.use_res_adapter=false` 등) | `lungadapter_sprs` |
+| QLung, AST / Audio-CLAP (`ast_qlung`, `clap_qlung`) | `qlung_icbhi` / `qlung_clap_icbhi` | `qlung_sprs` / `qlung_clap_sprs` (toolkit extension) |
+| AMS-D (`ast_amsd`) | `amsd_icbhi` (baseline: `model.params.method=baseline`) | `amsd_sprs` |
+| AdD-RSC (`ast_addrsc`) | `addrsc_icbhi` (authors' split: `data.params.split_file=rsc_toolkit/datasets/icbhi/data/addrsc_random1_split.txt`) | `addrsc_sprs` |
+| LungAdapter (`ast_lungadapter`) | `lungadapter_icbhi` (ablation, e.g. `model.params.use_res_adapter=false`) | `lungadapter_sprs` |
 | LoRA-RSC (`ast_lora_rsc`) | `lorarsc_icbhi` | `lorarsc_sprs` |
 | LungMix non-linear / none (`ast_lungmix`) | `lungmix_icbhi` / `model.params.variant=none` | `lungmix_sprs` |
-| GaP-Aug — CNN14 (`cnn14_gapaug`) | `gapaug_icbhi` (naive 기준선 `model.params.method=naive`) | — |
-| Domain Transfer — ResNeSt (`resnest_ibn_dt`) | `domaintransfer_icbhi` (기준선 `model.params.baseline=true model.params.mixup_alpha=0 data.params.splice_per_class=0 …`) | `domaintransfer_sprs` |
-| Prototype — CNN8-Pt (`protonet`) | `protonet_icbhi` (`model.params.method=cnn8` 기준선) | `protonet_sprs` |
-| RespireNet — CNN / +CBA (`respirenet`) | `respirenet_icbhi data.params.split_mode=official data.params.pad_seed=1 data.params.aug_seed=1` / `+ data.params.aug_scale=1 data.params.cba_seed=1` (저자 fold-4: `split_mode` 생략) | — |
-| MVST — 뷰 5개 + 융합 (`ast_mvst`) | `mvst_icbhi model.params.view=16` (16·32·64·128·256 각각) → `scripts/reproduction/aggregate_mvst_results.py` 로 융합 | `mvst_sprs model.params.view=…` |
-| M2D base / M2D-X / M2D-Resp (`m2d`) | `m2d_icbhi` / `model.params.pretrained_path=pretrained_models/upstream/m2d/<ckpt>` (M2D-Resp 는 `model.params.input_size=[80,608]` 추가) | `m2d_sprs …` (M2D-X 는 ICBHI 특화 공개 ckpt 를 그대로 미세조정 — 툴킷 관찰값, 논문 대응값 없음) |
-| OPERA-CT frozen / fine-tune (`opera_ct`) | `opera_embc_icbhi` / `opera_ft_icbhi` | `opera_embc_sprs` / `opera_ft_sprs` |
-| DDE-MAE (`audiomae_dde_cls`; 논문 표 제외) | `dde_icbhi_b2 data=icbhi_ddemae_16k` / `dde_icbhi_stage1 data=icbhi_ddemae_16k` → `dde_icbhi_stage2 data=icbhi_ddemae_16k model.params.encoder_ckpt=<stage1 final_state.pth>` (config 기본 `icbhi_ddemae`(4 kHz)는 붕괴 판정 — 실제 run 은 전부 16 kHz override) | — |
+| GaP-Aug with CNN14 (`cnn14_gapaug`) | `gapaug_icbhi` (naive baseline: `model.params.method=naive`) | `gapaug_sprs` (toolkit extension) |
+| Domain Transfer, ResNeSt (`resnest_ibn_dt`) | `domaintransfer_icbhi` (baseline: `model.params.baseline=true model.params.mixup_alpha=0 data.params.splice_per_class=0 …`) | `domaintransfer_sprs` |
+| Prototype, CNN8-Pt (`protonet`) | `protonet_icbhi` (CNN8 baseline: `model.params.method=cnn8`) | `protonet_sprs` |
+| RespireNet CNN / +CBA (`respirenet`) | `respirenet_icbhi data.params.split_mode=official data.params.pad_seed=1 data.params.aug_seed=1` / add `data.params.aug_scale=1 data.params.cba_seed=1` (authors' fold 4: omit `split_mode`) | — |
+| MVST, five views + fusion (`ast_mvst`) | `mvst_icbhi model.params.view=16` (for each of 16, 32, 64, 128, 256), then fuse with `scripts/reproduction/aggregate_mvst_results.py` | `mvst_sprs model.params.view=…` |
+| M2D / M2D-X / M2D-Resp (`m2d`) | `m2d_icbhi` / `model.params.pretrained_path=pretrained_models/upstream/m2d/<ckpt>` (M2D-Resp also `model.params.input_size=[80,608]`) | `m2d_sprs …` |
+| OPERA-CT frozen / fine-tuned (`opera_ct`) | `opera_embc_icbhi` / `opera_ft_icbhi` | `opera_embc_sprs` / `opera_ft_sprs` |
+| DDE-MAE (`audiomae_dde_cls`) | `dde_icbhi_b2 data=icbhi_ddemae_16k` / `dde_icbhi_stage1 data=icbhi_ddemae_16k` → `dde_icbhi_stage2 data=icbhi_ddemae_16k model.params.encoder_ckpt=<stage-1 final_state.pth>` | — |
 
-`seed=N run.name=<표의 이름>-sN` 을 항상 붙인다. 위 config 들이 쓰는 데이터 설정은 `rsc_toolkit/configs/data/`(ICBHI `icbhi_*`,
-SPRSound `sprsound_*`)에 있고, 사전학습 가중치는 `pretrained_models/upstream/` 또는 `RSCTK_PRETRAINED_ROOT` 아래에 둔다
-(없으면 AST·PANNs 는 자동 다운로드, BEATs·DASS·M2D·OPERA·AudioMAE 는 안내 메시지로 멈춘다).
-스모크(1 epoch·2 배치)는 `scripts/train.sh <config> trainer.params.max_epochs=1 ++trainer.params.limit_train_batches=2 ++trainer.params.limit_val_batches=2 run.name=smoke-…`.
-같은 `run.name` 의 best.pth/best.json 이 이미 있으면 학습은 시작하지 않는다(덮어쓰기 방지) — 새 이름을 쓰거나 `+run.overwrite=true` 를 붙인다. 등록된 컴포넌트 목록은 `rsc-toolkit list` (`rsctk list models`).
+Data configs live in `rsc_toolkit/configs/data/` (`icbhi_*`, `sprsound_*`). "Toolkit extension" marks a setting the
+original paper did not report; its recipe is the paper's ICBHI recipe applied unchanged.
 
-## 자기 모델 붙이기
+**Pre-trained backbones.** Put checkpoints under `pretrained_models/upstream/` or point `RSCTK_PRETRAINED_ROOT` to a
+directory that holds them. AST, PANNs and Hugging Face models (CLAP, AudioSet AST) are downloaded automatically; BEATs,
+DASS, M2D, OPERA-CT and AudioMAE checkpoints must be downloaded manually — the toolkit stops with the expected path and
+source when one is missing.
 
-**툴킷을 포크할 필요가 없다.** `BaseRSCModel` 을 상속하고 `training_forward` 하나만
-구현한 뒤 등록하면 학습·검증 루프가 그대로 돈다.
+Per-method seed aggregation scripts are in `scripts/reproduction/aggregate_*.py`.
+
+## Adding your own model
+
+**No fork is needed.** Subclass `BaseRSCModel`, implement `training_forward`, and register the class; the training and
+validation loops work unchanged.
 
 ```python
 from torch import nn
@@ -128,110 +246,137 @@ from rsc_toolkit.models.factory import ModelFactory
 class MyModel(BaseRSCModel, nn.Module):
     def __init__(self, n_cls: int = 4, **params):
         super().__init__()
-        self.net = ...          # n_cls 는 configs 의 model.params.n_cls 로 주입된다
+        self.net = ...          # n_cls is injected from model.params.n_cls
 
     def training_forward(self, audio_batch, labels, loss_func, **kwargs):
         logits = self.net(audio_batch)
-        return logits, loss_func(logits, labels)   # (logits, loss) 를 함께 돌려준다
+        return logits, loss_func(logits, labels)   # return (logits, loss)
 ```
 
-계약 전문은 [`rsc_toolkit/models/base.py`](rsc_toolkit/models/base.py) 에 있다.
-학습 스텝과 검증 스텝이 같은 메서드를 부르므로, 둘을 나눠야 하면 `self.training` 으로 분기한다.
-배치 3번째 원소(meta)를 받는 모델은 `accepts_meta = ("dev", ...)` 를 선언하면 어댑터가 datamodule 의
-`meta_kind` 와 학습 시작 전에 대조해 준다(미선언이면 검사하지 않는다).
+The full contract is documented in [`rsc_toolkit/models/base.py`](rsc_toolkit/models/base.py). Training and validation
+call the same method; branch on `self.training` if they must differ. A model that consumes the third batch element
+(metadata) declares `accepts_meta = ("dev", ...)`, and the adapter checks it against the datamodule's `meta_kind`
+before training starts.
 
-### 모델만이 아니다 — 등록소 10종
+Register the module and provide a model config from outside the repository:
 
-모델·손실·지표·옵티마이저·datamodule·raw 데이터셋·어댑터·피처 프로세서·피처 증강·meta 라벨이
-전부 같은 방식의 등록소([`rsc_toolkit/registries.py`](rsc_toolkit/registries.py))다.
-`ModelFactory.register_model_class` 는 `MODELS.register` 의 별칭이다.
+```bash
+RSC_TOOLKIT_PLUGINS=my_pkg.my_model rsc-toolkit-train --config-name default --config-dir my_configs \
+  data=icbhi_patchmix model=my_model
+```
+
+### Other extension points
+
+Models, losses, metrics, optimizers, datamodules, raw datasets, adapters, feature processors, feature augmentations and
+metadata labels all use the same registry mechanism ([`rsc_toolkit/registries.py`](rsc_toolkit/registries.py)).
+`ModelFactory.register_model_class` is an alias of `MODELS.register`.
 
 ```python
 from torch import nn
 from rsc_toolkit.registries import LOSSES, METRICS, PROCESSORS, META_LABELS
 
-@LOSSES.register("focal")                 # configs 의 loss.name=focal
+@LOSSES.register("focal")                 # loss.name=focal
 class FocalLoss(nn.Module): ...
 
-@METRICS.register("hflung_jaccard")       # metrics 의 val: [{name: hflung_jaccard}]
+@METRICS.register("hflung_jaccard")       # metrics: val: [{name: hflung_jaccard}]
 class HFLungJaccard(Metric): ...
 
 @PROCESSORS.register("hs_embed")          # data.params.features.kind=hs_embed
 class HeartSoundSSLProcessor(BaseAudioProcessor):
-    is_spectrogram = False                # True 면 학습 배치에 SpecAugment 를 걸 수 있다
+    is_spectrogram = False                # True allows SpecAugment on training batches
     @classmethod
-    def from_options(cls, opts, *, sampling_rate, feature_cache):   # features 블록(+ features.params)
+    def from_options(cls, opts, *, sampling_rate, feature_cache):   # the features block (+ features.params)
         return cls(ckpt=opts["params"]["ckpt"], sampling_rate=sampling_rate, feature_cache=feature_cache)
-    def get_processor_config(self):       # = 피처 캐시 키. 계산에 영향 주는 설정을 전부 넣는다
+    def get_processor_config(self):       # = feature cache key; include every setting that affects the output
         return {"kind": "hs_embed", "ckpt": self.ckpt, "sr": self.sampling_rate}
 
-@META_LABELS.register("hospital")         # data.params.meta_label_mode=hospital (팩토리 → item -> int)
+@META_LABELS.register("hospital")         # data.params.meta_label_mode=hospital (factory -> item -> int)
 def build_hospital():
     return lambda item: int(item["meta"]["hospital"])
 ```
 
-커스텀 인덱스 데이터셋은 `IndexDataset` 을 상속하고 config 로 주입한다 — datamodule 을 서브클래싱할 필요가 없다:
+A custom index dataset subclasses `IndexDataset` and is injected through the config — no datamodule subclass is needed:
 
 ```yaml
 data:
   params:
     datamodule_name: index
     index_dataset_cls: my_pkg.data.HeartSoundIndexDataset
-    index_dataset_params: { bandpass_hz: [25, 400], fade: false }   # 생성자 인자가 그대로 전달된다
-    collate_fn: my_pkg.data.my_collate                               # (선택) dotted path
+    index_dataset_params: { bandpass_hz: [25, 400], fade: false }   # passed to the constructor as-is
+    collate_fn: my_pkg.data.my_collate                               # optional dotted path
     features: { enabled: true, kind: hs_embed, params: { ckpt: /path/to/ssl.pt } }
 ```
 
-등록 경로는 셋이다:
+There are three ways to register components:
 
-1. **패키지 내부** — `rsc_toolkit/models/` 에 모듈을 두면 자동 스캔된다 (모델). 다른 종류는 허브에 lazy 로 선언한다.
-2. **엔트리포인트** — 외부 패키지는 설치만으로 등록된다. 그룹 하나로 모든 종류를 등록한다:
+1. **Inside the package** — modules in `rsc_toolkit/models/` are scanned automatically; other kinds are declared lazily
+   in the registry hub.
+2. **Entry point** — an installed package registers everything through one group:
 
    ```toml
    [project.entry-points."rsc_toolkit.plugins"]
-   my_plugin = "my_pkg"          # import 되면 데코레이터가 전부 실행되는 모듈
+   my_plugin = "my_pkg"          # a module whose import runs the decorators
    ```
 
-   (예전 그룹 `rsc_toolkit.models` 도 계속 읽는다.)
-3. **환경변수** — 아직 패키징하지 않은 로컬 모듈용:
+   (The older group `rsc_toolkit.models` is still read.)
+3. **Environment variable** — for local modules that are not packaged: `RSC_TOOLKIT_PLUGINS=my_pkg`.
 
-   ```bash
-   RSC_TOOLKIT_PLUGINS=my_pkg rsc-toolkit-train --config-name ... model.name=my_model
-   ```
+Pass the registered name as `model.name`, `loss.name`, `features.kind`, and so on. Unknown names fail immediately with the
+list of available ones. Your own configs are added with `--config-dir` (training) or
+`rsctk datasets preprocess … --config_dir` (feature precomputation).
 
-자기 config 는 `--config-dir` 로 얹는다(학습), `rsctk datasets preprocess … --config_dir` 로 얹는다(피처 사전계산).
-등록한 이름을 `model.name` / `loss.name` / `features.kind` 등으로 넘기면 된다. 미지 이름은 가용 목록과 함께 즉시 실패한다.
+### Changing the training loop
 
-## 학습·검증 루프 바꾸기
+Callbacks are plain Hydra `_target_` entries, so external classes can be attached directly (see
+`rsc_toolkit/configs/callbacks/*.yaml`). Checkpoint selection, the best-metric criterion and resume behaviour are all
+callbacks.
 
-콜백은 Hydra `_target_` 으로 완전히 열려 있어 외부 클래스도 그대로 붙는다
-(`rsc_toolkit/configs/callbacks/*.yaml` 참고). 체크포인트 선택 규칙, best 지표 기준,
-학습 재개 정책이 전부 콜백이다.
+## Configuration reference
 
-## 테스트
+| environment variable | purpose |
+|---|---|
+| `RSCTK_PRETRAINED_ROOT` | directory with pre-trained checkpoints (looked up by the path without the `pretrained_models/` prefix, or by file name) |
+| `RSCTK_FEATURE_CACHE_ROOT` | root of the feature cache |
+| `RSCTK_PROJECT_ROOT` | repository root used to resolve relative paths |
+| `RSC_TOOLKIT_PLUGINS` | comma-separated modules to import for registration |
+| `RSCTK_NDE_HUB_FALLBACK=1` | allow BTS-CARD to fetch its text encoder from the Hugging Face hub when no local copy exists |
 
-```bash
-pytest -m "not slow"      # 빠른 회귀
-pytest                    # 골든 텐서 포함 전체
+Relative paths in configs (`.datasets/…`, `outputs/…`, `pretrained_models/…`) are resolved against the working directory.
+
+Repository layout:
+
+```
+rsc_toolkit/
+  configs/        Hydra configs (one top-level config per method × dataset; data/, model/, callbacks/, …)
+  datasets/       downloaders, index builders, datamodules, feature cache
+  processors/     feature front ends (fbank, log-mel, CLAP, RespireNet images, …)
+  models/         model implementations (auto-registered)
+  methods/        training objectives shared by models
+  augmentations/  waveform and spectrogram augmentations
+  metrics/        ICBHI score (S_p, S_e, Score) and variants
+  trainer/        Lightning adapters and callbacks
+scripts/          train/eval wrappers, weight download, tutorial, reproduction utilities
+tests/            unit and integration tests, golden references
+sample_data/      toy ICBHI subset used by the tutorial and CI
 ```
 
-## 문서
+## Testing
 
-- [`DEV.md`](DEV.md) — 개발 환경
-- [`AGENTS.md`](AGENTS.md) — 저장소 작업 규약
-- [`TUTORIAL.md`](TUTORIAL.md) — 설치·toy 학습·공개 weight 재평가 최소 경로
+```bash
+pytest -m "not slow"      # fast regression tests (CPU)
+pytest                    # everything, including golden-tensor tests (some need GPUs, datasets or checkpoints)
+```
 
-## 알려진 제약
+Tests that need unavailable datasets, checkpoints or CUDA kernels are skipped. CI (`.github/workflows/ci.yml`) runs the
+wheel smoke test, the CPU unit tests and the tutorial on toy data.
 
-- 배포용 휠은 `scripts/packaging/smoke_installed_wheel.sh` 로 검증한다(빈 venv 설치 → 저장소 밖 cwd 에서
-  import·등록소·번들 데이터·config 합성·콘솔 스크립트). config 의 상대 경로(`.datasets/…`, `outputs/…`,
-  `pretrained_models/…`)는 **실행한 작업 디렉터리** 기준이다. 사전학습 가중치는 `RSCTK_PRETRAINED_ROOT=/path/to/weights` 로
-  한 디렉터리에 모아 둘 수 있고(후보 경로의 `pretrained_models/` 접두사를 뗀 상대 경로 또는 파일명으로 찾는다), 피처 캐시는
-  `RSCTK_FEATURE_CACHE_ROOT`, 저장소 루트 추정은 `RSCTK_PROJECT_ROOT` 로 바꾼다.
-- 논문별 **집계**(seed 평균) 는 아직 `scripts/reproduction/aggregate_*.py` 가 담당한다
-  (재평가 자체는 `rsc-toolkit-eval`).
-- CI 는 `.github/workflows/ci.yml`(휠 스모크 + CPU 단위 테스트) — GPU 가 필요한 골든 테스트는 로컬에서 돈다.
+## Known limitations
 
-## 라이선스
+- Feature caches are keyed by preprocessing settings, not by dataset content; rebuild the cache if you replace the raw
+  data in place.
+- The wheel does not include `sample_data/`; with a plain `pip install` start from your own data or ICBHI.
+- `scripts/packaging/smoke_installed_wheel.sh` checks an installed wheel from a clean virtual environment.
 
-MIT — [`LICENSE`](LICENSE)
+## License
+
+See [`LICENSE`](LICENSE).

@@ -1,48 +1,48 @@
 """
-GaP-Aug(Chang et al., ICASSP 2024) 분류기 — PANNs 원형 Cnn14 + 논문 Algorithm 1 학습 절차. **논문 명세 재구현**(공식·비공식 코드 없음).
+GaP-Aug (Chang et al., ICASSP 2024) classifier — original PANNs Cnn14 + the training procedure of paper Algorithm 1. **Re-implementation from the paper description** (no official or unofficial code).
 
-백본(공식 PANNs 코드 qiuqiangkong/audioset_tagging_cnn pytorch/models.py Cnn14 와 동일 구조 — 골든 대조 P0):
-  파형 → 파워 STFT(window, center, reflect) → mel(librosa slaney) → 10·log10(clamp amin 1e-10, ref 1, top_db None)
-  → bn0(BatchNorm2d(64), mel 축) → conv_block1–6(각 2×(3×3 conv+BN+ReLU), avg pool 2×2 / 마지막 1×1, dropout 0.2)
-  → 주파수(mel) 축 평균(mean dim=3) → 시간 축 max+mean [= pooled 2048] → dropout 0.5 → fc1(2048→2048)+ReLU [= feat] → dropout 0.5 [= emb, PANNs 'embedding']
-  → 분류 fc(2048→n_cls) — 입력은 head_input(emb|feat) 플래그.
-  ConvBlock 은 툴킷 models/backbone/cnn.py 의 것(공식과 동일: 3×3 ×2, bias 없음, xavier/BN 1·0 초기화) 을 재사용.
-  사전학습: AudioSet Cnn14 16 kHz 판(Cnn14_16k_mAP=0.438.pth, zenodo 3987831; 자매 논문 JMIR AI 2025 가 16 kHz 판 사용) —
-  spectrogram/logmel/fc_audioset 을 제외한 전 키를 strict 로 로드. 32 kHz 판(zenodo 3960586) 은 pretrained="32k" 플래그
-  (32 kHz·fmax 14 kHz 학습분이라 sample_rate/fmax/데이터 config 를 함께 바꿔야 한다 — 경고 출력).
+Backbone (same structure as Cnn14 in the official PANNs code qiuqiangkong/audioset_tagging_cnn pytorch/models.py — verified by golden comparison):
+  waveform → power STFT(window, center, reflect) → mel(librosa slaney) → 10·log10(clamp amin 1e-10, ref 1, top_db None)
+  → bn0(BatchNorm2d(64), mel axis) → conv_block1–6(each 2×(3×3 conv+BN+ReLU), avg pool 2×2 / last 1×1, dropout 0.2)
+  → mean over frequency (mel) axis (mean dim=3) → max+mean over time [= pooled 2048] → dropout 0.5 → fc1(2048→2048)+ReLU [= feat] → dropout 0.5 [= emb, PANNs 'embedding']
+  → classification fc(2048→n_cls) — its input is chosen by the head_input (emb|feat) flag.
+  ConvBlock is reused from the toolkit's models/backbone/cnn.py (same as official: 3×3 ×2, no bias, xavier/BN 1·0 init).
+  Pretraining: AudioSet Cnn14 16 kHz version (Cnn14_16k_mAP=0.438.pth, zenodo 3987831; the sister paper JMIR AI 2025 uses the 16 kHz version) —
+  all keys except spectrogram/logmel/fc_audioset are loaded strictly. The 32 kHz version (zenodo 3960586) is the pretrained="32k" flag
+  (trained at 32 kHz / fmax 14 kHz, so sample_rate/fmax/data config must change together — a warning is printed).
 
-특징(논문 §3.1 '64-dim log Mel filterbank, 25 ms / 6.25 ms'): 16 kHz, 10 s, 64 mel → n_fft 400 / hop 100 (feature_preset="paper").
-  공식 16k ckpt 는 512/160 으로 학습됐다(feature_preset="panns16k"; 골든 대조는 이 설정).
-  **특징 정의 = PANNs 식(가정, 질문 #5)**: 파워 스펙트럼 → slaney mel(fmin 50 / fmax 8000) → 10·log10 dB(ref 1, amin 1e-10, top_db None).
-  논문 문구는 kaldi fbank(HTK mel·자연로그) 로도 읽힐 수 있으나 백본이 PANNs 이므로 PANNs 프론트엔드 정의를 택한다.
-  창 함수(window): 공식 ckpt 는 hann 으로 학습 → 기본 hann; 자매 논문(jmir_full.txt:667-669) 은 같은 연구실 CNN14 파이프라인에
-  'Hamming window 512 / hop 160' 을 명시 → window="hamming" 플래그(가정).
+Features (paper §3.1 '64-dim log Mel filterbank, 25 ms / 6.25 ms'): 16 kHz, 10 s, 64 mel → n_fft 400 / hop 100 (feature_preset="paper").
+  The official 16k ckpt was trained with 512/160 (feature_preset="panns16k"; golden comparison uses this setting).
+  **Feature definition = PANNs style (assumption)**: power spectrum → slaney mel (fmin 50 / fmax 8000) → 10·log10 dB (ref 1, amin 1e-10, top_db None).
+  The paper wording could also be read as a kaldi fbank (HTK mel, natural log), but the backbone is PANNs, so the PANNs front-end definition is used.
+  Window function: the official ckpt was trained with hann → default hann; the sister paper (JMIR AI 2025) states
+  'Hamming window 512 / hop 160' for the same lab's CNN14 pipeline → window="hamming" flag (assumption).
 
-가정(저자 확인 전 — AUTHOR_QUESTIONS GaP-Aug #1–#8; 전부 config 플래그):
-  norm_mode        : log-mel 비음수화 = 샘플별 min-max [0,1] (모델 입력도 그 스케일; 학습·평가 동일 적용). 대안 batch_minmax / db_offset / none /
-                     sample_minmax_restore(γ 만 [0,1] 에서 적용하고 모델 입력은 원 dB 스케일로 복원 — 질문 #1 후반의 갈림길).
-                     부작용: 사전학습 bn0 running stats 는 PANNs dB 입력(mel 별 mean −46..−18, std ~20) 기준이라 [0,1] 입력에선
-                     초기 eval 출력이 거의 상수가 되고, train 중 bn0 running stats 가 재적응(momentum 0.1, ~수십 step) 한다.
-  mixup_alpha      : 1.0 (근거: 공식 PANNs 파이프라인 main.py:174 Mixup(mixup_alpha=1.) + do_mixup 짝/홀 쌍 = Algo. 1 line 7-12 구조;
-                     단 PANNs 는 bn0 **뒤** 에서 mixup, 여기서는 bn0 앞 스펙트로그램) — 여전히 가정 #2,  mixup_loss: soft (대안 pair)
-  triplet          : **w_trip 1.0** = 논문 Algorithm 1 line 14 'L ← L_NLL + L_triplet' 비가중 합(문면). 0.01 은 자매 논문(JMIR AI 2025,
-                     CE 기반·다른 세팅, λ=0.01) 근거의 **의도적 이탈 플래그**(w_trip=0.01) — 수정 회차 1 까지의 기본값이었음.
-                     margin 1.0, X̃_a 샘플(triplet_source), 무작위 삼중항,
-                     **triplet_layer** = emb(PANNs 'embedding' = fc1 ReLU 후 dropout 0.5; 학습 모드에선 dropout 마스크가 걸린다)
-                     | feat(fc1 ReLU, dropout 전) | pooled(conv 풀링 2048, fc1 전) — 질문 #3 의 '어느 층' 미기재 항목
-  head_input       : **emb** (공식 PANNs finetune_template.py Transfer_Cnn14 = post-dropout embedding 에 fc_transfer → log_softmax → NLL;
-                     논문 §2.3 'NLL loss' 문구와 부합) | feat (dropout 없이 fc1 ReLU 출력에 직접) — 질문 #4 관련, 미기재
-  joint_forward    : **False(기본, 문면)** = Algo. 1 line 13 대로 M(X̃_mix)·M(X̃_a) 두 번 forward(BN 배치통계 분리).
-                     True 면 16개를 한 배치로 묶어 한 번 forward(BN 통계 공유; 속도 최적화, 비문면)
-  head_init        : 분류 fc xavier_uniform(bias 0) (PANNs init_layer 관례)
-  window           : hann (ckpt 학습 설정) | hamming (자매 논문 관례)
-  데이터 측 가정   : 10 s 초과 사이클은 앞 절단(pad_type repeat; 논문 'divided into 10-second segments' 는 다중 세그먼트 분할로도
-                     읽힘 — 질문 #6), 녹음 단위 fade 없음(configs/data/icbhi_gapaug.yaml `fade: false`; 논문 언급 없음)
-  specaug/patchmask: augmentations/gap_aug.py 참고
+Assumptions (not confirmed by the authors; all are config flags):
+  norm_mode        : log-mel made non-negative = per-sample min-max [0,1] (the model input uses that scale; same for training and evaluation). Alternatives batch_minmax / db_offset / none /
+                     sample_minmax_restore (γ applied only in [0,1], model input restored to the original dB scale — an open question in the paper description).
+                     Side effect: the pretrained bn0 running stats assume PANNs dB input (per-mel mean −46..−18, std ~20), so with [0,1] input
+                     early eval outputs are nearly constant, and bn0 running stats re-adapt during training (momentum 0.1, ~tens of steps).
+  mixup_alpha      : 1.0 (rationale: official PANNs pipeline main.py:174 Mixup(mixup_alpha=1.) + do_mixup even/odd pairs = structure of Algo. 1 lines 7-12;
+                     but PANNs mixes **after** bn0, whereas here the spectrogram before bn0 is mixed) — still an assumption,  mixup_loss: soft (alternative pair)
+  triplet          : **w_trip 1.0** = unweighted sum 'L ← L_NLL + L_triplet' of paper Algorithm 1 line 14 (literal). 0.01 is an **intentional deviation flag**
+                     (w_trip=0.01) based on the sister paper (JMIR AI 2025, CE-based, different setting, λ=0.01).
+                     margin 1.0, X̃_a samples (triplet_source), random triplets,
+                     **triplet_layer** = emb (PANNs 'embedding' = fc1 ReLU then dropout 0.5; the dropout mask applies in training mode)
+                     | feat (fc1 ReLU, before dropout) | pooled (conv pooling 2048, before fc1) — the layer is not specified in the paper
+  head_input       : **emb** (official PANNs finetune_template.py Transfer_Cnn14 = fc_transfer on the post-dropout embedding → log_softmax → NLL;
+                     consistent with the 'NLL loss' wording of paper §2.3) | feat (directly on the fc1 ReLU output, no dropout) — not specified
+  joint_forward    : **False (default, literal)** = two forwards M(X̃_mix)·M(X̃_a) as in Algo. 1 line 13 (separate BN batch statistics).
+                     True packs all 16 into one batch for a single forward (shared BN statistics; speed optimization, not literal)
+  head_init        : classification fc xavier_uniform (bias 0) (PANNs init_layer convention)
+  window           : hann (ckpt training setting) | hamming (sister paper convention)
+  data-side assumptions: cycles longer than 10 s are truncated at the front (pad_type repeat; the paper's 'divided into 10-second segments' could
+                     also mean splitting into multiple segments), no per-recording fade (configs/data/icbhi_gapaug.yaml `fade: false`; not mentioned in the paper)
+  specaug/patchmask: see augmentations/gap_aug.py
 
-method → (증강, mixup): gapaug(gamma, on) | gapaug_nomixup(gamma, off) | naive(없음, off) | specaug(spec, on) |
-  patchmask(mask, on) | mixup_only(없음, on). `mixup` 인자로 개별 override 가능(specaug/patchmask w/o Mixup).
-손실은 모든 method 에서 동일(NLL + w_trip·triplet, 기본 w_trip 1; Table 2 는 '증강 비교' 이므로 손실은 고정 — 가정). 평가: loss_func(CE).
+method → (augmentation, mixup): gapaug(gamma, on) | gapaug_nomixup(gamma, off) | naive(none, off) | specaug(spec, on) |
+  patchmask(mask, on) | mixup_only(none, on). The `mixup` argument overrides it individually (specaug/patchmask w/o Mixup).
+The loss is the same for every method (NLL + w_trip·triplet, default w_trip 1; Table 2 compares augmentations, so the loss is fixed — assumption). Evaluation: loss_func(CE).
 """
 from __future__ import annotations
 
@@ -78,22 +78,22 @@ PANNS_CNN14 = {
     "16k": {
         "url": "https://zenodo.org/record/3987831/files/Cnn14_16k_mAP%3D0.438.pth?download=1",
         "path": "pretrained_models/upstream/Cnn14_16k_mAP=0.438.pth",
-        "sha256": "e2ee543a27919542c2ea03eabaa70b24dcd4e6c8e05621de6b67a94e4c5058e6",  # 2026-08-26 확인 (358,668,570 B)
+        "sha256": "e2ee543a27919542c2ea03eabaa70b24dcd4e6c8e05621de6b67a94e4c5058e6",  # verified (358,668,570 B)
         "size": 358_668_570,
         "sample_rate": 16000, "fmax": 8000.0,
     },
     "32k": {
         "url": "https://zenodo.org/record/3960586/files/Cnn14_mAP%3D0.431.pth?download=1",
         "path": "pretrained_models/upstream/Cnn14_mAP=0.431.pth",
-        "sha256": None,  # 미다운로드 — 첫 다운로드 시 provenance.json 에 기록
+        "sha256": None,  # not downloaded yet — recorded in provenance.json on first download
         "size": None,
         "sample_rate": 32000, "fmax": 14000.0,
     },
 }
-PANNS_LICENSE = "MIT (PANNs, qiuqiangkong/audioset_tagging_cnn) — 패키지 동봉·재배포 금지, 개별 다운로드"
+PANNS_LICENSE = "MIT (PANNs, qiuqiangkong/audioset_tagging_cnn) — not bundled or redistributed with the package, downloaded separately"
 FEATURE_PRESETS = {
-    "paper": dict(n_fft=400, hop=100),      # 25 ms / 6.25 ms @16 kHz (논문 §3.1)
-    "panns16k": dict(n_fft=512, hop=160),   # 공식 16k ckpt 학습 설정 (README) — 골든 대조
+    "paper": dict(n_fft=400, hop=100),      # 25 ms / 6.25 ms @16 kHz (paper §3.1)
+    "panns16k": dict(n_fft=512, hop=160),   # official 16k ckpt training setting (README) — golden comparison
 }
 WINDOWS = {"hann": torch.hann_window, "hamming": torch.hamming_window}
 EXCLUDE_PREFIXES = ("spectrogram_extractor.", "logmel_extractor.", "fc_audioset.")
@@ -103,7 +103,7 @@ NORM_MODES = ("sample_minmax", "sample_minmax_restore", "batch_minmax", "db_offs
 
 
 class PANNsLogMel(nn.Module):
-    """torchlibrosa Spectrogram(power) + LogmelFilterBank(librosa slaney mel, log10, ref 1, amin 1e-10, top_db None) 의 torchaudio 재현."""
+    """torchlibrosa Spectrogram(power) + LogmelFilterBank(librosa slaney mel, log10, ref 1, amin 1e-10, top_db None) reproduced with torchaudio."""
 
     def __init__(self, sample_rate=16000, n_fft=512, hop=160, n_mels=64, fmin=50.0, fmax=8000.0, ref=1.0, amin=1e-10, window="hann"):
         super().__init__()
@@ -117,15 +117,15 @@ class PANNsLogMel(nn.Module):
         self.ref, self.amin = float(ref), float(amin)
 
     def forward(self, wav: torch.Tensor) -> torch.Tensor:
-        """(B, L) → (B, 1, T, n_mels) — PANNs 레이아웃."""
+        """(B, L) → (B, 1, T, n_mels) — PANNs layout."""
         m = self.mel(wav)                                   # (B, n_mels, T)
         db = 10.0 * torch.log10(torch.clamp(m, min=self.amin)) - 10.0 * torch.log10(torch.tensor(max(self.amin, self.ref)))
         return db.transpose(1, 2).unsqueeze(1).contiguous()
 
 
 class Cnn14Backbone(nn.Module):
-    """PANNs Cnn14 의 bn0 이후 부분 (입력 (B,1,T,F) log-mel).
-    반환 dict(pooled=conv 풀링 2048(fc1 전, dropout 전), feat=fc1 ReLU 출력(dropout 전), emb=dropout 후 = PANNs 'embedding')."""
+    """The part of PANNs Cnn14 after bn0 (input (B,1,T,F) log-mel).
+    Returns dict(pooled=conv pooling 2048 (before fc1 and dropout), feat=fc1 ReLU output (before dropout), emb=after dropout = PANNs 'embedding')."""
 
     def __init__(self, n_mels: int = 64):
         super().__init__()
@@ -163,10 +163,10 @@ class Cnn14GaPAug(BaseRSCModel, nn.Module):
         self,
         n_cls: int = 4,
         method: str = "gapaug",
-        mixup: Optional[bool] = None,          # None = method 기본; True/False 로 override (SpecAug/PatchMask w/o Mixup)
+        mixup: Optional[bool] = None,          # None = method default; True/False overrides (SpecAug/PatchMask w/o Mixup)
         pretrained: Optional[str] = "16k",     # 16k | 32k | null
-        pretrained_path: Optional[str] = None, # 직접 경로 지정 시
-        # ---- 특징 ----
+        pretrained_path: Optional[str] = None, # explicit path
+        # ---- features ----
         sample_rate: int = 16000,
         feature_preset: str = "paper",         # paper(400/100) | panns16k(512/160)
         n_fft: Optional[int] = None,
@@ -174,8 +174,8 @@ class Cnn14GaPAug(BaseRSCModel, nn.Module):
         n_mels: int = 64,
         fmin: float = 50.0,
         fmax: float = 8000.0,
-        window: str = "hann",                  # hann(ckpt 학습 설정) | hamming(자매 논문 관례)  (가정)
-        norm_mode: str = "sample_minmax",      # sample_minmax | sample_minmax_restore | batch_minmax | db_offset | none  (가정 #1)
+        window: str = "hann",                  # hann (ckpt training setting) | hamming (sister paper convention)  (assumption)
+        norm_mode: str = "sample_minmax",      # sample_minmax | sample_minmax_restore | batch_minmax | db_offset | none  (assumption)
         db_offset: float = 100.0,
         # ---- GaP-Aug / PatchMask ----
         n_patches: int = 32,
@@ -188,21 +188,21 @@ class Cnn14GaPAug(BaseRSCModel, nn.Module):
         gain: float = 1.0,
         gamma_per: str = "patch",
         aug_p: float = 1.0,
-        # ---- SpecAug 비교군 (PANNs 기본값 가정) ----
+        # ---- SpecAug baseline (PANNs defaults assumed) ----
         specaug_time_width: int = 64,
         specaug_time_stripes: int = 2,
         specaug_freq_width: int = 8,
         specaug_freq_stripes: int = 2,
-        # ---- mixup / 손실 ----
-        mixup_alpha: float = 1.0,              # 가정 #2
+        # ---- mixup / loss ----
+        mixup_alpha: float = 1.0,              # assumption
         mixup_loss: str = "soft",              # soft | pair
-        w_trip: float = 1.0,                   # Algo. 1 line 14 비가중 합(문면). 0.01 = 자매 논문 근거 이탈 플래그 (#3)
+        w_trip: float = 1.0,                   # Algo. 1 line 14 unweighted sum (literal). 0.01 = deviation flag based on the sister paper
         triplet_margin: float = 1.0,
         triplet_p: float = 2.0,
-        triplet_source: str = "xa",            # xa (Algo. 1) | all (비혼합 전체 배치; 대안)
-        triplet_layer: str = "emb",            # emb | feat | pooled  (가정 #3: 임베딩 층 미기재)
-        head_input: str = "emb",               # emb (공식 Transfer_Cnn14 관행) | feat  (가정 #4: 미기재)
-        joint_forward: bool = False,           # False = Algo. 1 line 13 문면(2회 forward) | True = 결합 1회(비문면)
+        triplet_source: str = "xa",            # xa (Algo. 1) | all (whole unmixed batch; alternative)
+        triplet_layer: str = "emb",            # emb | feat | pooled  (assumption: embedding layer not specified)
+        head_input: str = "emb",               # emb (official Transfer_Cnn14 convention) | feat  (assumption: not specified)
+        joint_forward: bool = False,           # False = Algo. 1 line 13 literal (2 forwards) | True = single joint forward (not literal)
         head_init: str = "xavier",             # xavier | default
     ):
         super().__init__()
@@ -250,49 +250,49 @@ class Cnn14GaPAug(BaseRSCModel, nn.Module):
                     method, self.aug_kind, self.use_mixup, self.n_fft, self.hop, window, norm_mode, self.w_trip, triplet_layer,
                     self.mixup_alpha, head_input)
 
-    # ------------------------------------------------------------------ 사전학습
+    # ------------------------------------------------------------------ pretraining
     def load_panns_weights(self, path: Optional[str], variant: str = "16k") -> Dict[str, list]:
         from rsc_toolkit.paths import download_target, resolve_pretrained
 
         if path is None:
             spec = PANNS_CNN14[variant]
             if spec["sample_rate"] != self.sample_rate or spec["fmax"] != self.fmax:
-                logger.warning("PANNs Cnn14 %s ckpt 는 %d Hz / fmax %.0f 로 학습됐는데 모델은 %d Hz / fmax %.0f — "
-                               "데이터 config(sampling_rate)·fmax 를 함께 맞춰야 한다",
+                logger.warning("PANNs Cnn14 %s ckpt was trained at %d Hz / fmax %.0f but the model uses %d Hz / fmax %.0f — "
+                               "align the data config (sampling_rate) and fmax as well",
                                variant, spec["sample_rate"], spec["fmax"], self.sample_rate, self.fmax)
 
-            ckpt = resolve_pretrained([spec["path"]]) or download_target(spec["path"])  # RSCTK_PRETRAINED_ROOT → cwd 순
+            ckpt = resolve_pretrained([spec["path"]]) or download_target(spec["path"])  # RSCTK_PRETRAINED_ROOT, then cwd
             if not ckpt.exists():
                 from rsc_toolkit.datasets.download_utils import download_file, record_download_provenance
 
                 ckpt.parent.mkdir(parents=True, exist_ok=True)
-                logger.info("PANNs Cnn14 %s 다운로드: %s", variant, spec["url"])
+                logger.info("Downloading PANNs Cnn14 %s: %s", variant, spec["url"])
                 download_file(spec["url"], ckpt)
                 record_download_provenance(ckpt, url=spec["url"], known_size=spec["size"], known_sha256=spec["sha256"])
                 self._append_provenance_extras(ckpt, variant)
         else:
-            ckpt = resolve_pretrained(explicit=path)   # 상대 경로면 cwd → RSCTK_PRETRAINED_ROOT 아래 (P2-9 경로 독립)
+            ckpt = resolve_pretrained(explicit=path)   # relative path: cwd, then under RSCTK_PRETRAINED_ROOT
         state = torch.load(ckpt, map_location="cpu", weights_only=False)
         state = state.get("model", state)
         kept = {k: v for k, v in state.items() if not k.startswith(EXCLUDE_PREFIXES)}
         self.backbone.load_state_dict(kept, strict=True)
         self.pretrained_info = {"path": str(ckpt), "variant": variant, "n_loaded": len(kept),
                                 "excluded": sorted(k for k in state if k.startswith(EXCLUDE_PREFIXES))}
-        logger.info("PANNs Cnn14 로드: %s (%d 키, 제외 %d)", ckpt, len(kept), len(self.pretrained_info["excluded"]))
+        logger.info("Loaded PANNs Cnn14: %s (%d keys, %d excluded)", ckpt, len(kept), len(self.pretrained_info["excluded"]))
         return self.pretrained_info
 
     @staticmethod
     def _append_provenance_extras(ckpt: pathlib.Path, variant: str) -> None:
-        """record_download_provenance 가 쓰지 않는 라이선스·용도 필드를 provenance.json 에 병합(재다운로드 시 소실 방지)."""
+        """Merges license/usage fields that record_download_provenance does not write into provenance.json (kept across re-downloads)."""
         p = ckpt.with_name(ckpt.name + ".provenance.json")
         try:
             rec = json.loads(p.read_text()) if p.exists() else {}
-            rec.update({"license": PANNS_LICENSE, "used_by": f"rsc_toolkit/models/cnn14_gapaug.py (GaP-Aug, {variant} 판)"})
+            rec.update({"license": PANNS_LICENSE, "used_by": f"rsc_toolkit/models/cnn14_gapaug.py (GaP-Aug, {variant} version)"})
             p.write_text(json.dumps(rec, indent=1, ensure_ascii=False))
-        except OSError as e:  # provenance 기록 실패는 학습을 막지 않는다
-            logger.warning("provenance 추가 기록 실패 %s: %s", p, e)
+        except OSError as e:  # a provenance write failure does not block training
+            logger.warning("Failed to write extra provenance fields %s: %s", p, e)
 
-    # ------------------------------------------------------------------ 특징
+    # ------------------------------------------------------------------ features
     def _as_wave(self, x: torch.Tensor) -> torch.Tensor:
         if x.dim() == 3:
             x = x.squeeze(1)
@@ -301,16 +301,16 @@ class Cnn14GaPAug(BaseRSCModel, nn.Module):
         return x
 
     def compute_logmel(self, wav: torch.Tensor) -> torch.Tensor:
-        """파형 (B,L) → PANNs log-mel (B,1,T,F) (정규화 전; 골든 대조용)."""
+        """Waveform (B,L) → PANNs log-mel (B,1,T,F) (before normalization; for golden comparison)."""
         return self.frontend(self._as_wave(wav))
 
     def make_input(self, wav: torch.Tensor) -> torch.Tensor:
-        """log-mel → 비음수화(norm_mode) — 학습·평가 공통 입력 스케일 (sample_minmax_restore 는 모델 입력이 원 dB 스케일)."""
+        """log-mel → non-negative (norm_mode) — input scale shared by training and evaluation (with sample_minmax_restore the model input is on the original dB scale)."""
         with torch.no_grad():
             return normalize_nonneg(self.compute_logmel(wav), self.norm_mode, self.db_offset)
 
     def make_augmented_input(self, wav: torch.Tensor) -> torch.Tensor:
-        """학습 경로: 비음수화 → 증강(Algo. 1 line 5-6). sample_minmax_restore 면 [0,1] 에서 γ 를 적용한 뒤 dB 스케일로 복원."""
+        """Training path: non-negative → augmentation (Algo. 1 lines 5-6). With sample_minmax_restore, γ is applied in [0,1], then restored to the dB scale."""
         with torch.no_grad():
             lm = self.compute_logmel(wav)
             if self.norm_mode == "sample_minmax_restore":
@@ -344,7 +344,7 @@ class Cnn14GaPAug(BaseRSCModel, nn.Module):
             logits = self.forward(audio_batch)
             return logits, loss_func(logits, labels)
 
-        x = self.make_augmented_input(audio_batch)  # (B,1,T,F): 비음수화 + Algo. 1 line 5-6 샘플별 증강
+        x = self.make_augmented_input(audio_batch)  # (B,1,T,F): non-negative + per-sample augmentation of Algo. 1 lines 5-6
         B = x.shape[0]
 
         if not self.use_mixup or B < 2:
@@ -378,8 +378,8 @@ class Cnn14GaPAug(BaseRSCModel, nn.Module):
                 ob = self.forward_backbone(xb)
                 loss = loss + self.w_trip * triplet_loss(torch.cat([emb_a, self._trip(ob)]), torch.cat([ya, yb]), self.triplet_margin, self.triplet_p)
 
-        # 학습 지표용 로짓 (B, n_cls): a 위치 = M(X̃_a)(하드 라벨 대비 유효), b 위치 = M(X_mix)(혼합 입력이라 b 라벨과 무관).
-        # → 학습 train/topk_accuracy 는 참고 불가(절반이 혼합 예측). 손실만 의미 있다. 평가 지표는 eval 경로(forward) 로 계산된다.
+        # Logits for training metrics (B, n_cls): a positions = M(X̃_a) (valid against hard labels), b positions = M(X_mix) (mixed input, unrelated to b labels).
+        # → train/topk_accuracy during training is not meaningful (half are mixed predictions); only the loss is. Evaluation metrics use the eval path (forward).
         full = x.new_zeros((B, self.n_cls))
         full[idx_a] = logits_a.detach().to(full.dtype)
         full[idx_b] = logits_mix.detach().to(full.dtype)
@@ -387,7 +387,7 @@ class Cnn14GaPAug(BaseRSCModel, nn.Module):
             full[B - 1] = logits_a.detach().mean(0)
         return full, loss
 
-    # ------------------------------------------------------------------ 진단
+    # ------------------------------------------------------------------ diagnostics
     def describe(self) -> dict:
         n_all = sum(p.numel() for p in self.parameters())
         return {"params_total": n_all, "params_backbone": sum(p.numel() for p in self.backbone.parameters()),

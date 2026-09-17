@@ -1,18 +1,19 @@
 """
-MVST(ICASSP 2024) 의 뷰별 AST — 공식 코드 충실 이식 (P0).
+Per-view AST of MVST (ICASSP 2024) — faithful port of the official code (exact port of the official code, verified against goldens).
 
-출처:
-- 논문: Multi-View Spectrogram Transformer for Respiratory Sound Classification (https://arxiv.org/abs/2311.09655)
-- 공식 코드: https://github.com/wentaoheunnc/MVST {16,32,64,128,256}/models/ast.py (patch-mix ast.py 차용, 뷰별 커널만 다름)
+Sources:
+- Paper: Multi-View Spectrogram Transformer for Respiratory Sound Classification (https://arxiv.org/abs/2311.09655)
+- Official code: https://github.com/wentaoheunnc/MVST {16,32,64,128,256}/models/ast.py (borrowed from patch-mix ast.py; only the per-view kernel differs)
 
-구조 (원본 그대로):
-- DeiT-B distilled 골격. 패치 conv 의 kernel = stride = 뷰 커널 (16,16)/(32,8)/(64,4)/(128,2)/(256,1);
-  입력 (B,1,1024,256) → forward 에서 transpose(2,3) → (B,1,256,1024) = (freq 256, time 1024) → 모든 뷰 1024 패치, pos_embed (1,1026,768).
-- audioset_pretrain 분기: 내부 ASTModel(imagenet_pretrain=False, 뷰 커널) 을 만든 뒤 `audioset_16_16_0.4422.pth` 에서
-  **이름·모양이 모두 같은 키만** 복사 (모양 다르면 print 후 방치). 그 결과 pos_embed(514 vs 1026)는 전 뷰에서 미로드(trunc_normal 난수),
-  patch_embed.proj(768,1,16,16)는 16×16 뷰만 로드, 블록·norm·cls/dist 는 전 뷰 로드. 이어지는 pos_embed 보간은 같은 격자라 항등.
-- 특징 = (cls + dist)/2, 분류기 = deepcopy(mlp_head) = LayerNorm(768) + Linear(768, n_cls). mlp_head 는 forward 미사용.
-입력 파이프라인: fbank(798×128, AST 상수 정규화) → [SpecAugment 샘플별] → Resize((1024, 256)) bilinear — Resize 는 이 모델이 수행한다.
+Architecture (as in the original):
+- DeiT-B distilled skeleton. Patch conv kernel = stride = view kernel (16,16)/(32,8)/(64,4)/(128,2)/(256,1);
+  input (B,1,1024,256) → transpose(2,3) in forward → (B,1,256,1024) = (freq 256, time 1024) → 1024 patches for every view, pos_embed (1,1026,768).
+- audioset_pretrain branch: builds an inner ASTModel(imagenet_pretrain=False, view kernel), then copies from `audioset_16_16_0.4422.pth`
+  **only keys whose name and shape both match** (on shape mismatch it prints and leaves the key). As a result pos_embed (514 vs 1026) is not loaded
+  for any view (trunc_normal random), patch_embed.proj (768,1,16,16) is loaded only for the 16×16 view, and blocks, norm, cls/dist are loaded for all views.
+  The subsequent pos_embed interpolation is to the same grid, i.e. identity.
+- Features = (cls + dist)/2, classifier = deepcopy(mlp_head) = LayerNorm(768) + Linear(768, n_cls). mlp_head is unused in forward.
+Input pipeline: fbank (798×128, AST constant normalization) → [per-sample SpecAugment] → Resize((1024, 256)) bilinear — the Resize is done by this model.
 """
 from __future__ import annotations
 
@@ -38,7 +39,7 @@ logger = logging.getLogger(__name__)
 
 AUDIOSET_16_16_CANDIDATES = (
     "pretrained_models/upstream/audioset_16_16_0.4422.pth",
-    "pretrained_models/audioset_16_16_0.4422.pth",  # 원본 코드가 쓰는 위치
+    "pretrained_models/audioset_16_16_0.4422.pth",  # location used by the original code
 )
 VIEW_KERNELS = {16: (16, 16), 32: (32, 8), 64: (64, 4), 128: (128, 2), 256: (256, 1)}
 
@@ -48,13 +49,13 @@ class MVSTViewAST(BaseRSCModel, nn.Module):
     def __init__(
         self,
         n_cls: int = 4,
-        view: int = 16,                      # 16 | 32 | 64 | 128 | 256 (커널 (kf, kt) = VIEW_KERNELS[view])
+        view: int = 16,                      # 16 | 32 | 64 | 128 | 256 (kernel (kf, kt) = VIEW_KERNELS[view])
         input_fdim: int = 256,
         input_tdim: int = 1024,
         audioset_pretrain: bool = True,
         pretrained_path: Optional[str] = None,
         model_size: str = "base384",
-        input_layout: str = "freq_time",     # 툴킷 fbank (B,128,798) → 모델이 (B,798,128)→Resize(1024,256)
+        input_layout: str = "freq_time",     # toolkit fbank (B,128,798) → the model applies (B,798,128)→Resize(1024,256)
         resize_to: Tuple[int, int] = (1024, 256),
     ):
         super().__init__()
@@ -66,7 +67,7 @@ class MVSTViewAST(BaseRSCModel, nn.Module):
         self.resize_to = tuple(resize_to)
         self.final_feat_dim = 768
 
-        # 내부 ASTModel(imagenet_pretrain=False, audioset_pretrain=False) 과 동일: 랜덤 골격 + 뷰 커널 + 난수 pos_embed
+        # same as the inner ASTModel(imagenet_pretrain=False, audioset_pretrain=False): random skeleton + view kernel + random pos_embed
         self.v = _create_deit_skeleton(model_size, pretrained=False)
         self.original_num_patches = self.v.patch_embed.num_patches
         self.original_embedding_dim = self.v.pos_embed.shape[2]
@@ -83,7 +84,7 @@ class MVSTViewAST(BaseRSCModel, nn.Module):
 
         if audioset_pretrain:
             self.load_audioset_matching_keys(pretrained_path)
-            # 원본 ast.py:154-159 — 자기 격자로 bilinear 보간 (항등)
+            # original ast.py:154-159 — bilinear interpolation to its own grid (identity)
             new_pos_embed = self.v.pos_embed[:, 2:, :].detach().reshape(1, num_patches, 768).transpose(1, 2).reshape(1, 768, f_dim, t_dim)
             new_pos_embed = F.interpolate(new_pos_embed, size=(f_dim, t_dim), mode="bilinear")
             new_pos_embed = new_pos_embed.reshape(1, 768, num_patches).transpose(1, 2)
@@ -92,19 +93,19 @@ class MVSTViewAST(BaseRSCModel, nn.Module):
         self.mlp_head = nn.Sequential(nn.LayerNorm(self.original_embedding_dim), nn.Linear(self.original_embedding_dim, n_cls))
         self.classifier = deepcopy(self.mlp_head)  # main.py:257
 
-    # ----------------------------------------------------------------- 구성
+    # ----------------------------------------------------------------- construction
     def get_shape(self, input_fdim, input_tdim):
         test_proj = nn.Conv2d(1, 768, kernel_size=self.kernel, stride=self.kernel)
         out = test_proj(torch.randn(1, 1, input_fdim, input_tdim))
         return out.shape[2], out.shape[3]
 
     def load_audioset_matching_keys(self, path: Optional[str]) -> dict:
-        """원본 ast.py:130-137: 이름·모양이 같은 키만 복사 (module.v.* → v.*). 결과 요약을 돌려준다."""
+        """Original ast.py:130-137: copy only keys with matching name and shape (module.v.* → v.*). Returns a summary of the result."""
         from rsc_toolkit.paths import resolve_pretrained
 
-        p = resolve_pretrained(AUDIOSET_16_16_CANDIDATES, explicit=path)  # RSCTK_PRETRAINED_ROOT → cwd 순
+        p = resolve_pretrained(AUDIOSET_16_16_CANDIDATES, explicit=path)  # searched in RSCTK_PRETRAINED_ROOT, then cwd
         if p is None or not p.exists():
-            raise FileNotFoundError(f"audioset_16_16_0.4422.pth 가 없다 (scripts/reproduction/convert_hf_ast_to_yuangong.py 로 생성): {AUDIOSET_16_16_CANDIDATES}")
+            raise FileNotFoundError(f"audioset_16_16_0.4422.pth not found (create it with scripts/reproduction/convert_hf_ast_to_yuangong.py): {AUDIOSET_16_16_CANDIDATES}")
         weights = torch.load(p, map_location="cpu", weights_only=True)
         current = self.v.state_dict()
         loaded, mismatch = [], []
@@ -117,11 +118,11 @@ class MVSTViewAST(BaseRSCModel, nn.Module):
                 else:
                     mismatch.append(k1)
         self.v.load_state_dict(current, strict=False)
-        logger.info("MVST view %d AudioSet 로드: %d 키, 모양 불일치(미로드) %s", self.view, len(loaded), mismatch)
+        logger.info("MVST view %d AudioSet load: %d keys, shape mismatch (not loaded) %s", self.view, len(loaded), mismatch)
         return {"loaded": loaded, "mismatch": mismatch}
 
     def load_reference_checkpoint(self, path) -> None:
-        """MVST save_model 산출물(best.pth: model=module.v.*|v.* + mlp_head.*, classifier=0/1.*) strict 로드."""
+        """Strict load of an MVST save_model output (best.pth: model=module.v.*|v.* + mlp_head.*, classifier=0/1.*)."""
         ckpt = torch.load(path, map_location="cpu", weights_only=False)
         state = {}
         for k, v in ckpt["model"].items():
@@ -130,11 +131,11 @@ class MVSTViewAST(BaseRSCModel, nn.Module):
             state[k] = v
         state.update({f"classifier.{k}": v for k, v in ckpt["classifier"].items()})
         self.load_state_dict(state, strict=True)
-        logger.info("MVST view %d 저자 체크포인트 로드: %s (epoch %s)", self.view, path, ckpt.get("epoch"))
+        logger.info("MVST view %d authors' checkpoint loaded: %s (epoch %s)", self.view, path, ckpt.get("epoch"))
 
-    # ------------------------------------------------------------------ 실행
+    # ------------------------------------------------------------------ execution
     def to_model_input(self, x: torch.Tensor) -> torch.Tensor:
-        """툴킷 fbank (B,128,798) 또는 (B,798,128) → (B,1,1024,256) (원본 transforms.Resize, bilinear)."""
+        """Toolkit fbank (B,128,798) or (B,798,128) → (B,1,1024,256) (original transforms.Resize, bilinear)."""
         if x.dim() == 3:
             x = x.unsqueeze(1)
         if self.input_layout == "freq_time":
@@ -142,7 +143,8 @@ class MVSTViewAST(BaseRSCModel, nn.Module):
         return F.interpolate(x, size=self.resize_to, mode="bilinear", align_corners=False, antialias=True)
 
     def forward_features(self, x: torch.Tensor) -> torch.Tensor:
-        """원본 forward: (B,1,1024,256) → transpose(2,3) → 패치 → cls/dist → blocks → (cls+dist)/2."""
+        """Original forward: (B,1,1024,256) → transpose(2,3) → patches → cls/dist → blocks → (cls+dist)/2."""
+
         x = x.transpose(2, 3)
         B = x.shape[0]
         x = self.v.patch_embed(x)

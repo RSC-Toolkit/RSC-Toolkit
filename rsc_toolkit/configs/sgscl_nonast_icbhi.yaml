@@ -1,16 +1,16 @@
-# sgscl 저장소 비-AST 레시피 실행 config (400ep, bs64, adam 1e-3/wd 1e-6, cosine, MA 0.5).
+# Run config for the non-AST recipes of the sgscl repository (400 ep, bs 64, adam 1e-3/wd 1e-6, cosine, MA 0.5).
 #
 #   SFT(CE): rsctk-train --config-name sgscl_nonast_icbhi model.name=cnn6_sft run.name=icbhi-cnn6-ce
 #   SG-SCL : ... model.name=cnn6_sft model.params.method=sgscl loss=cross_entropy run.name=icbhi-cnn6-sgscl
-#   (seed 1~5 로 반복: seed=N)
+#   (repeat for seeds 1-5: seed=N)
 #
-# 주의: repo 스크립트(bs64/400ep/lr1e-3)와 Interspeech'23 본문(bs128/200ep)이 다르다 —
-# P0 원칙대로 공식 코드(스크립트)를 기본으로 한다 (docs §3.5 재현 위험 참고).
+# Note: the repo scripts (bs 64/400 ep/lr 1e-3) differ from the Interspeech'23 text (bs 128/200 ep) —
+# following official-code parity, the official code (scripts) is the default.
 defaults:
   - model: sft_backbone
   - data_defaults@data: base
   - data: icbhi_sgscl_nonast
-  - loss: cross_entropy_weighted_icbhi   # 스크립트 --weighted_loss (SG-SCL 은 loss=cross_entropy 로 오버라이드)
+  - loss: cross_entropy_weighted_icbhi   # script --weighted_loss (override with loss=cross_entropy for SG-SCL)
   - metrics: icbhi_metrics
   - optimizer: adam
   - trainer: default
@@ -21,12 +21,12 @@ seed: 1
 
 optimizer:
   params:
-    lr: 1e-3                   # 스크립트 --learning_rate 1e-3 (wd 1e-6 은 adam 기본)
+    lr: 1e-3                   # script --learning_rate 1e-3 (wd 1e-6 is the adam default)
 
 trainer:
   params:
     max_epochs: 400
-    precision: 16-mixed        # 원본 AMP(GradScaler+autocast)
+    precision: 16-mixed        # official AMP (GradScaler + autocast)
 
 run:
   name: icbhi-cnn6-ce

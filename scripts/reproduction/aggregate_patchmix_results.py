@@ -1,6 +1,6 @@
 """
-patch-mix P1 결과 집계: outputs/patchmix/<run>/best.json 을 모아
-방법별 seed 평균±표준편차(Sp/Se/Score)를 논문 보고치와 나란히 표로 찍는다.
+Patch-Mix 5-seed reproduction check aggregation: collects outputs/patchmix/<run>/best.json and
+prints a table of the per-method seed mean±std (Sp/Se/Score) next to the paper-reported values.
 
   .venv/bin/python scripts/reproduction/aggregate_patchmix_results.py
 """
@@ -9,7 +9,7 @@ import pathlib
 import re
 import statistics
 
-PAPER = {  # 논문 Table 1·2 (5 seeds)
+PAPER = {  # paper Table 1·2 (5 seeds)
     "icbhi-ast-sft":     ("AST SFT",      (77.14, 3.35), (41.97, 2.21), (59.55, 0.88)),
     "icbhi-patchmix-ce": ("Patch-Mix CE", (76.87, 5.05), (42.04, 3.98), (59.46, 0.78)),
     "icbhi-patchmix-cl": ("Patch-Mix CL", (81.66, 3.83), (43.07, 2.80), (62.37, 0.61)),
@@ -37,9 +37,9 @@ def main():
                 vals = [r[i] for r in rows]
                 return statistics.mean(vals), statistics.stdev(vals)
             sp, se, sc = ms(1), ms(2), ms(3)
-            print(f"  우리 평균 : Sp {sp[0]:6.2f}±{sp[1]:.2f}  Se {se[0]:6.2f}±{se[1]:.2f}  Score {sc[0]:6.2f}±{sc[1]:.2f}")
-            print(f"  논문 보고 : Sp {psp[0]:6.2f}±{psp[1]:.2f}  Se {pse[0]:6.2f}±{pse[1]:.2f}  Score {psc[0]:6.2f}±{psc[1]:.2f}")
-            print(f"  Score 차이: {sc[0]-psc[0]:+.2f} (논문 ±{psc[1]:.2f})")
+            print(f"  ours mean : Sp {sp[0]:6.2f}±{sp[1]:.2f}  Se {se[0]:6.2f}±{se[1]:.2f}  Score {sc[0]:6.2f}±{sc[1]:.2f}")
+            print(f"  paper     : Sp {psp[0]:6.2f}±{psp[1]:.2f}  Se {pse[0]:6.2f}±{pse[1]:.2f}  Score {psc[0]:6.2f}±{psc[1]:.2f}")
+            print(f"  Score diff: {sc[0]-psc[0]:+.2f} (paper ±{psc[1]:.2f})")
 
 if __name__ == "__main__":
     main()

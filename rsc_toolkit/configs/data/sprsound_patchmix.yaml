@@ -1,6 +1,6 @@
-# patch-mix 계열(AST/BEATs 백본, fbank 128×798) 논문을 **SPRSound 표준 태스크**로 확장할 때 쓰는 데이터 설정.
-# 논문들은 ICBHI 만 실험했으므로 **논문 목표치가 없다** — 툴킷 자체 결과(교차 데이터 일반화 관찰용).
-# SPRSound 는 데이터 본래 목적대로 2022 inter-patient, 이벤트 단위 **7-class** 로만 쓴다(사용자 결정 ④).
+# Data config for extending the patch-mix family papers (AST/BEATs backbones, fbank 128×798) to the **standard SPRSound task**.
+# The papers evaluate ICBHI only, so **there is no paper-reported value** — toolkit results (to observe cross-dataset generalization).
+# SPRSound is used only as the dataset intends: 2022 inter-patient, event-level **7-class**.
 name: sprsound_patchmix
 params:
   datamodule_name: index
@@ -13,7 +13,7 @@ params:
   sampling_rate: 16000
   sample_level: cycle
   desired_length_sec: 8.0
-  pad_type: repeat_fade          # ICBHI 쪽 patch-mix 계열과 동일 체인
+  pad_type: repeat_fade          # same chain as the patch-mix family on ICBHI
   resample_after_slice: true
   time_unit: ms_int
   train_splits: [train]

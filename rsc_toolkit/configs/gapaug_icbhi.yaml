@@ -1,15 +1,15 @@
-# GaP-Aug(Chang et al., ICASSP 2024) 재현 — **논문 명세 재구현·가정 런** (공식·비공식 코드 없음, 등급 C).
-#   CNN14(AudioSet 16k) + GaP-aug + Mixup + NLL + triplet(Algo. 1 비가중 합; model.params.w_trip=0.01 은 자매 논문 이탈 플래그), 20,000 iter(=40 epoch × 500 step), bs 16 균형 배치, Adam 1e-5, AMP 없음.
-#   앵커(공식 60/40, 단일 값): Table 1 GaP-aug+Mixup Se 58.20 / Sp 77.07 / Score 67.64 (Acc 69.01); Table 2 Naïve 48.34/64.28/56.31,
+# GaP-Aug (Chang et al., ICASSP 2024) reproduction — **re-implementation from the paper specification (assumption run)** (no official or unofficial code, grade C).
+#   CNN14 (AudioSet 16k) + GaP-aug + Mixup + NLL + triplet (Algo. 1 unweighted sum; model.params.w_trip=0.01 is a deviation flag following the sister paper), 20,000 iter (=40 epochs × 500 steps), bs 16 balanced batches, Adam 1e-5, no AMP.
+#   Paper-reported values (official 60/40 split, single values): Table 1 GaP-aug+Mixup Se 58.20 / Sp 77.07 / Score 67.64 (Acc 69.01); Table 2 Naïve 48.34/64.28/56.31,
 #   GaP-aug w/o Mixup 56.49/76.94/66.72, SpecAug w/ Mixup 48.63/79.54/64.09, PatchMask w/ Mixup 54.88/77.01/65.94, Mixup 55.88/71.82/63.85.
-#   실행: rsctk-train --config-name gapaug_icbhi run.name=icbhi-gapaug-s1 seed=1
-#   변형: model.params.method=naive|gapaug_nomixup|specaug|patchmask|mixup_only  (model.params.mixup=false 로 w/o Mixup)
-#   가정 플래그: configs/model/cnn14_gapaug.yaml 주석 참고.
+#   Run: rsctk-train --config-name gapaug_icbhi run.name=icbhi-gapaug-s1 seed=1
+#   Variants: model.params.method=naive|gapaug_nomixup|specaug|patchmask|mixup_only  (model.params.mixup=false for w/o Mixup)
+#   Assumption flags: see the comments in configs/model/cnn14_gapaug.yaml.
 defaults:
   - model: cnn14_gapaug
   - data_defaults@data: base
   - data: icbhi_gapaug
-  - loss: cross_entropy        # 평가 손실(및 naive 의 NLL); 학습 손실은 모델 내부(NLL+triplet)
+  - loss: cross_entropy        # evaluation loss (and the NLL of naive); the training loss is computed inside the model (NLL+triplet)
   - metrics: icbhi_metrics
   - optimizer: adam_gapaug
   - trainer: default
@@ -21,8 +21,8 @@ seed: 1
 trainer:
   params:
     max_epochs: 40             # 40 × 500 step
-    max_steps: 20000           # 논문 20,000 iterations
-    precision: 32              # AMP 언급 없음
+    max_steps: 20000           # paper: 20,000 iterations
+    precision: 32              # AMP not mentioned
 
 run:
   name: icbhi-gapaug

@@ -1,7 +1,7 @@
-# M2D SPRSound 미세조정 (m2d app/icbhi_sprs eval_sprs.sh): 50ep, bs64 + split_iter 4, Adam 5e-6/wd 1e-4 + cosine(T_max 40),
-#   비가중 CE, freeze_embed, SpecAug(scl), Standardize 0.2000/0.2094, fp32, best-on-test Score (7-class; 2022 inter-patient).
-#   목표(EMBC'25 Table II 인용): 베이스 230529 88.78±0.43 (M2D-X SPRS 가중치는 미공개 → 89.77 재현 불가).
-#   베이스 230529 : rsctk-train --config-name m2d_sprs run.name=sprs-m2d-base-s1 seed=1
+# M2D SPRSound fine-tuning (m2d app/icbhi_sprs eval_sprs.sh): 50 ep, bs 64 + split_iter 4, Adam 5e-6/wd 1e-4 + cosine (T_max 40),
+#   unweighted CE, freeze_embed, SpecAug (scl), Standardize 0.2000/0.2094, fp32, best-on-test Score (7-class; 2022 inter-patient).
+#   Target (cited in EMBC'25 Table II): base 230529 88.78±0.43 (M2D-X SPRS weights are not released → 89.77 cannot be reproduced).
+#   Base 230529   : rsctk-train --config-name m2d_sprs run.name=sprs-m2d-base-s1 seed=1
 defaults:
   - model: m2d
   - data_defaults@data: base

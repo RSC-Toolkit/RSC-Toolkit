@@ -1,4 +1,4 @@
-"""P2-7 — 배치 계약 문서 모듈: META_KINDS 표가 트리의 선언과 어긋나지 않는지, Batch 뷰."""
+"""Batch contract documentation module: the META_KINDS table does not diverge from the declarations in the tree; Batch view."""
 from __future__ import annotations
 
 import pytest
@@ -21,7 +21,7 @@ def test_meta_kinds_table_matches_datamodule_and_model_declarations():
                 BTSCARDSprsDataModule.meta_kind, AMSDDataModule.meta_kind, RespireNetDataModule.meta_kind,
                 LungmixDataModule.meta_kind}
     assert declared <= set(contract.META_KINDS)
-    # 표의 receivers 가 실제로 그 kind 를 accepts_meta 에 선언했는가 (SFT 4종 표기는 묶음이라 건너뛴다)
+    # do the table's receivers actually declare that kind in accepts_meta? (the SFT 4-model entry is a group label, so it is skipped)
     for kind, row in contract.META_KINDS.items():
         for name in row["receivers"]:
             if "/" in name:

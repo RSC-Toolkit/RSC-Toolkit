@@ -1,9 +1,9 @@
-# sgscl 저장소의 비-AST 백본 (등록명으로 고른다):
+# Non-AST backbones of the sgscl repository (selected by registered name):
 #   model.name=resnet18_sft | resnet34_sft | efficientnet_b0_sft | cnn6_sft
 # method:
-#   SFT(CE) : method=ce (기본) + loss=cross_entropy_weighted_icbhi (스크립트 --weighted_loss)
+#   SFT(CE) : method=ce (default) + loss=cross_entropy_weighted_icbhi (script --weighted_loss)
 #   SG-SCL  : model.params.method=sgscl + loss=cross_entropy
-#             (비-AST SG-SCL 공식 스크립트 = 저장소 커밋 6a1bdbd 의 *_da2.sh; 툴킷 config 와 동일)
+#             (official non-AST SG-SCL scripts = *_da2.sh at repository commit 6a1bdbd; same as the toolkit config)
 name: resnet18_sft
 params:
   n_cls: 4
@@ -15,5 +15,5 @@ params:
   temperature: 0.06
   alpha: 1.0
   target_type: project1_project2block
-  specaug_policy: icbhi_ast_sup   # 원본 train 루프의 배치 단위 SpecAugment
+  specaug_policy: icbhi_ast_sup   # per-batch SpecAugment of the official train loop
   specaug_mask: mean

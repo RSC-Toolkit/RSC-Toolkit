@@ -6,8 +6,8 @@ defaults:
   - metrics: icbhi_metrics
   - optimizer: adam
   - trainer: default
-  # 콜백 선택: ema(기본) 또는 none. `callbacks=none` 으로 끌 수 있다.
-  # trainer 뒤에 와야 trainer.params.callbacks 를 덮어쓴다.
+  # callback choice: ema (default) or none. Disable with `callbacks=none`.
+  # must come after trainer to override trainer.params.callbacks.
   - callbacks: ema
   - _self_
 
@@ -15,5 +15,5 @@ seed: 123
 
 run:
   name: ${data.name}-${model.name}
-  group: default        # callbacks/best_checkpoint.yaml 의 outputs/${run.group}/${run.name} 에 쓰인다 — null 이면 'outputs/None/…' 이 되므로 기본값을 둔다
+  group: default        # used in outputs/${run.group}/${run.name} of callbacks/best_checkpoint.yaml — null would give 'outputs/None/…', so a default is set
   tags: []

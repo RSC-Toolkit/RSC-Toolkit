@@ -1,5 +1,5 @@
-# OPERA-CT(EMBC 경로) ICBHI 데이터: sclmeta 파형 전처리(구간 리샘플·순환 패딩 8 s, 16 kHz) 를 파형 그대로 넘긴다
-# (배치 단위 trim·mel64·dB·min-max 는 모델 transform 이 담당 — 배치 의존이라 캐시 불가). bs 256 (ev_icbhi_opera.sh), drop_last 없음.
+# OPERA-CT (EMBC path) ICBHI data: sclmeta waveform preprocessing (segment resampling · 8 s circular padding, 16 kHz), passed on as raw waveforms
+# (per-batch trim · mel64 · dB · min-max are done by the model transform — batch-dependent, so not cacheable). bs 256 (ev_icbhi_opera.sh), no drop_last.
 name: icbhi_opera
 params:
   datamodule_name: index
@@ -28,7 +28,7 @@ params:
 
   features:
     enabled: true
-    kind: waveform               # 캐시 없음
+    kind: waveform               # no cache
   feature_precompute: false
 
   specaugment:

@@ -1,35 +1,37 @@
-# RSC-Toolkit 튜토리얼 (최소 경로)
+# RSC-Toolkit tutorial (minimal path)
 
-노트북 판 [`notebooks/tutorial.ipynb`](notebooks/tutorial.ipynb) 와 같은 내용을 셸 명령으로 적었다.
-필요한 것: Python ≥ 3.9(권장 3.11). Part A 는 CPU 에서 수 분. Part B 는 GPU 1장, 디스크 약 8 GB(ICBHI zip 1.98 GB + 추출 3.9 GB + 피처 캐시 2.7 GB), 다운로드 속도에 따라 30분 안팎.
+This is the shell version of [`notebooks/tutorial.ipynb`](notebooks/tutorial.ipynb).
+Requirements: Python ≥ 3.9 (3.11 recommended). Part A runs on a CPU in a few minutes. Part B needs one GPU and about 8 GB of
+disk (ICBHI zip 1.98 GB + extracted 3.9 GB + feature cache 2.7 GB) and takes roughly 30 minutes depending on download speed.
 
-## 0. 설치
+## 0. Installation
 
 ```bash
-git clone <repo-url> RSC-Toolkit && cd RSC-Toolkit
+git clone https://github.com/RSC-Toolkit/RSC-Toolkit.git RSC-Toolkit && cd RSC-Toolkit
 python3.11 -m venv .venv && source .venv/bin/activate
-pip install -e ".[trainer,models,notebook]"          # 논문과 같은 핀: pip install -r requirements-lock.txt 뒤 pip install -e . --no-deps
-# CPU 만 쓸 때(Part A): 위 줄 앞에 CPU torch 를 먼저 깔면 6 GB 가 아니라 1 GB 안팎이다
+pip install -e ".[trainer,models,notebook]"          # exact pins: pip install -r requirements-lock.txt, then pip install -e . --no-deps
+# CPU only (Part A): install the CPU build of torch first to download about 1 GB instead of 6 GB
 #   pip install --index-url https://download.pytorch.org/whl/cpu torch==2.7.0 torchaudio==2.7.0 torchvision==0.22.0
-python -m rsc_toolkit.cli --help                     # 또는 rsctk --help
+python -m rsc_toolkit.cli --help                     # or: rsctk --help
 ```
 
-작업 디렉터리를 하나 정한다. 아래는 `WORK=$PWD/outputs/tutorial` (git 이 무시하는 위치) 기준이며, 학습 산출물은 `cwd` 아래 `outputs/<group>/<run>/` 에 생기므로 명령은 `WORK` 에서 실행한다.
+Pick a working directory. The commands below use `WORK=$PWD/outputs/tutorial` (ignored by git). Training outputs are
+written to `outputs/<group>/<run>/` under the current directory, so run the commands from `WORK`.
 
 ```bash
 export WORK=$PWD/outputs/tutorial ROOT=$PWD; mkdir -p "$WORK"; cd "$WORK"
-export RSCTK_PRETRAINED_ROOT=$WORK/pretrained                                                # 자동 다운로드 가중치 위치
-SANDBOX=$(mktemp -d /tmp/rsc_tutorial_sandbox.XXXXXX)                                        # 재평가의 쓰기 격리 디렉터리 (outputs/ 밖)
+export RSCTK_PRETRAINED_ROOT=$WORK/pretrained                                                # where downloaded backbone weights go
+SANDBOX=$(mktemp -d /tmp/rsc_tutorial_sandbox.XXXXXX)                                        # write-isolation directory for re-evaluation (outside outputs/)
 ```
 
-## Part A — toy 데이터 (CPU)
+## Part A — toy data (CPU)
 
-### A-1. 인덱스
+### A-1. Index
 ```bash
 rsctk datasets build-index toy --project_root "$ROOT" --data_dir "$WORK/toy" --sample_level cycle
 ```
 
-### A-2. 학습 (CNN6, 1 epoch)
+### A-2. Training (CNN6, 1 epoch)
 ```bash
 rsc-toolkit-train --config-name default data=toy_fbank model=cnn model.params.backbone=cnn6 callbacks=best_checkpoint \
   data.params.project_root="$ROOT" data.params.data_dir="$WORK/toy" data.params.features.cache_dir="$WORK/cache_toy" \
@@ -37,18 +39,23 @@ rsc-toolkit-train --config-name default data=toy_fbank model=cnn model.params.ba
   run.name=toy-cnn run.group=tutorial hydra.run.dir="$WORK/hydra/toy-cnn" +run.overwrite=true
 cat "$WORK/outputs/tutorial/toy-cnn/best.json"
 ```
-`callbacks=best_checkpoint` 가 검증 Score 최고 시점의 `best.pth`·`best.json` 을 `outputs/<run.group>/<run.name>/` 에 쓰고, `hydra.run.dir` 아래 `.hydra/config.yaml` 이 설정 스냅샷이다.
+`callbacks=best_checkpoint` writes `best.pth` and `best.json` for the epoch with the best validation Score to
+`outputs/<run.group>/<run.name>/`; `.hydra/config.yaml` under `hydra.run.dir` is the config snapshot.
 
-> `+run.overwrite=true`: 같은 `run.name` 의 best.pth/best.json 이 이미 있으면 툴킷은 덮어쓰지 않고 멈춘다 — 튜토리얼은 재실행을 전제로 하므로 명시 허용한다.
+> `+run.overwrite=true`: if `best.pth`/`best.json` already exist for the same `run.name`, the toolkit stops instead of
+> overwriting them. The tutorial is meant to be re-run, so it allows overwriting explicitly.
 
-### A-3. 재평가
+### A-3. Re-evaluation
 ```bash
 rsc-toolkit-eval "$WORK/outputs/tutorial/toy-cnn" --project-root "$ROOT" --hydra-dir "$WORK/hydra/toy-cnn" --sandbox "$SANDBOX"
 ```
-스냅샷으로 같은 팩토리에서 모델·데이터를 다시 세우고 `best.pth` 를 strict 로드해 평가한 뒤 `best.json` 과 대조한다(PASS = |Δ| ≤ 0.05). run 디렉터리는 절대 경로로 준다(상대 경로는 `--project-root` 기준으로 풀린다). `--sandbox` 는 쓰기 격리용이며 `outputs/` 밖이어야 한다.
+The snapshot is used to rebuild the model and data through the same factories, `best.pth` is loaded strictly and evaluated,
+and the result is compared with `best.json` (PASS when |Δ| ≤ 0.05). Pass the run directory as an absolute path (relative
+paths are resolved against `--project-root`). `--sandbox` isolates all writes and must be outside `outputs/`.
 
-### A-4. 자기 모델
-파일 하나로 끝난다. `BaseRSCModel` 을 상속하고 `training_forward` 만 구현해 등록한다(계약: `rsc_toolkit/models/base.py`).
+### A-4. Your own model
+One file is enough. Subclass `BaseRSCModel`, implement `training_forward`, and register the class (contract:
+`rsc_toolkit/models/base.py`).
 
 ```bash
 mkdir -p "$WORK/plugins/configs/model"
@@ -66,7 +73,7 @@ class TutorialCNN(BaseRSCModel, nn.Module):
                                  nn.Conv2d(hidden, hidden, 3, padding=1), nn.ReLU(), nn.AdaptiveAvgPool2d(1), nn.Flatten(),
                                  nn.Linear(hidden, n_cls))
     def forward(self, x):
-        return self.net(x.unsqueeze(1) if x.dim() == 3 else x)      # [B, F, T] → [B, 1, F, T]
+        return self.net(x.unsqueeze(1) if x.dim() == 3 else x)      # [B, F, T] -> [B, 1, F, T]
     def training_forward(self, audio_batch, labels, loss_func, **kwargs):
         logits = self.forward(audio_batch)
         return logits, loss_func(logits, labels)
@@ -81,23 +88,26 @@ rsc-toolkit-train --config-name default --config-dir "$WORK/plugins/configs" dat
 RSC_TOOLKIT_PLUGINS=my_model PYTHONPATH="$WORK/plugins" \
 rsc-toolkit-eval "$WORK/outputs/tutorial/toy-mymodel" --project-root "$ROOT" --hydra-dir "$WORK/hydra/toy-mymodel" --sandbox "$SANDBOX"
 ```
-- 입력 `audio_batch` 는 데이터 config 가 정한 모양(fbank 면 `[B, F, T]`)이고, `loss_func` 는 config 의 손실이 주입된다. 반환은 `(logits [B, n_cls], loss)`.
-- 등록: 환경변수 `RSC_TOOLKIT_PLUGINS=<모듈>` 또는 패키지 엔트리포인트 `rsc_toolkit.plugins`. 모델 config 는 Hydra `--config-dir` 로 저장소 밖에서 준다.
-- 손실·지표·datamodule·프로세서도 같은 등록소 방식이다 — README "자기 모델 붙이기" 절.
+- `audio_batch` has the shape defined by the data config (`[B, F, T]` for fbank features), and `loss_func` is the loss
+  from the config. Return `(logits [B, n_cls], loss)`.
+- Registration: the environment variable `RSC_TOOLKIT_PLUGINS=<module>` or the package entry point `rsc_toolkit.plugins`.
+  The model config is supplied from outside the repository with Hydra's `--config-dir`.
+- Losses, metrics, datamodules and processors use the same registry mechanism — see "Adding your own model" in the README.
 
 ## Part B — ICBHI 2017 (GPU)
 
-### B-1. 다운로드 · 인덱스 · 검증
+### B-1. Download, index, validate
 ```bash
-rsctk datasets download    icbhi --project_root "$ROOT" --data_dir "$WORK/icbhi"       # 공식 zip 1.98 GB
+rsctk datasets download    icbhi --project_root "$ROOT" --data_dir "$WORK/icbhi"       # official zip, 1.98 GB
 rsctk datasets build-index icbhi --project_root "$ROOT" --data_dir "$WORK/icbhi" --sample_level cycle
 rsctk datasets validate    icbhi --project_root "$ROOT" --data_dir "$WORK/icbhi"
 ```
 
-### B-2. 1 epoch 학습 (표 1 "CNN6 fine-tuning" 레시피, 원래 400 epoch)
-GPU 학습에서는 dataloader 워커당 BLAS/OpenCV 스레드를 1 로 캡한다(공유 서버에서 워커 × 스레드 풀 폭주 방지; CPU 학습인 Part A 에는 걸지 않는다).
-PANNs Cnn6 사전학습 가중치는 zenodo(record 3960586)에서 `$RSCTK_PRETRAINED_ROOT/upstream/Cnn6_mAP=0.343.pth` 로 자동 다운로드된다.
-zenodo 가 막힌 망이면 그 파일을 같은 경로에 직접 두면 된다.
+### B-2. One epoch of training (CNN6 fine-tuning recipe; the full recipe uses 400 epochs)
+For GPU training, cap BLAS/OpenCV threads per dataloader worker at 1 (this prevents worker × thread-pool oversubscription on
+shared servers; Part A trains on the CPU and does not need it).
+The PANNs Cnn6 pre-trained weights are downloaded automatically from Zenodo (record 3960586) to
+`$RSCTK_PRETRAINED_ROOT/upstream/Cnn6_mAP=0.343.pth`. If Zenodo is blocked on your network, place that file at the same path.
 ```bash
 export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 OPENCV_FOR_THREADS_NUM=1
 rsc-toolkit-train --config-name sgscl_nonast_icbhi model.name=cnn6_sft \
@@ -105,12 +115,13 @@ rsc-toolkit-train --config-name sgscl_nonast_icbhi model.name=cnn6_sft \
   trainer.params.max_epochs=1 run.name=icbhi-cnn6-1epoch run.group=tutorial hydra.run.dir="$WORK/hydra/icbhi-cnn6-1epoch" +run.overwrite=true
 rsc-toolkit-eval "$WORK/outputs/sgscl/icbhi-cnn6-1epoch" --project-root "$ROOT" --hydra-dir "$WORK/hydra/icbhi-cnn6-1epoch" --sandbox "$SANDBOX"
 ```
-(이 레시피의 콜백은 `$WORK/outputs/sgscl/<run.name>` 에 저장한다.)
+(The callbacks of this recipe save to `$WORK/outputs/sgscl/<run.name>`.)
 
-### B-3. 공개된 논문 weight 재평가
-논문 표의 weight 는 run 묶음(`best.pth` · `best.json` · `.hydra/config.yaml`)으로 공개된다. 목록·링크는
-[`weights_manifest.csv`](weights_manifest.csv), 내려받기는 `scripts/download_paper_weights.py`(gdown 사용, `notebook` extra 에 포함; sha256 대조).
-url 은 Google Drive 폴더 링크(`…/folders/<id>`; run 폴더 자체 또는 run 폴더들을 담은 상위 폴더)이며, 아직 `[Google Drive]` 자리표시자면 안내만 나온다 — 그때는 묶음을 `$WORK/paper_weights/<run>/` 에 직접 둔다.
+### B-3. Re-evaluating a released paper weight
+The weights behind the benchmark tables are released as run bundles (`best.pth`, `best.json`, `.hydra/config.yaml`).
+[`weights_manifest.csv`](weights_manifest.csv) lists them with download links; `scripts/download_paper_weights.py` downloads
+a bundle (uses gdown, included in the `notebook` extra) and verifies its sha256 checksums. Links are Google Drive folder
+links (`…/folders/<id>`), either the run folder itself or a parent folder that contains run folders.
 
 ```bash
 python "$ROOT/scripts/download_paper_weights.py" --list
@@ -118,15 +129,19 @@ python "$ROOT/scripts/download_paper_weights.py" --run icbhi-cnn6-ce-s1 --out "$
 rsc-toolkit-eval "$WORK/paper_weights/icbhi-cnn6-ce-s1" --project-root "$ROOT" --sandbox "$SANDBOX" \
   --override data.params.data_dir="$WORK/icbhi" --override data.params.features.cache_dir="$WORK/cache_icbhi"
 ```
-묶음이 설정 스냅샷을 품고 있으므로 `outputs/` 없이 재평가된다. 경로 override 가 붙은 평가는 `status: OK` 와 함께 `best.json`(논문 표의 값)과의 |Δ| 를 보여주며, 같은 공식 test 이므로 |Δ| 는 0 이다(override 없이 돌리면 PASS/MISMATCH 판정).
+The bundle carries its own config snapshot, so it is re-evaluated without an `outputs/` directory. When paths are
+overridden, the evaluation reports `status: OK` together with |Δ| against `best.json` (the released value); on the same
+official test set |Δ| is 0 (without overrides it reports PASS/MISMATCH).
 
-## 패키지 설치만으로 쓰기
-자기 모델만 붙이는 사용자는 clone 없이도 된다: `pip install "rsc-toolkit[trainer,models] @ git+<repo-url>"`.
-같은 명령이 동작하되 toy 데이터(`sample_data/`)는 휠에 동봉되지 않으므로 Part A 대신 자기 데이터·ICBHI(Part B)로 시작한다.
+## Using the installed package only
+If you only want to plug in your own model, a clone is not required:
+`pip install "rsc-toolkit[trainer,models] @ git+https://github.com/RSC-Toolkit/RSC-Toolkit.git"`.
+The same commands work, but the toy data (`sample_data/`) is not included in the wheel, so start from your own data or
+ICBHI (Part B) instead of Part A.
 
-## 재현·검증 도구 한눈에
-| 무엇 | 명령 |
+## Tools at a glance
+| task | command |
 |---|---|
-| 논문 레시피 학습 | `scripts/train.sh <config> [override…]` (README 표) |
-| run 하나 재평가 | `rsc-toolkit-eval outputs/<group>/<run>` |
-| 튜토리얼 자동 실행 | `scripts/tutorial/run_tutorial.sh [--full]` (CI 는 Part A) |
+| train a method recipe | `scripts/train.sh <config> [override…]` (see the README table) |
+| re-evaluate one run | `rsc-toolkit-eval outputs/<group>/<run>` |
+| run this tutorial automatically | `scripts/tutorial/run_tutorial.sh [--full]` (CI runs Part A) |

@@ -1,5 +1,5 @@
-# PAFA(BEATs) ICBHI 데이터 설정: 16 kHz 파형 그대로 (BEATs 내부 fbank), 5초 cycle repeat+fade, bs32,
-# 환자 ID 를 meta 로 전달, SpecAugment 없음(--nospec).
+# PAFA (BEATs) ICBHI data config: raw 16 kHz waveform (fbank inside BEATs), 5 s cycles repeat+fade, bs 32,
+# patient ID passed as meta, no SpecAugment (--nospec).
 name: icbhi_pafa_beats
 params:
   datamodule_name: index
@@ -16,7 +16,7 @@ params:
   pad_type: repeat_fade
 
   train_splits: [train]
-  val_splits: [test]             # best-on-test 프로토콜
+  val_splits: [test]             # best-on-test protocol
   test_splits: [test]
 
   batch_size: 32
@@ -27,7 +27,7 @@ params:
 
   features:
     enabled: true
-    kind: waveform               # 캐시 없음
+    kind: waveform               # no cache
   feature_precompute: false
 
   specaugment:

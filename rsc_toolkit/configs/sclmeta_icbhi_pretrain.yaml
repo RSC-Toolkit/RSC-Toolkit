@@ -1,11 +1,11 @@
-# SCL-metadata 사전학습 run (SCL / M-SCL): 400ep, bs128, Adam 1e-4/wd 1e-4 + cosine(T_max 40), 평가 없음, 마지막 상태 저장.
+# SCL-metadata pretraining run (SCL / M-SCL): 400 ep, bs 128, Adam 1e-4/wd 1e-4 + cosine (T_max 40), no evaluation, saves the last state.
 #   M-SCL : rsctk-train --config-name sclmeta_icbhi_pretrain run.name=icbhi-sclmeta-mscl-pre-s1 seed=1
 #   SCL   : ... model.params.method=scl run.name=icbhi-sclmeta-scl-pre-s1
 defaults:
   - model: cnn6_sclmeta
   - data_defaults@data: base
   - data: icbhi_sclmeta
-  - loss: cross_entropy_weighted_icbhi   # 미사용 (SupCon 만) — 인터페이스용
+  - loss: cross_entropy_weighted_icbhi   # unused (SupCon only) — interface only
   - metrics: icbhi_metrics
   - optimizer: adam_sclmeta
   - trainer: default
@@ -21,7 +21,7 @@ trainer:
   params:
     max_epochs: 400
     precision: 32
-    limit_val_batches: 0        # 원본 사전학습은 평가 없음
+    limit_val_batches: 0        # the official pretraining has no evaluation
     num_sanity_val_steps: 0
 
 run:

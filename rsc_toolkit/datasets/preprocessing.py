@@ -9,13 +9,13 @@ from tqdm import tqdm
 logger = logging.getLogger(__name__)
 
 
-# 워커 프로세스를 fork 로 만들면, 부모가 이미 띄워둔 torch 의 스레드와 공유메모리
-# 파일 디스크립터 상태(multiprocessing.resource_sharer)를 그대로 물려받아 워커가
-# 기동 중 교착한다. process_fn 이 torch.Tensor 를 반환하면 결과를 돌려줄 때도 같은
-# fd 전달 경로를 타므로 재현 확률이 높다.
-# Linux 는 기본 start method 가 fork 라 이 문제가 드러나고, macOS 는 spawn 이라
-# 드러나지 않는다. spawn 은 워커를 새 인터프리터로 띄워 그 상태를 물려받지 않으므로
-# 두 플랫폼의 동작이 같아진다.
+# When worker processes are created with fork, they inherit the torch threads and shared-memory
+# file descriptor state (multiprocessing.resource_sharer) already started by the parent, and
+# deadlock during startup. If process_fn returns a torch.Tensor, returning the result takes the same
+# fd-passing path, which makes the deadlock likely.
+# Linux defaults to the fork start method and exposes the problem; macOS defaults to spawn and
+# does not. spawn starts workers as fresh interpreters that do not inherit that state, so
+# both platforms behave the same.
 DEFAULT_MP_START_METHOD = "spawn"
 
 
@@ -30,7 +30,7 @@ class ParallelPreprocessor:
         num_workers: int = 4,
         use_threads: bool = False,  # Use threads for GPU-bound tasks
         batch_size: Optional[int] = None,  # For batching GPU operations
-        mp_start_method: Optional[str] = None,  # None이면 DEFAULT_MP_START_METHOD
+        mp_start_method: Optional[str] = None,  # None means DEFAULT_MP_START_METHOD
     ):
         self.num_workers = num_workers
         self.use_threads = use_threads
@@ -38,7 +38,7 @@ class ParallelPreprocessor:
         self.mp_start_method = mp_start_method or DEFAULT_MP_START_METHOD
 
     def _make_executor(self):
-        """스레드 풀 또는 (교착을 피하는 start method 를 쓰는) 프로세스 풀을 만든다."""
+        """Create a thread pool or a process pool (using a start method that avoids deadlocks)."""
         if self.use_threads:
             return ThreadPoolExecutor(max_workers=self.num_workers)
 
@@ -46,7 +46,7 @@ class ParallelPreprocessor:
         available = mp.get_all_start_methods()
         if method not in available:
             logger.warning(
-                "multiprocessing start method '%s' 를 쓸 수 없어 '%s' 로 대체한다.",
+                "multiprocessing start method '%s' is unavailable; falling back to '%s'.",
                 method,
                 available[0],
             )

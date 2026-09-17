@@ -1,21 +1,21 @@
-# QLung(Interspeech 2026) 재현 실행 config (AST 레시피: 50ep, bs8, adam 5e-5/wd 1e-6, cosine, MA 0.6, AMP).
+# QLung (Interspeech 2026) reproduction run config (AST recipe: 50 ep, bs 8, adam 5e-5/wd 1e-6, cosine, MA 0.6, AMP).
 #
-#   QLung (코드 그대로, AQS rms 버그)   : rsctk-train --config-name qlung_icbhi seed=N run.name=icbhi-qlung-sN
-#   QLung (코드식 + 엔트로피, Figure 1) : ... data.params.qlung.entropy_source=entropy_nanmean run.name=icbhi-qlung-entropy-sN
-#        (entropy_source=entropy 는 문자 그대로 — 디지털 무음 사이클 71건이 nan AQS → nan 손실; AMP 스텝 스킵·스케일 붕괴 위험)
-#   QLung (논문 식 5 문자 그대로)       : ... data.params.qlung.entropy_source=entropy data.params.qlung.formula=paper
-#   CE 경로 (코드 quirk)                : ... model.params.method=ce run.name=icbhi-qlung-ce-sN
+#   QLung (code as is, AQS rms bug)          : rsctk-train --config-name qlung_icbhi seed=N run.name=icbhi-qlung-sN
+#   QLung (code formula + entropy, Figure 1) : ... data.params.qlung.entropy_source=entropy_nanmean run.name=icbhi-qlung-entropy-sN
+#        (entropy_source=entropy is literal — 71 digitally silent cycles give nan AQS → nan loss; risk of AMP step skipping and scale collapse)
+#   QLung (paper Eq. 5 taken literally)      : ... data.params.qlung.entropy_source=entropy data.params.qlung.formula=paper
+#   CE path (code quirk)                     : ... model.params.method=ce run.name=icbhi-qlung-ce-sN
 #   OOD : .venv/bin/python scripts/reproduction/eval_qlung_ood.py --run icbhi-qlung-sN
 #
-# 손실 = 비가중 CE (criterion[0]; --weighted_loss 미사용). DFAM CE 는 모델 내부.
-# 전제: .datasets/icbhi 인덱스 완료 (patchmix 와 피처 캐시 공유), AQS 캐시는 첫 실행 시 자동 생성.
+# Loss = unweighted CE (criterion[0]; --weighted_loss not used). DFAM CE is computed inside the model.
+# Prerequisite: .datasets/icbhi index built (feature cache shared with patchmix); the AQS cache is created automatically on the first run.
 defaults:
   - model: ast_qlung
   - data_defaults@data: base
   - data: icbhi_qlung
   - loss: cross_entropy
   - metrics: icbhi_metrics
-  - optimizer: adam            # lr 5e-5, wd 1e-6 (모델+AngularClassifier+DFAM 전부, train_qlung.py:345)
+  - optimizer: adam            # lr 5e-5, wd 1e-6 (model + AngularClassifier + DFAM, train_qlung.py:345)
   - trainer: default           # max_epochs 50
   - callbacks: qlung_paper
   - _self_
@@ -24,7 +24,7 @@ seed: 1
 
 trainer:
   params:
-    precision: 16-mixed        # 원본 AMP(GradScaler+autocast)
+    precision: 16-mixed        # official AMP (GradScaler + autocast)
 
 run:
   name: icbhi-qlung

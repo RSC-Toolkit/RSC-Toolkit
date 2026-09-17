@@ -1,8 +1,8 @@
 """
-LoRA-RSC(ICASSP 2025) P0 골든·구성 테스트.
+Official-code parity golden and configuration tests for LoRA-RSC (ICASSP 2025).
 
-골든 출처: scripts/reproduction/dump_lorarsc_goldens.py — 공식 deegy666/LoRA-RSC src/AST_LoRA_ICBHI.py·src/AST.py·dataset/icbhi.py 체인을
-README 핀 환경(transformers 4.28.1) 참조 venv 에서 실행 (LoRA·헤드는 det_fill 로 결정화).
+Golden source: scripts/reproduction/dump_lorarsc_goldens.py — the official deegy666/LoRA-RSC src/AST_LoRA_ICBHI.py, src/AST.py, dataset/icbhi.py chain
+run in a reference venv with the README-pinned environment (transformers 4.28.1) (LoRA and head made deterministic with det_fill).
 """
 import pathlib
 
@@ -19,15 +19,15 @@ def _repo_root() -> pathlib.Path:
     for c in pathlib.Path(__file__).resolve().parents:
         if (c / "pyproject.toml").exists():
             return c
-    raise RuntimeError("리포 루트를 찾지 못했다")
+    raise RuntimeError("repository root not found")
 
 
 REPO = _repo_root()
 GOLDEN = REPO / "tests" / "golden" / "lorarsc"
 HF = REPO / "pretrained_models/upstream/hf/ast-finetuned-audioset-10-10-0.4593"
 DATA = REPO / "sample_data/toy_dataset/files"
-needs_golden = pytest.mark.skipif(not (GOLDEN / "model.pt").exists(), reason="골든 없음")
-needs_hf = pytest.mark.skipif(not (HF / "config.json").exists(), reason="HF AST 스냅샷 없음")
+needs_golden = pytest.mark.skipif(not (GOLDEN / "model.pt").exists(), reason="golden missing")
+needs_hf = pytest.mark.skipif(not (HF / "config.json").exists(), reason="HF AST snapshot missing")
 
 
 def _det_fill(t, scale=1.0):
@@ -47,7 +47,7 @@ def _inject_golden(m: ASTLoRARSC, g: dict):
 
 @needs_golden
 def test_features_match_hf_extractor_and_sclmeta_chain():
-    """툴킷 sclmeta 패딩 + fbank(128, target_frames 500) == 원본 파형 체인 + 4.28.1 ASTFeatureExtractor(max_length 500)."""
+    """Toolkit sclmeta padding + fbank(128, target_frames 500) == original waveform chain + 4.28.1 ASTFeatureExtractor(max_length 500)."""
     g = torch.load(GOLDEN / "features.pt", weights_only=False)
     import torchaudio
     import torchaudio.transforms as T
@@ -57,7 +57,7 @@ def test_features_match_hf_extractor_and_sclmeta_chain():
     for i, meta in enumerate(g["meta"]):
         wav = DATA / f"{meta['file']}.wav"
         sr = torchaudio.info(str(wav)).sample_rate
-        # IndexDataset(resample_after_slice=True) 와 같은 절차
+        # same procedure as IndexDataset(resample_after_slice=True)
         audio, _ = torchaudio.load(str(wav), frame_offset=int(meta["onset"] * sr), num_frames=int(meta["offset"] * sr) - int(meta["onset"] * sr))
         audio = T.Resample(sr, 16000)(audio)
         audio = pre(audio)
@@ -66,7 +66,7 @@ def test_features_match_hf_extractor_and_sclmeta_chain():
         ref = g["features_noise"][i].transpose(0, 1)
         assert feat.shape == (128, 500)
         assert torch.allclose(feat, ref, atol=1e-4), float((feat - ref).abs().max())
-    # 원본 잡음(클립당 스칼라 DC 오프셋) 은 kaldi remove_dc_offset 로 무효 — 특징 차이가 부동소수 수준
+    # the original noise (scalar DC offset per clip) is cancelled by kaldi remove_dc_offset — feature difference is at float precision
     assert float((g["features_noise"] - g["features_clean"]).abs().max()) < 1e-4
     assert all(m["noise_shape"] == [1] for m in g["meta"])
 
@@ -75,21 +75,21 @@ def test_features_match_hf_extractor_and_sclmeta_chain():
 def test_layout_and_param_counts():
     m = ASTLoRARSC()
     assert m.lora_rank == 8 and abs(m.lora_scaling - 8 / 96) < 1e-12
-    assert m.num_trainable() == 299_524                       # README 0.299M (절삭)
+    assert m.num_trainable() == 299_524                       # README 0.299M (truncated)
     assert sum(p.numel() for p in m.parameters()) == 85_711_108 + 12 * 2 * 2 * 768 * 8
     assert float(m.ast.embeddings.position_embeddings.abs().max()) == 0.0 and not m.ast.embeddings.position_embeddings.requires_grad
     assert tuple(m.ast.embeddings.position_embeddings.shape) == (1, 590, 768)
     assert isinstance(m.ast.layers[0].attention.k_proj, LoRALinear) and not isinstance(m.ast.layers[0].attention.q_proj, LoRALinear)
-    # 4.28.1 fast-init quirk: 초기 LoRA 델타 ≠ 0 (down 이 0 이 아님)
+    # 4.28.1 fast-init quirk: initial LoRA delta != 0 (down is not 0)
     assert float(m.ast.layers[0].attention.k_proj.lora_down.weight.abs().max()) > 0
-    # 원본 train() 오버라이드: 백본 eval 유지
+    # original train() override: backbone stays in eval
     m.train()
     assert not m.ast.layers[0].training and m.ast.layernorm.training and m.classification_head.training
-    # 798 프레임 입력도 앞 500 만 쓴다
+    # a 798-frame input uses only the first 500
     x = torch.randn(2, 128, 798)
     assert torch.equal(m.to_model_input(x), x.transpose(1, 2)[:, :500])
     full = ASTLoRARSC(method="full_ft")
-    assert full.num_trainable() == 85_711_108                # README 85.74M 과 불일치 (정찰 정정: 코드 구성은 85.71M)
+    assert full.num_trainable() == 85_711_108                # disagrees with README 85.74M (the code configuration gives 85.71M)
     paper = ASTLoRARSC(lora_init="paper")
     assert float(paper.ast.layers[0].attention.k_proj.lora_down.weight.abs().max()) == 0.0
 
@@ -100,14 +100,14 @@ def test_model_matches_reference():
     g = torch.load(GOLDEN / "model.pt", weights_only=False)
     assert g["pos_embed_absmax"] == 0.0 and not g["pos_embed_requires_grad"]
     assert g["n_train"] == 299_524 and g["rank_dim"] == 8 and abs(g["scaling"] - 8 / 96) < 1e-12
-    # 참조 코드에서 from_pretrained 직후 LoRA down 이 0 이 아님 (trunc_normal 0.02 재초기화) — quirk 사실 확인
+    # in the reference code LoRA down is not 0 right after from_pretrained (trunc_normal 0.02 re-init) — confirms the quirk
     s = g["lora_init_stats_layer0"]
     assert s["lora_down_k"]["absmax"] > 0 and 0.01 < s["lora_down_k"]["std"] < 0.03
     m = ASTLoRARSC()
     assert m.num_trainable() == g["n_train"] and sum(p.numel() for p in m.parameters()) == g["n_total"]
     _inject_golden(m, g)
     m.eval()
-    x = g["input"].squeeze(1).transpose(1, 2)  # (N,500,128) → 툴킷 (N,128,500)
+    x = g["input"].squeeze(1).transpose(1, 2)  # (N,500,128) -> toolkit (N,128,500)
     with torch.no_grad():
         logits = m(x)
         _, loss = m.training_forward(x, g["labels"], F.cross_entropy)
@@ -140,7 +140,7 @@ def test_grads_only_on_trainable():
 
 
 def test_lorarsc_noise_dataset_is_deterministic_per_sample():
-    """1D 잡음 해석(rsc_toolkit/datasets/lorarsc_noise.py): 샘플별 N(0,0.3²), sample_id 로 결정적(캐시 1회·train/test 공통), 원본 float64→float32 순서."""
+    """1D noise interpretation (rsc_toolkit/datasets/lorarsc_noise.py): per-sample N(0,0.3²), deterministic by sample_id (cached once, shared by train/test), original float64->float32 order."""
     from rsc_toolkit.datasets.lorarsc_noise import LoRARSCNoisyIndexDataset as D
 
     torch.manual_seed(0)
@@ -153,5 +153,5 @@ def test_lorarsc_noise_dataset_is_deterministic_per_sample():
     assert not torch.equal(a1, a3)
     delta = (a1 - audio).double()
     assert abs(delta.std().item() - 0.3) < 0.01 and abs(delta.mean().item()) < 0.01
-    # 스칼라 DC 오프셋(공개 코드 해석)과 달리 프레임별로 제거되지 않는 잡음
+    # unlike the scalar DC offset (public-code interpretation), this noise is not removed per frame
     assert (delta - delta.mean()).abs().max() > 0.5

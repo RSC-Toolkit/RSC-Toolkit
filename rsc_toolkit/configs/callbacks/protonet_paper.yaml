@@ -1,8 +1,8 @@
 # @package _global_
-# Prototype 논문 학습 프로토콜 콜백:
-#   - datamodule 의 balanced class weight 를 모델에 주입 (공식 calculate_class_weight)
-#   - StepLR(step_size=200, gamma=0.9) — 원본은 매 iteration scheduler.step() 이므로 step 단위
-#   - 공식은 마지막 iteration(10000) 의 모델로만 평가 → final_* 를 주 판정으로 쓰고, best-on-test 도 병기
+# Prototype paper training-protocol callbacks:
+#   - injects the datamodule's balanced class weights into the model (official calculate_class_weight)
+#   - StepLR(step_size=200, gamma=0.9) — the official code calls scheduler.step() every iteration, so it is stepped per step
+#   - the official code evaluates only the last-iteration (10000) model → final_* is the primary result, best-on-test reported alongside
 trainer:
   params:
     callbacks:

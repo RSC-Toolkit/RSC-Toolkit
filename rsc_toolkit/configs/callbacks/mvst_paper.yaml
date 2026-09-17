@@ -1,12 +1,12 @@
 # @package _global_
-# MVST 뷰 학습 프로토콜 = patch-mix CE 레시피: MA 0.5, cosine(5e-5, 50ep), best-on-test Score & Se>5, 재개 지원
+# MVST view training protocol = patch-mix CE recipe: MA 0.5, cosine (5e-5, 50 ep), best-on-test Score & Se>5, resumable
 trainer:
   params:
     callbacks:
       - _target_: rsc_toolkit.trainer.callbacks.ma_update.LiveWeightAveraging
         beta: 0.5
       - _target_: rsc_toolkit.trainer.callbacks.paper_cosine_lr.PaperCosineLR
-        learning_rate: ${optimizer.params.lr}        # 단일 출처 — optimizer 그룹. 하드코딩 복사본이 CLI 스윕을 침묵 무효화했다
+        learning_rate: ${optimizer.params.lr}        # single source: the optimizer group (a hard-coded copy would silently ignore CLI sweeps)
         epochs: ${trainer.params.max_epochs}
       - _target_: rsc_toolkit.trainer.callbacks.icbhi_best_checkpoint.ICBHIBestScoreCheckpoint
         dirpath: outputs/mvst/${run.name}

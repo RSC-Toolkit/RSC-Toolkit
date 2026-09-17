@@ -1,9 +1,9 @@
-# QLung (Audio-CLAP) 의 SPRSound 데이터 설정 — SPRSound 표준 태스크(2022 inter-patient, 7-class) 직접 학습·검증 (SPR→SPR).
+# QLung (Audio-CLAP) SPRSound data config — trained and evaluated directly on the standard SPRSound task (2022 inter-patient, 7-class) (SPR→SPR).
 #
-# icbhi_qlung_clap.yaml 의 CLAP 경로(48 kHz → 8 s repeat_fade → ClapProcessor log-mel (1, 1001, 64), AQS 는 48 kHz 파형에서)를
-# sprsound_qlung.yaml 의 데이터셋 인자(Classification/ 하위, index_cycle.csv, 녹음 전체 리샘플 후 절단, time_unit s)에 얹었다.
-# 논문 앵커 없음(QLung 논문은 SPRSound 를 OOD 로만 썼다) → 재현 판정 대상이 아니라 **툴킷 확장 관찰값** (2026-09-10 사용자 요청).
-# 피처·AQS 캐시는 AST 판(sprsound_qlung)·ICBHI CLAP 판과 분리한다 — 체인(48 kHz, time_unit s)이 다르다.
+# Combines the CLAP path of icbhi_qlung_clap.yaml (48 kHz → 8 s repeat_fade → ClapProcessor log-mel (1, 1001, 64), AQS from the 48 kHz waveform)
+# with the dataset arguments of sprsound_qlung.yaml (under Classification/, index_cycle.csv, whole-recording resampling then slicing, time_unit s).
+# No paper-reported value (the QLung paper uses SPRSound only for OOD) → not a reproduction target but a **toolkit extension (no paper counterpart)**.
+# The feature and AQS caches are separate from the AST version (sprsound_qlung) and the ICBHI CLAP version — the chain (48 kHz, time_unit s) differs.
 name: sprsound_qlung_clap
 params:
   datamodule_name: qlung
@@ -11,22 +11,22 @@ params:
   index_dataset_cls: rsc_toolkit.datasets.qlung_data.QLungAQSIndexDataset
   project_root: ${hydra:runtime.cwd}
   data_dir: .datasets/sprsound
-  raw_data_subdir: Classification   # recording_path 는 Classification/ 기준 상대경로
+  raw_data_subdir: Classification   # recording_path is relative to Classification/
   index_filename: index_cycle.csv
-  sampling_rate: 48000           # CLAP 경로 (AST 판은 16000)
+  sampling_rate: 48000           # CLAP path (16000 in the AST version)
   sample_level: cycle
   desired_length_sec: 8.0
-  pad_type: repeat_fade          # BTS/Audio-CLAP 원본 전처리와 동일
+  pad_type: repeat_fade          # same as the official BTS/Audio-CLAP preprocessing
   fade: true
-  resample_after_slice: false    # 녹음 전체를 48 kHz 로 리샘플한 뒤 구간 절단 (sprsound_qlung 과 같은 규칙)
+  resample_after_slice: false    # resample the whole recording to 48 kHz, then slice segments (same rule as sprsound_qlung)
   time_unit: s
   train_splits: [train]
-  val_splits: [test]             # best-on-test — 다른 행과 동일 프로토콜
+  val_splits: [test]             # best-on-test — same protocol as the other rows
   test_splits: [test]
   batch_size: 8
   num_workers: 8
   shuffle_train: true
-  drop_last_train: true          # 원본 train loader drop_last=True
+  drop_last_train: true          # official train loader uses drop_last=True
   pin_memory: true
   features:
     enabled: true
@@ -37,13 +37,13 @@ params:
   feature_precompute_batch_size: 8
   feature_precompute_num_workers: 0
   specaugment:
-    enabled: false               # CLAP 경로에는 원본 AST 의 배치 SpecAugment 가 없다
+    enabled: false               # the CLAP path has no per-batch SpecAugment of the official AST path
   qlung:
     alpha: 0.7                   # --quality_alpha
     beta: 0.3                    # --quality_beta
-    entropy_source: rms          # AST 판 주 결과와 같은 해석(코드 그대로 = rms 중복 전달 버그 포함)
+    entropy_source: rms          # same interpretation as the AST version's main result (code as is, including the bug that passes rms twice)
     formula: code
-    cache_dir: downloaded_datasets/aqs_cache_clap48k_sprs   # 48 kHz 파형 기준 · SPRSound 전용
+    cache_dir: downloaded_datasets/aqs_cache_clap48k_sprs   # based on the 48 kHz waveform · SPRSound only
     precompute: true
     precompute_num_workers: 8
     attach_val: true

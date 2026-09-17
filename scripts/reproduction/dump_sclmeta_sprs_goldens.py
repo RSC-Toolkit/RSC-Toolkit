@@ -1,7 +1,7 @@
 """
-SCL-metadata 의 SPRSound 경로(dataset.py SPRS) P0 골든 — 공식 코드를 우리 venv 에서 실행.
-  .venv/bin/python scripts/reproduction/dump_sclmeta_sprs_goldens.py --repo <sclmeta 클론> --data .datasets/sprsound/Classification --out tests/golden/sclmeta_sprs
-골든: audio.pt (train/inter_test 이벤트 8개: 짧은/긴 것 포함 → 128000 샘플), rows.json (전 행: wav_path, onset, offset, split, event_label→id, sa_class_num).
+Official-code parity goldens for the SPRSound path of SCL-metadata (dataset.py SPRS) — runs the official code in our venv.
+  .venv/bin/python scripts/reproduction/dump_sclmeta_sprs_goldens.py --repo <sclmeta clone> --data .datasets/sprsound/Classification --out tests/golden/sclmeta_sprs
+Goldens: audio.pt (8 train/inter_test events, including short and long ones → 128000 samples), rows.json (all rows: wav_path, onset, offset, split, event_label→id, sa_class_num).
 """
 import argparse
 import json

@@ -1,13 +1,13 @@
-# Lung-SRAD(Interspeech 2026) DASS-medium(VMamba-S v2) 변형 — 공식 코드 기본값. method 로 사다리를 고른다:
-#   ce = DASS FT (blur ∅) · ce_blur = SAR(blur K5 σ3 stage2 blocks{2,3}) · patchmix_cl = Lung-SRAD(cl_mode dual; time|freq|2d 는 Table 2 변형)
-# mix_layout: as_code(원본 동작: 'time'=주파수 32bin, 'freq'=채널 96) | as_paper(Eq.6-7: 시간 256 / 주파수 32)
+# Lung-SRAD (Interspeech 2026) DASS-medium (VMamba-S v2) variant — official code defaults. Select the ladder step with method:
+#   ce = DASS FT (no blur) · ce_blur = SAR (blur K5 σ3, stage2 blocks {2,3}) · patchmix_cl = Lung-SRAD (cl_mode dual; time|freq|2d are the Table 2 variants)
+# mix_layout: as_code (official behavior: 'time' = 32 frequency bins, 'freq' = 96 channels) | as_paper (Eq.6-7: time 256 / frequency 32)
 name: dass_lungsrad
 params:
   n_cls: 4
   method: ce
   cl_mode: dual
   mix_layout: as_code
-  train_projector: true          # false = main.py 동작(projector 미학습). 저자 실측 차이 +1.61 (63.00 vs 61.39)
+  train_projector: true          # false = main.py behavior (projector not trained). Difference measured by the authors: +1.61 (63.00 vs 61.39)
   gaussian_blur: null            # null → method != ce
   blur_blocks: [2, 3]
   blur_stage: [2]
@@ -22,9 +22,9 @@ params:
   alpha_time: 1.0
   alpha_freq: 1.0
   alpha: 1.0
-  detach_mix_2d: false           # 원본 2d 분기 detach 없음 (quirk)
+  detach_mix_2d: false           # no detach in the official 2d branch (quirk)
   drop_path_rate: 0.3
-  audioset_pretrain: true        # DASS_medium_v2.pth ('module.v.' 제거, head 제외)
+  audioset_pretrain: true        # DASS_medium_v2.pth ('module.v.' stripped, head excluded)
   pretrained_path: null
-  amp: true                      # 원본 autocast fp16, GradScaler 없음 (trainer precision 32)
+  amp: true                      # official autocast fp16, no GradScaler (trainer precision 32)
   ssm_backend: auto              # auto | torch | cuda_oflex

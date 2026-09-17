@@ -1,12 +1,12 @@
 """
-QLung SPRSound OOD 평가 — ICBHI 학습 best.pth 를 ast_qlung 에 로드해 SPRSound 7→4 병합 뷰를 제로샷 평가 (논문 Table 2 OOD 열).
+QLung SPRSound OOD evaluation — loads the ICBHI-trained best.pth into ast_qlung and evaluates zero-shot on the SPRSound 7→4 merged view (paper Table 2 OOD column).
 
   .venv/bin/python scripts/reproduction/eval_qlung_ood.py --run icbhi-qlung-s1            # outputs/qlung/<run>/best.pth → ood.json
   .venv/bin/python scripts/reproduction/eval_qlung_ood.py --ckpt <best.pth> --out <json>
-  .venv/bin/python scripts/reproduction/eval_qlung_ood.py --run icbhi-qlung-clap-s1 --backbone clap   # Audio-CLAP 판 (48 kHz CLAP OOD 뷰)
+  .venv/bin/python scripts/reproduction/eval_qlung_ood.py --run icbhi-qlung-clap-s1 --backbone clap   # Audio-CLAP variant (48 kHz CLAP OOD view)
 
-평가 범위가 논문에 없어 둘 다 집계한다: "inter" = 2022 inter-patient test 1,429, "all" = train + inter-test 8,085 (논문 3.1 분포).
-전처리는 configs/data/sprsound_qlung_ood.yaml (ICBHI 와 같은 체인 가정). 지표 Sp/Se/Score = metrics/icbhi/score.py 산식.
+The paper does not specify the evaluation scope, so both are aggregated: "inter" = 2022 inter-patient test 1,429, "all" = train + inter-test 8,085 (paper 3.1 distribution).
+Preprocessing: configs/data/sprsound_qlung_ood.yaml (assumes the same chain as ICBHI). Metrics Sp/Se/Score = the formula in metrics/icbhi/score.py.
 """
 import argparse
 import json
@@ -39,12 +39,12 @@ def main():
     ap.add_argument("--scopes", default="inter,all")
     ap.add_argument("--method", default="aqm")
     ap.add_argument("--backbone", default="ast", choices=["ast", "clap"],
-                    help="ast = ast_qlung + 16 kHz fbank OOD 뷰 | clap = clap_qlung(Audio-CLAP 판) + 48 kHz CLAP OOD 뷰 (2026-09-07)")
+                    help="ast = ast_qlung + 16 kHz fbank OOD view | clap = clap_qlung (Audio-CLAP variant) + 48 kHz CLAP OOD view")
     ap.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
     ap.add_argument("--no-amp", action="store_true")
-    ap.add_argument("--limit-batches", type=int, default=0, help="스모크용")
-    ap.add_argument("--threads", type=int, default=2, help="메인 프로세스 torch 스레드 (공유 서버에서 64 스레드 STFT/리샘플은 100배 느리다)")
-    ap.add_argument("--workers", type=int, default=8, help="fbank 캐시 웜업 DataLoader 워커")
+    ap.add_argument("--limit-batches", type=int, default=0, help="for smoke tests")
+    ap.add_argument("--threads", type=int, default=2, help="torch threads in the main process (64-thread STFT/resampling is 100x slower on a shared server)")
+    ap.add_argument("--workers", type=int, default=8, help="DataLoader workers for the fbank cache warm-up")
     args = ap.parse_args()
     torch.set_num_threads(args.threads)
     if args.run:
@@ -52,7 +52,7 @@ def main():
         args.ckpt = args.ckpt or str(run_dir / "best.pth")
         args.out = args.out or str(run_dir / "ood.json")
     if not args.ckpt:
-        raise SystemExit("--run 또는 --ckpt 필요")
+        raise SystemExit("--run or --ckpt is required")
 
     ck = torch.load(args.ckpt, map_location="cpu", weights_only=False)
     if args.backbone == "clap":
@@ -88,7 +88,7 @@ def main():
         conf, sp, se, sc = score(preds, labels)
         results[scope] = {"splits": splits, "n": len(labels), "class_counts": counts, "S_p": sp, "S_e": se,
                           "icbhi_score": sc, "conf": conf.tolist(), "seconds": time.time() - t0}
-        print(f"[{scope}] n={len(labels)} (셋 {sum(counts)} = {counts})  Sp {sp:.2f} / Se {se:.2f} / Score {sc:.2f}")
+        print(f"[{scope}] n={len(labels)} (set {sum(counts)} = {counts})  Sp {sp:.2f} / Se {se:.2f} / Score {sc:.2f}")
     if args.out:
         pathlib.Path(args.out).parent.mkdir(parents=True, exist_ok=True)
         json.dump(results, open(args.out, "w"), indent=1)

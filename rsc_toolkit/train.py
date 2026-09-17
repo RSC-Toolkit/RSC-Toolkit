@@ -20,10 +20,10 @@ logger = logging.getLogger(__name__)
 
 
 def existing_run_artifacts(trainer: L.Trainer) -> List[pathlib.Path]:
-    """이 run 이름으로 이미 저장된 산출물(best.pth/best.json/final_state.pth …) — 콜백의 dirpath/filename 에서 찾는다.
+    """Artifacts already saved under this run name (best.pth/best.json/final_state.pth …), found via the callbacks' dirpath/filename.
 
-    같은 run.name 을 다시 투입하면 예전엔 아무 경고 없이 best.pth 를 덮어썼다 (REVIEW 2026-09-10 §4 P2).
-    재개용 last.ckpt(EpochResumeCheckpoint)는 제외한다 — 그것은 이어가기 신호다.
+    Used to prevent a run with the same run.name from silently overwriting best.pth.
+    The resume last.ckpt (EpochResumeCheckpoint) is excluded — it signals that training should continue.
     """
     from rsc_toolkit.trainer.callbacks.resume_checkpoint import EpochResumeCheckpoint
 
@@ -37,14 +37,14 @@ def existing_run_artifacts(trainer: L.Trainer) -> List[pathlib.Path]:
             for name in {str(filename), "best.json", pathlib.Path(str(filename)).with_suffix(".json").name}:
                 if (d / name).is_file():
                     found.add(d / name)
-        path = getattr(cb, "path", None)          # GapAugFinalMetrics 류: 파일 경로 하나
+        path = getattr(cb, "path", None)          # GapAugFinalMetrics and similar: a single file path
         if isinstance(path, (str, pathlib.Path)) and pathlib.Path(path).is_file():
             found.add(pathlib.Path(path))
     return sorted(found)
 
 
 def guard_existing_run(trainer: L.Trainer, cfg_dict: Dict[str, Any], resuming: bool) -> None:
-    """새로 시작하는 학습이 기존 산출물을 덮어쓰려 하면 멈춘다 (`+run.overwrite=true` 로 허용)."""
+    """Stop if a freshly started run would overwrite existing artifacts (allowed with `+run.overwrite=true`)."""
     if resuming:
         return
     existing = existing_run_artifacts(trainer)
@@ -52,12 +52,12 @@ def guard_existing_run(trainer: L.Trainer, cfg_dict: Dict[str, Any], resuming: b
         return
     run_cfg = cfg_dict.get("run") or {}
     if bool(run_cfg.get("overwrite", False)):
-        logger.warning("run.overwrite=true — 같은 run.name 의 기존 산출물을 덮어쓴다: %s", ", ".join(map(str, existing)))
+        logger.warning("run.overwrite=true — overwriting existing artifacts of the same run.name: %s", ", ".join(map(str, existing)))
         return
     raise RuntimeError(
-        f"run.name={run_cfg.get('name')!r} 의 산출물이 이미 있다: {', '.join(map(str, existing))}. "
-        "그대로 시작하면 best.pth/best.json 을 덮어쓴다 — 새 run.name 을 쓰거나, 이어가려면 last.ckpt 가 있는 상태에서 "
-        "resume=auto(기본)로 투입하고, 정말 덮어쓰려면 +run.overwrite=true 를 붙여라."
+        f"artifacts for run.name={run_cfg.get('name')!r} already exist: {', '.join(map(str, existing))}. "
+        "Starting now would overwrite best.pth/best.json — use a new run.name; to continue, launch with "
+        "resume=auto (default) while last.ckpt exists; to really overwrite, add +run.overwrite=true."
     )
 
 
@@ -104,18 +104,17 @@ def _collect_run_metadata(cfg_dict: Dict[str, Any]) -> Dict[str, Any]:
 
 def _apply_seed(cfg_dict: Dict[str, Any]) -> None:
     """
-    config 의 seed 를 실제로 적용한다.
+    Apply the seed from the config.
 
-    이전에는 config 에 `seed: 123` 이 있어도 코드에서 아무도 읽지 않아
-    매 실행이 다른 난수로 돌았다. 모델 초기화보다 먼저 불러야 한다.
-    workers=True 로 DataLoader 워커의 시드까지 파생시킨다.
+    Must be called before model initialization.
+    workers=True also derives the seeds of DataLoader workers.
     """
     seed = cfg_dict.get("seed")
     if seed is None:
-        logger.warning("config 에 seed 가 없다. 실행마다 결과가 달라진다.")
+        logger.warning("no seed in config; results will differ between runs.")
         return
     L.seed_everything(int(seed), workers=True)
-    logger.info("seed=%s 적용 (workers=True)", seed)
+    logger.info("seed=%s applied (workers=True)", seed)
 
 
 def _log_run_metadata(trainer: L.Trainer, cfg_dict: Dict[str, Any]) -> None:
@@ -138,7 +137,7 @@ def main(cfg: DictConfig) -> None:
 
     cfg_dict = _to_plain_dict(cfg)
 
-    # 난수를 쓰는 첫 단계(모델 초기화)보다 반드시 앞에 와야 한다.
+    # Must come before the first step that uses random numbers (model initialization).
     _apply_seed(cfg_dict)
 
     # --- Build components from config ---
@@ -151,8 +150,8 @@ def main(cfg: DictConfig) -> None:
     trainer = build_trainer(cfg_dict["trainer"])
 
     # --- LightningModule ---
-    # adapter: 기본 pl. {name: split_iter, params: {split_iter: 4}} 면 분할 배치 어댑터 (M2D 미세조정 quirk).
-    # 이름은 ADAPTERS registry 에서 찾고, 미지 이름은 침묵 폴백 없이 KeyError.
+    # adapter: default pl. {name: split_iter, params: {split_iter: 4}} selects the split-batch adapter (M2D fine-tuning quirk).
+    # Names are looked up in the ADAPTERS registry; unknown names raise KeyError without a silent fallback.
     pl_module = build_adapter(
         cfg_dict.get("adapter"),
         rsc_model=model,
@@ -165,8 +164,8 @@ def main(cfg: DictConfig) -> None:
     _log_run_metadata(trainer, cfg_dict)
 
     # --- Run ---
-    # resume: "auto"(기본) 면 EpochResumeCheckpoint 의 last.ckpt 가 있을 때 이어간다.
-    # "never" 면 무시하고 처음부터 (CLI: +resume=never).
+    # resume: "auto" (default) continues from EpochResumeCheckpoint's last.ckpt if it exists.
+    # "never" ignores it and starts from scratch (CLI: +resume=never).
     ckpt_path = None
     resume = str(cfg_dict.get("resume", "auto"))
     if resume == "auto":
@@ -174,9 +173,9 @@ def main(cfg: DictConfig) -> None:
 
         ckpt_path = find_resume_path(trainer)
         if ckpt_path is not None:
-            logger.info("재개: %s 에서 이어서 학습한다", ckpt_path)
+            logger.info("resume: continuing training from %s", ckpt_path)
     elif resume != "never":
-        raise ValueError(f"resume 은 auto|never 여야 한다: {resume!r}")
+        raise ValueError(f"resume must be auto|never: {resume!r}")
 
     guard_existing_run(trainer, cfg_dict, resuming=ckpt_path is not None)
 

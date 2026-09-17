@@ -1,8 +1,8 @@
-"""리팩토링 P1 8단계 — DatasetFactory → registries.DATASETS 위임, CLI 분리, preprocess --config_dir.
+"""DatasetFactory -> registries.DATASETS delegation, CLI split, preprocess --config_dir.
 
-고정하는 것: 내장 데이터셋 스냅샷, DatasetFactory 공개 API 의 의미(중복 등록은 이제 ValueError, 미지 이름은
-가용 목록 KeyError), CLI choices 가 registry 의 Mapping keys 라는 것, 외부 config_dir 로 data config 를 합성할 수
-있다는 것, `rsc_toolkit.datasets` 패키지의 재수출(import 하위호환).
+Pinned: the built-in dataset snapshot, the semantics of the DatasetFactory public API (duplicate registration now raises ValueError,
+an unknown name raises KeyError listing the available ones), CLI choices being the registry Mapping keys, composing a data config
+from an external config_dir, and the re-exports of the `rsc_toolkit.datasets` package (import backward compatibility).
 """
 from __future__ import annotations
 
@@ -47,7 +47,7 @@ def test_duplicate_registration_is_rejected_instead_of_silently_overwritten():
             class Second(BaseRSCDataset):
                 pass
 
-        DatasetFactory.register_dataset_class("_test_dup_ds")(First)  # 같은 클래스 재등록은 멱등
+        DatasetFactory.register_dataset_class("_test_dup_ds")(First)  # re-registering the same class is idempotent
         assert DatasetFactory.get_dataset_class("_test_dup_ds") is First
     finally:
         DATASETS.pop("_test_dup_ds", None)
@@ -74,7 +74,7 @@ def test_package_reexports_cli_names_for_backward_compatibility():
 
 
 def test_compose_data_config_with_external_config_dir(tmp_path):
-    """외부 디렉터리의 data/<이름>.yaml 을 --config_dir 로 합성할 수 있다 (학습 --config-dir 와 대칭)."""
+    """data/<name>.yaml in an external directory can be composed via --config_dir (symmetric with training --config-dir)."""
     pkg_cfg = pathlib.Path(rsc_toolkit.__file__).resolve().parent / "configs" / "data" / "toy.yaml"
     ext = tmp_path / "cfgs" / "data"
     ext.mkdir(parents=True)
@@ -83,7 +83,7 @@ def test_compose_data_config_with_external_config_dir(tmp_path):
     cfg = datasets_cli._compose_data_config("plugin_toy", tmp_path, config_dir=str(tmp_path / "cfgs"))
     assert cfg["name"] == "toy" and cfg["params"]["project_root"] == str(tmp_path)
 
-    # config_dir 없이 같은 이름을 부르면 패키지 목록에 없다고 안내한다
+    # calling the same name without config_dir reports that it is not in the package list
     with pytest.raises(ValueError, match="config_dir"):
         datasets_cli._compose_data_config("plugin_toy", tmp_path)
     with pytest.raises(FileNotFoundError):

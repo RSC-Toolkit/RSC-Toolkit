@@ -1,14 +1,15 @@
 """
-매 iteration 직전 가중치와의 가중 평균 — patch-mix 계열 논문의 --ma_update 재현.
+Weighted average with the weights from just before each iteration: --ma_update of the patch-mix family papers.
 
-출처: raymin0223/patch-mix util/misc.py update_moving_average + main.py train().
-원본은 batch 시작 때 state_dict 를 통째로 복사해 두고, optimizer.step() 뒤
+Source: raymin0223/patch-mix util/misc.py update_moving_average + main.py train().
+The original code copies the whole state_dict at batch start and, after optimizer.step(),
+overwrites **the live model directly** with
   new = old * beta + (1 - beta) * current
-로 **live 모델을 직접** 덮어쓴다 (shadow EMA 가 아니다). buffers(BN 통계 등)도
-state_dict 에 포함되므로 같이 평균된다 — 원본과 동일.
+(not a shadow EMA). Buffers (BN statistics, etc.) are part of the
+state_dict and are averaged too, same as the original code.
 
-툴킷 기본 EMACallback(beta 0.999, shadow) 과는 별개다. 논문 세팅(beta 0.5)은
-이 콜백을 쓴다.
+Separate from the toolkit's default EMACallback (beta 0.999, shadow). The paper setting (beta 0.5)
+uses this callback.
 """
 from typing import Dict, Optional
 

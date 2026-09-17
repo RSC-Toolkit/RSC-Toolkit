@@ -1,12 +1,12 @@
 """
-patch-mix 학습 프로토콜 구성요소 테스트.
+Tests for the patch-mix training protocol components.
 
-모델·데이터는 골든으로 고정했고(다른 테스트), 여기서는 프로토콜 조각들이
-원본 공식과 같은 수치를 내는지 본다:
+Model and data are pinned by goldens (other tests); here the protocol pieces are checked
+to produce the same numbers as the original formulas:
 - LiveWeightAveraging == util/misc.py update_moving_average (old*beta + (1-beta)*new)
 - PaperCosineLR == util/misc.py adjust_learning_rate
-- ICBHIBestScoreCheckpoint == main.py 의 "Score 최고 && Se>5" 저장 규칙
-- WeightedCrossEntropyFromCounts == main.py --weighted_loss 공식 (골든 값으로 대조)
+- ICBHIBestScoreCheckpoint == the "best Score && Se>5" saving rule in main.py
+- WeightedCrossEntropyFromCounts == the main.py --weighted_loss formula (compared against golden values)
 """
 import math
 import pathlib
@@ -26,7 +26,7 @@ def _repo_root() -> pathlib.Path:
     for c in pathlib.Path(__file__).resolve().parents:
         if (c / "pyproject.toml").exists():
             return c
-    raise RuntimeError("리포 루트를 찾지 못했다")
+    raise RuntimeError("repository root not found")
 
 
 GOLDEN = _repo_root() / "tests" / "golden" / "patchmix"
@@ -42,15 +42,15 @@ def test_live_weight_averaging_blends_with_previous_iteration():
     cb.on_train_batch_start(None, pl_module, None, 0)
 
     with torch.no_grad():
-        model.weight.copy_(torch.zeros(2, 2))  # optimizer.step() 흉내
+        model.weight.copy_(torch.zeros(2, 2))  # mimic optimizer.step()
     cb.on_train_batch_end(None, pl_module, None, None, 0)
 
-    # 원본: old*beta + (1-beta)*new = 1*0.5 + 0.5*0 = 0.5
+    # original: old*beta + (1-beta)*new = 1*0.5 + 0.5*0 = 0.5
     assert torch.allclose(model.weight, torch.full((2, 2), 0.5))
 
 
 def test_live_weight_averaging_includes_buffers():
-    """원본 update_moving_average 는 state_dict 전체(버퍼 포함)를 평균한다."""
+    """The original update_moving_average averages the whole state_dict (including buffers)."""
     model = nn.BatchNorm1d(3)
     pl_module = SimpleNamespace(rsc_model=model)
     cb = LiveWeightAveraging(beta=0.5)
@@ -96,7 +96,7 @@ def _fake_trainer(score, se, sp=80.0, epoch=4):
 
 
 def test_best_checkpoint_requires_se_above_threshold(tmp_path):
-    """원본: `if sc > best_acc[-1] and se > 5` — Se 문턱을 못 넘으면 저장하지 않는다."""
+    """Original: `if sc > best_acc[-1] and se > 5` — nothing is saved unless Se passes the threshold."""
     cb = ICBHIBestScoreCheckpoint(dirpath=str(tmp_path))
     pl_module = SimpleNamespace(rsc_model=nn.Linear(2, 2))
 
@@ -109,7 +109,7 @@ def test_best_checkpoint_requires_se_above_threshold(tmp_path):
     assert saved["icbhi_score"] == pytest.approx(58.0)
     assert "model" in saved
 
-    # 더 낮은 점수로는 갱신되지 않는다
+    # a lower score does not update
     cb.on_validation_end(_fake_trainer(score=57.0, se=45.0), pl_module)
     assert torch.load(tmp_path / "best.pth")["icbhi_score"] == pytest.approx(58.0)
 
@@ -122,9 +122,9 @@ def test_best_checkpoint_skips_sanity_check(tmp_path):
     assert not (tmp_path / "best.pth").exists()
 
 
-@pytest.mark.skipif(not (GOLDEN / "loss_goldens.pt").exists(), reason="골든 없음")
+@pytest.mark.skipif(not (GOLDEN / "loss_goldens.pt").exists(), reason="golden missing")
 def test_weighted_ce_from_counts_matches_reference_golden():
-    """골든의 weighted 값은 참조 공식(main.py:264-269)으로 계산된 것이다."""
+    """The golden weighted values were computed with the reference formula (main.py:264-269)."""
     from rsc_toolkit.methods.patchmix import PatchMixLoss
 
     g = torch.load(GOLDEN / "loss_goldens.pt")
@@ -163,9 +163,9 @@ def test_patchmix_run_config_composes_with_paper_protocol():
 ICBHI_INDEX = _repo_root() / ".datasets" / "icbhi" / "index" / "index_cycle.csv"
 
 
-@pytest.mark.skipif(not ICBHI_INDEX.exists(), reason="ICBHI 실데이터 인덱스 없음")
+@pytest.mark.skipif(not ICBHI_INDEX.exists(), reason="real ICBHI index missing")
 def test_weighted_ce_class_nums_match_real_official_train_split():
-    """config 에 박아 둔 class_nums 가 실제 공식 train 분포와 같은지 (드리프트 방지)."""
+    """class_nums hard-coded in the config match the real official train distribution (drift guard)."""
     from rsc_toolkit.datasets.index_dataset import IndexDataset
 
     ds = IndexDataset(

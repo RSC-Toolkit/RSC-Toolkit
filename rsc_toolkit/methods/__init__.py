@@ -1,6 +1,6 @@
 """
-논문별 학습 방법(손실·증강 등) 구성요소.
+Per-paper training method components (losses, augmentations, etc.).
 
-모델 구조(rsc_toolkit/models)와 달리, 여기는 특정 논문의 학습 레시피에 속하는
-조각들을 담는다. 각 모듈 docstring 에 출처(공식 저장소·논문)를 기록한다.
+Unlike the model architectures (rsc_toolkit/models), this package holds pieces that belong to
+a specific paper's training recipe. Each module docstring records its source (official repository, paper).
 """

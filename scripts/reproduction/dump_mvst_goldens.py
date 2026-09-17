@@ -1,8 +1,8 @@
 """
-MVST 뷰별 AST 의 P0 골든 — 공식 {view}/models/ast.py 를 참조 환경(timm 0.4.5)에서 실행.
-  .venv-ref-timm045/bin/python scripts/reproduction/dump_mvst_goldens.py --repo <MVST 클론> --out tests/golden/mvst
-audioset 분기가 ./pretrained_models/audioset_16_16_0.4422.pth 를 읽으므로 변환본을 심볼릭 링크로 걸어 둘 것.
-랜덤으로 남는 부분(pos_embed 전 뷰, patch proj 비-16 뷰, mlp_head)은 양쪽에서 det_fill 로 덮어 forward 를 대조한다.
+Official-code parity goldens for the per-view AST of MVST — runs the official {view}/models/ast.py in the reference environment (timm 0.4.5).
+  .venv-ref-timm045/bin/python scripts/reproduction/dump_mvst_goldens.py --repo <MVST clone> --out tests/golden/mvst
+The audioset branch reads ./pretrained_models/audioset_16_16_0.4422.pth, so symlink the converted weights there.
+Parts that remain random (pos_embed for all views, patch proj for non-16 views, mlp_head) are overwritten with det_fill on both sides before comparing the forward pass.
 """
 import argparse
 import importlib.util
@@ -48,7 +48,7 @@ def main():
         shapes[str(v)] = {k: list(t.shape) for k, t in m.state_dict().items()}
         print(f"view {v}: feats {tuple(feats.shape)} mean {float(feats.mean()):+.5f} keys {len(shapes[str(v)])}")
     json.dump(shapes, open(out / "state_dict_shapes.json", "w"), indent=0, sort_keys=True)
-    print("완료:", out)
+    print("done:", out)
 
 
 if __name__ == "__main__":

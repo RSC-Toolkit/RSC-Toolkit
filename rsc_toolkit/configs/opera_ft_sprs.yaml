@@ -1,5 +1,5 @@
-# OPERA-CT 전체 미세조정, SPRSound 7-class — 툴킷 표준 태스크 (목표치 없음). EMBC SPRS 레시피에서 freeze_body 끄고 lr 5e-6(M2D SPRS 값)·bs 64.
-#   실행: rsctk-train --config-name opera_ft_sprs run.name=sprs-operact-ft-s1 seed=1
+# Full fine-tuning of OPERA-CT, SPRSound 7-class — toolkit standard task (no target value). The EMBC SPRS recipe with freeze_body off, lr 5e-6 (the M2D SPRS value) and bs 64.
+#   Run: rsctk-train --config-name opera_ft_sprs run.name=sprs-operact-ft-s1 seed=1
 defaults:
   - model: opera_ct
   - data_defaults@data: base

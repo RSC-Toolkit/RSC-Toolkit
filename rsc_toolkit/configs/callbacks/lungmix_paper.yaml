@@ -1,6 +1,6 @@
 # @package _global_
-# Lungmix 학습 프로토콜 콜백: best = 툴킷 best-on-test(Score 최고, Se 게이트 없음 — 논문의 COMB(HF 포함) 기준 선택은 범위 밖이라 불가).
-# cosine annealing 은 optimizer/adamw_lungmix.yaml 의 lr_scheduler(epoch 단위) 로 처리.
+# Lungmix training-protocol callbacks: best = toolkit best-on-test (best Score, no Se gate — the paper's COMB-based selection (including HF) is out of scope and not possible).
+# Cosine annealing is handled by the lr_scheduler (per epoch) in optimizer/adamw_lungmix.yaml.
 trainer:
   params:
     callbacks:

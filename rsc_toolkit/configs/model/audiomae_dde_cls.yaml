@@ -1,12 +1,12 @@
-# Audio-MAE 인코더 + Linear 분류 (B2 직접 FT / DDE-MAE 2단계). encoder_ckpt 를 주면 1단계 final_state 의 E_R 만 로드(사전학습 ckpt 무시).
+# Audio-MAE encoder + Linear classifier (B2 direct FT / DDE-MAE stage 2). With encoder_ckpt, only E_R from the stage-1 final_state is loaded (pretrained ckpt ignored).
 name: audiomae_dde_cls
 params:
   n_cls: 4
   pretrained_path: pretrained_models/upstream/audiomae/pretrained.pth
-  encoder_ckpt: null         # 2단계: outputs/ddemae/<stage1 run>/final_state.pth
-  encoder_key: encoder_r.    # final_state 안의 E_R 접두 (E_I·디코더·q_θ 폐기 — 가정)
-  global_pool: true          # 가정: Audio-MAE 파인튜닝 관례(패치 평균 + fc_norm); false = cls 토큰
-  head_init_std: 0.02        # 가정: 헤드 초기화 (AS 파인튜닝 2e-5 는 AudioSet 전용)
-# [가정: 공식 Audio-MAE 파인튜닝 관례 미적용] 논문이 언급하지 않으므로 공식 main_finetune_as.py 기본값(drop_path 0.1, layer_decay 0.75,
-#   label smoothing 0.1, mixup 0.5, warmup 4 ep + cosine, 파인튜닝 2D 마스킹 mask_t/f 0.2, roll_mag_aug, head std 2e-5) 을 모두 쓰지 않는다
-#   (drop_path 0 · layer-decay 없음 · 마스킹 없음 · 스케줄 없음 · plain CE). 논문 §3.3 명시값(AdamW 1e-3/wd 5e-4, 50 ep) 만 적용.
+  encoder_ckpt: null         # stage 2: outputs/ddemae/<stage1 run>/final_state.pth
+  encoder_key: encoder_r.    # E_R prefix inside final_state (E_I · decoder · q_θ discarded — assumption)
+  global_pool: true          # Assumption: Audio-MAE fine-tuning convention (patch mean + fc_norm); false = cls token
+  head_init_std: 0.02        # Assumption: head initialization (2e-5 in AS fine-tuning is AudioSet-specific)
+# [Assumption: official Audio-MAE fine-tuning conventions not applied] The paper does not mention them, so none of the official main_finetune_as.py defaults (drop_path 0.1, layer_decay 0.75,
+#   label smoothing 0.1, mixup 0.5, warmup 4 ep + cosine, fine-tuning 2D masking mask_t/f 0.2, roll_mag_aug, head std 2e-5) are used
+#   (drop_path 0 · no layer decay · no masking · no schedule · plain CE). Only the values stated in paper §3.3 (AdamW 1e-3/wd 5e-4, 50 ep) are applied.

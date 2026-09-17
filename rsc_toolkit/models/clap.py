@@ -1,13 +1,13 @@
 """
-Audio-CLAP — BTS 논문(kaen2891/bts)의 오디오 전용 기준선. 공식 코드 충실 이식 (P0).
+Audio-CLAP — audio-only baseline of the BTS paper (kaen2891/bts). Exact port of the official code.
 
-원본 main.py set_model(--model_type ClapAudioModelWithProjection):
+Original main.py set_model(--model_type ClapAudioModelWithProjection):
   model = PretrainedCLAPWithProjection('laion/clap-htsat-unfused', 512)  (models/clap.py:6-16)
   classifier = nn.Linear(512, n_cls)
-forward 는 ClapAudioModelWithProjection(input_features).audio_embeds (512-d, 정규화 안 됨 —
-audio_projection(pooler_output) 로 끝난다. L2 정규화는 ClapModel.get_audio_features 경로에만 있다).
+forward is ClapAudioModelWithProjection(input_features).audio_embeds (512-d, not normalized —
+it ends with audio_projection(pooler_output); L2 normalization exists only in the ClapModel.get_audio_features path).
 
-transformers 5.x 는 input_features 를 (B, 1, T, F) 4D 로만 받는다 — 3D 면 채널 축을 붙인다.
+transformers 5.x only accepts 4D input_features (B, 1, T, F) — a channel axis is added for 3D input.
 """
 import torch.nn as nn
 
@@ -18,7 +18,7 @@ from .backbone.clap import PretrainedCLAPWithProjection
 
 @ModelFactory.register_model_class("audioclap")
 class AudioCLAP(BaseRSCModel, nn.Module):
-    accepts_meta = ("bts_meta7",)  # bts_precomputed 가 meta7 을 붙여 보내지만 오디오 전용 기준선은 무시한다
+    accepts_meta = ("bts_meta7",)  # bts_precomputed attaches meta7, but the audio-only baseline ignores it
 
     def __init__(
         self,
@@ -37,6 +37,6 @@ class AudioCLAP(BaseRSCModel, nn.Module):
         return self.classifier_head(self.backbone(x))
 
     def training_forward(self, audio_batch, labels, loss_func, meta_labels=None):
-        # meta_labels 는 bts_precomputed datamodule 이 붙이지만 오디오 전용 기준선은 쓰지 않는다
+        # meta_labels is attached by the bts_precomputed datamodule, but the audio-only baseline does not use it
         output = self.forward(audio_batch)
         return output, loss_func(output, labels)

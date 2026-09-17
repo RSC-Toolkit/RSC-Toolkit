@@ -1,6 +1,6 @@
-# QLung 의 ICBHI 데이터 설정 — icbhi_patchmix/icbhi_sgscl 와 동일 피처 체인(캐시 공유) + AQS float 를 배치 3번째 원소로.
-#   AQS 변형: data.params.qlung.entropy_source=rms(기본, 코드 버그 그대로) | entropy(코드식+엔트로피, Figure 1)
-#             data.params.qlung.formula=code(기본) | paper(논문 식 5 문자 그대로)
+# QLung ICBHI data config — same feature chain as icbhi_patchmix/icbhi_sgscl (shared cache) + AQS float as the 3rd batch element.
+#   AQS variants: data.params.qlung.entropy_source=rms (default, code bug kept) | entropy (code formula + entropy, Figure 1)
+#             data.params.qlung.formula=code (default) | paper (paper Eq. 5 taken literally)
 name: icbhi_qlung
 params:
   datamodule_name: qlung
@@ -14,16 +14,16 @@ params:
   sampling_rate: 16000
   sample_level: cycle
   desired_length_sec: 8.0
-  pad_type: repeat_fade          # 원본 cut_pad_sample_torchaudio (fade_out 포함) — AQS 도 이 파형에서 계산
+  pad_type: repeat_fade          # official cut_pad_sample_torchaudio (includes fade_out) — AQS is also computed from this waveform
 
   train_splits: [train]
-  val_splits: [test]             # 논문 프로토콜: 매 epoch 공식 test 평가 (best-on-test)
+  val_splits: [test]             # paper protocol: official test evaluation every epoch (best-on-test)
   test_splits: [test]
 
   batch_size: 8
   num_workers: 8
   shuffle_train: true
-  drop_last_train: true          # 원본 train loader drop_last=True
+  drop_last_train: true          # official train loader uses drop_last=True
   pin_memory: true
 
   features:
@@ -42,13 +42,13 @@ params:
   feature_precompute_num_workers: 0
 
   specaugment:
-    enabled: false               # 모델(ast_qlung)이 배치 단위로 적용한다
+    enabled: false               # applied per batch by the model (ast_qlung)
 
   qlung:
     alpha: 0.7               # --quality_alpha
     beta: 0.3                # --quality_beta
-    entropy_source: rms          # icbhi_dataset.py:177 버그 그대로 (H 자리에 rms) | entropy(문자 그대로, 무음 71건 nan) | entropy_nanmean
-    formula: code                # get_acoustic_features.py 정규화식
+    entropy_source: rms          # icbhi_dataset.py:177 bug kept (rms in place of H) | entropy (literal; 71 silent cycles give nan) | entropy_nanmean
+    formula: code                # normalization formula of get_acoustic_features.py
     cache_dir: downloaded_datasets/aqs_cache
     precompute: true
     precompute_num_workers: 8

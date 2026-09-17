@@ -1,10 +1,10 @@
 """
-GaP-Aug 재현용: 학습 종료 시점(최종 iterate) 의 test 지표를 best.json 에 final_* 로 병기한다.
+For GaP-Aug reproduction: records the test metrics at the end of training (final iterate) in best.json as final_*.
 
-논문은 20,000 iterations 뒤 어떤 모델로 평가했는지 미기재(AUTHOR_QUESTIONS GaP-Aug #8) → 툴킷 기본 best-on-test(ICBHIBestScoreCheckpoint,
-Se 게이트 없음) 와 함께 마지막 검증의 지표도 남겨 두 프로토콜을 모두 비교할 수 있게 한다.
-acc@1(Table 1 Acc 69.01 보조 앵커) 도 final_acc@1 로 남긴다(best.json 의 best 항목에는 acc 가 없음).
-콜백 목록에서 ICBHIBestScoreCheckpoint 뒤에 두어야 한다 (on_fit_end 시점에 best.json 이 있어야 병합).
+The paper does not state which model is evaluated after 20,000 iterations, so the metrics of the last validation are kept alongside the
+toolkit default best-on-test (ICBHIBestScoreCheckpoint, no Se gate), allowing both protocols to be compared.
+acc@1 (secondary paper-reported value: Table 1 Acc 69.01) is also kept as final_acc@1 (the best entry in best.json has no acc).
+Must come after ICBHIBestScoreCheckpoint in the callback list (best.json must exist at on_fit_end for the merge).
 """
 from __future__ import annotations
 
@@ -46,4 +46,4 @@ class FinalMetricsToBestJson(L.Callback):
         data.update(self._last)
         self.path.parent.mkdir(parents=True, exist_ok=True)
         atomic_json_dump(data, self.path)
-        logger.info("최종 iterate 지표 기록 → %s: %s", self.path, self._last)
+        logger.info("Recorded final-iterate metrics → %s: %s", self.path, self._last)

@@ -1,5 +1,5 @@
 # @package _global_
-# GaP-Aug 프로토콜: 매 epoch(=500 step) test Score 최고 (Se 게이트 없음) + 최종 iterate 지표 final_* 병기 + 재개
+# GaP-Aug protocol: best test Score every epoch (=500 steps) (no Se gate) + final-iterate metrics final_* alongside + resume
 trainer:
   params:
     callbacks:
@@ -8,6 +8,6 @@ trainer:
         min_se: -1.0
       - _target_: rsc_toolkit.trainer.callbacks.gapaug_final_metrics.FinalMetricsToBestJson
         dirpath: outputs/gapaug/${run.name}
-      - _target_: rsc_toolkit.trainer.callbacks.gapaug_sampler_epoch.GaPAugSamplerEpoch   # 재개 후에도 샘플러 epoch 열 동기화 (Lightning 은 set_epoch 를 안 부른다)
+      - _target_: rsc_toolkit.trainer.callbacks.gapaug_sampler_epoch.GaPAugSamplerEpoch   # keeps the sampler epoch sequence in sync after resume (Lightning does not call set_epoch)
       - _target_: rsc_toolkit.trainer.callbacks.resume_checkpoint.EpochResumeCheckpoint
         dirpath: outputs/gapaug/${run.name}

@@ -1,16 +1,16 @@
 """
-SG-SCL 저장소의 SFT 백본 4종(ResNet18/34, EfficientNet-B0, CNN6)에서 P0 골든을 뜬다.
+Produces official-code parity goldens for the 4 SFT backbones (ResNet18/34, EfficientNet-B0, CNN6) of the SG-SCL repository.
 
-실행 (참조 환경 — torch 1.13 + torchvision 0.14 + timm 0.4.5):
+Run (reference environment — torch 1.13 + torchvision 0.14 + timm 0.4.5):
   .venv-ref-timm045/bin/python scripts/reproduction/dump_sgscl_goldens.py \
-      --repo <sgscl 클론> --out tests/golden/sgscl_sft
+      --repo <sgscl clone> --out tests/golden/sgscl_sft
 
-주의:
-- ResNet/EfficientNet 의 1채널 첫 conv 는 원본에서도 랜덤 초기화로 남는다
-  (ImageNet sd 에서 삭제됨). 값 비교가 가능하도록 덤프/테스트 양쪽에서 같은
-  결정 패턴(linspace)으로 덮은 뒤 forward 를 뜬다.
-- CNN6 는 PANN ckpt 가 ./pretrained_models/Cnn6_mAP=0.343.pth (cwd 기준) 에
-  있어야 한다 — 저장소 아카이브를 심볼릭 링크로 걸어 실행한다.
+Notes:
+- The 1-channel first conv of ResNet/EfficientNet stays randomly initialized in the original code too
+  (it is removed from the ImageNet sd). To make values comparable, both the dump and the test overwrite it
+  with the same deterministic pattern (linspace) before running forward.
+- CNN6 needs the PANN ckpt at ./pretrained_models/Cnn6_mAP=0.343.pth (relative to cwd)
+  — the repository archive copy is symlinked there before running.
 """
 import argparse
 import json
@@ -20,9 +20,9 @@ import sys
 
 import torch
 
-# 원본 CNN6.load_sl_official_weights 는 map_location 없이 torch.load 를 부른다.
-# PANN ckpt 는 CUDA 저장이라 CPU 전용 참조 환경에서는 실패하므로 CPU 로 강제한다
-# (역직렬화 위치만 바뀔 뿐 가중치 값은 동일).
+# The original CNN6.load_sl_official_weights calls torch.load without map_location.
+# The PANN ckpt was saved on CUDA and fails in the CPU-only reference environment, so force CPU
+# (only the deserialization location changes; the weight values are identical).
 _orig_load = torch.load
 torch.load = lambda *a, **k: _orig_load(*a, **{**k, "map_location": "cpu"})
 
@@ -42,7 +42,7 @@ def main():
     out = pathlib.Path(args.out).resolve()
     out.mkdir(parents=True, exist_ok=True)
 
-    # CNN6 이 찾는 위치로 아카이브 링크
+    # link the archive copy to where CNN6 looks for it
     link = repo_root / "pretrained_models" / "Cnn6_mAP=0.343.pth"
     target = repo_root / "pretrained_models" / "upstream" / "Cnn6_mAP=0.343.pth"
     if not link.exists() and target.exists():
@@ -80,7 +80,7 @@ def main():
         print(f"{name:16} feats {tuple(feats.shape)} mean {float(feats.mean()):+.5f}")
 
     json.dump(specs, open(out / "state_dict_shapes.json", "w"), indent=0, sort_keys=True)
-    print("완료:", out)
+    print("done:", out)
 
 
 if __name__ == "__main__":

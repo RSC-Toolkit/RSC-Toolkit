@@ -1,19 +1,19 @@
-# PC-MCL(BEATs) SPRSound 확장 — **재현 판정 대상 아님**.
+# PC-MCL (BEATs) SPRSound extension — **not a reproduction target**.
 #
-# 논문(arXiv 2601.17080)은 ICBHI 만 실험했고 SPRSound 목표치가 없다. 각주 ¹⁵ 에서 "3-시그모이드 다중라벨 헤드가
-# ICBHI 4-class = 2×2 속성 구조에 묶여 7-class 로 표현할 수 없다"는 이유로 확장을 제외했었는데,
-# 사용자 결정(2026-09-01)에 따라 **라벨 공간을 6속성으로 분해**해 방법을 온전히 살린 채 확장한다.
+# The paper (arXiv 2601.17080) evaluates ICBHI only and has no SPRSound target. Its 3-sigmoid multi-label head is tied to
+# the ICBHI 4-class = 2×2 attribute structure and cannot express 7 classes as is,
+# so **the label space is decomposed into 6 attributes** to extend the method while keeping it intact.
 #
-# 무엇이 저자 것이고 무엇이 우리 것인가 (논문에 명시할 것):
-#   저자 것 — additive(합집합) 연결 규칙 · 버킷 포함 규칙 · PM(환자 매칭) · 손실 결합 · ICBHI 레시피 전부
-#   우리 것 — SPRSound 7-class 의 6속성 분해표, 존재하지 않는 속성 조합의 복호 우선순위,
-#             연결 조합을 28쌍으로 넓힐 때의 나열 순서(3-소스 조합 없음)
-#   상세: rsc_toolkit/methods/pcmcl_labelspace.py
+# What comes from the authors and what the toolkit adds:
+#   authors — additive (union) concatenation rule · bucket inclusion rule · PM (patient matching) · loss combination · the whole ICBHI recipe
+#   toolkit — the 6-attribute decomposition table for SPRSound 7-class, decoding priority for non-existent attribute combinations,
+#             enumeration order when widening the concatenation combinations to 28 pairs (no 3-source combinations)
+#   Details: rsc_toolkit/methods/pcmcl_labelspace.py
 #
-# MCL 은 살아 있다 — discont 속성을 Fine/Coarse/Wheeze+Crackle 셋이 공유하고, cont 를 Wheeze/W+C/Rhonchi/Stridor 넷이 공유한다.
-# PC 도 살아 있다 — 다중라벨 경로를 유지하므로 PM 헤드가 켜진 채로 돈다(label_mode=single 로 바꿨다면 꺼졌을 것이다).
+# MCL remains intact — the discont attribute is shared by Fine/Coarse/Wheeze+Crackle, and cont by Wheeze/W+C/Rhonchi/Stridor.
+# PC remains intact too — the multi-label path is kept, so the PM head stays on (switching to label_mode=single would turn it off).
 #
-#   실행: rsc-toolkit-train --config-name pcmcl_sprs run.name=sprs-pcmcl-beats-s1 seed=1
+#   Run: rsc-toolkit-train --config-name pcmcl_sprs run.name=sprs-pcmcl-beats-s1 seed=1
 defaults:
   - model: beats_pcmcl
   - data_defaults@data: base
@@ -29,13 +29,13 @@ seed: 1
 
 model:
   params:
-    n_cls: 6                     # 속성 수 (클래스는 7)
+    n_cls: 6                     # number of attributes (there are 7 classes)
     label_space: sprsound7
 
 trainer:
   params:
     max_epochs: 100
-    precision: 32                # 원본에 autocast 없음 — ICBHI 런과 동일
+    precision: 32                # no autocast in the official code — same as the ICBHI run
 
 run:
   name: sprs-pcmcl-beats

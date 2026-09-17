@@ -1,8 +1,8 @@
-# PC-MCL(BEATs) 를 SPRSound 표준 태스크(7-class)로 확장. ICBHI 레시피 그대로:
-# 16 kHz 파형 · 평가 사이클 10 s repeat+fade · bs32 · 동적 연결(11 조합)·PM 쌍.
-# 라벨 공간은 sprsound7(6속성) — 7-class 를 무손실 분해해 MCL 의 속성 공유를 살린다(methods/pcmcl_labelspace.py).
-# patient_id_mode 는 ICBHI 와 같은 구조적 선택(=녹음)을 유지한다: 실측 train 1,772 녹음 · 평균 3.76 이벤트 ·
-# 89.8% 가 ≥2 라 PM 양성 쌍이 성립한다. 환자 단위로 보려면 patient_id_mode=patient (243 환자 · 평균 27.4 이벤트).
+# PC-MCL (BEATs) extended to the standard SPRSound task (7-class). ICBHI recipe unchanged:
+# 16 kHz waveform · 10 s repeat+fade evaluation cycles · bs 32 · dynamic concatenation (11 combinations) · PM pairs.
+# The label space is sprsound7 (6 attributes) — a lossless decomposition of the 7 classes that keeps MCL's attribute sharing (methods/pcmcl_labelspace.py).
+# patient_id_mode keeps the same structural choice as ICBHI (= recording): measured on train, 1,772 recordings · mean 3.76 events ·
+# 89.8% with ≥2, so PM positive pairs exist. For patient-level grouping use patient_id_mode=patient (243 patients · mean 27.4 events).
 name: sprsound_pcmcl_beats
 params:
   datamodule_name: pcmcl
@@ -33,7 +33,7 @@ params:
   specaugment:
     enabled: false
   pcmcl:
-    label_space: sprsound7       # 6속성 분해 — 이걸 안 주면 4-class 변환기가 라벨 4·5·6 을 조용히 소실시킨다
+    label_space: sprsound7       # 6-attribute decomposition — without it the 4-class converter silently drops labels 4·5·6
     mode: default
     mixing_prob: 1.0
     conditional_mixing: false

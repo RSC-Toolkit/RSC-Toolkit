@@ -1,18 +1,18 @@
 """
-RespireNet 학습 파형 증강 — 원본 utils.py gen_augmented 가 쓰는 nlpaug 0.0.14 오디오 증강 5종의 충실 이식.
+RespireNet training waveform augmentation: a faithful port of the five nlpaug 0.0.14 audio augmentations used by gen_augmented in the original utils.py.
 
-출처: microsoft/RespireNet utils.py:184-197 + nlpaug 0.0.14 nlpaug/model/audio/{audio,noise,speed,loudness,vtlp,pitch}.py.
-원본 호출: NoiseAug(), SpeedAug(), LoudnessAug(factor=(0.5,2)), VtlpAug(sr, zone=(0,1)), PitchAug(sr, factor=(-1,3))
-중 하나를 random.randint 로 고르고 augment() (= model.manipulate) 1회.
+Source: microsoft/RespireNet utils.py:184-197 + nlpaug 0.0.14 nlpaug/model/audio/{audio,noise,speed,loudness,vtlp,pitch}.py.
+Original call: one of NoiseAug(), SpeedAug(), LoudnessAug(factor=(0.5,2)), VtlpAug(sr, zone=(0,1)), PitchAug(sr, factor=(-1,3))
+is picked with random.randint and augment() (= model.manipulate) is applied once.
 
-nlpaug 0.0.14 의 실제 동작을 그대로 옮긴다 (의도가 아니라 동작이 논문 수치 조건이므로):
-- zone 기본 (0.2, 0.8)·coverage 1 → 가운데 60% 구간만 증강 (Vtlp 만 zone (0,1)·coverage 0.1).
-- Speed: {0.5..1.9}\\{1.0} 0.1 간격, Pitch: randint(-1,3) → {-1,0,1,2} 반음, Loudness: uniform(0.5,2).
-- Noise: 백색잡음 irfft(randn) 을 그대로 더함(스케일 없음), 구간 위치는 randint 로 패딩.
-- Vtlp: librosa.stft 출력(freq, frames)을 (time, freq) 로 오독해 **프레임 축을 워핑**하는 nlpaug 버그 포함.
-- 원본 nlpaug 는 librosa ≥0.10 에서 time_stretch/pitch_shift 위치 인자로 TypeError — 저자 환경(librosa 0.8)에서는
-  동작했으므로 키워드 인자로 같은 연산을 호출한다.
-난수: np.random → 전달받은 RandomState, random → 전달받은 random.Random (재현성).
+The actual behavior of nlpaug 0.0.14 is ported as-is (the behavior, not the intent, is what produced the paper's numbers):
+- zone default (0.2, 0.8), coverage 1 → only the middle 60% is augmented (only Vtlp uses zone (0,1), coverage 0.1).
+- Speed: {0.5..1.9}\\{1.0} in 0.1 steps, Pitch: randint(-1,3) → {-1,0,1,2} semitones, Loudness: uniform(0.5,2).
+- Noise: white noise irfft(randn) added as-is (no scaling), segment position padded via randint.
+- Vtlp: includes the nlpaug bug that misreads the librosa.stft output (freq, frames) as (time, freq) and **warps the frame axis**.
+- The original nlpaug raises TypeError with librosa ≥0.10 because of positional time_stretch/pitch_shift arguments; it worked in the
+  authors' environment (librosa 0.8), so the same operations are called with keyword arguments.
+RNG: np.random → the given RandomState, random → the given random.Random (reproducibility).
 """
 from __future__ import annotations
 
@@ -61,7 +61,7 @@ class Noise(_Audio):
         uneven = segment_size % 2
         fft_size = segment_size // 2 + 1 + uneven
         noise_fft = rng.randn(fft_size)
-        # color == 'white': 색 가중 없음
+        # color == 'white': no color weighting
         if uneven:
             noise_fft = noise_fft[:-1]
         return np.fft.irfft(noise_fft)
@@ -122,7 +122,7 @@ class Vtlp(_Audio):
 
     def _manipulate(self, audio, sampling_rate, factor):
         stft = librosa.stft(audio)
-        time_dim, freq_dim = stft.shape  # nlpaug 의 축 오독 그대로 (실제로는 freq, frames)
+        time_dim, freq_dim = stft.shape  # nlpaug's axis misreading kept as-is (actually freq, frames)
         data_type = type(stft[0][0])
         factors = self.get_scale_factors(freq_dim, sampling_rate, fhi=self.fhi, alpha=factor)
         factors *= (freq_dim - 1) / max(factors)
@@ -159,7 +159,7 @@ class Pitch(_Audio):
 
 
 def gen_augmented(original: np.ndarray, sample_rate: int, np_rng: np.random.RandomState, py_rng: random.Random) -> np.ndarray:
-    """원본 utils.py:184-197 — 5종 중 하나를 균등 선택해 1회 적용."""
+    """Original utils.py:184-197: pick one of the five uniformly and apply it once."""
     augment_list = [
         Noise(),
         Speed(),

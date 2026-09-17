@@ -1,9 +1,9 @@
 """
-Prototype(ICASSP 2022) 이식 골든 테스트 — 공식 L3S/PrototypeSound 와 대조.
+Port golden tests for Prototype (ICASSP 2022) — compared with the official L3S/PrototypeSound.
 
-공식 코드는 (1) `np.float`(numpy≥1.24 에서 제거) (2) matplotlib 의존 (3) `move_data_to_gpu` 의 cuda 강제
-때문에 그대로 import 되지 않는다. 여기서는 그 셋만 최소로 우회해 원본 모듈을 불러와 값 대조한다.
-클론이 없으면 skip.
+The official code cannot be imported as is because of (1) `np.float` (removed in numpy>=1.24), (2) the matplotlib dependency and (3) forced cuda
+in `move_data_to_gpu`. Here only those three are minimally worked around to load the original module and compare values.
+Skipped if the clone is missing.
 """
 from __future__ import annotations
 
@@ -17,23 +17,23 @@ import pytest
 import torch
 
 REF = pathlib.Path("outputs/reference/prototypesound")
-pytestmark = pytest.mark.skipif(not REF.exists(), reason="PrototypeSound 클론 없음")
+pytestmark = pytest.mark.skipif(not REF.exists(), reason="PrototypeSound clone missing")
 
 
 def _load_official():
-    """공식 models_pytorch.py 를 sys.path 오염 없이 파일 경로로 로드한다.
+    """Loads the official models_pytorch.py by file path without polluting sys.path.
 
-    공식 모듈이 요구하는 것: `config`(utils/config.py 상수), `matplotlib.pyplot`, `np.float`.
-    `move_data_to_gpu` 는 models_pytorch.py 안에 정의돼 있어 utils 패키지는 필요 없다.
-    sys.path 를 건드리면 뒤따르는 테스트의 import(lightning 등)를 가로채므로 절대 넣지 않는다.
+    What the official module needs: `config` (utils/config.py constants), `matplotlib.pyplot`, `np.float`.
+    `move_data_to_gpu` is defined inside models_pytorch.py, so the utils package is not needed.
+    sys.path is never touched, since that would hijack imports (lightning etc.) in subsequent tests.
     """
-    np.float = float  # 공식 PrototypeLayer 가 np.zeros(dtype=np.float) 사용 (numpy>=1.24 에서 제거됨)
+    np.float = float  # the official PrototypeLayer uses np.zeros(dtype=np.float) (removed in numpy>=1.24)
 
     if "official_models_pytorch" in sys.modules:
         return sys.modules["official_models_pytorch"]
 
-    # 공식 모듈이 import 하는 matplotlib.pyplot / config 를 **로드하는 동안만** 스텁으로 채우고 즉시 되돌린다.
-    # (스텁을 남기면 torchmetrics 가 matplotlib.axes 를 찾다 실패하고, sys.path 를 건드리면 lightning import 를 가로챈다.)
+    # fill matplotlib.pyplot / config imported by the official module with stubs **only while loading**, then restore immediately.
+    # (leftover stubs make torchmetrics fail looking for matplotlib.axes, and touching sys.path hijacks the lightning import.)
     added = []
     for name in ("matplotlib", "matplotlib.pyplot"):
         if name not in sys.modules:
@@ -43,7 +43,7 @@ def _load_official():
             added.append(name)
     if "matplotlib" in added:
         sys.modules["matplotlib"].pyplot = sys.modules["matplotlib.pyplot"]
-    if "config" not in sys.modules:  # utils/config.py 를 그대로 로드(상수 재입력 금지)
+    if "config" not in sys.modules:  # load utils/config.py as is (do not re-type the constants)
         cspec = importlib.util.spec_from_file_location("config", REF / "baseline_cnn" / "utils" / "config.py")
         cmod = importlib.util.module_from_spec(cspec)
         cspec.loader.exec_module(cmod)
@@ -68,7 +68,7 @@ def _load_official():
     "form", ["vector1d", "vector2d", "vector2d_att", "vector2d_avgp", "vector2d_maxp", "vector2d_maxp_att"]
 )
 def test_prototype_layer_matches_official(form):
-    """6개 proto_form 전부 공식 루프 구현과 비트 일치(벡터화해도 값이 같아야 한다)."""
+    """All 6 proto_forms are bit-identical to the official loop implementation (vectorization must not change values)."""
     from rsc_toolkit.models.protonet import PrototypeLayer
 
     M = _load_official()
@@ -100,7 +100,7 @@ def test_diverse_loss_matches_official():
 
 @pytest.mark.parametrize("method,official", [("cnn8", "DecisionLevelMaxPooling"), ("proto", "ProtoNet")])
 def test_full_model_matches_official(method, official):
-    """특징 추출(torchlibrosa)→인코더→출력까지 공식과 비트 일치."""
+    """Bit-identical to the official code from feature extraction (torchlibrosa) through the encoder to the output."""
     from rsc_toolkit.models.protonet import ProtoNetModel
 
     M = _load_official()
@@ -123,7 +123,7 @@ def test_full_model_matches_official(method, official):
 
 
 def test_fix_length_matches_numpy_wrap_and_center_crop():
-    """짧으면 np.pad(wrap), 길면 센터 크롭(eval) — 공식 data_generator.read_batch_audio."""
+    """Short input: np.pad(wrap); long input: center crop (eval) — official data_generator.read_batch_audio."""
     from rsc_toolkit.datasets.protonet_data import fix_length
 
     short = torch.arange(10, dtype=torch.float).view(1, 10)
@@ -142,7 +142,7 @@ def test_fix_length_matches_numpy_wrap_and_center_crop():
 
 
 def test_bandpass_matches_official_filter():
-    """scipy butter/lfilter 계수·적용이 공식 preprocessing 과 동일."""
+    """scipy butter/lfilter coefficients and application are identical to the official preprocessing."""
     from scipy.signal import butter, lfilter
 
     from rsc_toolkit.datasets.protonet_data import ButterBandpass

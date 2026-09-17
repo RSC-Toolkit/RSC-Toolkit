@@ -1,14 +1,14 @@
-# DDE-MAE 1단계(분리 FT, 논문 §2.3 (i)) — 논문 명세 재구현·가정 런. 평가 없음, final_state.pth 저장.
-#   bs 8, AdamW 2e-4/wd 5e-4 (명시), epoch 미기재 → 50 가정, 스케줄 없음 가정, 식 7 (α1 0.5, α2 0.02).
+# DDE-MAE stage 1 (disentangled FT, paper §2.3 (i)) — re-implementation from the paper specification (assumption run). No evaluation, saves final_state.pth.
+#   bs 8, AdamW 2e-4/wd 5e-4 (stated), epochs not specified → 50 assumed, no schedule assumed, Eq. 7 (α1 0.5, α2 0.02).
 #   S3: rsctk ... --config-name dde_icbhi_stage1 seed=1 run.name=icbhi-ddemae-s3-pre-s1
 #   S2: rsctk ... --config-name dde_icbhi_stage1 model.params.variant=s2 seed=1 run.name=icbhi-ddemae-s2-pre-s1
-#   ablation: model.params.use_mi=false (−MI) / model.params.use_siamese=false (−Siamese) / 둘 다 (Table 2 4행 추정)
+#   ablation: model.params.use_mi=false (−MI) / model.params.use_siamese=false (−Siamese) / both (Table 2 row 4, inferred)
 defaults:
   - model: audiomae_dde
   - data_defaults@data: base
   - data: icbhi_ddemae
-  - loss: cross_entropy            # 미사용 (모델 내부 손실) — 인터페이스용
-  - metrics: ddemae_none           # 더미 로짓 → 분류 지표 무의미
+  - loss: cross_entropy            # unused (the loss is computed inside the model) — interface only
+  - metrics: ddemae_none           # dummy logits → classification metrics are meaningless
   - optimizer: adamw_ddemae_stage1
   - trainer: default
   - callbacks: ddemae_stage1
@@ -18,9 +18,9 @@ seed: 1
 
 trainer:
   params:
-    max_epochs: 50                 # 가정
+    max_epochs: 50                 # assumption
     precision: 32
-    limit_val_batches: 0           # 1단계는 평가 없음
+    limit_val_batches: 0           # stage 1 has no evaluation
     num_sanity_val_steps: 0
 
 run:

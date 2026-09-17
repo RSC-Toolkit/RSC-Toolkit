@@ -1,6 +1,6 @@
-# Lungmix §III-B: AdamW lr 1e-5 + cosine annealing. 가정: T_max = epochs(50, 미기재), eta_min 0, warmup 없음.
-# weight_decay: 논문 미기재 → 0 선택(가정; 저자 질문 #2). 대안값: torch AdamW 기본 1e-2, 툴킷 AST/AdamW 선례 1e-6 —
-# lr 1e-5·50 epoch 미세조정에서 wd 의 영향은 작지만 확인 전이므로 플래그로 둔다 (optimizer.params.weight_decay).
+# Lungmix §III-B: AdamW lr 1e-5 + cosine annealing. Assumptions: T_max = epochs (50, not specified), eta_min 0, no warmup.
+# weight_decay: not specified in the paper → 0 chosen (assumption). Alternatives: torch AdamW default 1e-2, toolkit AST/AdamW precedent 1e-6 —
+# the effect of wd is small for 50-epoch fine-tuning at lr 1e-5, but it is unconfirmed, so it is left as a flag (optimizer.params.weight_decay).
 name: adamw
 params:
   lr: 1e-5

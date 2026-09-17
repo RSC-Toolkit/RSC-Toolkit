@@ -1,12 +1,12 @@
 """
-PAFA(wa976/PAFA) 의 P0 골든 — 공식 코드를 우리 venv 에서 실행해 뜬다 (torch/torchaudio 만 필요).
+Official-code parity goldens for PAFA (wa976/PAFA) — produced by running the official code in our venv (only torch/torchaudio needed).
 
-  .venv/bin/python scripts/reproduction/dump_pafa_goldens.py --repo <PAFA 클론> --out tests/golden/pafa
+  .venv/bin/python scripts/reproduction/dump_pafa_goldens.py --repo <PAFA clone> --out tests/golden/pafa
 
-골든:
-- beats_features.pt   : 원본 BEATsTransferLearningModel(iter3+ AS2M ckpt, eval) 의 (2, 80000) 파형 → (2, T', 768)
-- pafa_head_loss.pt   : 원본 ProjectionHead(768→768, attention, ln; det_fill) + PAFALoss(λ 50 / 5e-4) 출력
-- pipeline_golden.pt  : 원본 슬라이스·cut/pad(5초 repeat+fade) 를 실제 ICBHI 녹음 2개에 적용한 cycle 파형
+Goldens:
+- beats_features.pt   : original BEATsTransferLearningModel (iter3+ AS2M ckpt, eval) applied to (2, 80000) waveforms → (2, T', 768)
+- pafa_head_loss.pt   : outputs of the original ProjectionHead(768→768, attention, ln; det_fill) + PAFALoss(λ 50 / 5e-4)
+- pipeline_golden.pt  : cycle waveforms from applying the original slicing and cut/pad (5 s repeat+fade) to 2 real ICBHI recordings
 """
 import argparse
 import pathlib
@@ -30,7 +30,7 @@ def main():
     out = pathlib.Path(args.out); out.mkdir(parents=True, exist_ok=True)
     repo = pathlib.Path(args.repo).resolve()
     sys.path.insert(0, str(repo))
-    # 원본 util 의 무관한 임포트 스텁 (torch dynamo 가 sys.modules 를 훑으므로 __spec__ 을 준다)
+    # stubs for unrelated imports in the original util (torch dynamo scans sys.modules, so give them a __spec__)
     import importlib.machinery
     for name in ("tkinter", "nlpaug", "nlpaug.augmenter", "nlpaug.augmenter.audio", "cmapy", "wget",
                  "matplotlib", "matplotlib.pyplot", "seaborn", "sklearn", "sklearn.manifold"):
@@ -40,7 +40,7 @@ def main():
             sys.modules[name] = mod
     sys.modules["tkinter"].W = "w"
 
-    # ---- 1) BEATs 특징 ----
+    # ---- 1) BEATs features ----
     from models.beats import BEATsTransferLearningModel  # noqa: E402
     m = BEATsTransferLearningModel(num_target_classes=4, model_path=args.ckpt, spec_transform=None).eval()
     torch.manual_seed(7)
@@ -57,7 +57,7 @@ def main():
         det_fill(p)
     head.eval()
     torch.manual_seed(8)
-    f = torch.randn(6, 5, 768)                      # (B, T', D) 토큰 시퀀스
+    f = torch.randn(6, 5, 768)                      # (B, T', D) token sequence
     pid = torch.tensor([101, 101, 102, 103, 103, 103])
     with torch.no_grad():
         proj = head(f)
@@ -67,7 +67,7 @@ def main():
                out / "pafa_head_loss.pt")
     print("pafa loss", float(loss), "single-patient", float(loss_single))
 
-    # ---- 3) 데이터 파이프라인 (원본 slice + cut_pad, 실제 녹음) ----
+    # ---- 3) data pipeline (original slice + cut_pad, real recordings) ----
     import torchaudio  # noqa: E402
     from torchaudio import transforms as T  # noqa: E402
     from util.icbhi_util import _slice_data_torchaudio, cut_pad_sample_torchaudio  # noqa: E402
@@ -89,7 +89,7 @@ def main():
         golden.append({"sample_id": r["sample_id"], "wav": chunk.squeeze(0)})
     torch.save(golden, out / "pipeline_golden.pt")
     print("pipeline golden", len(golden), [g["sample_id"] for g in golden[:2]])
-    print("완료:", out)
+    print("done:", out)
 
 
 if __name__ == "__main__":

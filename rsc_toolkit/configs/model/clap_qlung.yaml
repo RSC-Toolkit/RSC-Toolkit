@@ -1,18 +1,18 @@
-# QLung 방법부를 Audio-CLAP 백본에 얹은 변형 (논문 Table 1·2 의 두 번째 행).
-#   method=aqm (기본) — AngularClassifier(s_a 37) CE + 0.4·CE(DFAM s_d 15)
-#   method=ce        — 같은 데이터 경로의 Audio-CLAP 선형 헤드(이득 산정용 기준선)
-# 하이퍼파라미터는 저자 AST 코드 값을 그대로 옮겼다 — 논문이 CLAP 판의 값을 따로 밝히지 않는다(가정 ①).
+# Variant that places the QLung method on the Audio-CLAP backbone (second row of paper Tables 1·2).
+#   method=aqm (default) — AngularClassifier(s_a 37) CE + 0.4·CE(DFAM s_d 15)
+#   method=ce        — Audio-CLAP linear head on the same data path (baseline for measuring the gain)
+# Hyperparameters are copied from the authors' AST code — the paper does not give separate values for the CLAP version (assumption ① in models/clap_qlung.py).
 name: clap_qlung
 params:
   n_cls: 4
   method: aqm
   pretrained_name: laion/clap-htsat-unfused
-  final_feat_dim: 512            # CLAP audio_embeds 차원 (models/clap.py 와 동일)
+  final_feat_dim: 512            # CLAP audio_embeds dimension (same as models/clap.py)
   s_a: 37.0
   s_d: 15.0
-  kappa: 0.5                     # DFAM m (품질 마진 계수)
+  kappa: 0.5                     # DFAM m (quality margin coefficient)
   gamma: 0.5
   m_target: 0.2
   lambda_aqm: 0.4                # --alpha
-  class_nums: [2063, 1215, 501, 363]   # ICBHI 공식 train 4-class 개수 → π_y
+  class_nums: [2063, 1215, 501, 363]   # per-class counts of the official ICBHI train set (4-class) → π_y
   easy_margin: false

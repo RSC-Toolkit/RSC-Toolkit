@@ -1,9 +1,9 @@
-"""리팩토링 P1 6단계 — features.kind → PROCESSORS registry 로 옮긴 뒤 **캐시 키 패리티**.
+"""**Cache-key parity** after moving features.kind to the PROCESSORS registry.
 
-IndexDataModule._build_feature_processor 의 if-elif(예전 생성 인자)를 각 프로세서의 from_options 로
-옮겼다. 캐시 키는 get_processor_config() 이므로, (구) 직접 생성 vs (신) from_options 생성의
-get_processor_config() 가 같으면 기존 수십 GB 캐시가 그대로 적중한다. 여기서 그것을 내장 kind 별로 고정한다.
-SpecAugment 게이트(is_spectrogram)의 진리표도 예전 {"mel","fbank"} 화이트리스트와 같아야 한다.
+The if-elif in IndexDataModule._build_feature_processor (former constructor arguments) moved to each processor's from_options.
+The cache key is get_processor_config(), so if get_processor_config() of (old) direct construction and (new) from_options
+construction match, existing caches (tens of GB) still hit. This pins that per built-in kind.
+The truth table of the SpecAugment gate (is_spectrogram) must also match the former {"mel","fbank"} whitelist.
 """
 from __future__ import annotations
 
@@ -26,7 +26,7 @@ def _opts(**overrides):
 def test_builtin_processor_kinds_snapshot():
     assert set(PROCESSORS) == {"clap", "mel", "fbank", "sclmeta_mel", "waveform"}
     assert set(AUGMENTATIONS) == {"specaugment"}
-    assert PROCESSORS.get("mel") is PROCESSORS.get("fbank")  # 별칭
+    assert PROCESSORS.get("mel") is PROCESSORS.get("fbank")  # alias
 
 
 def test_is_spectrogram_truth_table_matches_former_whitelist():
@@ -53,7 +53,7 @@ def test_mel_from_options_cache_key_parity():
 def test_sclmeta_mel_from_options_cache_key_parity():
     from rsc_toolkit.processors.sclmeta_mel import SCLMetaMelProcessor
 
-    # win_length=None → n_fft 로 채우는 예전 규칙(fc.win_length or fc.n_fft) 유지
+    # keep the former rule that fills win_length=None with n_fft (fc.win_length or fc.n_fft)
     opts = _opts(kind="sclmeta_mel", n_mels=64, n_fft=1024, win_length=None, hop_length=512, f_min=50.0, f_max=2000.0)
     old = SCLMetaMelProcessor(sampling_rate=16000, n_mels=64, n_fft=1024, win_length=1024, hop_length=512,
                               f_min=50.0, f_max=2000.0, feature_cache=None)
@@ -75,7 +75,7 @@ def test_waveform_from_options_ignores_cache():
 def test_clap_from_options_cache_key_parity(monkeypatch):
     import rsc_toolkit.processors.clap as clap_mod
 
-    # HF 가중치 다운로드를 피한다 — 생성 인자와 캐시 키만 본다
+    # avoid downloading HF weights — only constructor arguments and cache key are checked
     monkeypatch.setattr(clap_mod.ClapProcessor, "from_pretrained", staticmethod(lambda *a, **k: None))
     opts = _opts(kind="clap", clap_model_name="laion/clap-htsat-unfused")
     old = clap_mod.CLAPProcessor(sampling_rate=48000, model_name="laion/clap-htsat-unfused", feature_cache=None)
@@ -95,7 +95,7 @@ def test_feature_config_params_slot_overrides_flat_fields():
 
 
 class _DM:
-    """IndexDataModule 의 게이트 메서드만 빌려 쓰는 최소 대역 (생성자를 거치지 않는다)."""
+    """Minimal stand-in that borrows only the gate methods of IndexDataModule (bypasses the constructor)."""
 
     def __init__(self, kind: str, specaug_enabled: bool):
         self.features_cfg = FeatureConfig(kind=kind)
@@ -125,7 +125,7 @@ def test_unknown_kind_lists_available():
 
 
 def test_plugin_kind_with_is_spectrogram_gets_specaugment():
-    """새 스펙트럼 kind 는 선언만으로 SpecAugment 를 받는다 — 예전엔 화이트리스트를 고쳐야 했다."""
+    """A new spectrogram kind gets SpecAugment just by declaring it — previously the whitelist had to be edited."""
     from rsc_toolkit.processors.base import BaseAudioProcessor
 
     @PROCESSORS.register("_test_plugin_spec")

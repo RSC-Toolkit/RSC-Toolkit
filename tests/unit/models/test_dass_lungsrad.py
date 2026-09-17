@@ -1,10 +1,10 @@
 """
-Lung-SRAD(DASS-medium + SAR blur + Dual-Axis Patch-Mix CL) P0 골든·구성 테스트.
+Official-code parity golden and configuration tests for Lung-SRAD (DASS-medium + SAR blur + Dual-Axis Patch-Mix CL).
 
-골든 출처: scripts/reproduction/dump_lungsrad_goldens.py — 공식 Lung-SRAD models_DASS/* (클론 무수정, CUDA selective_scan 커널) 를
-실 ckpt(DASS_medium_v2.pth) 로 GPU 에서 실행. 여기서는 툴킷 구현을 순수 torch 폴백(CPU) 또는 GPU 에서 돌려 대조한다.
-CPU 에서는 원본이 CUDA 생성기로 뽑은 난수(randint/randperm on device) 를 재현할 수 없어, 골든에 기록된 lam/index/구간에서
-같은 값을 돌려주도록 torch.randint/torch.randperm 을 테스트 안에서만 고정한다 (GPU 가 있으면 고정 없이 원본과 같은 호출 순서로 재현).
+Golden source: scripts/reproduction/dump_lungsrad_goldens.py — the official Lung-SRAD models_DASS/* (clone unmodified, CUDA selective_scan kernel) run
+on GPU with the real ckpt (DASS_medium_v2.pth). Here the toolkit implementation runs on the pure torch fallback (CPU) or on GPU and is compared.
+On CPU the random numbers the original draws from a CUDA generator (randint/randperm on device) cannot be reproduced, so torch.randint/torch.randperm are
+pinned inside the tests only to return the lam/index/segments recorded in the golden (with a GPU, reproduced with the same call order as the original, without pinning).
 """
 import os
 import pathlib
@@ -27,26 +27,26 @@ def _repo_root() -> pathlib.Path:
     for c in pathlib.Path(__file__).resolve().parents:
         if (c / "pyproject.toml").exists():
             return c
-    raise RuntimeError("리포 루트를 찾지 못했다")
+    raise RuntimeError("repository root not found")
 
 
 REPO = _repo_root()
 GOLDEN = REPO / "tests" / "golden" / "lungsrad" / "model.pt"
 CKPT = REPO / "pretrained_models/upstream/dass/DASS_medium_v2.pth"
-needs_golden = pytest.mark.skipif(not GOLDEN.exists(), reason="골든 없음")
-needs_ckpt = pytest.mark.skipif(not CKPT.exists(), reason="DASS ckpt 없음")
-needs_kernel = pytest.mark.skipif(not (cuda_kernel_available() and torch.cuda.is_available()), reason="selective_scan CUDA 커널 없음")
+needs_golden = pytest.mark.skipif(not GOLDEN.exists(), reason="golden missing")
+needs_ckpt = pytest.mark.skipif(not CKPT.exists(), reason="DASS ckpt missing")
+needs_kernel = pytest.mark.skipif(not (cuda_kernel_available() and torch.cuda.is_available()), reason="selective_scan CUDA kernel missing")
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-torch.backends.cudnn.allow_tf32 = False      # 골든과 같은 fp32 정확 경로 (dump 스크립트와 동일 설정)
+torch.backends.cudnn.allow_tf32 = False      # same exact fp32 path as the golden (same settings as the dump script)
 torch.backends.cuda.matmul.allow_tf32 = False
 torch.backends.cudnn.deterministic = True
 torch.backends.cudnn.benchmark = False
 
 
-# 48M 모델 CPU 폴백은 스레드를 과다 점유해 서버 load 를 300 까지 올린다 — 이 파일이 도는 동안만 제한한다.
-# **모듈 최상단에서 걸면 안 된다**: pytest 는 모든 모듈을 먼저 수집하므로 그 시점의 set_num_threads 가
-# 전체 실행 내내 남고, torchaudio 의 T.Resample 이 스레드 수에 따라 비트 단위로 다른 값을 낸다
-# (실측: tests/unit/datasets/test_sprsound_sclmeta.py 의 파형 비트 대조가 16 스레드에서만 실패한다).
+# The CPU fallback of the 48M model grabs too many threads and pushes server load up to 300 — limit threads only while this file runs.
+# **Do not set it at module top level**: pytest collects all modules first, so set_num_threads at that point would
+# persist for the whole run, and torchaudio T.Resample gives bitwise-different values depending on the thread count
+# (measured: the waveform bitwise comparison in tests/unit/datasets/test_sprsound_sclmeta.py fails only with 16 threads).
 
 
 @pytest.fixture(autouse=True, scope="module")
@@ -82,7 +82,7 @@ def model_blur():
 
 @contextmanager
 def _fixed_rng(start=None, perm_first=None):
-    """CPU 에서 원본(CUDA 생성기)의 randint/randperm(N, device) 결과를 골든 값으로 고정. randperm(B) (CPU, device 인자 없음) 는 그대로."""
+    """On CPU, pin randint/randperm(N, device) of the original (CUDA generator) to the golden values. randperm(B) (CPU, no device argument) is left as is."""
     if DEVICE.type == "cuda":
         yield
         return
@@ -104,7 +104,7 @@ def _fixed_rng(start=None, perm_first=None):
         torch.randint, torch.randperm = orig_randint, orig_randperm
 
 
-# ------------------------------------------------------------------------------------------ 구성
+# ------------------------------------------------------------------------------------------ configuration
 def test_gaussian_kernel_values():
     g = gaussian_kernel1d(5, 3.0)
     assert torch.allclose(g, torch.tensor([0.1782, 0.2105, 0.2225, 0.2105, 0.1782]), atol=5e-5) and abs(g.sum() - 1) < 1e-6
@@ -124,7 +124,7 @@ def test_ss2d_layout_and_blur_hook():
         op.blur_enable = False
         y_noblur = op(x)
     assert y_blur.shape == x.shape and y_noblur.shape == x.shape
-    assert not torch.allclose(y_blur, y_noblur)  # blur hook 이 실제로 출력을 바꾼다
+    assert not torch.allclose(y_blur, y_noblur)  # the blur hook actually changes the output
 
 
 def test_vssm_medium_structure_and_blur_blocks():
@@ -132,7 +132,7 @@ def test_vssm_medium_structure_and_blur_blocks():
     on = [(i, j) for i, layer in enumerate(m.v.layers) for j, blk in enumerate(layer.blocks) if blk.op.blur_enable]
     assert on == [(2, 2), (2, 3)]
     assert [len(l.blocks) for l in m.v.layers] == [2, 2, 20, 2] and m.v.dims == [96, 192, 384, 768]
-    assert sum(p.numel() for p in m.v.parameters()) == 48246052  # 골든 n_params (head 4-class 포함; 정찰 48.246M)
+    assert sum(p.numel() for p in m.v.parameters()) == 48246052  # golden n_params (including the 4-class head; 48.246M)
     assert isinstance(m.projector, nn.Identity)
     ft = DASSLungSRAD(n_cls=4, method="ce", audioset_pretrain=False, ssm_backend="torch")
     assert not any(blk.op.blur_enable for l in ft.v.layers for blk in l.blocks)
@@ -146,12 +146,12 @@ def test_ckpt_keys_match():
     assert m.dass_load_info["loaded"] == 490
 
 
-# ------------------------------------------------------------------------------------------ 골든 대조
+# ------------------------------------------------------------------------------------------ golden comparison
 @needs_golden
 @needs_ckpt
 def test_resize_and_patch_embed_match(golden, model_blur):
     g = golden
-    raw = g["input_raw"].transpose(1, 2).to(DEVICE)          # (2,128,798) 툴킷 레이아웃
+    raw = g["input_raw"].transpose(1, 2).to(DEVICE)          # (2,128,798) toolkit layout
     inp = model_blur.to_model_input(raw)
     assert inp.shape == (2, 1, 128, 1024)
     assert torch.allclose(inp.cpu(), g["model_input_bchw"][:2], atol=1e-5)
@@ -178,20 +178,20 @@ def test_forward_matches_reference(golden, model_blur):
         feats, logits = model_blur.forward_features(x4)
     assert torch.allclose(feats.cpu(), g["features_blur"], atol=1e-3), (feats.cpu() - g["features_blur"]).abs().max()
     assert torch.allclose(logits.cpu(), g["logits_blur"], atol=1e-3), (logits.cpu() - g["logits_blur"]).abs().max()
-    # blur off (FT 구조) — 같은 가중치, blur 블록 ∅
+    # blur off (FT structure) — same weights, blur blocks ∅
     ft = _build("ce")
     with torch.no_grad():
         feats_off, logits_off = ft.forward_features(x4)
     assert torch.allclose(feats_off.cpu(), g["features_noblur"], atol=1e-3)
     assert torch.allclose(logits_off.cpu(), g["logits_noblur"], atol=1e-3)
-    assert not torch.allclose(g["logits_noblur"], g["logits_blur"], atol=1e-3)  # blur 가 실제로 출력을 바꾼다
-    # training_forward(평가 모드) 의 로짓 = forward_features 로짓, 손실 = CE
+    assert not torch.allclose(g["logits_noblur"], g["logits_blur"], atol=1e-3)  # blur actually changes the output
+    # logits of training_forward (eval mode) = forward_features logits, loss = CE
     with torch.no_grad():
         images = g["images"].transpose(1, 2).to(DEVICE)  # (4,128,1024)
         out, loss = model_blur.training_forward(images, g["labels"].to(DEVICE), nn.CrossEntropyLoss())
     if DEVICE.type == "cpu":
         assert torch.allclose(out.cpu(), g["logits_blur"], atol=1e-3) and abs(float(loss) - g["loss"]["ce"]) < 1e-3
-    else:  # GPU 는 autocast fp16 경로 → 원본 fp16 골든과 대조 (느슨)
+    else:  # GPU uses the autocast fp16 path -> compared with the original fp16 golden (loose)
         assert torch.allclose(out.cpu(), g["logits_blur_fp16"], atol=5e-2)
 
 
@@ -204,7 +204,7 @@ def test_patchmix_as_code_matches_reference(golden, model_blur, mix_type):
     pe_ref = golden["patch_embed"]
     dims = {d: g["changed_dims"][f"dim{d}"] for d in (1, 2, 3)}
     C, Fq, T = pe_ref.shape[1:]
-    # 원본 동작(as_code): time → dim2(주파수 32) 연속 구간, 전 채널·전 시간; freq → dim1(채널 96) 연속 구간; 2d → 시간 전 구간, (채널×주파수) 토큰
+    # original behavior (as_code): time -> contiguous segment on dim2 (frequency 32), all channels and all time; freq -> contiguous segment on dim1 (channels 96); 2d -> full time range, (channel×frequency) tokens
     if mix_type == "time":
         seg = dims[2]
         assert len(dims[1]) == C and len(dims[3]) == T and 1 <= len(seg) < Fq and (seg.max() - seg.min() + 1) == len(seg)
@@ -217,10 +217,10 @@ def test_patchmix_as_code_matches_reference(golden, model_blur, mix_type):
         fixed = dict(start=int(seg.min()))
     else:
         assert len(dims[3]) == T
-        tok = g["changed_tokens_cf"]   # (C·F) 토큰 index
+        tok = g["changed_tokens_cf"]   # (C·F) token index
         assert len(tok) > 0 and len(tok) < C * Fq
         fixed = dict(perm_first=tok)
-    # 재현: 같은 seed·호출 순서 (GPU) / 골든 구간으로 고정 (CPU)
+    # reproduction: same seed and call order (GPU) / pinned to golden segments (CPU)
     with torch.no_grad(), _fixed_rng(**fixed):
         np.random.seed(g["seed"])
         torch.manual_seed(g["seed"])
@@ -231,7 +231,7 @@ def test_patchmix_as_code_matches_reference(golden, model_blur, mix_type):
     assert abs(lam - g["lam"]) < 1e-9
     assert abs(float(xm.float().sum()) - g["mixed_patch_embed_sum"]) < 1e-2 * max(1.0, abs(g["mixed_patch_embed_sum"]))
     assert torch.allclose(xm.float().cpu().flatten()[::997], g["mixed_patch_embed_checksum"], atol=1e-4)
-    ch = (xm != pe0).cpu()   # 변경 위치는 같은 장치에서 계산한 원본과 비교 (골든 pe 와는 1e-5 수준 차이가 있어 전부 '변경' 으로 보임)
+    ch = (xm != pe0).cpu()   # changed positions are compared with the original computed on the same device (the golden pe differs at ~1e-5, so everything would look 'changed')
     for d in (1, 2, 3):
         assert torch.equal(ch.any(dim=tuple(k for k in range(4) if k != d)).nonzero().flatten(), dims[d])
     with torch.no_grad(), _fixed_rng(**fixed):
@@ -256,7 +256,7 @@ def test_patchmix_as_paper_axes():
             changed = xm != x
             seg = changed.any(dim=tuple(k for k in range(4) if k != axis)).nonzero().flatten()
             others = [d for d in (1, 2, 3) if d != axis]
-            if len(seg) == 0:  # index 가 항등이면 변화 없음
+            if len(seg) == 0:  # identity index means no change
                 assert torch.equal(index, torch.arange(B))
                 continue
             assert (seg.max() - seg.min() + 1) == len(seg) and len(seg) < size
@@ -264,15 +264,15 @@ def test_patchmix_as_paper_axes():
                 assert changed.any(dim=tuple(k for k in range(4) if k != d)).sum() == x.shape[d]
             assert abs(lam - (1 - len(seg) / size)) < 1e-9
             assert torch.equal(y_b, y[index])
-    # 2d(as_paper): (F×T) 패치, 채널 전부
+    # 2d(as_paper): (F×T) patches, all channels
     xm, *_ = v.apply_patch_mix(x.clone(), y, "2d")
     changed = xm != x
     assert changed.any(dim=(0, 2, 3)).sum() in (0, C)
-    # as_code 와 축이 다르다
+    # axes differ from as_code
     v.mix_layout = "as_code"
     xm2, *_ = v.apply_patch_mix(x.clone(), y, "time")
     ch2 = xm2 != x
-    assert ch2.any(dim=(0, 1, 3)).sum() < Fq or ch2.sum() == 0   # as_code time = dim2 부분 구간
+    assert ch2.any(dim=(0, 1, 3)).sum() < Fq or ch2.sum() == 0   # as_code time = partial segment on dim2
 
 
 @needs_golden
@@ -298,14 +298,14 @@ def test_dual_loss_matches_reference(golden, model_blur):
             lf = model_blur._axis_cl(x4, labels, proj1, "freq")
     assert abs(float(ce) - L["ce"]) < 1e-3 and abs(float(lt) - L["time"]) < 1e-3 and abs(float(lf) - L["freq"]) < 1e-3
     assert abs(float(ce + lt + lf) - L["total"]) < 2e-3
-    # PatchMixConLoss 단독
+    # PatchMixConLoss alone
     u = g["conloss_unit"]
     val = model_blur.patchmix_con_loss(u["p1"].to(DEVICE), u["p2"].to(DEVICE), torch.tensor([0, 1, 2, 3]).to(DEVICE), None, u["lam"], u["index"].to(DEVICE))
     assert abs(float(val) - u["value"]) < 1e-5
 
 
 def test_training_forward_paths_small():
-    """사전학습 없이 작은 입력으로 ce / ce_blur / patchmix_cl(dual, time, freq, 2d) 의 training_forward 가 돌고 gradient 가 흐른다."""
+    """Without pretraining, training_forward of ce / ce_blur / patchmix_cl(dual, time, freq, 2d) runs on small inputs and gradients flow."""
     torch.manual_seed(0)
     x = torch.randn(4, 128, 100)
     y = torch.tensor([0, 1, 2, 3])
@@ -324,10 +324,10 @@ def test_training_forward_paths_small():
     m.eval()
     with torch.no_grad():
         logits, loss = m.training_forward(x, y, nn.CrossEntropyLoss())
-    assert torch.allclose(loss, nn.CrossEntropyLoss()(logits, y))  # 평가 모드는 CE 만
+    assert torch.allclose(loss, nn.CrossEntropyLoss()(logits, y))  # eval mode uses CE only
 
 
-# ------------------------------------------------------------------------------------------ 커널 vs 폴백
+# ------------------------------------------------------------------------------------------ kernel vs fallback
 @needs_kernel
 def test_selective_scan_fallback_matches_kernel():
     torch.manual_seed(0)
@@ -365,9 +365,9 @@ def test_model_kernel_vs_fallback_forward():
     assert torch.allclose(a, b, atol=1e-4, rtol=1e-4), (a - b).abs().max()
 
 
-# ------------------------------------------------------------------------------------------ 2-class 파생 지표
+# ------------------------------------------------------------------------------------------ 2-class derived metric
 def test_two_class_derived_metric_matches_main_py():
-    """main.py:420-427 --two_cls_eval: normal 은 pred==0, abnormal 은 pred>0 이면 정답 → Sp/Se/Score."""
+    """main.py:420-427 --two_cls_eval: normal is correct if pred==0, abnormal if pred>0 -> Sp/Se/Score."""
     logits = torch.tensor([[2., 0, 0, 0], [0, 2., 0, 0], [0, 0, 2., 0], [0, 0, 0, 2.], [0, 2., 0, 0], [2., 0, 0, 0], [0, 0, 0, 2.], [0, 0, 2., 0]])
     labels = torch.tensor([0, 1, 2, 3, 3, 1, 0, 1])
     hits, counts = [0.0] * 4, [0.0] * 4

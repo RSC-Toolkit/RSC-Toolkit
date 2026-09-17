@@ -233,14 +233,14 @@ def test_processor_preprocessing_skips_cached(tmp_path, feature_cache):
 
 def test_cache_dir_reflects_real_processor_config(tmp_path):
     """
-    실제 processor(MelBankAudioProcessor)의 설정이 캐시 키에 반영되는지 확인한다.
+    Checks that the settings of a real processor (MelBankAudioProcessor) are reflected in the cache key.
 
-    이전에는 base.py 가 `_get_processor_config()`(밑줄) 를 호출하고
-    AttributeError 를 삼켰다. 실제 이름은 밑줄이 없어서 설정이 조용히
-    캐시 키에서 빠졌고, n_mels 가 달라도 같은 캐시 디렉토리를 썼다.
+    Previously base.py called `_get_processor_config()` (with underscore) and
+    swallowed the AttributeError. The real name has no underscore, so the settings silently
+    dropped out of the cache key and the same cache directory was used even with a different n_mels.
 
-    위쪽 MockProcessor 로만 검사하면 더미가 오타 이름을 정의하는 한
-    같은 실수를 다시 놓친다. 그래서 여기서는 실제 processor 를 쓴다.
+    Testing only with the MockProcessor above misses the same mistake as long as the dummy
+    defines the misspelled name, so a real processor is used here.
     """
     from rsc_toolkit.processors.mel import MelBankAudioProcessor
 
@@ -259,7 +259,7 @@ def test_cache_dir_reflects_real_processor_config(tmp_path):
 
 
 def test_cache_dir_warns_when_processor_has_no_config(tmp_path, caplog):
-    """get_processor_config() 가 없는 processor 면 조용히 넘어가지 말고 경고한다."""
+    """A processor without get_processor_config() triggers a warning instead of being silently skipped."""
 
     class _NoConfig:
         pass

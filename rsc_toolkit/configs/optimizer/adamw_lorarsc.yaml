@@ -1,4 +1,4 @@
-# LoRA-RSC main_icbhi.py:188 + train.yaml: AdamW(lr_LoRA 0.01, betas (0.9,0.98), eps 1e-6, weight_decay 0.1). full-FT 는 lr 5e-5, linear 1e-3.
+# LoRA-RSC main_icbhi.py:188 + train.yaml: AdamW (lr_LoRA 0.01, betas (0.9,0.98), eps 1e-6, weight_decay 0.1). full-FT uses lr 5e-5, linear 1e-3.
 name: adamw
 params:
   lr: 0.01

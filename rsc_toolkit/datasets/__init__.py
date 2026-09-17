@@ -1,14 +1,15 @@
-"""rsc_toolkit.datasets — raw 데이터셋(다운로드·인덱스·검증)과 학습용 index dataset/datamodule 들.
+"""rsc_toolkit.datasets -- raw datasets (download, index, validation) and index datasets/datamodules for training.
 
-등록소는 `DatasetFactory`(= registries.DATASETS 위임). CLI(`rsctk datasets …`)는 `rsc_toolkit.datasets.cli` 에
-있고, 여기서는 예전 import 경로(`from rsc_toolkit.datasets import build_parser, handle_command, …`)를 위해
-재수출만 한다. 새 코드는 `rsc_toolkit.datasets.cli` 를 직접 쓰라 (monkeypatch 대상도 그쪽이다).
+The registry is `DatasetFactory` (delegates to registries.DATASETS). The CLI (`rsctk datasets ...`) lives in
+`rsc_toolkit.datasets.cli`; this module only re-exports it for the legacy import path
+(`from rsc_toolkit.datasets import build_parser, handle_command, ...`). New code should use `rsc_toolkit.datasets.cli`
+directly (it is also the monkeypatch target).
 """
 from rsc_toolkit.datasets.factory import DatasetFactory
 
 DatasetFactory.register_datasets()
 
-from rsc_toolkit.datasets.cli import (  # noqa: E402  (등록 뒤에 import — CLI choices 가 등록소를 읽는다)
+from rsc_toolkit.datasets.cli import (  # noqa: E402  (imported after registration -- CLI choices read the registry)
     _available_data_configs,
     _compose_data_config,
     _configure_processor_raw_data_directory,

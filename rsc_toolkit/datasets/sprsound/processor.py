@@ -35,7 +35,7 @@ class SPRSoundDatasetProcessor(BaseRSCDatasetProcessor):
     metadata_file: Optional[str] = None
 
     def processed_extra_files(self) -> List[str]:
-        # 인덱스를 쓸 때 함께 쓰는 공식 split 파일. 없으면 split 필터가 걸릴 곳이 없다.
+        # Official split file used together with the index. Without it the split filter has nothing to apply to.
         return ["official_split.txt"]
 
     @property

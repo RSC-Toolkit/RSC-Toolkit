@@ -1,12 +1,12 @@
 """
-PAFA 논문(Interspeech 2025)의 투영 헤드와 손실 — 공식 코드 충실 이식 (원문 그대로).
+Projection head and loss of the PAFA paper (Interspeech 2025), a faithful port of the official code (verbatim).
 
-출처: https://github.com/wa976/PAFA method/pafa.py
-- ProjectionHead: (선택) temporal softmax attention 풀링 → Linear-Norm(bn|ln)-ReLU-Linear.
-  BEATs 용은 attention=True, norm_type='ln', hidden_dim=None(=input_dim), output_dim=768.
-- PAFALoss: PCSL = 환자 내 분산 / 환자 centroid 간 거리 제곱합, GPAL = centroid 들의 전역
-  centroid 대비 거리 제곱 평균; 반환 = lambda_pcsl*PCSL + lambda_gpal*GPAL.
-  배치에 환자가 1명뿐이면 0 (requires_grad=True 상수).
+Source: https://github.com/wa976/PAFA method/pafa.py
+- ProjectionHead: (optional) temporal softmax attention pooling → Linear-Norm(bn|ln)-ReLU-Linear.
+  For BEATs: attention=True, norm_type='ln', hidden_dim=None(=input_dim), output_dim=768.
+- PAFALoss: PCSL = intra-patient variance / sum of squared distances between patient centroids, GPAL = mean squared
+  distance of the centroids to the global centroid; returns lambda_pcsl*PCSL + lambda_gpal*GPAL.
+  0 if the batch contains only one patient (constant with requires_grad=True).
 """
 import torch
 import torch.nn as nn

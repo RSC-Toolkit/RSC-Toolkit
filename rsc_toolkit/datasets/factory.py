@@ -1,20 +1,20 @@
 """
-raw 데이터셋(다운로드·인덱스·CLI) 등록소 — 하위호환 창구.
+Registry of raw datasets (download, index, CLI) -- backward-compatible entry point.
 
-등록의 원천은 `rsc_toolkit.registries.DATASETS` (공용 Registry) 다. 데이터셋 모듈은 데코레이터로 등록한다:
+The source of truth is `rsc_toolkit.registries.DATASETS` (shared Registry). Dataset modules register with a decorator:
 
     from rsc_toolkit.datasets.factory import DatasetFactory
     @DatasetFactory.register_dataset_class("icbhi")
     class ICBHIDataset(BaseRSCDataset): ...
 
-    from rsc_toolkit.registries import DATASETS   # 같은 것
+    from rsc_toolkit.registries import DATASETS   # same thing
     @DATASETS.register("heartsound")
     class HeartSoundDataset(BaseRSCDataset): ...
 
-내장 4종(icbhi · sprsound · hflungv1 · toy)은 허브에 lazy 로 선언돼 있어 파일명 규약과 무관하게 항상 보인다.
-패키지 안의 `*_dataset*` 모듈 스캔(register_datasets)은 예전 규약의 하위호환으로 유지하고, 외부 패키지는
-엔트리포인트 `rsc_toolkit.plugins` / `RSC_TOOLKIT_PLUGINS` 로 붙는다 (rsc_toolkit.registry 참조).
-같은 이름에 다른 클래스를 등록하면 ValueError — 예전의 침묵 덮어쓰기는 폐지했다.
+The 4 built-in datasets (icbhi, sprsound, hflungv1, toy) are declared lazily in the hub, so they are always visible regardless of file naming.
+Scanning package modules named `*_dataset*` (register_datasets) is kept for backward compatibility with the old convention; external packages
+attach via the `rsc_toolkit.plugins` entry point / `RSC_TOOLKIT_PLUGINS` (see rsc_toolkit.registry).
+Registering a different class under an existing name raises ValueError (no silent overwrite).
 """
 from __future__ import annotations
 
@@ -33,14 +33,14 @@ _SCANNED = False
 
 
 class DatasetFactory:
-    # Mapping (keys() 가 CLI choices) — 엔트리포인트 데이터셋도 자동으로 나타난다.
+    # Mapping (keys() are the CLI choices) -- entry-point datasets show up automatically.
     datasets: Registry = DATASETS
 
     @staticmethod
     def register_datasets() -> None:
         """
-        rsc_toolkit.datasets 아래 이름에 "_dataset" 이 들어간 모듈(하위 패키지 포함)을 import 해
-        데코레이터가 실행되게 하고, 플러그인을 읽는다. 멱등. import 실패는 모듈 단위로 경고만 남긴다.
+        Import modules under rsc_toolkit.datasets whose names contain "_dataset" (subpackages included) so their
+        decorators run, then load plugins. Idempotent. Import failures only log a warning per module.
         """
         global _SCANNED
         if _SCANNED:
@@ -53,12 +53,12 @@ class DatasetFactory:
             try:
                 importlib.import_module(name)
             except Exception as exc:
-                # ImportError 만 삼키면 내부 오타(NameError 등)가 스캔 전체를 중단시킨다 — 모듈 단위 격리 + 기록
-                # (registry.Registry._scan_package 와 같은 원칙, REVIEW 2026-09-10 §1 P2).
+                # Swallowing only ImportError would let an internal typo (NameError, etc.) abort the whole scan -- isolate per module + record
+                # (same principle as registry.Registry._scan_package).
                 DATASETS._failed[name] = f"{type(exc).__name__}: {exc}"
                 logger.log(logging.WARNING if isinstance(exc, ImportError) else logging.ERROR,
-                           "데이터셋 모듈 %s 을 불러오지 못해 등록에서 제외한다 (%s): %s", name,
-                           "선택 의존성 누락?" if isinstance(exc, ImportError) else "모듈 내부 오류", exc)
+                           "Dataset module %s could not be imported and is excluded from registration (%s): %s", name,
+                           "missing optional dependency?" if isinstance(exc, ImportError) else "error inside the module", exc)
 
         for _, module_name, is_pkg in pkgutil.iter_modules(package.__path__):
             if "_dataset" in module_name:
@@ -69,7 +69,7 @@ class DatasetFactory:
             try:
                 subpackage = importlib.import_module(f"rsc_toolkit.datasets.{module_name}")
             except ImportError as exc:
-                logger.warning("데이터셋 하위 패키지 %s 을 불러오지 못했다: %s", module_name, exc)
+                logger.warning("Could not import dataset subpackage %s: %s", module_name, exc)
                 continue
             if not hasattr(subpackage, "__path__"):
                 continue
@@ -81,7 +81,7 @@ class DatasetFactory:
 
     @classmethod
     def register_dataset_class(cls, dataset_name: str) -> Callable[[Type[BaseRSCDataset]], Type[BaseRSCDataset]]:
-        """클래스 데코레이터. 같은 이름에 다른 클래스를 다시 등록하면 ValueError (같은 클래스는 멱등)."""
+        """Class decorator. Re-registering a different class under the same name raises ValueError (same class is idempotent)."""
         return DATASETS.register(dataset_name)
 
     @classmethod
@@ -90,4 +90,4 @@ class DatasetFactory:
 
     @classmethod
     def get_dataset_class(cls, dataset_name: str) -> Type[BaseRSCDataset]:
-        return DATASETS.get(dataset_name)  # 미지 이름: KeyError("Unknown dataset '...'. Available: [...]")
+        return DATASETS.get(dataset_name)  # unknown name: KeyError("Unknown dataset '...'. Available: [...]")

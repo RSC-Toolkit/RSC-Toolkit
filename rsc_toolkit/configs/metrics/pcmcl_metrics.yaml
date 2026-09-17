@@ -1,5 +1,5 @@
-# PC-MCL: 학습 배치 라벨이 3-label float 라 train 메트릭 없음. 검증은 모델이 3-sigmoid→4-class one-hot (B,4) 를
-# 돌려주므로 기존 ICBHIScore(argmax) 를 그대로 쓴다 (conversion.py 규칙은 모델 안에서 적용).
+# PC-MCL: train batch labels are 3-label floats, so there are no train metrics. For validation the model returns 3-sigmoid → 4-class one-hot (B,4),
+# so the existing ICBHIScore (argmax) is used as is (the conversion.py rules are applied inside the model).
 train: []
 
 val:

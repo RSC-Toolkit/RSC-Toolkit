@@ -1,5 +1,5 @@
-# DDE-MAE 논문 Table 1 B2: Audio-MAE(AS-2M) 인코더 + CE 직접 미세조정 (앵커 64.47/50.72/57.59±0.91) — 논문 명세 재구현·가정 런.
-#   50 ep, bs 8(가정), AdamW 1e-3/wd 5e-4, 스케줄 없음(가정), plain CE, 4 kHz fbank(가정), best-on-test Score.
+# DDE-MAE paper Table 1 B2: Audio-MAE (AS-2M) encoder + direct CE fine-tuning (paper-reported 64.47/50.72/57.59±0.91) — re-implementation from the paper specification (assumption run).
+#   50 ep, bs 8 (assumed), AdamW 1e-3/wd 5e-4, no schedule (assumed), plain CE, 4 kHz fbank (assumed), best-on-test Score.
 #   rsctk: .venv/bin/python -m rsc_toolkit.train --config-name dde_icbhi_b2 seed=1 run.name=icbhi-ddemae-b2-s1
 defaults:
   - model: audiomae_dde_cls

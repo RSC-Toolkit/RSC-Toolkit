@@ -1,32 +1,32 @@
 """
-meta(도메인) 라벨 — sgscl 계열(DAT·SG-SCL)·PAFA·SCL-metadata 학습이 쓰는 보조 라벨.
+meta (domain) labels -- auxiliary labels used by sgscl-family (DAT, SG-SCL), PAFA and SCL-metadata training.
 
-`data.params.meta_label_mode` 의 값은 `rsc_toolkit.registries.META_LABELS` 의 이름이다. 등록된 객체는
-**팩토리**(인자 없이 불러 `item -> int` 함수를 돌려준다). 내장 4 mode 는 아래에 있고 허브에 lazy 로
-선언돼 있다; 서드파티는 데코레이터로 붙인다:
+Values of `data.params.meta_label_mode` are names in `rsc_toolkit.registries.META_LABELS`. A registered object is a
+**factory** (called without arguments, it returns an `item -> int` function). The 4 built-in modes are defined below and declared
+lazily in the hub; third parties attach theirs with the decorator:
 
     from rsc_toolkit.registries import META_LABELS
     @META_LABELS.register("hospital")
     def build_hospital():
         return lambda item: int(item["meta"]["hospital"])
 
-원본 sgscl util/icbhi_util.py get_meta_infor() 의 매핑을 따른다. 논문·스크립트가 실제로 쓰는 것은
-'dev'(청진기 장비 4종)·'patient'(PAFA)·'sa'/'sa_sprs'(SCL-metadata) 뿐이다.
+Follows the mapping of get_meta_infor() in the original sgscl util/icbhi_util.py. The modes actually used by the papers/scripts are only
+'dev' (4 stethoscope devices), 'patient' (PAFA) and 'sa'/'sa_sprs' (SCL-metadata).
 """
 from __future__ import annotations
 
 from typing import Any, Callable, Dict, Mapping
 
-# 원본 icbhi_dataset.py:41 — device_to_id (meta_cls_list 순서와 동일)
+# Original icbhi_dataset.py:41 -- device_to_id (same order as meta_cls_list)
 ICBHI_DEVICE_TO_ID = {"Meditron": 0, "LittC2SE": 1, "Litt3200": 2, "AKGC417L": 3}
 
 MetaLabelFn = Callable[[Dict[str, Any]], int]
 
 
 class UnknownMetaLabelMode(KeyError, NotImplementedError):
-    """미지 meta_label_mode. (registry 의 KeyError 이면서, 예전 호출자가 기대하던 NotImplementedError 이기도 하다.)"""
+    """Unknown meta_label_mode. (Both the registry's KeyError and the NotImplementedError expected by legacy callers.)"""
 
-    def __str__(self) -> str:  # KeyError 는 repr 로 감싸므로 메시지를 그대로 보여준다
+    def __str__(self) -> str:  # KeyError wraps the message in repr, so show the message as-is
         return str(self.args[0]) if self.args else ""
 
 
@@ -39,19 +39,19 @@ def _num(v):
 
 
 def _is_adult(meta: Mapping[str, Any]) -> bool:
-    """ICBHI 메타: 성인은 adult_BMI, 소아는 child_weight/child_height 가 기재된다; 둘 다 없으면 나이 19세 기준."""
+    """ICBHI meta: adults have adult_BMI, children have child_weight/child_height; if neither is present, age 19 is the threshold."""
     if _num(meta.get("adult_BMI")) is not None:
         return True
     if _num(meta.get("child_weight")) is not None or _num(meta.get("child_height")) is not None:
         return False
     age = _num(meta.get("age"))
-    # 메타가 전혀 없는 환자(ICBHI 223)는 원본 metadata.csv 가 M·A(=0) 로 둔다 → 결측은 성인으로
+    # A patient with no metadata at all (ICBHI 223) is M/A (=0) in the original metadata.csv -> missing is treated as adult
     return age is None or age >= 19
 
 
-# ── 내장 mode 팩토리 (registries.META_LABELS 에 lazy 선언) ──────────────────────────────────
+# ── built-in mode factories (declared lazily in registries.META_LABELS) ──────────────────────────────────
 def build_dev() -> MetaLabelFn:
-    """mode="dev": ICBHI 청진기 장비 → {Meditron:0, LittC2SE:1, Litt3200:2, AKGC417L:3}."""
+    """mode="dev": ICBHI stethoscope device -> {Meditron:0, LittC2SE:1, Litt3200:2, AKGC417L:3}."""
 
     def fn(item: Dict[str, Any]) -> int:
         device = str(item["meta"]["device"])
@@ -59,15 +59,15 @@ def build_dev() -> MetaLabelFn:
             return ICBHI_DEVICE_TO_ID[device]
         except KeyError:
             raise KeyError(
-                f"알 수 없는 device {device!r} (sample_id={item.get('sample_id')!r}); "
-                f"기대값: {sorted(ICBHI_DEVICE_TO_ID)}"
+                f"unknown device {device!r} (sample_id={item.get('sample_id')!r}); "
+                f"expected: {sorted(ICBHI_DEVICE_TO_ID)}"
             ) from None
 
     return fn
 
 
 def build_patient() -> MetaLabelFn:
-    """mode="patient": PAFA(wa976/PAFA icbhi_dataset.py) — 파일명 앞 환자 번호를 정수 그대로 쓴다."""
+    """mode="patient": PAFA (wa976/PAFA icbhi_dataset.py) -- the patient number at the start of the file name, used as an integer."""
 
     def fn(item: Dict[str, Any]) -> int:
         return int(item["meta"]["patient_id"])
@@ -76,11 +76,11 @@ def build_patient() -> MetaLabelFn:
 
 
 def build_sa() -> MetaLabelFn:
-    """mode="sa": SCL-metadata(ilyassmoummad/scl_icbhi2017) metadata.csv 의 sa_class_num.
+    """mode="sa": sa_class_num from SCL-metadata (ilyassmoummad/scl_icbhi2017) metadata.csv.
 
-    성별(M/F) x 연령군(A=성인, C=소아) → M·A 0, F·A 1, F·C 2, M·C 3.
-    A/C 는 ICBHI 메타의 성인(BMI 기재)/소아(신장·체중 기재) 구분 (나이 19세 경계와 일치).
-    결측(환자 223: 성별·나이 없음)은 원본 CSV 대로 M·A → 0. 전 6898 cycle 대조로 확인.
+    sex (M/F) x age group (A=adult, C=child) -> M/A 0, F/A 1, F/C 2, M/C 3.
+    A/C follows the adult (BMI recorded) / child (height and weight recorded) distinction in ICBHI meta (consistent with the age-19 threshold).
+    Missing (patient 223: no sex or age) is M/A -> 0, as in the original CSV. Verified against all 6898 cycles.
     """
 
     def fn(item: Dict[str, Any]) -> int:
@@ -96,10 +96,10 @@ def build_sa() -> MetaLabelFn:
 
 
 def build_sa_sprs() -> MetaLabelFn:
-    """mode="sa_sprs": SCL-metadata SPRS metadata.csv 의 sa_class_num.
+    """mode="sa_sprs": sa_class_num from the SCL-metadata SPRS metadata.csv.
 
-    gender(0/1) x age_group(0: <5세, 1: ≥5세) → gender*2 + age_group
-    (train 분포 2004/1558/1527/1567; age_group 경계 4.9 | 5.0 — 원본 CSV 전수 대조로 확인)
+    gender(0/1) x age_group(0: <5 years, 1: >=5 years) -> gender*2 + age_group
+    (train distribution 2004/1558/1527/1567; age_group boundary 4.9 | 5.0 -- verified against the full original CSV)
     """
 
     def fn(item: Dict[str, Any]) -> int:
@@ -114,8 +114,8 @@ def build_sa_sprs() -> MetaLabelFn:
 
 def build_meta_label_fn(mode: str) -> MetaLabelFn:
     """
-    IndexDataset 아이템(meta dict 포함)에서 meta 라벨 정수를 뽑는 함수를 만든다.
-    mode 는 META_LABELS 의 이름(내장: dev · patient · sa · sa_sprs, 또는 플러그인 등록 이름).
+    Build a function that extracts the integer meta label from an IndexDataset item (with meta dict).
+    mode is a name in META_LABELS (built-in: dev, patient, sa, sa_sprs, or a plugin-registered name).
     """
     from rsc_toolkit.registries import META_LABELS
 
@@ -123,7 +123,7 @@ def build_meta_label_fn(mode: str) -> MetaLabelFn:
         factory = META_LABELS.get(mode)
     except KeyError:
         raise UnknownMetaLabelMode(
-            f"meta_label_mode={mode!r} 는 지원하지 않는다. Available: {sorted(META_LABELS)}. "
-            "필요하면 META_LABELS.register 로 팩토리를 등록하라 (원본 get_meta_infor 매핑 참조)."
+            f"meta_label_mode={mode!r} is not supported. Available: {sorted(META_LABELS)}. "
+            "Register a factory with META_LABELS.register if needed (see the original get_meta_infor mapping)."
         ) from None
     return factory()

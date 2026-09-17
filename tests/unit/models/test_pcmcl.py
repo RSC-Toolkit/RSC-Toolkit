@@ -1,9 +1,9 @@
 """
-PC-MCL(arXiv 2601.17080, wa976/PC-MCL) P0 골든·구성 테스트.
+Official-code parity golden and configuration tests for PC-MCL (arXiv 2601.17080, wa976/PC-MCL).
 
-골든 출처: scripts/reproduction/dump_pcmcl_goldens.py — 공식 util/dataset_pcmcl.py·icbhi_util.py·augmentation.py·method/conversion.py·
-models/BEATs(실제 iter3+ AS2M ckpt)·models/AST(timm 0.4.5 참조 venv, AudioSet 10/10 ckpt, 헤드 det_fill) 를 최소 패치로 실행한 결과.
-골든/ckpt/ICBHI 인덱스가 없으면 해당 테스트는 skip.
+Golden source: scripts/reproduction/dump_pcmcl_goldens.py — results of running the official util/dataset_pcmcl.py, icbhi_util.py, augmentation.py, method/conversion.py,
+models/BEATs (real iter3+ AS2M ckpt) and models/AST (timm 0.4.5 reference venv, AudioSet 10/10 ckpt, head det_fill) with minimal patches.
+Tests are skipped when the golden/ckpt/ICBHI index is missing.
 """
 import pathlib
 import random
@@ -27,7 +27,7 @@ def _repo_root() -> pathlib.Path:
     for c in pathlib.Path(__file__).resolve().parents:
         if (c / "pyproject.toml").exists():
             return c
-    raise RuntimeError("리포 루트를 찾지 못했다")
+    raise RuntimeError("repository root not found")
 
 
 REPO = _repo_root()
@@ -37,10 +37,10 @@ SPLIT = REPO / "rsc_toolkit/datasets/icbhi/data/official_split.txt"
 BEATS_CKPT = REPO / "pretrained_models/upstream/BEATs_iter3_plus_AS2M.pt"
 AST_CKPT = REPO / "pretrained_models/upstream/audioset_0.4593.pth"
 
-needs = lambda name: pytest.mark.skipif(not (GOLDEN / name).exists(), reason=f"골든 {name} 없음")  # noqa: E731
-needs_icbhi = pytest.mark.skipif(not ICBHI.exists(), reason="ICBHI 인덱스 없음")
-needs_beats = pytest.mark.skipif(not BEATS_CKPT.exists(), reason="BEATs ckpt 없음")
-needs_ast = pytest.mark.skipif(not AST_CKPT.exists(), reason="AudioSet AST ckpt 없음")
+needs = lambda name: pytest.mark.skipif(not (GOLDEN / name).exists(), reason=f"golden {name} missing")  # noqa: E731
+needs_icbhi = pytest.mark.skipif(not ICBHI.exists(), reason="ICBHI index missing")
+needs_beats = pytest.mark.skipif(not BEATS_CKPT.exists(), reason="BEATs ckpt missing")
+needs_ast = pytest.mark.skipif(not AST_CKPT.exists(), reason="AudioSet AST ckpt missing")
 
 
 def _det_fill(t):
@@ -51,7 +51,7 @@ def _det_fill(t):
 @pytest.fixture(scope="module")
 def train_ds():
     if not ICBHI.exists():
-        pytest.skip("ICBHI 인덱스 없음")
+        pytest.skip("ICBHI index missing")
     from rsc_toolkit.datasets.pcmcl_concat import PCMCLConcatDataset
 
     return PCMCLConcatDataset(index_csv=ICBHI, data_root=REPO / ".datasets/icbhi", split_file=SPLIT, split="train",
@@ -59,12 +59,12 @@ def train_ds():
                               cache_dir=REPO / "outputs/pcmcl/cache")
 
 
-# ------------------------------------------------------------------ 라벨 변환/손실 (골든 불필요)
+# ------------------------------------------------------------------ label conversion/loss (no golden needed)
 def test_label_conversion_rules():
     y4 = torch.tensor([0, 1, 2, 3])
     assert torch.equal(label4_to_multilabel(y4), torch.tensor([[1., 0, 0], [0, 1, 0], [0, 0, 1], [0, 1, 1]]))
     combos = torch.tensor([[i, j, k] for i in (0, 1) for j in (0, 1) for k in (0, 1)])
-    # conversion.py additive: [1,0,0]→0, c&w→3, c→1, w→2, 전부 0→0, normal+c→1, normal+w→2
+    # conversion.py additive: [1,0,0]->0, c&w->3, c->1, w->2, all 0->0, normal+c->1, normal+w->2
     assert multilabel_binary_to_label4(combos).tolist() == [0, 2, 1, 3, 0, 2, 1, 3]
     logits = torch.tensor([[5., -5, -5], [-5, 5, 5], [5, 5, -5], [-5, -5, -5]])
     onehot = multilabel_logits_to_onehot4(logits, 0.5)
@@ -86,7 +86,7 @@ def test_pm_head_layout():
     assert hs(torch.randn(3, 768)).shape == (3, 2)
 
 
-# ------------------------------------------------------------------ 데이터셋
+# ------------------------------------------------------------------ dataset
 @needs("dataset.pt")
 @needs_icbhi
 def test_dataset_structure_matches_reference(train_ds):
@@ -104,14 +104,14 @@ def test_dataset_structure_matches_reference(train_ds):
     assert [c["original_label"] for c in ds.all_cycles] == m["cycle_labels"]
     assert [c["length"] for c in ds.all_cycles] == m["cycle_lengths"]
     assert [list(c) for c in ds.mixing_combinations] == m["combinations"]
-    for i, raw in enumerate(g["raw_cycles"]):  # 원 길이 사이클 (fade 1/16 + 절단)
+    for i, raw in enumerate(g["raw_cycles"]):  # original-length cycles (fade 1/16 + truncation)
         assert torch.equal(ds.all_cycles[i]["audio"], raw), i
 
 
 @needs("dataset.pt")
 @needs_icbhi
 def test_dataset_sample_sequence_matches_reference(train_ds):
-    """같은 seed·같은 인덱스 열에서 원본(python random) 과 동일한 연결/PM 샘플이 나온다."""
+    """With the same seed and index sequence, the same concatenation/PM samples as the original (python random) come out."""
     g = torch.load(GOLDEN / "dataset.pt", weights_only=False)
     ds = train_ds
     ds.reseed(g["meta"]["seed"])
@@ -134,7 +134,7 @@ def test_dataset_sample_sequence_matches_reference(train_ds):
 @needs("dataset.pt")
 @needs_icbhi
 def test_test_split_cut_pad_matches_reference():
-    """평가 경로: IndexDataset(fade) + repeat_fade 10 s == 원본 테스트 사이클 cut_pad."""
+    """Evaluation path: IndexDataset(fade) + repeat_fade 10 s == original test-cycle cut_pad."""
     from rsc_toolkit.datasets.index_dataset import IndexDataset
     from rsc_toolkit.processors.audio import AudioPreprocessConfig, AudioPreprocessor
 
@@ -144,7 +144,7 @@ def test_test_split_cut_pad_matches_reference():
                       split="test", split_file=SPLIT, audio_preprocessor=pre, fade=True)
     assert len(ds) == g["meta"]["test_n_cycles"]
     stems = [pathlib.Path(p).stem for p in ds.df["recording_path"]]
-    assert stems[:20] == g["meta"]["test_cycle_filenames_head"]     # 인덱스 순서 == 원본 정렬 순서
+    assert stems[:20] == g["meta"]["test_cycle_filenames_head"]     # index order == original sort order
     for t in g["test_samples"]:
         item = ds[t["index"]]
         assert item["label"] == t["original_label"] and stems[t["index"]] == t["filename"]
@@ -160,15 +160,15 @@ def test_paper_intent_flags_change_pairing():
               enable_ssl=True, ssl_prob=0.3, rng_seed=1, cache_dir=REPO / "outputs/pcmcl/cache")
     quirk = PCMCLConcatDataset(patient_id_mode="recording", hard_negative_mode="dict_order", **kw)
     paper = PCMCLConcatDataset(patient_id_mode="patient", hard_negative_mode="random_profile", **kw)
-    assert len(quirk.patient_cycles) > len(paper.patient_cycles)          # 녹음(539) vs 환자 단위
+    assert len(quirk.patient_cycles) > len(paper.patient_cycles)          # recording (539) vs patient level
     assert all(len(k.split("_")) == 5 for k in quirk.patient_cycles) and all("_" not in k for k in paper.patient_cycles)
     n = len(quirk.all_cycles)
     infos_q = [quirk.get_sample(i) for i in range(n, n + 60)]
     negs_q = [d["sample"]["mix_info"] for d in infos_q if d["ssl_label"] == 0]
-    assert negs_q and all(m == "hard_negative_normal_only" for m in negs_q)   # quirk: dict 첫 그룹만
+    assert negs_q and all(m == "hard_negative_normal_only" for m in negs_q)   # quirk: only the first dict group
     infos_p = [paper.get_sample(i) for i in range(n, n + 200)]
     negs_p = {d["sample"]["mix_info"] for d in infos_p if d["ssl_label"] == 0}
-    assert len(negs_p) > 1                                                    # 프로필 무작위
+    assert len(negs_p) > 1                                                    # random profile
     basic = PCMCLConcatDataset(hard_negative_mode="basic", **kw)
     assert all(d["sample"]["mix_info"] == "basic_negative" for d in (basic.get_sample(i) for i in range(n, n + 40)) if d["ssl_label"] == 0)
 
@@ -185,7 +185,7 @@ def test_ablation_modes(train_ds):
     assert len(single) == 2 * len(single.all_cycles) and single.n_ssl == 0
     x, y, ssl = single[len(single.all_cycles)]
     assert y.dtype == torch.long and int(y) in (0, 1, 2, 3) and int(ssl) == -1
-    assert [len(c) for c in single.classwise_cycle_list] == [2063, 1215, 501, 363]  # 공식 train 4-class 분포 (dominant 라벨)
+    assert [len(c) for c in single.classwise_cycle_list] == [2063, 1215, 501, 363]  # official train 4-class distribution (dominant label)
 
 
 @needs("fbank_input.pt")
@@ -220,7 +220,7 @@ def test_conversion_and_score_match_reference():
     assert abs(sp - g["sp"]) < 1e-9 and abs(se - g["se"]) < 1e-9 and abs(sc - g["score"]) < 1e-9
 
 
-# ------------------------------------------------------------------ 모델
+# ------------------------------------------------------------------ model
 def _check_heads_and_loss(m, g, feats_ours, atol):
     for p in m.classifier.parameters():
         _det_fill(p)
@@ -231,7 +231,7 @@ def _check_heads_and_loss(m, g, feats_ours, atol):
         ssl_logits = m.pm_head(feats_ours)
     assert torch.allclose(logits3, g["logits3"], atol=atol), (logits3 - g["logits3"]).abs().max()
     assert torch.allclose(ssl_logits, g["ssl_logits"], atol=atol)
-    # 손실: (1-w)·BCE + w·CE(mask) — 학습 경로 그대로 (골든은 eval 특징이라 dropout 을 끈 채 eval 로 대조; PM 손실은 meta_labels 유무로 결정된다)
+    # loss: (1-w)·BCE + w·CE(mask) — same as the training path (the golden uses eval features, so compare in eval with dropout off; the PM loss depends on whether meta_labels is given)
     m.eval()
     m.ssl_weight, m.loss_combine = 0.1, "code"
     with torch.no_grad():
@@ -241,7 +241,7 @@ def _check_heads_and_loss(m, g, feats_ours, atol):
     with torch.no_grad():
         _, loss_p = m.training_forward(g_input(g), g["labels3"], nn.BCEWithLogitsLoss(), meta_labels=g["ssl_labels"])
     assert torch.allclose(loss_p, g["loss_paper_a0.1"], rtol=1e-3, atol=1e-4)
-    # 검증 경로: 4-class long → one-hot (B,4) + 3-label BCE
+    # validation path: 4-class long -> one-hot (B,4) + 3-label BCE
     with torch.no_grad():
         onehot, vloss = m.training_forward(g_input(g), torch.tensor([0, 3]), nn.BCEWithLogitsLoss())
     assert onehot.shape == (2, 4) and set(onehot.sum(1).tolist()) == {1.0}
@@ -300,7 +300,7 @@ def test_beats_pcmcl_training_step_shapes():
     assert logits.shape == (3, 3) and loss.requires_grad
     loss.backward()
     assert m.pm_head.ssl_classifier.weight.grad is not None and m.classifier.weight.grad is not None
-    # PM 라벨이 전부 -1 이면 결합 없이 BCE 만 (원본 ssl_mask.sum()==0)
+    # if all PM labels are -1, BCE only without combination (original ssl_mask.sum()==0)
     _, loss2 = m.training_forward(wav, y, nn.BCEWithLogitsLoss(), meta_labels=torch.tensor([-1, -1, -1]))
     assert torch.isfinite(loss2)
     single = BEATsPCMCL(n_cls=4, label_mode="single", enable_ssl=True)
@@ -317,14 +317,14 @@ def test_train_collate_and_adapter_contract(train_ds):
     batch = pcmcl_train_collate([train_ds[0], train_ds[n], train_ds[len(train_ds) - 1]])
     x, y, ssl = batch
     assert x.shape == (3, 160000) and y.shape == (3, 3) and y.dtype == torch.float32 and ssl.dtype == torch.long
-    assert x.squeeze(1).shape == x.shape                                       # PLAdapter batch[0].squeeze(1) 무해
+    assert x.squeeze(1).shape == x.shape                                       # PLAdapter batch[0].squeeze(1) is harmless
     assert int(ssl[0]) == -1 and int(ssl[1]) == -1 and int(ssl[2]) in (0, 1)
 
 
-@pytest.mark.skipif(not pathlib.Path("pretrained_models/upstream/BEATs_iter3_plus_AS2M.pt").exists(), reason="BEATs 체크포인트 없음")
+@pytest.mark.skipif(not pathlib.Path("pretrained_models/upstream/BEATs_iter3_plus_AS2M.pt").exists(), reason="BEATs checkpoint missing")
 def test_multilabel_model_rejects_integer_labels_in_training_mode():
-    """P2-7: 학습 모드에서 정수 라벨(datamodule concat_single + label_mode=multilabel 오조합)은 조용히 검증 경로로
-    흐르지 않고 TypeError 로 멈춘다. 검증 모드의 정수 라벨(one-hot 경로)은 그대로다."""
+    """In training mode, integer labels (misconfigured datamodule concat_single + label_mode=multilabel) do not silently flow into the validation path
+    but stop with TypeError. Integer labels in validation mode (one-hot path) are unchanged."""
     import pytest
     from rsc_toolkit.models.beats_pcmcl import BEATsPCMCL
 

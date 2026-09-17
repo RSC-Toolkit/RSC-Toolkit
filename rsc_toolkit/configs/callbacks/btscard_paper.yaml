@@ -1,6 +1,6 @@
 # @package _global_
-# BTS-CARD 학습 프로토콜 콜백 (공식 스크립트 scripts/icbhi_*.sh: 15 ep, MA 0.5 매 step(판별기·상수 제외), cosine 5e-5,
-# ICBHI 공식 test 기준 best(Score 최고 & Se>5) — 원본은 α별 11개 best 를 저장하지만 툴킷은 α=0 고정 단일 best).
+# BTS-CARD training-protocol callbacks (official scripts scripts/icbhi_*.sh: 15 ep, MA 0.5 every step (excluding discriminators and constants), cosine 5e-5,
+# best on the official ICBHI test set (best Score & Se>5) — the official code saves 11 bests, one per α; the toolkit fixes α=0 with a single best).
 trainer:
   params:
     callbacks:

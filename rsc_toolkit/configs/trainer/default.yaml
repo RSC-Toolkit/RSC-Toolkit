@@ -1,9 +1,9 @@
 params:
   max_epochs: 50
-  # Lightning 기본 ModelCheckpoint 비활성화 (2026-08-29): 검증 가중치는 ICBHIBestScoreCheckpoint 가
-  # outputs/<run>/best.pth 로, 재개용은 EpochResumeCheckpoint 가 trainer.save_checkpoint 로 직접 저장한다.
-  # 기본 저장물(lightning_logs/<run>/version_*/checkpoints/epoch=*.ckpt, run 당 ~1 GB)은 아무도 참조하지
-  # 않으면서 268 GB 를 차지해 삭제했다. TensorBoard 로그(tfevents)는 그대로 남는다.
+  # Lightning's default ModelCheckpoint is disabled: validation weights are saved by ICBHIBestScoreCheckpoint to
+  # outputs/<run>/best.pth, and resume checkpoints by EpochResumeCheckpoint directly via trainer.save_checkpoint.
+  # The default artifacts (lightning_logs/<run>/version_*/checkpoints/epoch=*.ckpt, ~1 GB per run) are never referenced
+  # and only take disk space. TensorBoard logs (tfevents) are still written.
   enable_checkpointing: false
   accelerator: auto
   devices: 1
@@ -14,6 +14,6 @@ params:
     save_dir: lightning_logs
     name: ${run.name}
 
-  # 콜백은 여기 인라인으로 두지 않고 `callbacks` config 그룹에서 고른다.
-  # (configs/callbacks/{ema,none}.yaml — 상위 config 의 defaults 목록 참고)
+  # Callbacks are not inlined here; they are selected from the `callbacks` config group.
+  # (configs/callbacks/{ema,none}.yaml — see the defaults list of the top-level config)
   callbacks: []

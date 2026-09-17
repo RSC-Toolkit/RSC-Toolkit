@@ -1,11 +1,11 @@
 """
-BTS 저자 체크포인트(best.pth)를 툴킷 BTSModel 에 그대로 로드해 공식 test 셋(test.pt)을
-평가한다 — 구조·텍스트 파이프라인·데이터가 원본과 같다면 README 수치
-(Sp 82.58 / Se 45.11 / Score 63.85) 가 나와야 한다 (P0 체크포인트 로드 동일성).
+Loads the BTS authors' checkpoint (best.pth) into the toolkit BTSModel as-is and evaluates the official test set (test.pt)
+— if the architecture, text pipeline and data match the original, the README numbers
+(Sp 82.58 / Se 45.11 / Score 63.85) must come out (checkpoint-load equivalence with the official code).
 
   .venv/bin/python scripts/reproduction/eval_bts_checkpoint.py [--device cuda:1] [--amp]
 
---amp: 원본 validate 처럼 autocast(fp16) 로 평가 (기본은 fp32).
+--amp: evaluate with autocast (fp16) like the original validate (default: fp32).
 """
 import argparse
 import json
@@ -18,7 +18,7 @@ from rsc_toolkit.models.bts import BTSModel
 
 
 def get_score(hits, counts):
-    """원본 util/icbhi_util.py get_score — Sp = 정상 정확도, Se = 비정상 정확도, Score = 평균."""
+    """Original util/icbhi_util.py get_score — Sp = normal-class accuracy, Se = abnormal-class accuracy, Score = mean."""
     sp = hits[0] / counts[0] * 100
     se = sum(hits[1:]) / sum(counts[1:]) * 100
     return sp, se, (sp + se) / 2
@@ -31,7 +31,7 @@ def main():
     ap.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
     ap.add_argument("--batch_size", type=int, default=8)
     ap.add_argument("--amp", action="store_true")
-    ap.add_argument("--out", default=None, help="결과 json 저장 경로")
+    ap.add_argument("--out", default=None, help="path to save the result json")
     args = ap.parse_args()
 
     model = BTSModel(n_cls=4, meta_mode="all")

@@ -1,10 +1,10 @@
-"""`rsctk datasets …` 서브커맨드 (download · preprocess · build-index · validate).
+"""`rsctk datasets ...` subcommands (download, preprocess, build-index, validate).
 
-리팩토링 P1 8단계에서 `rsc_toolkit/datasets/__init__.py` 에서 분리했다 — DatasetFactory 만 쓰려는 import 가
-argparse·hydra 코드를 끌고 오지 않도록. `__init__` 은 하위호환으로 여기 이름들을 재수출한다.
+Kept separate from `rsc_toolkit/datasets/__init__.py` so that imports that only need DatasetFactory
+do not pull in argparse/hydra code. `__init__` re-exports these names for backward compatibility.
 
-preprocess 의 데이터 config 는 패키지 내부 `rsc_toolkit/configs/data/*.yaml` 이 기본이고, `--config_dir` 로
-외부 디렉터리(hydra searchpath)를 더할 수 있다 — 학습 경로의 `--config-dir` 와 대칭.
+The data config for preprocess defaults to the package-internal `rsc_toolkit/configs/data/*.yaml`; `--config_dir`
+adds an external directory (hydra searchpath) -- symmetric with `--config-dir` on the training path.
 """
 from __future__ import annotations
 
@@ -57,7 +57,7 @@ def _configure_processor_raw_data_directory(
 
 
 def _dataset_choices():
-    # Mapping keys — 엔트리포인트/플러그인으로 등록한 데이터셋도 자동으로 나타난다.
+    # Mapping keys -- datasets registered via entry points/plugins show up automatically.
     return sorted(DatasetFactory.datasets.keys())
 
 
@@ -75,18 +75,18 @@ def build_parser(subparsers):
 
     preprocess_parser = dataset_subparsers.add_parser(
         "preprocess",
-        help="학습 config(configs/data/*.yaml) 기준으로 피처 캐시를 미리 채운다 (예: CLAP 임베딩)",
+        help="Pre-fill the feature cache from a training config (configs/data/*.yaml) (e.g. CLAP embeddings)",
     )
     preprocess_parser.add_argument("dataset", choices=_dataset_choices())
     preprocess_parser.add_argument(
         "--data_config",
         default=None,
-        help="사용할 데이터 config 이름 (rsc_toolkit/configs/data/<이름>.yaml 또는 --config_dir 의 data/<이름>.yaml, 기본: dataset 이름)",
+        help="Data config name to use (rsc_toolkit/configs/data/<name>.yaml or data/<name>.yaml under --config_dir; default: dataset name)",
     )
     preprocess_parser.add_argument(
         "--config_dir",
         default=None,
-        help="추가 hydra config 탐색 디렉터리 — 외부 패키지의 data config 를 쓸 때 (학습의 --config-dir 와 대칭)",
+        help="Extra hydra config search directory -- for data configs from an external package (symmetric with --config-dir in training)",
     )
     preprocess_parser.add_argument("--project_root", default=None, help="Base directory for relative paths (defaults to repo root)")
     preprocess_parser.add_argument(
@@ -98,12 +98,12 @@ def build_parser(subparsers):
         "--sample_level",
         choices=["cycle", "clip"],
         default=None,
-        help="config 의 sample_level 재정의 (기본: config 값)",
+        help="Override the config's sample_level (default: config value)",
     )
-    preprocess_parser.add_argument("--workers", type=int, default=None, help="피처 계산 DataLoader 워커 수 (기본: config 값)")
-    preprocess_parser.add_argument("--batch_size", type=int, default=None, help="피처 계산 배치 크기 (기본: config 값)")
-    preprocess_parser.add_argument("--cache_dir", default=None, help="피처 캐시 디렉토리 재정의 (기본: config 값)")
-    preprocess_parser.add_argument("--force", action="store_true", help="이 설정의 기존 캐시를 지우고 전부 다시 계산")
+    preprocess_parser.add_argument("--workers", type=int, default=None, help="DataLoader workers for feature computation (default: config value)")
+    preprocess_parser.add_argument("--batch_size", type=int, default=None, help="Batch size for feature computation (default: config value)")
+    preprocess_parser.add_argument("--cache_dir", default=None, help="Override the feature cache directory (default: config value)")
+    preprocess_parser.add_argument("--force", action="store_true", help="Delete the existing cache for this setting and recompute everything")
 
     index_parser = dataset_subparsers.add_parser(
         "build-index",
@@ -160,58 +160,58 @@ def _compose_data_config(
     data_config_name: str, project_root: pathlib.Path, config_dir: Optional[str] = None
 ) -> dict:
     """
-    학습이 쓰는 것과 동일한 hydra 데이터 config 를 합성해 plain dict 로 돌려준다.
+    Compose the same hydra data config that training uses and return it as a plain dict.
 
-    캐시 디렉토리·키가 학습(IndexDataModule)과 어긋나면 미리 뽑은 피처를
-    학습이 읽지 못하므로, config 를 별도로 해석하지 않고 학습과 같은 소스를 쓴다.
+    If the cache directory or key diverged from training (IndexDataModule), training could not read
+    the precomputed features, so the config is not interpreted separately; the same source as training is used.
 
-    `config_dir` 를 주면 그 디렉터리를 hydra searchpath 에 더해 외부 `data/<이름>.yaml` 도 인정한다
-    (이때 패키지 내부 목록 검증은 건너뛰고, 합성 실패를 그대로 보고한다).
+    With `config_dir`, that directory is added to the hydra searchpath so external `data/<name>.yaml` files are accepted
+    (the package-internal list check is skipped and composition errors are reported as-is).
     """
     try:
         from hydra import compose, initialize_config_module
         from omegaconf import OmegaConf
     except ImportError as exc:
         raise RuntimeError(
-            "preprocess 는 trainer 의존성이 필요하다: pip install 'rsc-toolkit[trainer]'"
+            "preprocess requires the trainer dependencies: pip install 'rsc-toolkit[trainer]'"
         ) from exc
 
     overrides = [f"data={data_config_name}"]
     if config_dir:
         extra = pathlib.Path(config_dir).expanduser().resolve()
         if not extra.is_dir():
-            raise FileNotFoundError(f"--config_dir 디렉터리가 없다: {extra}")
+            raise FileNotFoundError(f"--config_dir directory does not exist: {extra}")
         overrides.append(f"hydra.searchpath=[file://{extra}]")
     else:
         available = _available_data_configs()
         if data_config_name not in available:
             raise ValueError(
-                f"데이터 config '{data_config_name}' 가 없다. 사용 가능: {', '.join(available)} "
-                "(외부 config 는 --config_dir 로 탐색 경로를 더하라)"
+                f"Data config '{data_config_name}' not found. Available: {', '.join(available)} "
+                "(for external configs, add a search path with --config_dir)"
             )
 
     with initialize_config_module(config_module="rsc_toolkit.configs", version_base=None):
         cfg = compose(config_name="default", overrides=overrides)
 
-    # config 의 project_root 는 ${hydra:runtime.cwd} 인데, 이 리졸버는 hydra 런타임
-    # 밖(compose API)에서는 동작하지 않는다. CLI 가 정한 project_root 로 덮어쓴다.
+    # The config's project_root is ${hydra:runtime.cwd}, but that resolver does not work
+    # outside the hydra runtime (compose API). Overwrite it with the project_root chosen by the CLI.
     cfg.data.params.project_root = str(project_root)
     return OmegaConf.to_container(cfg.data, resolve=True)
 
 
 def _handle_preprocess(args, *, project_root: pathlib.Path, dataset_dir: pathlib.Path) -> None:
     """
-    학습 config 기준으로 피처 캐시를 미리 채운다.
+    Pre-fill the feature cache based on a training config.
 
-    핵심 원칙: 캐시 규약(디렉토리·키·sample_id)을 여기서 복제하지 않는다.
-    build_datamodule -> IndexDataModule 라는 학습 경로 그대로를 태워서,
-    미리 뽑은 캐시를 학습이 반드시 재사용하게 만든다.
+    Key principle: the cache conventions (directory, key, sample_id) are not duplicated here.
+    The exact training path build_datamodule -> IndexDataModule is used,
+    so training is guaranteed to reuse the precomputed cache.
     """
     import shutil
 
     data_config_name = getattr(args, "data_config", None) or args.dataset
     config_dir = getattr(args, "config_dir", None)
-    # config_dir 가 없으면 예전과 같은 2-인자 호출 (테스트·외부 코드가 이 시그니처로 바꿔 끼운다)
+    # Without config_dir, keep the 2-argument call (tests and external code substitute this signature)
     data_cfg = (
         _compose_data_config(data_config_name, project_root, config_dir=config_dir)
         if config_dir
@@ -222,19 +222,19 @@ def _handle_preprocess(args, *, project_root: pathlib.Path, dataset_dir: pathlib
     cfg_dataset_name = str(params.get("dataset_name", ""))
     if cfg_dataset_name != args.dataset:
         raise ValueError(
-            f"데이터 config '{data_config_name}' 는 dataset_name={cfg_dataset_name!r} 용이다. "
-            f"'{args.dataset}' 에는 쓸 수 없다. --data_config 로 맞는 config 를 지정하라. "
-            f"(사용 가능: {', '.join(_available_data_configs())})"
+            f"Data config '{data_config_name}' is for dataset_name={cfg_dataset_name!r}. "
+            f"It cannot be used for '{args.dataset}'. Specify a matching config with --data_config. "
+            f"(available: {', '.join(_available_data_configs())})"
         )
 
     features = params.get("features") or {}
     if not features.get("enabled"):
         raise ValueError(
-            f"데이터 config '{data_config_name}' 는 features 를 쓰지 않는다 "
-            "(features.enabled 가 false). 미리 뽑을 피처가 정의된 config 를 지정하라."
+            f"Data config '{data_config_name}' does not use features "
+            "(features.enabled is false). Specify a config that defines features to precompute."
         )
 
-    # CLI 재정의 (주지 않은 항목은 config 값 유지)
+    # CLI overrides (unspecified items keep the config value)
     params["data_dir"] = str(dataset_dir)
     if getattr(args, "sample_level", None):
         params["sample_level"] = args.sample_level
@@ -246,11 +246,11 @@ def _handle_preprocess(args, *, project_root: pathlib.Path, dataset_dir: pathlib
     if getattr(args, "batch_size", None) is not None:
         params["feature_precompute_batch_size"] = int(args.batch_size)
 
-    # 워밍업은 아래에서 직접 돌린다 (--force 로 캐시를 비울 틈을 만들기 위해).
-    # setup() 중 자동 워밍업이 먼저 돌면 안 되므로 꺼 둔다.
+    # Warm-up runs explicitly below (to leave room for clearing the cache with --force).
+    # Automatic warm-up during setup() must not run first, so it is disabled.
     params["feature_precompute"] = False
 
-    # lightning 의존이라 여기서 import (datasets CLI 전체를 무겁게 만들지 않기 위해)
+    # Imported here because it depends on lightning (keeps the datasets CLI lightweight)
     from rsc_toolkit.trainer.factories.build_datamodule import build_datamodule
 
     dm = build_datamodule(data_cfg)
@@ -258,7 +258,7 @@ def _handle_preprocess(args, *, project_root: pathlib.Path, dataset_dir: pathlib
         dm.setup(None)
     except FileNotFoundError as exc:
         raise FileNotFoundError(
-            f"{exc}\n인덱스가 없다. 먼저 인덱스를 만들어라: "
+            f"{exc}\nIndex not found. Build the index first: "
             f"rsctk datasets build-index {args.dataset} --data_dir {dataset_dir} "
             f"--sample_level {params.get('sample_level', 'cycle')}"
         ) from exc
@@ -274,11 +274,11 @@ def _handle_preprocess(args, *, project_root: pathlib.Path, dataset_dir: pathlib
                 continue
             cleared.add(str(features_dir))
             if pathlib.Path(features_dir).exists():
-                logger.info("--force: 기존 피처 캐시 삭제 %s", features_dir)
+                logger.info("--force: deleting existing feature cache %s", features_dir)
                 shutil.rmtree(features_dir)
                 pathlib.Path(features_dir).mkdir(parents=True, exist_ok=True)
 
-    # 학습(setup)이 쓰는 것과 동일한 워밍업 루틴을 split 별로 돌린다.
+    # Run the same warm-up routine as training (setup) for each split.
     for split_name, ds in targets:
         dm._warmup_feature_cache(ds, split_name=split_name)
 
@@ -286,14 +286,14 @@ def _handle_preprocess(args, *, project_root: pathlib.Path, dataset_dir: pathlib
     if cache is not None:
         stats = cache.get_cache_stats()
         logger.info(
-            "✅ 피처 캐시 준비 완료: %s (.pt %s개)",
+            "✅ Feature cache ready: %s (%s .pt files)",
             stats.get("cache_dir"),
             stats.get("pt_files"),
         )
 
 
 def handle_command(args) -> int:
-    """서브커맨드를 실행하고 프로세스 종료 코드(0=성공)를 돌려준다."""
+    """Run the subcommand and return the process exit code (0 = success)."""
     project_root_arg = getattr(args, "project_root", None)
     project_root = (
         pathlib.Path(project_root_arg).expanduser().resolve()
@@ -340,23 +340,23 @@ def handle_command(args) -> int:
         processed_ok = processor.validate_processed_files()
 
         if downloaded_ok:
-            logger.info("✅ 다운로드 파일 검증 통과")
+            logger.info("✅ Downloaded files validated")
         else:
-            logger.error("❌ 다운로드 파일 검증 실패 (%s)", dataset_dir)
+            logger.error("❌ Downloaded file validation failed (%s)", dataset_dir)
 
         if processed_ok is None:
-            logger.warning("⏭️  전처리 산출물 없음 — 아직 build-index 를 안 했거나 검증 미구현 (실패 아님)")
+            logger.warning("⏭️  No preprocessing artifacts -- build-index has not run yet or validation is not implemented (not a failure)")
         elif processed_ok:
-            logger.info("✅ 전처리 산출물 검증 통과")
+            logger.info("✅ Preprocessing artifacts validated")
         else:
-            logger.error("❌ 전처리 산출물 검증 실패")
+            logger.error("❌ Preprocessing artifact validation failed")
 
         failed = (not downloaded_ok) or (processed_ok is False)
         if failed:
-            logger.error("❌ 데이터셋 '%s' 검증 실패", args.dataset)
+            logger.error("❌ Dataset '%s' validation failed", args.dataset)
             return 1
 
-        logger.info("✅ 데이터셋 '%s' 검증 통과", args.dataset)
+        logger.info("✅ Dataset '%s' validated", args.dataset)
         return 0
 
     raise NotImplementedError(args.dataset_command)

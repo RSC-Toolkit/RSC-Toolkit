@@ -1,9 +1,9 @@
 """
-서드파티 확장점 회귀 테스트.
+Regression tests for third-party extension points.
 
-툴킷의 최종 목표는 "외부 연구자가 설치 후 자기 모델만 구현하면 학습·검증이 도는 것" 이다.
-그 목표를 지탱하는 것이 ① BaseRSCModel 계약 ② 세 가지 등록 경로 두 가지이므로,
-둘 다 여기서 고정한다. (2026-09-01 신설 — 그전에는 외부 확장 경로에 테스트가 없었다.)
+The toolkit's goal is that "an external researcher installs it, implements only their own model, and training/validation run".
+That goal rests on (1) the BaseRSCModel contract and (2) the three registration paths,
+so both are pinned here.
 """
 from __future__ import annotations
 
@@ -23,13 +23,13 @@ from rsc_toolkit.models.factory import (
 
 
 def _unregister(name: str) -> None:
-    """등록소는 프로세스 전역이라 테스트가 서로 오염되지 않게 되돌린다."""
+    """The registry is process-global, so restore it to keep tests from polluting each other."""
     ModelFactory.registry().pop(name, None)
 
 
 class TestContract:
     def test_training_forward_is_required(self):
-        """계약을 안 지킨 모델은 인스턴스화 자체가 막혀야 한다 — 학습 중에 터지면 늦다."""
+        """A model that breaks the contract must be blocked at instantiation — failing during training is too late."""
 
         class Incomplete(BaseRSCModel, nn.Module):
             pass
@@ -38,7 +38,7 @@ class TestContract:
             Incomplete()
 
     def test_minimal_conforming_model_runs(self):
-        """README 에 적은 최소 예제가 실제로 도는지 — 문서와 코드가 어긋나지 않도록."""
+        """The minimal example in the README actually runs — so docs and code do not diverge."""
 
         class Minimal(BaseRSCModel, nn.Module):
             def __init__(self, n_cls: int = 4):
@@ -60,8 +60,8 @@ class TestContract:
 
     def test_kwargs_are_open_for_meta_labels(self):
         """
-        meta 를 안 쓰는 모델도 **kwargs 를 열어야 한다 —
-        PLAdapter 가 meta_label_mode 데이터셋에서 meta_labels 를 넘기기 때문이다.
+        Models that do not use meta must still accept **kwargs —
+        PLAdapter passes meta_labels for meta_label_mode datasets.
         """
 
         class IgnoresMeta(BaseRSCModel, nn.Module):
@@ -77,22 +77,22 @@ class TestContract:
             audio_batch=torch.randn(2, 16, 8),
             labels=torch.tensor([0, 1]),
             loss_func=nn.CrossEntropyLoss(),
-            meta_labels=torch.tensor([0, 1]),  # 넘겨도 죽지 않아야 한다
+            meta_labels=torch.tensor([0, 1]),  # passing it must not crash
         )
         assert logits.shape == (2, 4)
 
 
 class TestRegistration:
     def test_core_models_still_register(self):
-        """확장점을 추가하면서 내부 스캔이 깨지지 않았는지."""
+        """Adding extension points did not break the internal scan."""
         registry = ModelFactory.registry()
         assert len(registry) >= 30
         for name in ("ast", "beats", "resnet18_sft"):
-            assert name in registry, f"핵심 모델 {name} 이 등록되지 않았다"
+            assert name in registry, f"core model {name} is not registered"
         assert all(issubclass(cls, BaseRSCModel) for cls in registry.values())
 
     def test_env_var_plugin_path(self, tmp_path, monkeypatch):
-        """RSC_TOOLKIT_PLUGINS 로 지정한 외부 모듈이 등록된다 (패키징 없이)."""
+        """An external module named in RSC_TOOLKIT_PLUGINS gets registered (without packaging)."""
         module_name = "rsc_env_plugin_fixture"
         (tmp_path / f"{module_name}.py").write_text(
             textwrap.dedent(
@@ -126,17 +126,17 @@ class TestRegistration:
 
     def test_broken_plugin_does_not_kill_the_registry(self, monkeypatch):
         """
-        플러그인 하나가 깨져도 나머지 모델은 살아 있어야 한다 —
-        남의 코드 때문에 툴킷 전체가 못 쓰게 되면 안 된다.
+        If one plugin is broken the other models must stay alive —
+        someone else's code must not make the whole toolkit unusable.
         """
         monkeypatch.setenv(PLUGIN_ENV_VAR, "rsc_definitely_not_a_real_module")
-        ModelFactory._register_plugins()  # 예외를 밖으로 던지지 않아야 한다
+        ModelFactory._register_plugins()  # must not raise
         assert "ast" in ModelFactory.registry()
 
     def test_entry_point_group_is_stable(self):
         """
-        외부 패키지가 pyproject 에 적는 그룹 이름이라 함부로 바꾸면 남의 설치가 조용히 깨진다.
-        README 와 factory 독스트링에 적힌 값과 같아야 한다.
+        This group name is written in external packages' pyproject, so changing it carelessly silently breaks their installs.
+        It must equal the value documented in the README and the factory docstring.
         """
         assert PLUGIN_ENTRY_POINT_GROUP == "rsc_toolkit.models"
         assert PLUGIN_ENV_VAR == "RSC_TOOLKIT_PLUGINS"

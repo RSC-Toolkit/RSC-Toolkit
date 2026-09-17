@@ -1,32 +1,36 @@
 """
-Audio-MAE 백본 + DDE-MAE(Disentangling Dual-Encoder MAE) — Wei·Miao·Li, Interspeech 2025 (arXiv 2506.10698).
+Audio-MAE backbone + DDE-MAE (Disentangling Dual-Encoder MAE) — Wei, Miao, Li, Interspeech 2025 (arXiv 2506.10698).
 
-[P0 골든 — 공식 코드 있음] Audio-MAE(facebookresearch/AudioMAE, models_mae.py / models_vit.py, timm 0.3.2 계보) 를 timm 1.0 Block 위에
-재구현. 골든(scripts/reproduction/dump_ddemae_goldens.py, 별도 venv CPU) 과 1e-4 일치:
-  - AudioMAEEncoder : ViT-B/16, img_size (1024, 128)=(T, F), patch 16 → grid 64x8=512 토큰(t-major), cls_token,
-                      고정 2D sin-cos pos_embed (공식 get_2d_sincos_pos_embed_flexible(patch_hw=(8,64)) — 격자 (8,64) 로 계산해 t-major
-                      토큰에 붙이는 공식 quirk 그대로; ckpt 값과 일치 검증), timm Block x12 (768, heads 12, mlp 4, qkv_bias, LN eps 1e-6),
-                      norm (MAE latent) / fc_norm(global_pool 파인튜닝, models_vit.py:52-54).
-  - MAEDecoder      : decoder_embed Linear(in_dim → 512), mask_token, decoder_pos_embed(513, 512) 고정 sin-cos,
-                      decoder_mode=1 (공개 AS-2M ckpt 가 이걸로 학습됨): AudioMAE timm_patch/swin_transformer.py SwinTransformerBlock x16
-                      (dim 512, heads 16, feat (64,8), window (4,4), 홀수 블록 shift (2,0), scaled-cosine attn + log-CPB meta MLP, post-norm),
-                      cls 제거 후 (64,8) 격자 처리; decoder_mode=0: timm Block x8 (전역 어텐션, cls 유지 후 제거). decoder_norm, decoder_pred(512→256).
-  - random_masking / patchify / unpatchify / MAE 재구성 손실 (models_mae.py:225-247, :171-197, :395-411).
-  - load_audiomae_checkpoint: pretrained.pth['model'] 에서 이름·모양 일치 키만 strict 로드 (인코더 150 키, 디코더 280 키 = 430; drop 0).
+[Official-code parity, verified against goldens — official code exists] Audio-MAE (facebookresearch/AudioMAE, models_mae.py / models_vit.py,
+timm 0.3.2 lineage) re-implemented on timm 1.0 Blocks. Matches the goldens (scripts/reproduction/dump_ddemae_goldens.py, separate venv, CPU) within 1e-4:
+  - AudioMAEEncoder : ViT-B/16, img_size (1024, 128)=(T, F), patch 16 → grid 64x8=512 tokens (t-major), cls_token,
+                      fixed 2D sin-cos pos_embed (official get_2d_sincos_pos_embed_flexible(patch_hw=(8,64)) — the official quirk of computing on
+                      an (8,64) grid and attaching it to t-major tokens is kept; verified to match the ckpt values), timm Block x12 (768, heads 12,
+                      mlp 4, qkv_bias, LN eps 1e-6), norm (MAE latent) / fc_norm (global_pool fine-tuning, models_vit.py:52-54).
+  - MAEDecoder      : decoder_embed Linear(in_dim → 512), mask_token, decoder_pos_embed(513, 512) fixed sin-cos,
+                      decoder_mode=1 (used to train the public AS-2M ckpt): AudioMAE timm_patch/swin_transformer.py SwinTransformerBlock x16
+                      (dim 512, heads 16, feat (64,8), window (4,4), shift (2,0) on odd blocks, scaled-cosine attn + log-CPB meta MLP, post-norm),
+                      operating on the (64,8) grid after removing cls; decoder_mode=0: timm Block x8 (global attention, cls kept then removed).
+                      decoder_norm, decoder_pred(512→256).
+  - random_masking / patchify / unpatchify / MAE reconstruction loss (models_mae.py:225-247, :171-197, :395-411).
+  - load_audiomae_checkpoint: strict load of only name- and shape-matching keys from pretrained.pth['model'] (encoder 150 keys, decoder 280 keys = 430; drop 0).
 
-[논문 명세 재구현 — 코드 없음, 골든 없음] DDE 부분 (rsc_toolkit/methods/dde_mae.py 와 함께):
-  - DDEMAE(model 'audiomae_dde', 1단계): 사전학습 인코더 복제 → E_R(원본 mel), E_I(원본 mel + time-shuffle mel 병렬).
-      결합 = 토큰별 특징 차원 concat (Fig.1 판독; 1536 → decoder_embed 신규 초기화 [가정]) → 디코더 → 마스크 mel 재구성 L_recon(식 5 MSE).
-      L_siamese(식 6, margin 가정 1.0, 풀링 벡터 가정), L_MI = vCLUB(식 4, 풀링 벡터 가정, q_θ 보조 Adam lr 1e-4 가정 매 스텝 1회).
-      총손실 식 7: L = L_recon + 0.5 L_siamese + 0.02 L_MI. variant='s2' 는 단일 인코더 + 원 디코더 재구성(L_recon)만.
-  - AudioMAEClassifier(model 'audiomae_dde_cls', B2/2단계): 인코더(+ encoder_ckpt 로 1단계 E_R 만 로드) → global_pool+fc_norm [가정] → Linear → CE.
+[Re-implementation from the paper description — no code, no goldens] DDE part (together with rsc_toolkit/methods/dde_mae.py):
+  - DDEMAE (model 'audiomae_dde', stage 1): duplicate the pretrained encoder → E_R (original mel), E_I (original mel + time-shuffled mel in parallel).
+      Fusion = per-token concat along the feature dimension (read from Fig. 1; 1536 → newly initialized decoder_embed [assumption]) → decoder →
+      masked mel reconstruction L_recon (Eq. 5 MSE).
+      L_siamese (Eq. 6, margin assumed 1.0, pooled vectors assumed), L_MI = vCLUB (Eq. 4, pooled vectors assumed, auxiliary Adam for q_θ with
+      lr 1e-4 assumed, once per step).
+      Total loss Eq. 7: L = L_recon + 0.5 L_siamese + 0.02 L_MI. variant='s2' is a single encoder + original decoder reconstruction (L_recon) only.
+  - AudioMAEClassifier (model 'audiomae_dde_cls', B2/stage 2): encoder (+ only the stage-1 E_R loaded via encoder_ckpt) → global_pool+fc_norm [assumption] → Linear → CE.
 
-가정 목록(전부 config 플래그): mask_ratio 0.8, norm_pix_loss False, decoder_mode 1(ckpt 와 키 일치),
-decoder_embed 1536→512 신규 초기화, time-shuffle 단위 'patch', E_I 두 입력 마스크 = 물리적으로 같은 패치, Siamese/MI 풀링 벡터, margin 1.0,
-q_θ MLP(768-512-768) + 보조 Adam 1e-4, 분류 헤드 global_pool(fc_norm), E_I 폐기.
+Assumptions (all config flags): mask_ratio 0.8, norm_pix_loss False, decoder_mode 1 (keys match the ckpt),
+decoder_embed 1536→512 newly initialized, time-shuffle unit 'patch', masks of the two E_I inputs = physically the same patches, pooled vectors for
+Siamese/MI, margin 1.0, q_θ MLP (768-512-768) + auxiliary Adam 1e-4, classification head global_pool (fc_norm), E_I discarded.
 
-quirk: pl_adapter 가 단일 optimizer 라 q_θ 는 모델 내부 보조 optimizer 로 갱신한다(training_forward 안). 주 손실의 MI 항은 q_θ 파라미터를
-detach 한 함수형 호출로 계산해 주 optimizer 가 q_θ 를 건드리지 않게 한다 (grad None → AdamW 스킵). 보조 optimizer 상태는 last.ckpt 에 없다.
+quirk: pl_adapter uses a single optimizer, so q_θ is updated by an auxiliary optimizer inside the model (within training_forward). The MI term of
+the main loss is computed with a functional call on detached q_θ parameters so the main optimizer never touches q_θ (grad None → AdamW skips it).
+The auxiliary optimizer state is not stored in last.ckpt.
 """
 from __future__ import annotations
 
@@ -51,9 +55,9 @@ logger = logging.getLogger(__name__)
 AUDIOMAE_CKPT = "pretrained_models/upstream/audiomae/pretrained.pth"
 
 
-# =================================================================================================== 인코더
+# =================================================================================================== encoder
 class AudioMAEEncoder(nn.Module):
-    """공식 MaskedAutoencoderViT 인코더부(models_mae.py) + models_vit.py 의 global_pool/fc_norm."""
+    """Encoder part of the official MaskedAutoencoderViT (models_mae.py) + global_pool/fc_norm of models_vit.py."""
 
     def __init__(self, img_size=(1024, 128), patch_size=16, in_chans=1, embed_dim=768, depth=12, num_heads=12,
                  mlp_ratio=4.0, global_pool: bool = True):
@@ -62,14 +66,14 @@ class AudioMAEEncoder(nn.Module):
         ps = (patch_size, patch_size) if isinstance(patch_size, int) else tuple(patch_size)
         self.patch_embed = PatchEmbed(tuple(img_size), ps, in_chans, embed_dim)
         gt, gf = self.patch_embed.grid_size  # (T/16, F/16) = (64, 8)
-        self.patch_hw = (gf, gt)  # 공식 PatchEmbed_org.patch_hw = (img_size[1]//p, img_size[0]//p) = (8, 64)
+        self.patch_hw = (gf, gt)  # official PatchEmbed_org.patch_hw = (img_size[1]//p, img_size[0]//p) = (8, 64)
         self.cls_token = nn.Parameter(torch.zeros(1, 1, embed_dim))
         self.pos_embed = nn.Parameter(torch.zeros(1, self.patch_embed.num_patches + 1, embed_dim), requires_grad=False)
         self.blocks = nn.ModuleList([
             Block(embed_dim, num_heads, mlp_ratio, qkv_bias=True, norm_layer=norm_layer) for _ in range(depth)])
         self.norm = norm_layer(embed_dim)
         self.global_pool = bool(global_pool)
-        self.fc_norm = norm_layer(embed_dim)  # models_vit.py: global_pool=True 일 때만 쓰는 새 LN (ckpt 에 없음)
+        self.fc_norm = norm_layer(embed_dim)  # models_vit.py: new LN used only when global_pool=True (not in the ckpt)
         self.embed_dim = embed_dim
         self.pos_embed.data.copy_(torch.from_numpy(
             get_2d_sincos_pos_embed(embed_dim, self.patch_hw, cls_token=True)).float().unsqueeze(0))
@@ -89,7 +93,7 @@ class AudioMAEEncoder(nn.Module):
     def forward_tokens(self, x: torch.Tensor, mask_ratio: float = 0.0, noise: Optional[torch.Tensor] = None):
         """
         x: (B, 1, T, F). models_mae.forward_encoder: patch_embed → +pos → random_masking → cls → blocks → norm.
-        반환 (latent (B, 1+keep, D), mask (B, L) [1=제거], ids_restore (B, L)).
+        Returns (latent (B, 1+keep, D), mask (B, L) [1=removed], ids_restore (B, L)).
         """
         x = self.patch_embed(x)
         x = x + self.pos_embed[:, 1:, :]
@@ -101,9 +105,9 @@ class AudioMAEEncoder(nn.Module):
         return self.norm(x), mask, ids_restore
 
     def forward_features(self, x: torch.Tensor) -> torch.Tensor:
-        """models_vit.VisionTransformer.forward_features: global_pool → mean(패치) → fc_norm (공식 경로).
-        global_pool=False 는 공식 미지원(models_vit.py:33 이 self.norm 을 무조건 삭제해 AttributeError) — 여기서는 MAE 사전학습 norm 을
-        재사용해 cls 토큰을 내는 **자체 대안**(가정 플래그 global_pool)."""
+        """models_vit.VisionTransformer.forward_features: global_pool → mean(patches) → fc_norm (official path).
+        global_pool=False is unsupported officially (models_vit.py:33 always deletes self.norm, causing AttributeError) — here it is a
+        **toolkit alternative** that reuses the MAE-pretrained norm and outputs the cls token (assumption flag global_pool)."""
         x = self.patch_embed(x) + self.pos_embed[:, 1:, :]
         cls = (self.cls_token + self.pos_embed[:, :1, :]).expand(x.shape[0], -1, -1)
         x = torch.cat((cls, x), dim=1)
@@ -124,9 +128,9 @@ def _init_weights(m):
         nn.init.constant_(m.weight, 1.0)
 
 
-# =================================================================================================== 마스킹·패치
+# =================================================================================================== masking / patches
 def random_masking(x: torch.Tensor, mask_ratio: float, noise: Optional[torch.Tensor] = None):
-    """models_mae.random_masking (noise 주입 가능 — 골든·마스크 동기화용). mask_ratio 0 이면 전체 유지."""
+    """models_mae.random_masking (noise can be injected — for goldens and mask synchronization). mask_ratio 0 keeps everything."""
     N, L, D = x.shape
     len_keep = int(L * (1 - mask_ratio))
     if noise is None:
@@ -158,8 +162,8 @@ def unpatchify(x: torch.Tensor, img_size=(1024, 128), p: int = 16) -> torch.Tens
 
 def mae_recon_loss(imgs: torch.Tensor, pred: torch.Tensor, mask: torch.Tensor, norm_pix_loss: bool = False, p: int = 16,
                    scope: str = "masked"):
-    """models_mae.forward_loss: 제거된 패치의 MSE 평균 (scope='masked', 공식 MAE).
-    논문 식 5 는 전체 스펙트로그램 MSE 로 쓰여 있어 마스크 한정은 **가정**(플래그 recon_scope; 'all' = 전 패치 평균)."""
+    """models_mae.forward_loss: mean MSE over removed patches (scope='masked', official MAE).
+    Paper Eq. 5 is written as MSE over the whole spectrogram, so restricting it to masked patches is an **assumption** (flag recon_scope; 'all' = mean over all patches)."""
     target = patchify(imgs, p)
     if norm_pix_loss:
         mean = target.mean(dim=-1, keepdim=True)
@@ -171,7 +175,7 @@ def mae_recon_loss(imgs: torch.Tensor, pred: torch.Tensor, mask: torch.Tensor, n
     return (loss * mask).sum() / mask.sum()
 
 
-# =================================================================================================== Swin 디코더 블록 (timm_patch)
+# =================================================================================================== Swin decoder block (timm_patch)
 def _window_partition(x, ws):
     B, H, W, C = x.shape
     x = x.view(B, H // ws[0], ws[0], W // ws[1], ws[1], C)
@@ -288,7 +292,7 @@ class SwinDecoderBlock(nn.Module):
         return x
 
 
-# =================================================================================================== 디코더
+# =================================================================================================== decoder
 class MAEDecoder(nn.Module):
     def __init__(self, in_dim=768, num_patches=512, patch_hw=(8, 64), decoder_embed_dim=512, decoder_depth=8,
                  decoder_num_heads=16, mlp_ratio=4.0, patch_size=16, in_chans=1, decoder_mode=1):
@@ -317,7 +321,7 @@ class MAEDecoder(nn.Module):
         self.apply(_init_weights)
 
     def forward(self, x: torch.Tensor, ids_restore: torch.Tensor) -> torch.Tensor:
-        """x: (B, 1+keep, in_dim) [cls 포함] → pred (B, L, p*p)  (models_mae.forward_decoder)."""
+        """x: (B, 1+keep, in_dim) [cls included] → pred (B, L, p*p)  (models_mae.forward_decoder)."""
         x = self.decoder_embed(x)
         mask_tokens = self.mask_token.repeat(x.shape[0], ids_restore.shape[1] + 1 - x.shape[1], 1)
         x_ = torch.cat([x[:, 1:, :], mask_tokens], dim=1)
@@ -335,69 +339,69 @@ class MAEDecoder(nn.Module):
         return pred
 
 
-# =================================================================================================== ckpt 로드
+# =================================================================================================== ckpt loading
 def load_audiomae_checkpoint(encoder: Optional[AudioMAEEncoder], path, decoder: Optional[MAEDecoder] = None,
                              skip_decoder_embed: bool = False) -> Dict:
     """
-    pretrained.pth['model'] 을 인코더/디코더 모듈에 이름·모양 일치 키만 strict 로드.
-    - 인코더: fc_norm 은 ckpt 에 없다(models_vit 의 새 LN) → 제외하고 나머지 전부 필수.
-    - 디코더: skip_decoder_embed=True 면 decoder_embed.* 를 건너뛴다 (DDE concat 1536 입력 → 신규 초기화 가정).
-    pos_embed / decoder_pos_embed 는 로드 전 계산값과 ckpt 값이 일치하는지 검증(flatten 순서 quirk 방어).
+    Strict load of only name- and shape-matching keys from pretrained.pth['model'] into the encoder/decoder modules.
+    - Encoder: fc_norm is not in the ckpt (new LN of models_vit) → excluded; all other keys are required.
+    - Decoder: skip_decoder_embed=True skips decoder_embed.* (DDE concat 1536 input → assumed newly initialized).
+    pos_embed / decoder_pos_embed computed before loading are verified to match the ckpt values (guards against the flatten-order quirk).
     """
     ckpt = torch.load(pathlib.Path(path), map_location="cpu", weights_only=False)
     state = ckpt["model"] if "model" in ckpt else ckpt
     info = {"path": str(path), "encoder_used": [], "decoder_used": [], "dropped": []}
     used = set()
     if encoder is not None:
-        names = set(encoder.state_dict().keys())  # 비영속 버퍼 제외
+        names = set(encoder.state_dict().keys())  # non-persistent buffers excluded
         kept = {k: v for k, v in state.items() if k in names and not k.startswith("fc_norm.")}
         missing = sorted(n for n in names if n not in kept and not n.startswith("fc_norm."))
         if missing:
-            raise RuntimeError(f"Audio-MAE ckpt 에 인코더 키가 없다: {missing[:5]}")
+            raise RuntimeError(f"Audio-MAE ckpt is missing encoder keys: {missing[:5]}")
         if not torch.allclose(encoder.pos_embed, kept["pos_embed"], atol=1e-6):
-            raise RuntimeError("pos_embed 계산값이 ckpt 와 다르다 (flatten 순서 quirk 확인)")
+            raise RuntimeError("computed pos_embed differs from the ckpt (check the flatten-order quirk)")
         sd = encoder.state_dict()
         for k, v in kept.items():
             if tuple(sd[k].shape) != tuple(v.shape):
-                raise RuntimeError(f"인코더 모양 불일치 {k}: {tuple(v.shape)} vs {tuple(sd[k].shape)}")
+                raise RuntimeError(f"encoder shape mismatch {k}: {tuple(v.shape)} vs {tuple(sd[k].shape)}")
         encoder.load_state_dict(kept, strict=False)
         info["encoder_used"] = sorted(kept)
         used |= set(kept)
     if decoder is not None:
-        names = set(decoder.state_dict().keys())  # 비영속 버퍼(attn_mask, relative_coordinates_log) 제외
+        names = set(decoder.state_dict().keys())  # non-persistent buffers (attn_mask, relative_coordinates_log) excluded
         kept = {k: v for k, v in state.items() if k in names and not (skip_decoder_embed and k.startswith("decoder_embed."))}
         missing = sorted(n for n in names if n not in kept and not (skip_decoder_embed and n.startswith("decoder_embed.")))
         if missing:
-            raise RuntimeError(f"Audio-MAE ckpt 에 디코더 키가 없다 (decoder_mode 확인): {missing[:5]}")
+            raise RuntimeError(f"Audio-MAE ckpt is missing decoder keys (check decoder_mode): {missing[:5]}")
         if not torch.allclose(decoder.decoder_pos_embed, kept["decoder_pos_embed"], atol=1e-6):
-            raise RuntimeError("decoder_pos_embed 계산값이 ckpt 와 다르다")
+            raise RuntimeError("computed decoder_pos_embed differs from the ckpt")
         for k, v in kept.items():
             if tuple(decoder.state_dict()[k].shape) != tuple(v.shape):
-                raise RuntimeError(f"디코더 모양 불일치 {k}: {tuple(v.shape)} vs {tuple(decoder.state_dict()[k].shape)}")
+                raise RuntimeError(f"decoder shape mismatch {k}: {tuple(v.shape)} vs {tuple(decoder.state_dict()[k].shape)}")
         decoder.load_state_dict(kept, strict=False)
         info["decoder_used"] = sorted(kept)
         used |= set(kept)
     info["dropped"] = sorted(k for k in state if k not in used)
-    logger.info("Audio-MAE ckpt %s: 인코더 %d 키, 디코더 %d 키, drop %d 키", path, len(info["encoder_used"]),
+    logger.info("Audio-MAE ckpt %s: encoder %d keys, decoder %d keys, dropped %d keys", path, len(info["encoder_used"]),
                 len(info["decoder_used"]), len(info["dropped"]))
     return info
 
 
 def _to_tf(x: torch.Tensor) -> torch.Tensor:
-    """툴킷 fbank 특징 (B, F=128, T=1024) [또는 (B,1,F,T)] → Audio-MAE 입력 (B, 1, T, F)."""
+    """Toolkit fbank features (B, F=128, T=1024) [or (B,1,F,T)] → Audio-MAE input (B, 1, T, F)."""
     if x.dim() == 4:
         x = x.squeeze(1)
     return x.transpose(1, 2).unsqueeze(1).contiguous()
 
 
-# =================================================================================================== 분류 모델 (B2 / 2단계)
+# =================================================================================================== classification model (B2 / stage 2)
 @ModelFactory.register_model_class("audiomae_dde_cls")
 class AudioMAEClassifier(BaseRSCModel, nn.Module):
     """
-    Audio-MAE 인코더 + Linear 분류 (CE).
-    - B2: pretrained_path(AS-2M pretrained.pth) 인코더에서 바로 미세조정.
-    - 2단계(S2/S3): encoder_ckpt(1단계 final_state.pth) 의 E_R(encoder_key 접두)만 로드 — E_I·디코더·q_θ 는 폐기(가정).
-    헤드 토큰: global_pool=True → 패치 평균 + fc_norm(Audio-MAE 파인튜닝 관례, 가정) / False → cls (플래그).
+    Audio-MAE encoder + Linear classification (CE).
+    - B2: fine-tune directly from the pretrained_path (AS-2M pretrained.pth) encoder.
+    - Stage 2 (S2/S3): load only E_R (encoder_key prefix) from encoder_ckpt (stage-1 final_state.pth) — E_I, decoder, q_θ are discarded (assumption).
+    Head token: global_pool=True → patch mean + fc_norm (Audio-MAE fine-tuning convention, assumption) / False → cls (flag).
     """
 
     def __init__(self, n_cls: int = 4, pretrained_path: Optional[str] = AUDIOMAE_CKPT, encoder_ckpt: Optional[str] = None,
@@ -411,9 +415,9 @@ class AudioMAEClassifier(BaseRSCModel, nn.Module):
         elif pretrained_path is not None:
             from rsc_toolkit.paths import resolve_pretrained
 
-            self.load_info = load_audiomae_checkpoint(self.encoder, resolve_pretrained(explicit=pretrained_path))  # RSCTK_PRETRAINED_ROOT 인정
+            self.load_info = load_audiomae_checkpoint(self.encoder, resolve_pretrained(explicit=pretrained_path))  # honors RSCTK_PRETRAINED_ROOT
         self.head = nn.Linear(self.encoder.embed_dim, n_cls)
-        nn.init.trunc_normal_(self.head.weight, std=head_init_std)  # main_finetune_as.py:  trunc_normal_(head.weight, std=2e-5) 는 AS 용; 가정 0.02
+        nn.init.trunc_normal_(self.head.weight, std=head_init_std)  # main_finetune_as.py:  trunc_normal_(head.weight, std=2e-5) is for AS; 0.02 assumed
         nn.init.zeros_(self.head.bias)
 
     def load_stage1_encoder(self, path, encoder_key: str = "encoder_r.") -> Dict:
@@ -421,14 +425,14 @@ class AudioMAEClassifier(BaseRSCModel, nn.Module):
         state = state.get("model", state)
         enc = {k[len(encoder_key):]: v for k, v in state.items() if k.startswith(encoder_key)}
         if not enc:
-            raise RuntimeError(f"{path} 에 '{encoder_key}' 키가 없다 (1단계 final_state 인지 확인)")
-        enc = {k: v for k, v in enc.items() if not k.startswith("fc_norm.")}  # 1단계는 fc_norm 을 쓰지 않았다 → 새 LN 유지
+            raise RuntimeError(f"{path} has no '{encoder_key}' keys (check that it is a stage-1 final_state)")
+        enc = {k: v for k, v in enc.items() if not k.startswith("fc_norm.")}  # stage 1 does not use fc_norm → keep the new LN
         missing, unexpected = self.encoder.load_state_dict(enc, strict=False)
         missing = [m for m in missing if not m.startswith("fc_norm.")]
         if missing or unexpected:
-            raise RuntimeError(f"E_R 로드 불일치: missing {missing[:5]} unexpected {unexpected[:5]}")
+            raise RuntimeError(f"E_R load mismatch: missing {missing[:5]} unexpected {unexpected[:5]}")
         others = sorted({k.split(".")[0] for k in state if not k.startswith(encoder_key)})
-        logger.info("1단계 E_R 로드 %s (%d 키); 폐기: %s", path, len(enc), others)
+        logger.info("Loaded stage-1 E_R %s (%d keys); discarded: %s", path, len(enc), others)
         return {"loaded": sorted(enc), "discarded_prefixes": others}
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -439,13 +443,13 @@ class AudioMAEClassifier(BaseRSCModel, nn.Module):
         return logits, loss_func(logits, labels)
 
 
-# =================================================================================================== DDE-MAE (1단계)
+# =================================================================================================== DDE-MAE (stage 1)
 @ModelFactory.register_model_class("audiomae_dde")
 class DDEMAE(BaseRSCModel, nn.Module):
     """
-    variant='s3': E_R + E_I(원본·셔플 병렬), concat(1536) → 디코더, L = L_recon + α1 L_siamese + α2 L_MI (식 7).
-    variant='s2': 단일 인코더(E_R) + 원 디코더(768 입력, 사전학습 decoder_embed 로드), L = L_recon.
-    training_forward 는 (더미 logits (B, n_cls) 0, loss) 를 돌려준다 — 1단계는 평가가 없다 (limit_val_batches 0).
+    variant='s3': E_R + E_I (original and shuffled in parallel), concat (1536) → decoder, L = L_recon + α1 L_siamese + α2 L_MI (Eq. 7).
+    variant='s2': single encoder (E_R) + original decoder (768 input, pretrained decoder_embed loaded), L = L_recon.
+    training_forward returns (dummy zero logits (B, n_cls), loss) — stage 1 has no evaluation (limit_val_batches 0).
     """
 
     def __init__(self, variant: str = "s3", n_cls: int = 4, pretrained_path: Optional[str] = AUDIOMAE_CKPT,
@@ -466,7 +470,7 @@ class DDEMAE(BaseRSCModel, nn.Module):
             raise ValueError("recon_scope ∈ {masked, all}")
         self.recon_scope = recon_scope
         if shuffle_unit == "frame" and shuffle_mask == "same_physical":
-            raise ValueError("shuffle_unit=frame 은 패치 단위 물리 동기화가 불가 → shuffle_mask=same_index 를 써라")
+            raise ValueError("shuffle_unit=frame cannot synchronize physical patches → use shuffle_mask=same_index")
         self.variant, self.n_cls = variant, n_cls
         self.mask_ratio, self.norm_pix_loss, self.patch_size = float(mask_ratio), bool(norm_pix_loss), int(patch_size)
         self.alpha_siamese, self.alpha_mi = float(alpha_siamese), float(alpha_mi)
@@ -482,24 +486,24 @@ class DDEMAE(BaseRSCModel, nn.Module):
                                   patch_hw=self.encoder_r.patch_hw, decoder_mode=decoder_mode, patch_size=patch_size)
         self.load_info = None
         if pretrained_path is not None:
-            # 상대 경로는 cwd → RSCTK_PRETRAINED_ROOT 아래 순으로 찾는다 (P2-9 경로 독립; 예전엔 직행)
+            # relative paths are searched in cwd, then under RSCTK_PRETRAINED_ROOT
             self.load_info = load_audiomae_checkpoint(self.encoder_r, str(resolve_pretrained(explicit=pretrained_path)),
                                                       self.decoder, skip_decoder_embed=dual)
-        # E_I = 사전학습 인코더 복제 (논문 §2.3 "duplicate the pretrained encoder")
+        # E_I = duplicate of the pretrained encoder (paper §2.3 "duplicate the pretrained encoder")
         self.encoder_i = copy.deepcopy(self.encoder_r) if dual else None
         self.club = VCLUB(D, D, club_hidden) if self.use_mi else None
         self._club_opt = torch.optim.Adam(self.club.parameters(), lr=float(club_lr)) if self.use_mi else None
         self.last_losses: Dict[str, float] = {}
 
-    # ---------------------------------------------------------------- 부품
+    # ---------------------------------------------------------------- components
     @staticmethod
     def _pool(latent: torch.Tensor) -> torch.Tensor:
-        return latent[:, 1:, :].mean(dim=1)  # cls 제외 패치 토큰 평균 (가정)
+        return latent[:, 1:, :].mean(dim=1)  # mean of patch tokens excluding cls (assumption)
 
     def forward_stage1(self, x_tf: torch.Tensor, noise: Optional[torch.Tensor] = None, perm: Optional[torch.Tensor] = None):
         """
-        x_tf: (B, 1, T, F). 반환 dict(loss, recon, siamese, mi, pred, mask, z_r, z_i, z_i_shuf).
-        noise/perm 은 테스트 재현용 주입값.
+        x_tf: (B, 1, T, F). Returns dict(loss, recon, siamese, mi, pred, mask, z_r, z_i, z_i_shuf).
+        noise/perm are injected values for reproducible tests.
         """
         B = x_tf.shape[0]
         L = self.encoder_r.patch_embed.num_patches
@@ -512,8 +516,8 @@ class DDEMAE(BaseRSCModel, nn.Module):
             recon = mae_recon_loss(x_tf, pred, mask, self.norm_pix_loss, self.patch_size, self.recon_scope)
             out.update(pred=pred, recon=recon, loss=recon, z_r=lat_r)
             return out
-        lat_i, mask_i, ids_restore_i = self.encoder_i.forward_tokens(x_tf, self.mask_ratio, noise)  # 같은 마스크(가정)
-        pred = self.decoder(torch.cat([lat_r, lat_i], dim=-1), ids_restore)  # 토큰별 특징 concat (Fig.1)
+        lat_i, mask_i, ids_restore_i = self.encoder_i.forward_tokens(x_tf, self.mask_ratio, noise)  # same mask (assumption)
+        pred = self.decoder(torch.cat([lat_r, lat_i], dim=-1), ids_restore)  # per-token feature concat (Fig. 1)
         recon = mae_recon_loss(x_tf, pred, mask, self.norm_pix_loss, self.patch_size, self.recon_scope)
         loss = recon
         out.update(pred=pred, recon=recon, z_r=lat_r, z_i=lat_i)
@@ -530,8 +534,8 @@ class DDEMAE(BaseRSCModel, nn.Module):
             if self.siamese_level == "pooled":
                 sia = siamese_hinge(self._pool(lat_i), self._pool(lat_i_s), self.siamese_margin)
             else:
-                # token 단위: same_physical 이면 permute_token_noise 가 argsort 순위까지 보존하므로 k 번째 유지 토큰이
-                # 두 입력에서 같은 물리 패치 — 토큰별로 바로 대응. same_index 면 같은 격자 위치끼리 비교.
+                # token level: with same_physical, permute_token_noise preserves even the argsort ranks, so the k-th kept token is
+                # the same physical patch in both inputs — tokens correspond directly. With same_index, same grid positions are compared.
                 sia = siamese_hinge(lat_i[:, 1:], lat_i_s[:, 1:], self.siamese_margin)
             loss = loss + self.alpha_siamese * sia
             out.update(siamese=sia, z_i_shuf=lat_i_s, perm=perm)
@@ -546,7 +550,7 @@ class DDEMAE(BaseRSCModel, nn.Module):
         return out
 
     def _club_step(self, zr: torch.Tensor, zi: torch.Tensor):
-        """q_θ 보조 갱신: log q_θ(z_I|z_R) 최대화 (입력은 detach — 주 파라미터 불변)."""
+        """Auxiliary q_θ update: maximize log q_θ(z_I|z_R) (inputs detached — main parameters unchanged)."""
         for _ in range(self.club_steps):
             self._club_opt.zero_grad(set_to_none=True)
             nll = -self.club.loglikelihood(zr, zi)
@@ -554,7 +558,8 @@ class DDEMAE(BaseRSCModel, nn.Module):
             self._club_opt.step()
         self._club_opt.zero_grad(set_to_none=True)
 
-    # ---------------------------------------------------------------- 학습 계약
+    # ---------------------------------------------------------------- training contract
+
     def training_forward(self, audio_batch, labels, loss_func, meta_labels=None):
         x_tf = _to_tf(audio_batch)
         out = self.forward_stage1(x_tf)

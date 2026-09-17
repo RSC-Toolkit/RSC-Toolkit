@@ -1,15 +1,16 @@
 """
-ADD-RSC(Interspeech 2025, deegy666/ADD-RSC) 의 적응 차분 잡음제거 층 — models/adapt_diff_denoise.py 충실 재현 (P0).
+Adaptive differential denoising layer of ADD-RSC (Interspeech 2025, deegy666/ADD-RSC) — faithful port of
+models/adapt_diff_denoise.py (exact port of the official code, verified against goldens).
 
-DiffTransformerLayer(d_model 256, num_heads 8, depth 6) 는 **단일 층**이다 (`depth` 는 λ_init = 0.8 − 0.6·exp(−0.3·depth) 계산에만 쓰인다).
-forward(x (B, N=1024 프레임, C=256 주파수)):
-  x1 = AFNO1D(x)                                  # 시간축 rfft(ortho) → 블록대각 2층 MLP(복소, ReLU) → softshrink(0.01) → irfft + 잔차
-  x2 = classifier((x1[:,0] + x1[:,1]) / 2)        # 보조 로짓: **앞 두 프레임 평균** → Linear(256, 4) (원본 하드코딩)
-  y  = attn(norm1(x1)) + x1                       # 차분 어텐션 (RMSNorm 사전정규화)
+DiffTransformerLayer(d_model 256, num_heads 8, depth 6) is a **single layer** (`depth` is only used to compute λ_init = 0.8 − 0.6·exp(−0.3·depth)).
+forward(x (B, N=1024 frames, C=256 frequency bins)):
+  x1 = AFNO1D(x)                                  # time-axis rfft(ortho) → block-diagonal 2-layer MLP (complex, ReLU) → softshrink(0.01) → irfft + residual
+  x2 = classifier((x1[:,0] + x1[:,1]) / 2)        # auxiliary logits: **mean of the first two frames** → Linear(256, 4) (hard-coded in the original)
+  y  = attn(norm1(x1)) + x1                       # differential attention (RMSNorm pre-norm)
   z  = ff(norm2(y)) + y                           # SwiGLU
   return z, x2
-원본 MultiHeadDifferentialAttention.forward 는 매 호출마다 `nn.LayerNorm(N).to('cuda:0')` 을 만들어 attention 을 정규화하지만 그 결과를
-쓰지 않는다(죽은 코드; LayerNorm 초기화는 난수를 소비하지 않는다) — 여기서는 생성하지 않는다. 그 외 초기화 순서(kaiming/xavier)는 원본과 동일.
+The original MultiHeadDifferentialAttention.forward builds `nn.LayerNorm(N).to('cuda:0')` on every call to normalize the attention but
+never uses the result (dead code; LayerNorm init consumes no RNG) — it is not created here. Otherwise the init order (kaiming/xavier) matches the original.
 """
 from __future__ import annotations
 
@@ -139,7 +140,7 @@ class MultiHeadDifferentialAttention(nn.Module):
         A1 = torch.matmul(Q1, K1.transpose(-2, -1)) * scaling
         A2 = torch.matmul(Q2, K2.transpose(-2, -1)) * scaling
         attention = F.softmax(A1, dim=-1) - lambda_val * F.softmax(A2, dim=-1)
-        # (원본: 여기서 nn.LayerNorm(N) 을 새로 만들어 attention 을 정규화하지만 결과 미사용 — 생략)
+        # (original: builds a new nn.LayerNorm(N) here to normalize attention, but the result is unused — omitted)
         O = torch.matmul(attention, V)
         O_reshaped = O.contiguous().view(batch * self.num_heads, N, 2 * self.d_head)
         rms_norm = torch.sqrt(O_reshaped.pow(2).mean(dim=-1, keepdim=True) + self.eps)
@@ -156,7 +157,7 @@ class DiffTransformerLayer(nn.Module):
         self.attn = MultiHeadDifferentialAttention(d_model, num_heads, depth)
         self.norm2 = RMSNorm(d_model)
         self.ff = SwiGLU(d_model)
-        self.classifier = nn.Linear(256, n_cls)  # 원본 하드코딩 Linear(256, 4) — 생성 순서 유지
+        self.classifier = nn.Linear(256, n_cls)  # original hard-codes Linear(256, 4) — creation order preserved
         self.aff = AFNO1D(hidden_size=d_model)
 
     def forward(self, x):
@@ -168,7 +169,7 @@ class DiffTransformerLayer(nn.Module):
 
 
 class LabelSmoothingLoss(nn.Module):
-    """models/bias_denoise_loss.py — KLDiv(reduction none) 기반 label smoothing, 유효 타깃 수로 정규화."""
+    """models/bias_denoise_loss.py — label smoothing based on KLDiv(reduction none), normalized by the number of valid targets."""
 
     def __init__(self, size=4, padding_idx=5, smoothing=0.20, normalize_length=True):
         super().__init__()

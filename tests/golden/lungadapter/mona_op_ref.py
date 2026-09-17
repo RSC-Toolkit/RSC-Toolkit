@@ -1,9 +1,9 @@
 """
-Mona(arXiv 2311.15010, [22] in LungAdapter) 의 MonaOp 참조 구현 — LungAdapter Attention-Adapter 식(6)-(7) conv 부분의 골든.
+MonaOp reference implementation from Mona (arXiv 2311.15010, [22] in LungAdapter); golden for the conv part of the LungAdapter Attention-Adapter, Eq. (6)-(7).
 
-출처: https://github.com/Leiyi-Hu/mona  Swin-Transformer-Classification/mmcls/models/backbones/swin_transformer_mona.py (class MonaOp)
-      라이선스: MIT (원 파일 헤더 "Copyright (c) 2021 Microsoft, Licensed under The MIT License"; Mona 저장소 LICENSE 도 MIT)
-      사본: outputs/reference/papers/lungadapter/mona_ref.py:27-48 (2026-08-26 취득) 에서 MonaOp 클래스만 그대로 수록(mmcv 의존 제거).
+Source: https://github.com/Leiyi-Hu/mona  Swin-Transformer-Classification/mmcls/models/backbones/swin_transformer_mona.py (class MonaOp)
+      License: MIT (original file header "Copyright (c) 2021 Microsoft, Licensed under The MIT License"; the Mona repository LICENSE is also MIT)
+      Copy: only the MonaOp class, verbatim (mmcv dependency removed).
 """
 import torch.nn as nn
 

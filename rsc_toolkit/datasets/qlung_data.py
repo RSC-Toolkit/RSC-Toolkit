@@ -1,21 +1,21 @@
 """
-QLung 데이터 경로 — AQS(음향 품질 점수) 를 sample_id 별로 캐시해 배치의 3번째 원소(meta_labels 자리, **float**) 로 실어 보낸다.
+QLung data path -- caches AQS (acoustic quality score) per sample_id and sends it as the 3rd batch element (meta_labels slot, **float**).
 
-공식 util/icbhi_dataset.py:170-177: 데이터셋 생성 시 사이클마다 (8 s repeat 패딩 + fade_out 된 16 kHz 파형에서)
+Official util/icbhi_dataset.py:170-177: when the dataset is built, for every cycle (on the 16 kHz waveform after 8 s repeat padding + fade_out)
   rms_energy = compute_rms_energy(wave), spectral_entropy = compute_spectral_entropy(wave),
-  quality_score = compute_quality_score_entropy_rms(rms_energy, rms_energy, α, β)   ← 엔트로피 자리에 rms (버그, 기본값 유지)
-를 계산해 __getitem__ 이 (image, label, rms, entropy, quality) 를 돌려준다. train 루프는 quality_score 만 쓴다.
+  quality_score = compute_quality_score_entropy_rms(rms_energy, rms_energy, α, β)   <- rms in the entropy slot (bug, kept as default)
+is computed, and __getitem__ returns (image, label, rms, entropy, quality). The train loop uses only quality_score.
 
-툴킷 구현:
-  QLungAQSIndexDataset(IndexDataset): 항목에 out["aqs"] 추가. rms/entropy 는 파형에서 torch 로 계산(methods/qlung.py) 하고
-    downloaded_datasets/aqs_cache/<dataset>_acoustic_<전처리키>.pt (sample_id → {rms, entropy}) 에 캐시(변형 무관, 1회).
-    변형별 AQS 도 <dataset>_<variant>.pt 로 남긴다(집계·검사용; 런타임은 rms/entropy 에서 순수 함수로 계산).
-  QLungDataModule(IndexDataModule, data_registry 'qlung'): qlung 블록 {aqs_alpha, aqs_beta, entropy_source, formula, cache_dir,
-    precompute, attach_val} 을 데이터셋에 넘기고, setup 에서 누락 sample_id 의 rms/entropy 를 DataLoader(num_workers) 로 일괄 계산.
-    IndexFeatureDataset 대신 _QLungFeatureDataset 이 (feats, label, sample_id, aqs float) 를 내고 collate 가 float64 텐서로 만든다(공식 default_collate 와 동일).
-    val 배치에도 AQS 를 붙인다(attach_val 기본 true; 원본 val loader 도 quality 를 돌려주되 미사용 — 모델 eval 경로는 무시).
-  전처리키 = (sampling_rate, desired_length_sec, pad_type, fade, resample_after_slice, time_unit) — 파형이 다르면 캐시가 갈린다.
-SPRSound 도 같은 클래스로 동작한다(OOD 평가엔 AQS 가 필요 없지만 형식을 맞춘다; label_map 으로 7→4 파생 라벨 — Rhonchi·Stridor 행은 제외).
+Toolkit implementation:
+  QLungAQSIndexDataset(IndexDataset): adds out["aqs"] to each item. rms/entropy are computed from the waveform in torch (methods/qlung.py) and
+    cached in downloaded_datasets/aqs_cache/<dataset>_acoustic_<preprocessing key>.pt (sample_id -> {rms, entropy}) (variant-independent, once).
+    Per-variant AQS is also written to <dataset>_<variant>.pt (for aggregation/inspection; at runtime it is computed as a pure function of rms/entropy).
+  QLungDataModule(IndexDataModule, data_registry 'qlung'): passes the qlung block {aqs_alpha, aqs_beta, entropy_source, formula, cache_dir,
+    precompute, attach_val} to the dataset, and in setup computes rms/entropy for missing sample_ids in bulk with DataLoader(num_workers).
+    Instead of IndexFeatureDataset, _QLungFeatureDataset yields (feats, label, sample_id, aqs float) and collate builds a float64 tensor (same as the official default_collate).
+    AQS is attached to val batches too (attach_val default true; the original val loader also returns quality but does not use it -- the model eval path ignores it).
+  preprocessing key = (sampling_rate, desired_length_sec, pad_type, fade, resample_after_slice, time_unit) -- different waveforms get separate caches.
+SPRSound works with the same class (OOD evaluation does not need AQS, but the format is kept; label_map gives 7->4 derived labels -- Rhonchi and Stridor rows are excluded).
 """
 from __future__ import annotations
 
@@ -66,14 +66,14 @@ class AQSConfig:
 
 
 class AcousticFeatureCache:
-    """sample_id → {'rms','entropy'} 의 단일 .pt 파일 캐시 (원자적 저장)."""
+    """Single .pt file cache of sample_id -> {'rms','entropy'} (atomic save)."""
 
     def __init__(self, path: pathlib.Path):
         self.path = pathlib.Path(path)
         self.data: Dict[str, Dict[str, float]] = {}
         if self.path.exists():
             self.data = torch.load(self.path, map_location="cpu", weights_only=False)
-            logger.info("AQS 음향 특징 캐시 로드: %s (%d)", self.path, len(self.data))
+            logger.info("Loaded AQS acoustic feature cache: %s (%d)", self.path, len(self.data))
 
     def missing(self, sample_ids: List[str]) -> List[str]:
         return [s for s in sample_ids if s not in self.data]
@@ -89,7 +89,7 @@ class AcousticFeatureCache:
 
 
 class QLungAQSIndexDataset(IndexDataset):
-    """IndexDataset + out['aqs'] (float). 캐시에 없으면 그 자리에서 계산해 메모리 캐시에 넣는다(파일 저장은 datamodule)."""
+    """IndexDataset + out['aqs'] (float). If missing from the cache, it is computed on the spot and put into the in-memory cache (the datamodule saves the file)."""
 
     N_CLS = 4
 
@@ -104,13 +104,13 @@ class QLungAQSIndexDataset(IndexDataset):
 
             self.df, dropped = apply_label_map(self.df, label_map, where=f"QLungAQSIndexDataset split={self.split}")
             counts = self.df["label"].value_counts().sort_index().to_dict()
-            logger.info("QLungAQSIndexDataset(split=%s): 라벨 매핑 적용 → %s (제외 %d 행)", self.split, counts, dropped)
+            logger.info("QLungAQSIndexDataset(split=%s): applied label map -> %s (dropped %d rows)", self.split, counts, dropped)
 
     def sample_ids(self) -> List[str]:
         return self.df["sample_id"].astype(str).tolist()
 
     def acoustic_features(self, idx: int) -> Tuple[str, Dict[str, float]]:
-        """파형 로드(전처리 포함) → {rms, entropy}. 캐시 미사용(계산 전용)."""
+        """Load waveform (with preprocessing) -> {rms, entropy}. Does not use the cache (computation only)."""
         item = IndexDataset.__getitem__(self, idx)
         return str(item["sample_id"]), compute_acoustic_features(item["audio"])
 
@@ -127,7 +127,7 @@ class QLungAQSIndexDataset(IndexDataset):
 
 
 class _QLungFeatureDataset(IndexFeatureDataset):
-    """(feats, label, sample_id, aqs float) — IndexFeatureDataset 의 int meta 대신 float."""
+    """(feats, label, sample_id, aqs float) -- float instead of IndexFeatureDataset's int meta."""
 
     def __init__(self, index_ds, feature_processor, feature_transform=None, attach_aqs: bool = True):
         super().__init__(index_ds, feature_processor, feature_transform=feature_transform, meta_label_fn=None)
@@ -144,9 +144,9 @@ class _QLungFeatureDataset(IndexFeatureDataset):
         return feats, item["label"], item["sample_id"]
 
 
-from rsc_toolkit.datasets import collate as _collate  # P2-6: collate 단일 구현
+from rsc_toolkit.datasets import collate as _collate  # single collate implementation
 
-# (x, y, aqs float64) — 공식: python float → default_collate float64 (loss.py:60 부터 float64 로 흐른다)
+# (x, y, aqs float64) -- official: python float -> default_collate float64 (float64 from loss.py:60 on)
 qlung_collate = _collate.qlung_collate
 
 
@@ -166,10 +166,10 @@ def precompute_acoustic_features(ds: QLungAQSIndexDataset, cache: AcousticFeatur
     sids = ds.sample_ids()
     missing = set(cache.missing(sids))
     if not missing:
-        logger.info("AQS 음향 특징 캐시 완비 split=%s (%d)", split_name, len(sids))
+        logger.info("AQS acoustic feature cache complete split=%s (%d)", split_name, len(sids))
         return 0
     idx = [i for i, s in enumerate(sids) if s in missing]
-    logger.info("AQS 음향 특징 계산 split=%s: %d/%d 누락 (workers=%d)", split_name, len(idx), len(sids), num_workers)
+    logger.info("Computing AQS acoustic features split=%s: %d/%d missing (workers=%d)", split_name, len(idx), len(sids), num_workers)
     t0 = time.time()
     loader = DataLoader(_AcousticJob(ds, idx), batch_size=batch_size, shuffle=False, num_workers=num_workers,
                         collate_fn=lambda b: b)
@@ -179,19 +179,19 @@ def precompute_acoustic_features(ds: QLungAQSIndexDataset, cache: AcousticFeatur
             cache.update({sid: f for sid, f in batch})
             done += len(batch)
             if done % 800 < len(batch):
-                logger.info("  AQS 특징 %d/%d (%.1fs)", done, len(idx), time.time() - t0)
+                logger.info("  AQS features %d/%d (%.1fs)", done, len(idx), time.time() - t0)
     cache.save()
-    logger.info("AQS 음향 특징 계산 완료 split=%s: %d 개, %.1fs → %s", split_name, done, time.time() - t0, cache.path)
+    logger.info("AQS acoustic features computed split=%s: %d items, %.1fs -> %s", split_name, done, time.time() - t0, cache.path)
     return done
 
 
 class QLungDataModule(IndexDataModule):
-    """IndexDataModule + qlung 블록(AQS 설정) — 배치 (x, y, aqs float64)."""
+    """IndexDataModule + qlung block (AQS settings) -- batch (x, y, aqs float64)."""
 
-    meta_kind = "qlung_aqs"  # batch[2] = AQS float (B,) — ast_qlung/clap_qlung 의 accepts_meta 와 대조
+    meta_kind = "qlung_aqs"  # batch[2] = AQS float (B,) -- checked against accepts_meta of ast_qlung/clap_qlung
 
     def __init__(self, *args, qlung: Optional[dict] = None, label_map: Optional[str] = None, **kwargs):
-        kwargs.setdefault("collate_fn", qlung_collate)  # AQS float64 를 batch[2] 로 (예전엔 loader 3종을 복붙 override)
+        kwargs.setdefault("collate_fn", qlung_collate)  # AQS float64 as batch[2]
         super().__init__(*args, **kwargs)
         cfg = dict(qlung or {})
         self.aqs_cfg = AQSConfig(**cfg)
@@ -204,23 +204,23 @@ class QLungDataModule(IndexDataModule):
             from rsc_toolkit.datasets.lungmix_data import SPRSOUND_7_TO_4
             self.label_map = dict(SPRSOUND_7_TO_4)
         elif label_map not in (None, "none"):
-            raise ValueError(f"label_map 은 none|sprsound_7to4: {label_map!r}")
+            raise ValueError(f"label_map must be none|sprsound_7to4: {label_map!r}")
 
     def preprocess_key(self) -> str:
-        # 기존 캐시 파일명(AQS·acoustic .pt)을 유지해야 하므로 값이 있을 때의 서식은 바꾸지 않는다; None 은 예전엔 TypeError.
+        # Existing cache file names (AQS/acoustic .pt) must be preserved, so the format for non-None values stays unchanged; None maps to "none".
         length = "none" if self.desired_length_sec is None else f"{self.desired_length_sec:g}"
         return (f"sr{self.sampling_rate}_len{length}_{self.pad_type}_fade{int(self.fade)}"
                 f"_ras{int(self.resample_after_slice)}_{self.time_unit}")
 
     def _index_dataset_kwargs(self, *, split: str, role: Optional[str] = None) -> Dict[str, Any]:
-        # 부모의 조립(fade/resample_after_slice/time_unit/split_file 규칙 포함)에 QLung 전용 인자만 더한다
+        # Add only the QLung-specific arguments to the parent's assembly (including the fade/resample_after_slice/time_unit/split_file rules)
         kwargs = super()._index_dataset_kwargs(split=split, role=role)
         kwargs.update(aqs=self.aqs_cfg, acoustic_cache=self.acoustic_cache, label_map=self.label_map)
         return kwargs
 
     def _wrap_with_features(self, base_ds, *, feature_transform=None, meta_label_fn=None, split_role=None):
-        fp = self._make_feature_processor_with_cache()  # 캐시 디렉터리·키·체인 대장은 부모와 동일
-        if split_role is None:  # 직접 호출(setup 밖) 하위호환 — 예전 identity 비교
+        fp = self._make_feature_processor_with_cache()  # cache directory, key and chain ledger are the same as the parent's
+        if split_role is None:  # direct call (outside setup), backward compatible -- identity comparison
             split_role = "train" if base_ds is getattr(self, "train_ds", None) else "val"
         attach = True if split_role == "train" else self.aqs_cfg.attach_val
         return _QLungFeatureDataset(base_ds, fp, feature_transform=feature_transform, attach_aqs=attach)
@@ -248,13 +248,13 @@ class QLungDataModule(IndexDataModule):
         os.replace(tmp, self.aqs_variant_path)
         vals = torch.tensor(list(d.values()), dtype=torch.float64)
         finite = vals[torch.isfinite(vals)]
-        logger.info("AQS 변형 %s: n=%d mean %.4f std %.4f min %.4f max %.4f nan=%d → %s", self.aqs_cfg.variant, len(vals),
+        logger.info("AQS variant %s: n=%d mean %.4f std %.4f min %.4f max %.4f nan=%d -> %s", self.aqs_cfg.variant, len(vals),
                     float(finite.mean()) if len(finite) else float("nan"), float(finite.std()) if len(finite) > 1 else 0.0,
                     float(finite.min()) if len(finite) else float("nan"), float(finite.max()) if len(finite) else float("nan"),
                     int((~torch.isfinite(vals)).sum()), self.aqs_variant_path)
 
     def setup(self, stage: Optional[str] = None) -> None:
-        # 원본은 fbank 변환 전에 AQS 를 계산한다 — 피처 웜업(부모 setup) 전에 AQS 캐시를 채운다.
+        # The original computes AQS before the fbank conversion -- fill the AQS cache before feature warm-up (parent setup).
         if self.index_csv is None:
             self.outputs_directory.mkdir(parents=True, exist_ok=True)
             self.index_csv = self._default_index_path()
@@ -264,4 +264,4 @@ class QLungDataModule(IndexDataModule):
         if stage in (None, "test"):
             self._precompute_aqs(self._build_index_dataset(splits=self.test_splits), "test")
         super().setup(stage)
-    # dataloader 3종은 부모 그대로 (collate_fn=qlung_collate 는 __init__ 에서 주입)
+    # the 3 dataloaders are inherited unchanged (collate_fn=qlung_collate is injected in __init__)

@@ -1,8 +1,8 @@
-"""공용 Registry 의 계약 (리팩토링 P1 1단계).
+"""Contract of the shared Registry.
 
-여기서 고정하는 것: 중복 등록 거부·멱등 재등록, lazy 선언과 첫 조회 import, ImportError 격리,
-미지 이름의 가용 목록 KeyError, build() 의 비파괴 params, Mapping 프로토콜(dict 소비 코드 호환),
-플러그인 로더 멱등성·격리.
+Pinned here: rejection of duplicate registration and idempotent re-registration, lazy declarations and import on first lookup, ImportError isolation,
+KeyError listing the available names for an unknown name, non-mutating params in build(), the Mapping protocol (compatibility with dict-consuming code),
+idempotence and isolation of the plugin loader.
 """
 from __future__ import annotations
 
@@ -34,7 +34,7 @@ class TestRegisterSemantics:
             pass
 
         reg.register("a")(A)
-        reg.register("a")(A)  # 모듈 재로드 등 — 조용히 통과
+        reg.register("a")(A)  # module reload etc. — passes silently
         assert reg.get("a") is A
 
     def test_different_object_same_name_is_rejected(self):
@@ -64,7 +64,7 @@ class TestRegisterSemantics:
         reg.register("a")(object)
         reg.register_lazy("b", "os.path:join")
         assert reg.pop("a") is object
-        assert reg.pop("b") is None  # lazy 는 해석하지 않고 버린다
+        assert reg.pop("b") is None  # lazy entries are dropped without resolving
         assert reg.pop("zzz", None) is None
         with pytest.raises(KeyError):
             reg.pop("zzz")
@@ -77,8 +77,8 @@ class TestLazy:
     def test_lazy_is_resolved_on_first_get_only(self):
         reg = Registry("thing")
         reg.register_lazy("join", "os.path:join")
-        assert "join" in reg  # 조회 없이도 존재는 안다
-        assert reg._objs == {}  # 아직 import 안 함
+        assert "join" in reg  # existence is known without lookup
+        assert reg._objs == {}  # not imported yet
         import os.path
 
         assert reg.get("join") is os.path.join
@@ -92,12 +92,12 @@ class TestLazy:
     def test_lazy_duplicate_declaration(self):
         reg = Registry("thing")
         reg.register_lazy("x", "os.path:join")
-        reg.register_lazy("x", "os.path:join")  # 같은 대상은 멱등
+        reg.register_lazy("x", "os.path:join")  # same target is idempotent
         with pytest.raises(ValueError):
             reg.register_lazy("x", "os.path:split")
 
     def test_decorator_matching_lazy_declaration_is_accepted(self):
-        """내장 항목을 그 모듈 안에서 데코레이터로도 등록하면 (같은 경로) 통과해야 한다."""
+        """Registering a built-in entry with a decorator inside its own module (same path) must also pass."""
         reg = Registry("thing")
         reg.register_lazy("R", f"{__name__}:_Dummy")
         assert reg.register("R")(_Dummy) is _Dummy
@@ -106,7 +106,7 @@ class TestLazy:
     def test_decorator_conflicting_with_lazy_declaration_is_rejected(self):
         reg = Registry("thing")
         reg.register_lazy("R", "os.path:join")
-        with pytest.raises(ValueError, match="내장 항목"):
+        with pytest.raises(ValueError, match="built-in entry"):
             reg.register("R")(_Dummy)
 
     def test_missing_dependency_only_breaks_that_entry(self):
@@ -118,7 +118,7 @@ class TestLazy:
         import os.path
 
         assert reg.get("fine") is os.path.join
-        assert "broken" in reg  # 선언은 남아 있고, 다시 시도하면 같은 오류
+        assert "broken" in reg  # the declaration remains; retrying gives the same error
 
     def test_missing_attribute_is_import_error(self):
         reg = Registry("thing")
@@ -149,12 +149,12 @@ class TestLookupAndBuild:
         cfg = {"name": "rec", "params": {"lr": 1e-3}}
         assert reg.build(cfg, "pos", extra=True) == "built"
         assert calls == [(("pos",), {"lr": 1e-3, "extra": True})]
-        assert cfg == {"name": "rec", "params": {"lr": 1e-3}}  # 비파괴
+        assert cfg == {"name": "rec", "params": {"lr": 1e-3}}  # not mutated
 
     def test_build_without_name_or_with_none_params(self):
         reg = Registry("thing")
         reg.register("rec")(lambda **kw: kw)
-        with pytest.raises(KeyError, match="'name' 가 없다"):
+        with pytest.raises(KeyError, match="has no 'name'"):
             reg.build({"params": {}})
         assert reg.build({"name": "rec", "params": None}) == {}
         assert reg.build({"name": "rec"}) == {}
@@ -174,7 +174,7 @@ class TestMappingProtocol:
         reg.register_lazy("a", "os.path:join")
         assert sorted(reg) == ["a", "b"]
         assert list(reg.keys()) == ["a", "b"]
-        assert dict(reg)["b"] is int  # values() 는 lazy 를 해석한다
+        assert dict(reg)["b"] is int  # values() resolves lazy entries
         assert set(reg.items()) >= {("b", int)}
         assert len(reg) == 2
         del reg["a"]
@@ -204,10 +204,10 @@ class TestPackageScan:
             import rsc_scan_fixture_pkg as p
 
             p.REG = Registry("scan", scan_packages=("rsc_scan_fixture_pkg",))
-            assert "good" in p.REG  # 스캔이 good.py 를 import 했다
+            assert "good" in p.REG  # the scan imported good.py
             assert p.REG._scanned is True
             names_before = list(p.REG)
-            p.REG._discover()  # 멱등
+            p.REG._discover()  # idempotent
             assert list(p.REG) == names_before
         finally:
             for m in list(sys.modules):
@@ -216,12 +216,12 @@ class TestPackageScan:
 
 
     def test_internal_module_error_is_isolated_and_reported(self, tmp_path, monkeypatch):
-        """ImportError 가 아닌 내부 오류(NameError 등)도 모듈 단위로 격리되고, KeyError 메시지가 원인을 지목한다
-        (REVIEW 2026-09-10 §1 P2 — 예전엔 스캔 전체가 중단돼 알파벳순 뒤 모듈이 영구 미등록)."""
+        """Internal errors other than ImportError (NameError etc.) are also isolated per module, and the KeyError message names the cause
+        (previously the whole scan aborted and modules alphabetically after it stayed unregistered permanently)."""
         pkg = tmp_path / "rsc_scan_fixture_pkg2"
         pkg.mkdir()
         (pkg / "__init__.py").write_text("")
-        (pkg / "a_broken.py").write_text("undefined_name_here\n")          # NameError (알파벳순 첫 모듈)
+        (pkg / "a_broken.py").write_text("undefined_name_here\n")          # NameError (alphabetically first module)
         (pkg / "b_good.py").write_text(
             textwrap.dedent(
                 """
@@ -236,7 +236,7 @@ class TestPackageScan:
             import rsc_scan_fixture_pkg2 as p
 
             p.REG = Registry("scan2", scan_packages=("rsc_scan_fixture_pkg2",))
-            assert "good2" in p.REG                                    # 뒤 모듈이 살아남았다
+            assert "good2" in p.REG                                    # the later module survived
             assert list(p.REG.failed_modules) == ["rsc_scan_fixture_pkg2.a_broken"]
             assert p.REG.failed_modules["rsc_scan_fixture_pkg2.a_broken"].startswith("NameError")
             with pytest.raises(KeyError) as exc:
@@ -257,7 +257,7 @@ class TestPluginLoader:
         monkeypatch.syspath_prepend(str(tmp_path))
         monkeypatch.setenv(PLUGIN_ENV_VAR, f"{module_name}, rsc_definitely_missing_plugin")
         try:
-            load_plugins(force=True)  # 깨진 모듈이 있어도 예외를 밖으로 던지지 않는다
+            load_plugins(force=True)  # does not raise even with a broken module
             assert sys.modules[module_name].LOADED is True
         finally:
             sys.modules.pop(module_name, None)
@@ -268,8 +268,8 @@ class TestPluginLoader:
         load_plugins()
         assert registry_mod._PLUGINS_LOADED is True
         monkeypatch.setenv(PLUGIN_ENV_VAR, "rsc_definitely_missing_plugin")
-        load_plugins()  # 두 번째는 no-op (깨진 모듈을 시도하지 않는다)
-        load_plugins(force=True)  # force 는 다시 훑는다 — 역시 예외 없이
+        load_plugins()  # second call is a no-op (does not retry the broken module)
+        load_plugins(force=True)  # force rescans — still without raising
 
 
 class _Dummy:

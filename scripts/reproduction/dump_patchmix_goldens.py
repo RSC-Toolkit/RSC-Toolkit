@@ -1,20 +1,20 @@
 """
-Patch-Mix 공식 코드(timm 0.4.5)에서 P0 골든 파일을 뜬다.
+Produces official-code parity golden files from the official Patch-Mix code (timm 0.4.5).
 
-실행 (참조 환경 필수 — 툴킷 venv 가 아니라 구버전 환경):
+Run (the reference environment is required — an old-version environment, not the toolkit venv):
   .venv-ref-timm045/bin/python scripts/reproduction/dump_patchmix_goldens.py \
-      --repo <patch-mix 저장소 클론 경로> --ckpt pretrained_models/upstream/audioset_0.4593.pth
+      --repo <path to the patch-mix repository clone> --ckpt pretrained_models/upstream/audioset_0.4593.pth
 
-산출물 (tests/golden/patchmix/):
-  - reference_versions.json  : 참조 환경의 torch/timm 버전
-  - state_dict_shapes.json   : 참조 ASTModel(audioset, 798/128)의 {키: 모양}
-  - features_input.pt / features_golden.pt : 고정 입력과 참조 forward 출력 (B=2, 768)
-  - loss_goldens.pt          : 손실 입력 텐서 + 참조 손실 값
+Outputs (tests/golden/patchmix/):
+  - reference_versions.json  : torch/timm versions of the reference environment
+  - state_dict_shapes.json   : {key: shape} of the reference ASTModel(audioset, 798/128)
+  - features_input.pt / features_golden.pt : fixed input and reference forward output (B=2, 768)
+  - loss_goldens.pt          : loss input tensors + reference loss values
 
-주의:
-- 참조 PatchMixConLoss 는 .cuda() 를 하드코딩하므로 CPU 실행을 위해
-  Tensor.cuda / Module.cuda 를 항등으로 패치한다 (수학에는 영향 없음).
-- 입력 텐서를 함께 저장하므로 버전 간 RNG 차이는 결과에 영향을 주지 않는다.
+Notes:
+- The reference PatchMixConLoss hard-codes .cuda(), so for CPU execution
+  Tensor.cuda / Module.cuda are patched to identity (no effect on the math).
+- The input tensors are saved as well, so RNG differences across versions do not affect the results.
 """
 import argparse
 import json
@@ -27,14 +27,14 @@ from types import SimpleNamespace
 import torch
 import torch.nn as nn
 
-# CPU 전용 환경에서 참조 코드의 하드코딩된 .cuda() 를 무력화
+# neutralize the hard-coded .cuda() of the reference code in a CPU-only environment
 torch.Tensor.cuda = lambda self, *a, **k: self  # type: ignore[assignment]
 nn.Module.cuda = lambda self, *a, **k: self  # type: ignore[assignment]
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--repo", required=True, help="patch-mix 공식 저장소 클론 경로")
-    ap.add_argument("--ckpt", required=True, help="audioset_0.4593.pth 경로")
+    ap.add_argument("--repo", required=True, help="path to the patch-mix official repository clone")
+    ap.add_argument("--ckpt", required=True, help="path to audioset_0.4593.pth")
     ap.add_argument("--out", default="tests/golden/patchmix")
     args = ap.parse_args()
 
@@ -52,7 +52,7 @@ def main():
         except Exception:
             return None
 
-    # 참조 저장소는 URL·커밋으로 기록한다 — 로컬 클론 경로는 머신마다 다르고 골든의 출처 정보가 아니다
+    # record the reference repository by URL and commit — the local clone path differs per machine and is not provenance of the goldens
     json.dump(
         {"torch": torch.__version__, "timm": timm.__version__,
          "repo": _git("config", "--get", "remote.origin.url") or repo.name, "commit": _git("rev-parse", "--short", "HEAD")},
@@ -61,17 +61,17 @@ def main():
 
     sys.path.insert(0, str(repo))
 
-    # 참조 ast.py 는 './pretrained_models/audioset_10_10_0.4593.pth' 를 cwd 기준으로 찾는다
+    # the reference ast.py looks for './pretrained_models/audioset_10_10_0.4593.pth' relative to cwd
     workdir = tempfile.mkdtemp(prefix="patchmix_golden_")
     os.makedirs(os.path.join(workdir, "pretrained_models"), exist_ok=True)
     os.symlink(ckpt, os.path.join(workdir, "pretrained_models", "audioset_10_10_0.4593.pth"))
     os.chdir(workdir)
 
-    from models.ast import ASTModel  # noqa: E402  (참조 저장소)
+    from models.ast import ASTModel  # noqa: E402  (reference repository)
     from method.patchmix import PatchMixLoss  # noqa: E402
     from method.patchmix_cl import PatchMixConLoss  # noqa: E402
 
-    # ---- 모델 골든: main.py 의 AST 호출과 동일 (798/128 스왑 포함) ----
+    # ---- model goldens: same as the AST call in main.py (including the 798/128 swap) ----
     torch.manual_seed(0)
     model = ASTModel(
         label_dim=4, fstride=10, tstride=10, input_fdim=798, input_tdim=128,
@@ -91,7 +91,7 @@ def main():
     torch.save(feats.float(), out / "features_golden.pt")
     print("features golden:", tuple(feats.shape), "mean", float(feats.mean()))
 
-    # ---- 손실 골든 (입력도 함께 저장) ----
+    # ---- loss goldens (inputs saved too) ----
     torch.manual_seed(7)
     g = {}
     g["pred"] = torch.randn(8, 4)
@@ -120,7 +120,7 @@ def main():
 
     torch.save(g, out / "loss_goldens.pt")
     print("loss goldens:", {k: v for k, v in g.items() if isinstance(v, float)})
-    print("완료:", out)
+    print("done:", out)
 
 
 if __name__ == "__main__":

@@ -1,17 +1,17 @@
 """
-HTSAT-Swin(OPERA-CT 인코더) 툴킷 재구현 — evelyn0414/OPERA src/model/htsat/htsat.py (Ke Chen HTS-AT, torchlibrosa 프론트엔드 주석 처리본) 충실 재현.
+Toolkit re-implementation of HTSAT-Swin (OPERA-CT encoder) — faithful reproduction of evelyn0414/OPERA src/model/htsat/htsat.py (Ke Chen's HTS-AT with the torchlibrosa front end commented out).
 
-원본과의 관계:
-- 모듈 이름·버퍼(attn_mask, relative_position_index)·파라미터 배치가 원본 HTSAT_Swin_Transformer 와 동일해 공식 ckpt 의
-  `encoder.encoder.htsat.*` 키를 접두어만 떼고 strict 로 로드한다 (197 키). 사용되지 않는 torchlibrosa 프론트엔드
-  (spectrogram_extractor·logmel_extractor) 와 SpecAugmentation 은 두지 않는다 (원본 forward 도 주석 처리로 안 씀).
-- 입력은 외부 멜 (B,1,T,64). forward: bn0 → (T≤1024) reshape_wav2img(T→1024 bicubic 보간, 4 조각을 주파수축에 쌓아 256×256)
-  → patch_embed(4×4/4) → Swin 4 stage(depth 2,2,6,2 · window 8) → norm → token-semantic 재배열 후 전 토큰 평균 = latent_output(768).
-  T>1024 이면 eval 시 1024/겹침 512 슬라이딩 후 latent 평균, train 시 무작위 crop (원본 그대로).
-- tscam_conv·head(AudioSet 527) 는 ckpt 에 있어 모듈로 유지하지만 latent_output 만 쓰므로 계산하지 않는다
-  (framewise/clipwise 출력 생략). eval 모드에서 attention map 을 모아 평균하던 부분도 출력에 영향이 없어 생략.
-- DropPath(drop_path_rate 0.1, linspace 감쇠) 는 train 모드에서 살아 있다 — EMBC 동결 프로토콜(freeze_body) 도 model.train()
-  상태라 그대로 동작하고, bn0 도 배치 통계를 쓰며 running 통계를 갱신한다 (원본 quirk, 유지).
+Relation to the original code:
+- Module names, buffers (attn_mask, relative_position_index) and parameter layout match the original HTSAT_Swin_Transformer, so the
+  `encoder.encoder.htsat.*` keys of the official ckpt load strictly after stripping the prefix (197 keys). The unused torchlibrosa front end
+  (spectrogram_extractor·logmel_extractor) and SpecAugmentation are not included (the original forward comments them out too).
+- Input is an external mel (B,1,T,64). forward: bn0 → (T≤1024) reshape_wav2img (T→1024 bicubic interpolation, 4 pieces stacked along the frequency axis to 256×256)
+  → patch_embed(4×4/4) → Swin 4 stages (depth 2,2,6,2 · window 8) → norm → token-semantic reshape, then mean over all tokens = latent_output(768).
+  If T>1024: sliding 1024 windows with 512 overlap and latent averaging at eval, random crop at train (same as the original).
+- tscam_conv·head (AudioSet 527) are in the ckpt and kept as modules, but only latent_output is used, so they are not computed
+  (framewise/clipwise outputs omitted). The eval-mode collection and averaging of attention maps is also omitted, as it does not affect the output.
+- DropPath (drop_path_rate 0.1, linspace decay) is active in train mode — the EMBC frozen protocol (freeze_body) also runs under model.train(),
+  so it stays active, and bn0 uses batch statistics and updates its running statistics (quirk of the original, kept).
 """
 from __future__ import annotations
 
@@ -62,7 +62,7 @@ def window_reverse(windows, window_size, H, W):
 
 
 class PatchEmbed(nn.Module):
-    """htsat_util.PatchEmbed — stride 와 kernel 이 다를 수 있는 패치 임베딩 (여기서는 4×4/4, 패딩 0)."""
+    """htsat_util.PatchEmbed — patch embedding whose stride may differ from the kernel (here 4×4/4, padding 0)."""
 
     def __init__(self, img_size=256, patch_size=4, in_chans=1, embed_dim=96, norm_layer=None, patch_stride=4):
         super().__init__()
@@ -76,7 +76,7 @@ class PatchEmbed(nn.Module):
 
     def forward(self, x):
         B, C, H, W = x.shape
-        assert H == self.img_size[0] and W == self.img_size[1], f"입력 {H}x{W} ≠ 모델 {self.img_size}"
+        assert H == self.img_size[0] and W == self.img_size[1], f"input {H}x{W} ≠ model {self.img_size}"
         x = self.proj(x).flatten(2).transpose(1, 2)
         return self.norm(x)
 
@@ -145,7 +145,7 @@ class SwinTransformerBlock(nn.Module):
         self.dim, self.input_resolution, self.num_heads = dim, input_resolution, num_heads
         self.window_size, self.shift_size, self.mlp_ratio = window_size, shift_size, mlp_ratio
         if min(self.input_resolution) <= self.window_size:
-            # 원본: 창이 해상도 이상이면 분할하지 않는다 (마지막 stage 8×8 → shift 0)
+            # original: no partitioning when the window is at least the resolution (last stage 8×8 → shift 0)
             self.shift_size = 0
             self.window_size = min(self.input_resolution)
         assert 0 <= self.shift_size < self.window_size
@@ -227,7 +227,7 @@ class BasicLayer(nn.Module):
 
 
 class HTSATSwin(nn.Module):
-    """OPERA-CT 의 HTSAT_Swin_Transformer (config.py: spec 256, patch 4/4, dim 96, depth 2,2,6,2, heads 4,8,16,32, window 8, mel 64, 527 클래스, tscam)."""
+    """HTSAT_Swin_Transformer of OPERA-CT (config.py: spec 256, patch 4/4, dim 96, depth 2,2,6,2, heads 4,8,16,32, window 8, mel 64, 527 classes, tscam)."""
 
     def __init__(self, spec_size=256, patch_size=4, patch_stride=(4, 4), in_chans=1, num_classes=527, embed_dim=96,
                  depths=(2, 2, 6, 2), num_heads=(4, 8, 16, 32), window_size=8, mlp_ratio=4.0, qkv_bias=True,
@@ -255,7 +255,7 @@ class HTSATSwin(nn.Module):
                 downsample=PatchMerging if (i_layer < self.num_layers - 1) else None))
         self.norm = norm_layer(self.num_features)
         self.avgpool = nn.AdaptiveAvgPool1d(1)
-        # ckpt 호환용 (AudioSet token-semantic 헤드) — latent_output 경로에서는 쓰지 않는다
+        # for ckpt compatibility (AudioSet token-semantic head) — not used in the latent_output path
         SF = spec_size // (2 ** (len(depths) - 1)) // self.patch_stride[0] // self.freq_ratio
         self.tscam_conv = nn.Conv2d(self.num_features, num_classes, kernel_size=(SF, 3), padding=(0, 1))
         self.head = nn.Linear(num_classes, num_classes)
@@ -270,7 +270,7 @@ class HTSATSwin(nn.Module):
             nn.init.constant_(m.bias, 0)
             nn.init.constant_(m.weight, 1.0)
 
-    # ---- 원본 forward_features 의 latent_output 부분 ----
+    # ---- latent_output part of the original forward_features ----
     def forward_features(self, x):
         frames_num = x.shape[2]
         x = self.pos_drop(self.patch_embed(x))
@@ -309,20 +309,20 @@ class HTSATSwin(nn.Module):
         return x.reshape(x.shape[0], x.shape[1], x.shape[2] * x.shape[3], x.shape[4])  # B C 256 256
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """x: (B, 1, T, mel_bins) 외부 멜 → latent_output (B, 768). 원본 forward 의 latent_output 만 반환."""
+        """x: (B, 1, T, mel_bins) external mel → latent_output (B, 768). Returns only the latent_output of the original forward."""
         x = self.bn0(x.transpose(1, 3)).transpose(1, 3)
         if x.shape[2] > self.freq_ratio * self.spec_size:
             if self.training:
                 return self.forward_features(self.reshape_wav2img(self.crop_wav(x, crop_size=self.freq_ratio * self.spec_size)))
-            overlap_size, crop_size = 512, 1024  # 원본 하드코딩
+            overlap_size, crop_size = 512, 1024  # hard-coded in the original
             outs = [self.forward_features(self.reshape_wav2img(self.crop_wav(x, crop_size=crop_size, spe_pos=cur_pos)))
                     for cur_pos in range(0, x.shape[2] - crop_size - 1, overlap_size)]
             return torch.stack(outs, 0).float().mean(0)
         return self.forward_features(self.reshape_wav2img(x))
 
 
-# 공식 Cola(htsat) ckpt 에서 툴킷이 버리는 키: 미사용 torchlibrosa 프론트엔드(htsat 내부) 와 COLA 프로젝터(g, layer_norm, linear —
-# extract_feature(dim=768) 는 인코더 출력을 그대로 돌려주므로 두 프로토콜 모두 쓰지 않는다)
+# Keys of the official Cola(htsat) ckpt that the toolkit drops: the unused torchlibrosa front end (inside htsat) and the COLA projector (g, layer_norm, linear —
+# extract_feature(dim=768) returns the encoder output as is, so neither protocol uses it)
 OPERA_CT_DROPPED_KEY_PREFIXES = (
     "encoder.encoder.htsat.spectrogram_extractor.",
     "encoder.encoder.htsat.logmel_extractor.",
@@ -332,7 +332,7 @@ _HTSAT_PREFIX = "encoder.encoder.htsat."
 
 
 def load_opera_ct_checkpoint(model: HTSATSwin, path: str) -> List[str]:
-    """encoder-operaCT.ckpt(Lightning, Cola encoder='htsat') → HTSATSwin strict 로드. 버린 키 목록을 돌려준다."""
+    """encoder-operaCT.ckpt (Lightning, Cola encoder='htsat') → strict load into HTSATSwin. Returns the list of dropped keys."""
     ck = torch.load(path, map_location="cpu", weights_only=False)
     sd = ck["state_dict"] if "state_dict" in ck else ck
     new_sd, dropped = {}, []
@@ -342,6 +342,6 @@ def load_opera_ct_checkpoint(model: HTSATSwin, path: str) -> List[str]:
         elif k.startswith(_HTSAT_PREFIX):
             new_sd[k[len(_HTSAT_PREFIX):]] = v
         else:
-            raise KeyError(f"예상 밖의 ckpt 키: {k}")
+            raise KeyError(f"unexpected ckpt key: {k}")
     model.load_state_dict(new_sd, strict=True)
     return dropped

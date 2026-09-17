@@ -1,4 +1,4 @@
-# LungAdapter: Adam lr 5e-4 (논문 3.1.2 명시; Bae 5e-5 의 10배). weight_decay 는 미기재 → Bae 1e-6 상속 추정.
+# LungAdapter: Adam lr 5e-4 (stated in paper 3.1.2; 10× Bae's 5e-5). weight_decay not specified → assumed inherited from Bae (1e-6).
 name: adam
 params:
   lr: 5e-4

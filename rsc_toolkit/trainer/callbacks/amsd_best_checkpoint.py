@@ -1,10 +1,10 @@
 """
-AMS-D 용 best 선택 — ICBHIBestScoreCheckpoint 와 같은 프로토콜(val=공식 test, Score 최고 && Se > min_se) 이되
-(1) 판정 키를 고를 수 있고(기본: 논문 이진 지표 paper_score/paper_S_e/paper_S_p — 사용자 결정 2026-08-26),
-(2) best.json 에 표준 4-class ICBHIScore(S_p/S_e/icbhi_score) 와 이진 지표를 **모두** 기록한다.
+Best selection for AMS-D: same protocol as ICBHIBestScoreCheckpoint (val = official test, highest Score && Se > min_se), except that
+(1) the selection keys are configurable (default: the paper's binary metrics paper_score/paper_S_e/paper_S_p), and
+(2) best.json records **both** the standard 4-class ICBHIScore (S_p/S_e/icbhi_score) and the binary metrics.
 
-표준 산식으로 best 를 고르려면 score_key=icbhi_score se_key=S_e sp_key=S_p 로 바꾼다.
-공식 코드의 선택(train 내부 80/20 valid 의 best_acc/best_score ckpt, test.py 기본 epoch 45) 은 구현하지 않고 문서화한다.
+To select best by the standard formula, set score_key=icbhi_score se_key=S_e sp_key=S_p.
+The official code's selection (best_acc/best_score ckpt on an 80/20 valid split inside train, test.py default epoch 45) is documented, not implemented.
 """
 from __future__ import annotations
 
@@ -29,7 +29,7 @@ class AMSDBestScoreCheckpoint(ICBHIBestScoreCheckpoint):
         score_key: str = "paper_score",
         se_key: str = "paper_S_e",
         sp_key: str = "paper_S_p",
-        min_se: float = -1.0,             # 원본에 Se 게이트 없음
+        min_se: float = -1.0,             # no Se gate in the original code
         model_attr: str = "rsc_model",
         record_keys: Sequence[str] = DEFAULT_RECORD_KEYS,
     ):
@@ -42,11 +42,11 @@ class AMSDBestScoreCheckpoint(ICBHIBestScoreCheckpoint):
             return
         metrics = trainer.callback_metrics
         if self.score_key not in metrics:
-            # 부모(ICBHIBestScoreCheckpoint)와 같은 이유의 fail-fast — 침묵 무산출 완주 방지.
+            # Fail fast for the same reason as the parent (ICBHIBestScoreCheckpoint): avoid silently finishing with no output.
             raise RuntimeError(
-                f"best 선정 메트릭 '{self.score_key}' 가 로그에 없다 (있는 키: {sorted(map(str, metrics))}). "
-                f"metrics config 의 val 목록에 해당 메트릭이 있는지 확인하라 — "
-                f"이대로 완주하면 best.pth/best.json 없이 끝난다."
+                f"best-selection metric '{self.score_key}' is not logged (available keys: {sorted(map(str, metrics))}). "
+                f"Check that the metric is in the val list of the metrics config; "
+                f"otherwise training finishes without best.pth/best.json."
             )
         score = float(metrics[self.score_key])
         se = float(metrics.get(self.se_key, float("nan")))
@@ -63,5 +63,5 @@ class AMSDBestScoreCheckpoint(ICBHIBestScoreCheckpoint):
         path = self.dirpath / self.filename
         atomic_torch_save({"model": model.state_dict(), **info}, path)
         atomic_json_dump(info, path.with_suffix(".json"))
-        logger.info("Best 갱신(%s): epoch %d, %s=%.2f | 표준 Sp/Se/Score %s/%s/%s", self.score_key, info["epoch"], self.score_key, score,
+        logger.info("Best updated (%s): epoch %d, %s=%.2f | standard Sp/Se/Score %s/%s/%s", self.score_key, info["epoch"], self.score_key, score,
                     info.get("S_p"), info.get("S_e"), info.get("icbhi_score"))

@@ -1,19 +1,19 @@
 # @package _global_
-# sgscl 논문 AST 학습 프로토콜 콜백 (patch-mix 와 동일 값 — 같은 저자 계열 레시피):
-#   - 매 iteration 직전 가중치와 0.5:0.5 live 평균 (--ma_update --ma_beta 0.5)
-#   - epoch 단위 cosine LR (eta_min = lr * 0.1^3), warmup 없음
-#   - best-on-test 선택: Score 최고 && Se > 5 일 때 저장 (원본 validate 와 동일)
+# sgscl paper AST training-protocol callbacks (same values as patch-mix — recipe from the same author lineage):
+#   - 0.5:0.5 live average with the pre-iteration weights at every iteration (--ma_update --ma_beta 0.5)
+#   - per-epoch cosine LR (eta_min = lr * 0.1^3), no warmup
+#   - best-on-test selection: save when Score is best && Se > 5 (same as the official validate)
 trainer:
   params:
     callbacks:
       - _target_: rsc_toolkit.trainer.callbacks.ma_update.LiveWeightAveraging
         beta: 0.5
       - _target_: rsc_toolkit.trainer.callbacks.paper_cosine_lr.PaperCosineLR
-        learning_rate: ${optimizer.params.lr}        # 단일 출처 — optimizer 그룹. 하드코딩 복사본이 CLI 스윕을 침묵 무효화했다
+        learning_rate: ${optimizer.params.lr}        # single source: the optimizer group (a hard-coded copy would silently ignore CLI sweeps)
         epochs: ${trainer.params.max_epochs}
       - _target_: rsc_toolkit.trainer.callbacks.icbhi_best_checkpoint.ICBHIBestScoreCheckpoint
         dirpath: outputs/sgscl/${run.name}
         min_se: 5.0
-      # epoch 단위 재개용 last.ckpt (외부 요인으로 죽어도 이어서; 정상 종료 시 삭제)
+      # per-epoch last.ckpt for resuming after an external interruption (deleted on normal completion)
       - _target_: rsc_toolkit.trainer.callbacks.resume_checkpoint.EpochResumeCheckpoint
         dirpath: outputs/sgscl/${run.name}

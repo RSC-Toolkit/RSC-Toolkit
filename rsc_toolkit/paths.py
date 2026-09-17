@@ -1,16 +1,16 @@
-"""경로 해석의 단일 출처 (리팩토링 P2-9) — 저장소 밖에서 설치해 써도 되게.
+"""Single source of path resolution — so the toolkit also works when installed outside the repository.
 
-두 가지를 한 곳에서 정한다:
+Two things are decided here:
 
-1. **사전학습 체크포인트** (`pretrained_models/upstream/…`). 모델마다 후보 목록을 cwd 기준으로 찾고 없으면 내려받았는데,
-   이제 `RSCTK_PRETRAINED_ROOT` 환경변수를 먼저 본다 — 여러 checkout 이 한 디렉터리의 가중치를 공유하거나, 패키지로
-   설치한 사용자가 가중치를 아무 데나 둘 수 있게. 해석 순서:
-     명시 경로(config 의 pretrained_path)              → 그대로(상대면 cwd, 없으면 ROOT 아래에서도 찾는다)
-     각 후보 경로 c 에 대해                              → ROOT/<c 에서 'pretrained_models/' 접두사를 뗀 것> → ROOT/<basename> → cwd/c
-   내려받을 때의 목적지도 같은 규칙(ROOT 가 있으면 ROOT 아래).
+1. **Pretrained checkpoints** (`pretrained_models/upstream/…`). Each model has a list of candidate paths relative to cwd and
+   downloads the file if none exists; the `RSCTK_PRETRAINED_ROOT` environment variable is checked first, so several checkouts
+   can share one weights directory and users of the installed package can keep weights anywhere. Resolution order:
+     explicit path (pretrained_path in the config)    → as is (relative to cwd; if missing, also looked up under ROOT)
+     for each candidate path c                        → ROOT/<c without the 'pretrained_models/' prefix> → ROOT/<basename> → cwd/c
+   The download destination follows the same rule (under ROOT if set).
 
-2. **프로젝트 루트**. 몇몇 모듈이 `Path(__file__).parents[2]` 로 저장소 루트를 추정했는데 설치본에서는 site-packages 를
-   가리킨다. `project_root_from()` 은 인자 → `RSCTK_PROJECT_ROOT` → cwd(저장소 표지가 있으면) → 패키지 상위(개발 checkout) → cwd.
+2. **Project root**. `Path(__file__).parents[2]` points to site-packages in an installed package, so it cannot be used to
+   locate the repository root. `project_root_from()` resolves: argument → `RSCTK_PROJECT_ROOT` → cwd (if it has repository markers) → package parent (development checkout) → cwd.
 """
 from __future__ import annotations
 
@@ -27,7 +27,7 @@ PathLike = Union[str, os.PathLike]
 
 
 def pretrained_root() -> Optional[pathlib.Path]:
-    """`RSCTK_PRETRAINED_ROOT` (없으면 None)."""
+    """`RSCTK_PRETRAINED_ROOT` (None if unset)."""
     raw = os.environ.get(PRETRAINED_ROOT_ENV, "").strip()
     return pathlib.Path(raw).expanduser() if raw else None
 
@@ -39,10 +39,10 @@ def _under_root(root: pathlib.Path, candidate: str) -> Iterable[pathlib.Path]:
 
 
 def resolve_pretrained(candidates: Sequence[str] = (), explicit: Optional[PathLike] = None) -> Optional[pathlib.Path]:
-    """존재하는 체크포인트 경로를 돌려준다 (없으면 None — 호출자가 내려받거나 오류를 낸다).
+    """Return an existing checkpoint path (None if not found — the caller downloads it or raises).
 
-    `explicit` 이 있으면 그것을 우선한다: 절대/존재하는 상대 경로면 그대로, 상대인데 없으면 ROOT 아래에서도 찾고,
-    그래도 없으면 **그 경로를 그대로** 돌려준다(호출자의 기존 오류 메시지가 그 경로를 지목하도록).
+    `explicit` takes precedence: an absolute or existing relative path is returned as is; a missing relative path is also
+    looked up under ROOT, and if still not found **that path is returned unchanged** (so the caller's error message names it).
     """
     root = pretrained_root()
     if explicit is not None:
@@ -66,7 +66,7 @@ def resolve_pretrained(candidates: Sequence[str] = (), explicit: Optional[PathLi
 
 
 def download_target(candidate: str) -> pathlib.Path:
-    """체크포인트를 내려받을 자리 — ROOT 가 있으면 ROOT 아래(접두사 제거), 없으면 cwd 기준 후보 경로 그대로."""
+    """Download destination for a checkpoint — under ROOT if set (prefix removed), otherwise the candidate path relative to cwd."""
     root = pretrained_root()
     if root is not None:
         rel = candidate[len(_PRETRAINED_PREFIX):] if candidate.startswith(_PRETRAINED_PREFIX) else candidate
@@ -75,7 +75,7 @@ def download_target(candidate: str) -> pathlib.Path:
 
 
 def project_root_from(project_root: Optional[PathLike] = None) -> pathlib.Path:
-    """저장소/작업 루트: 인자 → RSCTK_PROJECT_ROOT → cwd(표지 파일이 있으면) → 패키지 상위(개발 checkout) → cwd."""
+    """Repository/work root: argument → RSCTK_PROJECT_ROOT → cwd (if it has marker files) → package parent (development checkout) → cwd."""
     if project_root:
         return pathlib.Path(project_root).expanduser().resolve()
     env = os.environ.get(PROJECT_ROOT_ENV, "").strip()

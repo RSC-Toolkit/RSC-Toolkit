@@ -1,6 +1,6 @@
-# OPERA-CT(HTSAT-Swin, evelyn0414/OPERA) 분류 모델 — EMBC'25 동결 평가 경로(eval-audio-repr app/icbhi_sprs solve.py) 재현.
-#   freeze_body true = EMBC --freeze_body (백본 동결, Tfm 헤드만 학습; ICBHI 4-class 48.97±1.21 / SPRS 7-class 71.62±0.84 앵커)
-#   freeze_body false = 툴킷 표준 태스크 전체 미세조정 (논문 목표치 없음)
+# OPERA-CT (HTSAT-Swin, evelyn0414/OPERA) classifier — reproduction of the EMBC'25 frozen-evaluation path (eval-audio-repr app/icbhi_sprs solve.py).
+#   freeze_body true = EMBC --freeze_body (frozen backbone, only the Tfm head is trained; paper-reported ICBHI 4-class 48.97±1.21 / SPRS 7-class 71.62±0.84)
+#   freeze_body false = full fine-tuning on the toolkit standard task (no paper-reported value)
 name: opera_ct
 params:
   n_cls: 4
@@ -10,7 +10,7 @@ params:
   head_depth: 4
   head_heads: 1
   head_mlp_ratio: 1
-  freq_mask: 20                  # scl args 기본 (evar SpecAugment, 배치 공유 마스크)
+  freq_mask: 20                  # scl args default (evar SpecAugment, mask shared across the batch)
   time_mask: 40
   input_sec: 8.0
   sample_rate: 16000

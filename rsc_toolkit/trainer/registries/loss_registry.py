@@ -1,4 +1,4 @@
-"""하위호환 창구. 등록의 원천은 rsc_toolkit.registries.LOSSES (내장은 lazy 선언, 외부는 데코레이터) 다."""
+"""Backward-compatibility alias. The source of truth is rsc_toolkit.registries.LOSSES (built-ins declared lazily, external entries via decorator)."""
 from rsc_toolkit.registries import LOSSES
 
 __all__ = ["LOSSES"]

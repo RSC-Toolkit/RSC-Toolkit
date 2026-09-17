@@ -1,10 +1,10 @@
-"""리팩토링 P1 10단계 — 잔여 안전망.
+"""Remaining safety nets.
 
-(a) PLAdapter 의 학습 메트릭 키는 `train/` 접두사를 붙인다 — 검증 키는 그대로(best-checkpoint·검증 스크립트·
-    best.json 스키마 불변). 예전엔 train/val 의 같은 키(acc@1)가 callback_metrics 와 TensorBoard 한 시리즈에 섞였고,
-    train 목록에 icbhi_score 를 넣으면 best 선정이 train 값으로 오염될 수 있었다.
-(b) FeatureCache.configure 는 audio_chain 없이 부르면 경고한다 (다음 릴리스에 필수) — 체인 대장 없는 캐시는
-    다른 전처리의 피처를 조용히 읽을 수 있다. SPRSound OOD 경로도 이제 체인을 남긴다.
+(a) PLAdapter prefixes training metric keys with `train/` — validation keys stay unchanged (best checkpoint, validation scripts,
+    best.json schema unchanged). Previously the same key (acc@1) in train/val was mixed into callback_metrics and a single TensorBoard
+    series, and putting icbhi_score in the train list could contaminate best selection with train values.
+(b) FeatureCache.configure warns when called without audio_chain (required in the next release) — a cache without a chain ledger
+    can silently read features from a different preprocessing. The SPRSound OOD path now records the chain too.
 """
 from __future__ import annotations
 
@@ -54,7 +54,7 @@ def test_train_metric_keys_are_prefixed_and_val_keys_are_not(monkeypatch):
     adapter.on_validation_epoch_end()
     assert "train/acc@1" in logged
     assert "acc@1" in logged and "icbhi_score" in logged and "S_p" in logged and "S_e" in logged
-    assert not any(k.startswith("val/") for k in logged)  # 검증 키는 무접두사 유지 (콜백·스크립트 호환)
+    assert not any(k.startswith("val/") for k in logged)  # validation keys stay unprefixed (callback/script compatibility)
 
 
 def test_feature_cache_configure_warns_without_audio_chain(tmp_path, caplog):

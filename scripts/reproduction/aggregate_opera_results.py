@@ -1,10 +1,10 @@
 """
-OPERA-CT P1 집계: outputs/opera/<run>/best.json (+ logs/<run>.done EXIT=0).
+OPERA-CT 5-seed reproduction check aggregation: outputs/opera/<run>/best.json (+ logs/<run>.done EXIT=0).
 
   .venv/bin/python scripts/reproduction/aggregate_opera_results.py
 
-앵커: EMBC'25(arXiv 2504.18004) OPERA-CT 동결 + Tfm 헤드 — ICBHI 4-class Score 48.97±1.21, SPRSound 7-class 71.62±0.84 (5회 반복).
-전체 미세조정(ft) 은 툴킷 정의 레시피라 논문 목표치가 없다 (동결 대비 비교만).
+Paper-reported values: EMBC'25 (arXiv 2504.18004) frozen OPERA-CT + Tfm head — ICBHI 4-class Score 48.97±1.21, SPRSound 7-class 71.62±0.84 (5 repetitions).
+Full fine-tuning (ft) uses a toolkit-defined recipe, so it has no paper-reported value (compared only against the frozen setting).
 """
 import json
 import pathlib
@@ -12,11 +12,11 @@ import re
 import statistics
 
 PAPER = {
-    # EMBC'25 Table I / II OPERA-CT 행: (Sp, Se, Score) mean±std
-    "icbhi-operact-frozen": ("OPERA-CT 동결 + Tfm (ICBHI 4-class)", ((79.09, 9.51), (18.86, 8.95), (48.97, 1.21))),
-    "sprs-operact-frozen":  ("OPERA-CT 동결 + Tfm (SPRSound 7-class)", ((83.23, 4.72), (60.00, 5.58), (71.62, 0.84))),
-    "icbhi-operact-ft":     ("OPERA-CT 전체 미세조정 (ICBHI, 툴킷 레시피)", None),
-    "sprs-operact-ft":      ("OPERA-CT 전체 미세조정 (SPRSound, 툴킷 레시피)", None),
+    # EMBC'25 Table I / II OPERA-CT rows: (Sp, Se, Score) mean±std
+    "icbhi-operact-frozen": ("OPERA-CT frozen + Tfm (ICBHI 4-class)", ((79.09, 9.51), (18.86, 8.95), (48.97, 1.21))),
+    "sprs-operact-frozen":  ("OPERA-CT frozen + Tfm (SPRSound 7-class)", ((83.23, 4.72), (60.00, 5.58), (71.62, 0.84))),
+    "icbhi-operact-ft":     ("OPERA-CT full fine-tuning (ICBHI, toolkit recipe)", None),
+    "sprs-operact-ft":      ("OPERA-CT full fine-tuning (SPRSound, toolkit recipe)", None),
 }
 
 
@@ -46,12 +46,12 @@ def main():
         if len(rows) >= 2:
             ms = lambda i: (statistics.mean([r[i] for r in rows]), statistics.stdev([r[i] for r in rows]))  # noqa: E731
             sp, se, sc = ms(1), ms(2), ms(3)
-            print(f"  우리 평균 : Sp {sp[0]:6.2f}±{sp[1]:.2f}  Se {se[0]:6.2f}±{se[1]:.2f}  Score {sc[0]:6.2f}±{sc[1]:.2f}")
+            print(f"  ours mean : Sp {sp[0]:6.2f}±{sp[1]:.2f}  Se {se[0]:6.2f}±{se[1]:.2f}  Score {sc[0]:6.2f}±{sc[1]:.2f}")
             if paper is not None:
                 (psp, psps), (pse, pses), (psc, pscs) = paper
-                print(f"  EMBC 보고 : Sp {psp:6.2f}±{psps:.2f}  Se {pse:6.2f}±{pses:.2f}  Score {psc:6.2f}±{pscs:.2f}   Score 차이: {sc[0]-psc:+.2f}")
+                print(f"  EMBC      : Sp {psp:6.2f}±{psps:.2f}  Se {pse:6.2f}±{pses:.2f}  Score {psc:6.2f}±{pscs:.2f}   Score diff: {sc[0]-psc:+.2f}")
             else:
-                print("  논문 목표치 없음 (툴킷 정의 레시피)")
+                print("  no paper-reported value (toolkit-defined recipe)")
 
 
 if __name__ == "__main__":

@@ -1,22 +1,22 @@
 """
-PAFA 논문(Interspeech 2025)의 BEATs 미세조정 모델 — 공식 코드 충실 이식 (P0).
+BEATs fine-tuning model from the PAFA paper (Interspeech 2025) — exact port of the official code.
 
-출처:
-- 논문: Patient-Aware Feature Alignment for Robust Lung Sound Classification:
+Sources:
+- Paper: Patient-Aware Feature Alignment for Robust Lung Sound Classification:
   Cohesion-Separation and Global Alignment Losses (https://arxiv.org/abs/2505.23834)
-- 공식 코드: https://github.com/wa976/PAFA models/beats.py (BEATsTransferLearningModel)
-  + main.py set_model()/train()/validate() 의 beats 분기.
+- Official code: https://github.com/wa976/PAFA models/beats.py (BEATsTransferLearningModel)
+  + the beats branch of main.py set_model()/train()/validate().
 
-구조 (원본 그대로):
-- 백본: BEATs(iter3+ AS2M 사전학습 ckpt 의 cfg 로 구성, predictor 없음) — 입력은
-  16 kHz 파형 (B, L). extract_features 가 내부에서 kaldi fbank(128 mel, 25/10 ms) →
-  패치 임베딩 → Transformer 로 토큰 시퀀스 (B, T', 768) 를 낸다.
-- 분류기: nn.Linear(768, n_cls) 를 **토큰별로** 적용한 뒤 시간축 평균 (main.py:365-367).
-- PAFA: ProjectionHead(768→768, attention 풀링, LayerNorm) 로 (B, 768) 을 만들고
-  PAFALoss(patient_ids) 를 더한다: loss = w_ce*CE + w_pafa*PAFA (main.py:379-389).
-- SpecAugment 는 스크립트가 --nospec 이라 없음 (spec_transform=None).
+Architecture (same as the original code):
+- Backbone: BEATs (built from the cfg of the iter3+ AS2M pretrained ckpt, no predictor). Input is a
+  16 kHz waveform (B, L). extract_features internally computes a kaldi fbank (128 mel, 25/10 ms) →
+  patch embedding → Transformer and returns a token sequence (B, T', 768).
+- Classifier: nn.Linear(768, n_cls) applied **per token**, then averaged over time (main.py:365-367).
+- PAFA: ProjectionHead (768→768, attention pooling, LayerNorm) produces (B, 768) and
+  PAFALoss(patient_ids) is added: loss = w_ce*CE + w_pafa*PAFA (main.py:379-389).
+- No SpecAugment, since the script uses --nospec (spec_transform=None).
 
-툴킷 배선: datamodule 이 (파형, 라벨, 환자 ID) 배치를 준다 (meta_label_mode=patient).
+Toolkit wiring: the datamodule yields (waveform, label, patient ID) batches (meta_label_mode=patient).
 """
 from __future__ import annotations
 
@@ -35,7 +35,7 @@ logger = logging.getLogger(__name__)
 
 BEATS_CKPT_CANDIDATES = (
     "pretrained_models/upstream/BEATs_iter3_plus_AS2M.pt",
-    "pretrained_models/BEATs_iter3_plus_AS2M.pt",  # 원본 코드가 쓰는 위치
+    "pretrained_models/BEATs_iter3_plus_AS2M.pt",  # location used by the original code
 )
 
 
@@ -44,17 +44,17 @@ def _resolve_beats_ckpt(path: Optional[str]) -> pathlib.Path:
 
     if path is not None:
         return resolve_pretrained(explicit=path)
-    found = resolve_pretrained(BEATS_CKPT_CANDIDATES)  # RSCTK_PRETRAINED_ROOT → cwd 순
+    found = resolve_pretrained(BEATS_CKPT_CANDIDATES)  # RSCTK_PRETRAINED_ROOT, then cwd
     if found is not None:
         return found
     raise FileNotFoundError(
-        "BEATs_iter3_plus_AS2M.pt 가 없다. microsoft/unilm/beats 의 'BEATs_iter3+ (AS2M)' 를 받아 "
-        f"{BEATS_CKPT_CANDIDATES[0]} 에 둘 것"
+        "BEATs_iter3_plus_AS2M.pt not found. Download 'BEATs_iter3+ (AS2M)' from microsoft/unilm/beats and "
+        f"place it at {BEATS_CKPT_CANDIDATES[0]}"
     )
 
 
 class BEATsTransferLearningModel(nn.Module):
-    """원본 models/beats.py 와 동일 (ckpt cfg 로 BEATs 구성 + 가중치 로드, extract_features 반환)."""
+    """Same as the original models/beats.py (builds BEATs from the ckpt cfg, loads weights, returns extract_features)."""
 
     def __init__(self, num_target_classes: int = 4, model_path: Optional[str] = None, spec_transform=None):
         super().__init__()
@@ -70,7 +70,7 @@ class BEATsTransferLearningModel(nn.Module):
         self.beats = BEATs(self.cfg)
         self.beats.load_state_dict(self.checkpoint["model"])
         self.final_feat_dim = self.cfg.encoder_embed_dim
-        del self.checkpoint  # 원본은 들고 있지만 state_dict 에 안 들어가는 잔여 메모리라 버린다
+        del self.checkpoint  # the original keeps it, but it is not part of state_dict, so free the memory
 
     def forward(self, x, padding_mask=None, training=False):
         if padding_mask is not None:
@@ -82,16 +82,16 @@ class BEATsTransferLearningModel(nn.Module):
 
 @ModelFactory.register_model_class("beats")
 class BEATsClassifier(BaseRSCModel, nn.Module):
-    """원본 set_model 의 beats 구성: 백본 + 토큰별 Linear(mean 풀링) [+ PAFA ProjectionHead]."""
+    """beats configuration of the original set_model: backbone + per-token Linear (mean pooling) [+ PAFA ProjectionHead]."""
 
-    accepts_meta = ("patient",)  # batch[2] = 환자 번호 (meta_label_mode=patient; method=pafa 에 필수)
+    accepts_meta = ("patient",)  # batch[2] = patient ID (meta_label_mode=patient; required for method=pafa)
 
     def __init__(
         self,
         n_cls: int = 4,
         pretrained_path: Optional[str] = None,
         method: str = "ce",             # "ce" | "pafa"
-        # ---- PAFA (스크립트 beats_pafa.sh 값이 기본) ----
+        # ---- PAFA (defaults follow the beats_pafa.sh script) ----
         w_ce: float = 1.0,
         w_pafa: float = 1.0,
         lambda_pcsl: float = 50.0,
@@ -112,7 +112,7 @@ class BEATsClassifier(BaseRSCModel, nn.Module):
         if method == "pafa":
             from rsc_toolkit.methods.pafa import PAFALoss, ProjectionHead
 
-            # 원본 main.py:250 — beats 는 attention=True
+            # original main.py:250 — beats uses attention=True
             self.projector = ProjectionHead(
                 self.backbone.final_feat_dim, hidden_dim, output_dim,
                 attention=True, norm_type=norm_type, proj_type=proj_type,
@@ -128,7 +128,7 @@ class BEATsClassifier(BaseRSCModel, nn.Module):
         return self.backbone(waveform)      # (B, T', 768)
 
     def forward(self, waveform: torch.Tensor) -> torch.Tensor:
-        # 원본: output = classifier(features); output = output.mean(dim=1)
+        # original: output = classifier(features); output = output.mean(dim=1)
         return self.classifier(self.forward_features(waveform)).mean(dim=1)
 
     def training_forward(self, audio_batch, labels, loss_func, meta_labels=None):
@@ -138,7 +138,7 @@ class BEATsClassifier(BaseRSCModel, nn.Module):
         if (not self.training) or self.method == "ce":
             return logits, loss_class
         if meta_labels is None:
-            raise ValueError("method=pafa 는 배치에 환자 ID 가 필요하다 (datamodule meta_label_mode=patient)")
+            raise ValueError("method=pafa requires patient IDs in the batch (datamodule meta_label_mode=patient)")
         proj = self.projector(features)
         loss_pafa = self.pafa_loss(proj, meta_labels, lambda_pcsl=self.lambda_pcsl, lambda_gpal=self.lambda_gpal)
         return logits, self.w_ce * loss_class + self.w_pafa * loss_pafa

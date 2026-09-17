@@ -1,4 +1,4 @@
-# PC-MCL(BEATs) ICBHI: 16 kHz 파형, 학습 = 동적 연결(11 조합)·PM 쌍 (datamodule pcmcl), 평가 = 테스트 사이클 단독 10 s repeat+fade.
+# PC-MCL (BEATs) ICBHI: 16 kHz waveform, training = dynamic concatenation (11 combinations) · PM pairs (datamodule pcmcl), evaluation = single test cycles, 10 s repeat+fade.
 name: icbhi_pcmcl_beats
 params:
   datamodule_name: pcmcl
@@ -11,34 +11,34 @@ params:
 
   sampling_rate: 16000
   sample_level: cycle
-  desired_length_sec: 10.0       # 논문 명시 T=10 s (argparse 기본 8)
-  pad_type: repeat_fade          # cut_pad_sample_torchaudio(repeat) — 평가 사이클 단독
+  desired_length_sec: 10.0       # T=10 s stated in the paper (argparse default 8)
+  pad_type: repeat_fade          # cut_pad_sample_torchaudio(repeat) — single evaluation cycles
 
   train_splits: [train]
-  val_splits: [test]             # best-on-test 프로토콜 (main.py:1361-1370)
+  val_splits: [test]             # best-on-test protocol (main.py:1361-1370)
   test_splits: [test]
 
-  batch_size: 32                 # argparse 기본 32 (train drop_last=True)
-  num_workers: 8                 # 원본 0 (단일 python random 스트림) — 워커별 스트림, '동일 분포' (pcmcl_concat.py 상단 참고)
+  batch_size: 32                 # argparse default 32 (train drop_last=True)
+  num_workers: 8                 # official 0 (single python random stream) — per-worker streams, 'same distribution' (see the top of pcmcl_concat.py)
   shuffle_train: true
   drop_last_train: true
   pin_memory: true
 
   features:
     enabled: true
-    kind: waveform               # BEATs 내부 fbank
+    kind: waveform               # fbank inside BEATs
   feature_precompute: false
 
   specaugment:
     enabled: false
 
-  pcmcl:                         # PCMCLConcatDataset 인자 (기본 = 공식 코드 동작)
+  pcmcl:                         # PCMCLConcatDataset arguments (default = official code behavior)
     mode: default                # default | concat_single | noconcat_multi (Table 3 ablation)
-    mixing_prob: 1.0             # 논문 '원본당 증강 1개' (argparse 기본 0.5)
+    mixing_prob: 1.0             # paper: 'one augmentation per original' (argparse default 0.5)
     conditional_mixing: false
     mixing_label_strategy: additive
     enable_ssl: true
-    ssl_prob: 0.3                # argparse 기본 (논문 미명시) — 가정
-    patient_id_mode: recording   # quirk: 공식 스플릿 모드 patient_id = 파일명(녹음). 논문 의도: patient
-    hard_negative_mode: dict_order   # quirk: dict 첫 ≥2 그룹(normal_only). 논문 의도: random_profile ; Table 5 'Base' = basic 은 추정(코드에서 주석 처리된 호출, 저자 질문 #8)
+    ssl_prob: 0.3                # argparse default (not stated in the paper) — assumption
+    patient_id_mode: recording   # quirk: in the official split mode patient_id = file name (recording). Paper intent: patient
+    hard_negative_mode: dict_order   # quirk: first dict group with ≥2 entries (normal_only). Paper intent: random_profile; Table 5 'Base' = basic is a guess (the call is commented out in the code)
     cache_dir: outputs/pcmcl/cache

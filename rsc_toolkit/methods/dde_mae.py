@@ -1,19 +1,19 @@
 """
-DDE-MAE(Wei·Miao·Li, Interspeech 2025, arXiv 2506.10698) 의 분리(disentanglement) 손실 부품 — **논문 명세 재구현**
-(공개 코드 없음 → 골든 없음. 식 번호는 논문 본문 기준).
+Disentanglement loss components of DDE-MAE (Wei·Miao·Li, Interspeech 2025, arXiv 2506.10698): **re-implemented from the paper specification**
+(no public code → no goldens; equation numbers follow the paper body).
 
-- time_shuffle          : 논문 §2.2 "time-shuffled" 입력 X̃ (시간축 무작위 셔플). 단위(프레임/패치 열)는 미기재 →
-                          기본 'patch'(16 프레임 = 패치 열 64개의 순서 셔플), 대안 'frame'(1024 프레임 셔플) — 가정 플래그.
-                          'patch' 를 기본으로 둔 근거: 두 입력에서 물리적으로 같은 패치를 마스킹(shuffle_mask=same_physical)·토큰 대응이 가능.
-                          논문 문구 "randomly shuffling the time axis of the spectrogram" 의 문자적 해석은 'frame'(더 강한 셔플, same_index 강제)
-                          → 저자 질문 7번 답 전까지 사다리 후 두 값 민감도 확인 권장.
-- siamese_hinge         : 식 6  L_siamese = mean_i( max( ‖E_I(X)_i − E_I(X̃)_i‖₂ − margin, 0 ) ). margin 미기재 → 1.0 가정.
-- VCLUB                 : 식 4  vCLUB 상한 (Cheng et al., ICML 2020)  I(Z_R;Z_I) ≤ E_p(z_R,z_I)[log q_θ(z_I|z_R)] − E_p(z_R)p(z_I)[log q_θ(z_I|z_R)],
-                          q_θ(z_I|z_R) = N(μ_θ(z_R), diag σ²_θ(z_R)) (CLUB 공식 구현 CLUB.py 의 MLP 형태 재구현; 입력이 토큰별인지
-                          풀링 벡터인지 미기재 → 풀링 벡터(패치 토큰 평균) 가정). q_θ 는 log-likelihood 최대화로 따로 학습해야 하므로
-                          모델 내부 보조 Adam(lr 미기재 → 1e-4 가정, 매 스텝 1회) — rsc_toolkit/models/audiomae_dde.py DDEMAE 참조.
+- time_shuffle          : paper §2.2 "time-shuffled" input X̃ (random shuffle along the time axis). The unit (frame / patch column) is not specified →
+                          default 'patch' (shuffle the order of the 64 patch columns of 16 frames each), alternative 'frame' (shuffle 1024 frames); assumption flag.
+                          Rationale for the 'patch' default: the physically same patch can be masked in both inputs (shuffle_mask=same_physical) and tokens correspond.
+                          The literal reading of "randomly shuffling the time axis of the spectrogram" is 'frame' (stronger shuffle, forces same_index);
+                          checking sensitivity to both values is recommended.
+- siamese_hinge         : Eq. 6  L_siamese = mean_i( max( ‖E_I(X)_i − E_I(X̃)_i‖₂ − margin, 0 ) ). margin not specified → 1.0 assumed.
+- VCLUB                 : Eq. 4  vCLUB upper bound (Cheng et al., ICML 2020)  I(Z_R;Z_I) ≤ E_p(z_R,z_I)[log q_θ(z_I|z_R)] − E_p(z_R)p(z_I)[log q_θ(z_I|z_R)],
+                          q_θ(z_I|z_R) = N(μ_θ(z_R), diag σ²_θ(z_R)) (re-implements the MLP form of the official CLUB implementation CLUB.py; whether the input is per token
+                          or a pooled vector is not specified → pooled vector (mean of patch tokens) assumed). q_θ must be trained separately by maximizing log-likelihood, so
+                          the model uses an internal auxiliary Adam (lr not specified → 1e-4 assumed, one update per step); see DDEMAE in rsc_toolkit/models/audiomae_dde.py.
 
-전부 '가정(저자 확인 전)'.
+All of the above are assumptions not confirmed by the authors.
 """
 from __future__ import annotations
 
@@ -32,15 +32,15 @@ def time_shuffle(
     generator: Optional[torch.Generator] = None,
 ) -> Tuple[torch.Tensor, torch.Tensor]:
     """
-    x: (B, 1, T, F) — Audio-MAE 입력 배치 (T=1024 프레임, F=128 mel). 샘플마다 독립 순열.
-    unit='patch': T/patch_frames 개의 패치 열(각 16 프레임) 순서를 섞는다 (기본 가정).
-    unit='frame': T 프레임을 프레임 단위로 섞는다 (대안).
-    반환: (x̃, perm) — x̃[b, :, t, :] = x[b, :, perm[b, t], :] (unit 단위 인덱스).
+    x: (B, 1, T, F), Audio-MAE input batch (T=1024 frames, F=128 mel). Independent permutation per sample.
+    unit='patch': shuffle the order of the T/patch_frames patch columns (16 frames each) (default assumption).
+    unit='frame': shuffle the T frames individually (alternative).
+    Returns (x̃, perm) with x̃[b, :, t, :] = x[b, :, perm[b, t], :] (indices in units of `unit`).
     """
     B, C, T, Fdim = x.shape
     if unit == "patch":
         if T % patch_frames != 0:
-            raise ValueError(f"T={T} 가 patch_frames={patch_frames} 의 배수가 아니다")
+            raise ValueError(f"T={T} is not a multiple of patch_frames={patch_frames}")
         n = T // patch_frames
         perm = torch.stack([torch.randperm(n, generator=generator) for _ in range(B)]).to(x.device)  # (B, n)
         xs = x.reshape(B, C, n, patch_frames, Fdim)
@@ -55,7 +55,7 @@ def time_shuffle(
 
 
 def time_unshuffle(x_shuffled: torch.Tensor, perm: torch.Tensor, unit: str = "patch", patch_frames: int = 16) -> torch.Tensor:
-    """time_shuffle 의 역연산 (테스트·검증용)."""
+    """Inverse of time_shuffle (for tests and verification)."""
     B, C, T, Fdim = x_shuffled.shape
     inv = torch.argsort(perm, dim=1)
     if unit == "patch":
@@ -69,9 +69,9 @@ def time_unshuffle(x_shuffled: torch.Tensor, perm: torch.Tensor, unit: str = "pa
 
 def permute_token_noise(noise: torch.Tensor, perm: torch.Tensor, grid_t: int, grid_f: int) -> torch.Tensor:
     """
-    마스킹 noise (B, grid_t*grid_f; t-major) 를 패치 열 순열 perm (B, grid_t) 에 맞춰 옮긴다:
-    셔플 입력 X̃ 의 열 t' 는 원본 열 perm[t'] 이므로 noise_s[:, t', f] = noise[:, perm[t'], f].
-    → argsort 로 만든 마스크가 X 와 X̃ 에서 **물리적으로 같은 패치** 를 남긴다 (가정: '같은 마스크' 를 같은 패치로 해석).
+    Permutes the masking noise (B, grid_t*grid_f; t-major) according to the patch-column permutation perm (B, grid_t):
+    column t' of the shuffled input X̃ is original column perm[t'], so noise_s[:, t', f] = noise[:, perm[t'], f].
+    → the mask built by argsort keeps **the physically same patches** in X and X̃ (assumption: 'same mask' means same patches).
     """
     B = noise.shape[0]
     n2 = noise.view(B, grid_t, grid_f)
@@ -79,27 +79,27 @@ def permute_token_noise(noise: torch.Tensor, perm: torch.Tensor, grid_t: int, gr
     return torch.gather(n2, 1, idx).reshape(B, grid_t * grid_f)
 
 
-# ------------------------------------------------------------------------------------------ Siamese hinge (식 6)
+# ------------------------------------------------------------------------------------------ Siamese hinge (Eq. 6)
 def siamese_hinge(z_a: torch.Tensor, z_b: torch.Tensor, margin: float = 1.0) -> torch.Tensor:
     """
-    z_a, z_b: (B, D) 풀링 벡터 (가정) 또는 (B, N, D) 토큰 — 마지막 차원 L2 거리, 나머지 차원 평균.
+    z_a, z_b: (B, D) pooled vectors (assumption) or (B, N, D) tokens; L2 distance over the last dim, mean over the rest.
     L = mean( max( ‖z_a − z_b‖₂ − margin, 0 ) )
     """
     d = torch.linalg.vector_norm(z_a - z_b, ord=2, dim=-1)
     return F.relu(d - margin).mean()
 
 
-# ------------------------------------------------------------------------------------------ vCLUB (식 4)
+# ------------------------------------------------------------------------------------------ vCLUB (Eq. 4)
 class VCLUB(nn.Module):
     """
-    변분 CLUB 상한 추정기. q_θ(z_I | z_R) = N(μ(z_R), diag exp(logσ²(z_R))).
-    구조(가정, CLUB 공식 CLUB.py 'CLUB' 클래스 형태): μ: Linear(x,h)-ReLU-Linear(h,y), logσ²: Linear(x,h)-ReLU-Linear(h,y)-Tanh.
+    Variational CLUB upper-bound estimator. q_θ(z_I | z_R) = N(μ(z_R), diag exp(logσ²(z_R))).
+    Structure (assumption, form of the 'CLUB' class in the official CLUB.py): μ: Linear(x,h)-ReLU-Linear(h,y), logσ²: Linear(x,h)-ReLU-Linear(h,y)-Tanh.
 
-    - loglikelihood(z_r, z_i) : E[log q_θ(z_i|z_r)] (상수항 제외) — q_θ 학습(최대화)용.
-    - mi_upper_bound(z_r, z_i): 식 4 = positive − negative,
+    - loglikelihood(z_r, z_i) : E[log q_θ(z_i|z_r)] (without constants), for training (maximizing) q_θ.
+    - mi_upper_bound(z_r, z_i): Eq. 4 = positive − negative,
         positive = mean_i  −(μ(z_r_i) − z_i_i)² / 2σ²_i          (∑_d)
         negative = mean_{i,j} −(μ(z_r_i) − z_i_j)² / 2σ²_i        (∑_d)
-      (log σ 항은 i 에만 의존해 상쇄되므로 CLUB 구현처럼 생략.)
+      (the log σ term depends only on i and cancels, so it is omitted as in the CLUB implementation.)
     """
 
     def __init__(self, x_dim: int = 768, y_dim: int = 768, hidden: int = 512):
@@ -124,8 +124,8 @@ class VCLUB(nn.Module):
 
     def mi_upper_bound_detached_q(self, z_r: torch.Tensor, z_i: torch.Tensor) -> torch.Tensor:
         """
-        q_θ 파라미터를 상수로 두고(그래디언트는 z_r, z_i 로만) 식 4 를 계산한다 —
-        주 손실의 backward 가 q_θ 를 건드리지 않게 하기 위함 (q_θ 는 보조 Adam 만 갱신).
+        Computes Eq. 4 with the q_θ parameters held constant (gradients flow only to z_r, z_i),
+        so that the main loss backward does not touch q_θ (q_θ is updated only by the auxiliary Adam).
         """
         mu_params = {k: v.detach() for k, v in self.p_mu.named_parameters()}
         lv_params = {k: v.detach() for k, v in self.p_logvar.named_parameters()}

@@ -1,4 +1,4 @@
-# PC-MCL(AST) ICBHI: kaldi fbank 128 mel (mean -4.2677393 / std 4.5689974), 10 s → 998 프레임, 학습 = 동적 연결·PM 쌍, 평가 = 사이클 단독.
+# PC-MCL (AST) ICBHI: kaldi fbank 128 mel (mean -4.2677393 / std 4.5689974), 10 s → 998 frames, training = dynamic concatenation · PM pairs, evaluation = single cycles.
 name: icbhi_pcmcl_ast
 params:
   datamodule_name: pcmcl
@@ -34,12 +34,12 @@ params:
     window_type: hanning
     dither: 0.0
     normalize: true
-  feature_precompute: true       # 평가셋(test) fbank 캐시
+  feature_precompute: true       # fbank cache for the evaluation set (test)
   feature_precompute_batch_size: 8
   feature_precompute_num_workers: 0
 
   specaugment:
-    enabled: false               # SpecAugment 는 모델(ast_pcmcl.specaug) 이 배치 단위로 적용 (원본 main.py:531)
+    enabled: false               # SpecAugment is applied per batch by the model (ast_pcmcl.specaug) (official main.py:531)
 
   pcmcl:
     mode: default

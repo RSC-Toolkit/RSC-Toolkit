@@ -1,7 +1,7 @@
-# AMS-D 를 SPRSound 표준 태스크(7-class)로 확장. ICBHI 레시피 그대로:
-# 16 kHz · 8 s repeat 패딩(fade 없음) → raw kaldi fbank 128 × 798 → AMSDFeatureDataset 이 마스킹 후 정규화. bs24, drop_last True.
-# ICBHI 와 마찬가지로 `dataset_aug`(논문 §3.1, 생성 스크립트 미공개) 는 쓰지 않는다 — 알려진 결손.
-# 지표는 ICBHI 확장과 같은 표준 7-class Se/Sp/Score 를 쓴다(논문의 이진 Se/Sp 는 ICBHI 앵커 비교 전용).
+# AMS-D extended to the standard SPRSound task (7-class). ICBHI recipe unchanged:
+# 16 kHz · 8 s repeat padding (no fade) → raw kaldi fbank 128 × 798 → AMSDFeatureDataset normalizes after masking. bs 24, drop_last True.
+# As on ICBHI, `dataset_aug` (paper §3.1, generation script not released) is not used — known gap.
+# Metrics are the same standard 7-class Se/Sp/Score as the other SPRSound extensions (the paper's binary Se/Sp is only for comparison with the ICBHI paper-reported values).
 name: sprsound_amsd
 params:
   datamodule_name: amsd

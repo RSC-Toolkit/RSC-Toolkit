@@ -1,16 +1,16 @@
 # -*- coding: utf-8 -*-
 """
-공개된 논문 weight 내려받기 — weights_manifest.csv 의 url 로 묶음(best.pth·best.json·.hydra/·sha256.txt)을 받고
-sha256.txt 의 모든 항목과 대장의 best_pth_sha256 을 대조한다. url 은 Google Drive **폴더 링크**(…/folders/<id>)로,
-run 폴더 자체이거나 여러 run 폴더를 담은 **상위 폴더**여도 된다(상위 폴더면 <run>/ 아래 파일만 골라 받는다).
+Download published paper weights — fetches the bundle (best.pth, best.json, .hydra/, sha256.txt) from the url in weights_manifest.csv
+and checks every entry of sha256.txt plus best_pth_sha256 from the manifest. The url is a Google Drive **folder link** (…/folders/<id>);
+it may be the run folder itself or a **parent folder** holding several run folders (then only files under <run>/ are downloaded).
 
   python scripts/download_paper_weights.py --list
   python scripts/download_paper_weights.py --run icbhi-cnn6-ce-s1 --out paper_weights/
 
-url 이 아직 "[Google Drive]" 자리표시자면 안내만 출력하고 종료 코드 2 를 돌려준다(업로드 전). 파일 하나 링크로는 묶음이 안 된다.
-받은 뒤 재평가:
+If the url is still the "[Google Drive]" placeholder, a notice is printed and exit code 2 is returned (not uploaded yet). A single-file link cannot hold a bundle.
+Re-evaluation after download:
   rsc-toolkit-eval paper_weights/icbhi-cnn6-ce-s1 --project-root <clone> --override data.params.data_dir=<dataset dir>
-종료 코드: 0 전부 OK · 1 오류(대장에 없음·해시 불일치·다운로드 실패) · 2 링크 미공개 (여러 run 이면 가장 큰 값).
+Exit codes: 0 all OK · 1 error (not in manifest, hash mismatch, download failure) · 2 link not published (the largest value over several runs).
 """
 from __future__ import annotations
 
@@ -34,23 +34,23 @@ def sha256(path: pathlib.Path) -> str:
 
 
 def verify_bundle(dst: pathlib.Path, expected_best_sha: str) -> str | None:
-    """sha256.txt 의 전 항목 + 대장의 best.pth 해시를 대조. 문제가 있으면 사유를 돌려준다."""
+    """Check every entry of sha256.txt plus the best.pth hash from the manifest. Returns the reason if there is a problem."""
     if not (dst / "best.pth").exists():
-        return "best.pth 없음"
+        return "best.pth missing"
     if sha256(dst / "best.pth") != expected_best_sha:
-        return "best.pth sha256 이 대장과 다르다"
+        return "best.pth sha256 differs from the manifest"
     listing = dst / "sha256.txt"
     if not listing.exists():
-        return "sha256.txt 없음 (묶음이 불완전하다)"
+        return "sha256.txt missing (incomplete bundle)"
     for line in listing.read_text().splitlines():
         if not line.strip():
             continue
         digest, rel = line.split("  ", 1)
         f = dst / rel
         if not f.exists():
-            return f"{rel} 없음"
+            return f"{rel} missing"
         if sha256(f) != digest:
-            return f"{rel} sha256 불일치"
+            return f"{rel} sha256 mismatch"
     return None
 
 
@@ -60,10 +60,10 @@ def _folder_id(url: str) -> str:
 
 
 def download_run(url: str, run: str, dst: pathlib.Path) -> str | None:
-    """Drive 폴더 링크에서 run 묶음을 dst/ 에 받는다. 문제가 있으면 사유를 돌려준다.
+    """Download a run bundle from a Drive folder link into dst/. Returns the reason if there is a problem.
 
-    폴더 목록은 gdown 의 skip_download 로 먼저 읽는다 — url 이 run 폴더면 전부, 상위 폴더면 `<run>/` 아래 파일만 받는다
-    (gdown --folder 는 하위 폴더 하나만 고를 수 없어 파일 단위로 받는다).
+    The folder listing is read first with gdown's skip_download — if the url is the run folder, everything is downloaded; if it is a
+    parent folder, only files under `<run>/` (gdown --folder cannot select a single subfolder, so files are downloaded one by one).
     """
     import os
 
@@ -72,10 +72,10 @@ def download_run(url: str, run: str, dst: pathlib.Path) -> str | None:
     listing_base = dst.parent.resolve()
     try:
         files = gdown.download_folder(id=_folder_id(url), output=str(listing_base) + os.sep, skip_download=True, quiet=True)
-    except Exception as exc:                        # 권한(링크 공유 아님)·네트워크
-        return f"폴더 목록을 읽지 못했다: {type(exc).__name__}: {str(exc)[:200]}"
+    except Exception as exc:                        # permissions (link not shared) or network
+        return f"failed to read the folder listing: {type(exc).__name__}: {str(exc)[:200]}"
     if not files:
-        return "폴더가 비어 있다 (아직 업로드 전이거나 링크가 다른 폴더다)"
+        return "folder is empty (not uploaded yet, or the link points to a different folder)"
     entries = []
     for f in files:
         try:
@@ -83,14 +83,14 @@ def download_run(url: str, run: str, dst: pathlib.Path) -> str | None:
         except ValueError:
             rel = pathlib.Path(f.path).parts
         entries.append((f.id, tuple(rel)))
-    # 어느 깊이에 있든 `<run>/` 디렉터리 아래 파일을 고른다 (상위 폴더 안에 또 폴더가 있어도 된다)
+    # Select files under a `<run>/` directory at any depth (the parent folder may contain nested folders)
     wanted = [(fid, parts[parts.index(run) + 1:]) for fid, parts in entries if run in parts[:-1]]
     if not wanted:
-        # url 자체가 run 폴더: best.pth 가 하나뿐이면 그 디렉터리를 묶음 루트로 본다
+        # The url is the run folder itself: if there is exactly one best.pth, treat its directory as the bundle root
         roots = {parts[:-1] for _, parts in entries if parts[-1] == "best.pth"}
         if len(roots) != 1:
             seen = sorted({"/".join(parts) for _, parts in entries})[:8]
-            return f"폴더에 {run}/ 가 없고 best.pth 도 하나가 아니다 (있는 것: {seen})"
+            return f"folder has no {run}/ and does not contain exactly one best.pth (found: {seen})"
         prefix = roots.pop()
         wanted = [(fid, parts[len(prefix):]) for fid, parts in entries if parts[:len(prefix)] == prefix]
     dst.mkdir(parents=True, exist_ok=True)
@@ -101,7 +101,7 @@ def download_run(url: str, run: str, dst: pathlib.Path) -> str | None:
         local.parent.mkdir(parents=True, exist_ok=True)
         got = gdown.download(id=fid, output=str(local), quiet=True)
         if not got:
-            return f"{'/'.join(parts)} 다운로드 실패"
+            return f"{'/'.join(parts)} download failed"
     return None
 
 
@@ -120,31 +120,31 @@ def main() -> int:
     for run in args.run:
         r = rows.get(run)
         if r is None:
-            print(f"{run}: 대장에 없다"); rc = max(rc, 1); continue
+            print(f"{run}: not in the manifest"); rc = max(rc, 1); continue
         dst = pathlib.Path(args.out) / run
         if dst.exists():
             problem = verify_bundle(dst, r["best_pth_sha256"])
             if problem is None:
-                print(f"{run}: 이미 있음, sha256 전부 일치 → {dst}"); continue
-            print(f"{run}: 기존 폴더 {dst} 가 대장과 다르다 ({problem}) — 다시 받는다")
+                print(f"{run}: already present, all sha256 match → {dst}"); continue
+            print(f"{run}: existing folder {dst} differs from the manifest ({problem}) — downloading again")
         if r["url"] == URL_PLACEHOLDER or not r["url"]:
-            print(f"{run}: 아직 공개 링크가 없다(대장 url={r['url']!r}). 링크가 생기면 weights_manifest.csv 의 url 을 채우고 다시 실행하라. "
-                  f"묶음이 손에 있으면 {dst}/ 에 직접 두어도 된다.")
+            print(f"{run}: no public link yet (manifest url={r['url']!r}). Once a link exists, fill in the url in weights_manifest.csv and run again. "
+                  f"If you already have the bundle, you can place it in {dst}/ directly.")
             rc = max(rc, 2); continue
         if "/folders/" not in r["url"]:
-            print(f"{run}: url 은 Google Drive 폴더 링크(…/folders/<id>)여야 한다: {r['url']}"); rc = max(rc, 1); continue
+            print(f"{run}: url must be a Google Drive folder link (…/folders/<id>): {r['url']}"); rc = max(rc, 1); continue
         try:
             import gdown  # noqa: F401
         except ImportError:
-            raise SystemExit("gdown 이 필요하다: pip install gdown (또는 pip install -e '.[notebook]')")
+            raise SystemExit("gdown is required: pip install gdown (or pip install -e '.[notebook]')")
         dst.parent.mkdir(parents=True, exist_ok=True)
         print(f"{run}: {r['url']} → {dst}")
         problem = download_run(r["url"], run, dst)
         if problem:
-            print(f"{run}: 다운로드 실패 — {problem}"); rc = max(rc, 1); continue
+            print(f"{run}: download failed — {problem}"); rc = max(rc, 1); continue
         problem = verify_bundle(dst, r["best_pth_sha256"])
         if problem:
-            print(f"{run}: 검증 실패 — {problem}"); rc = max(rc, 1)
+            print(f"{run}: verification failed — {problem}"); rc = max(rc, 1)
         else:
             print(f"{run}: OK → {dst}")
     return rc

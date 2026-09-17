@@ -1,5 +1,5 @@
 # @package _global_
-# DDE-MAE 분류(B2/2단계) 평가 프로토콜: 매 epoch 공식 test Score 최고 (Se 게이트 없음 — 논문 선택 기준 미기재, 툴킷 표준), 재개 지원
+# DDE-MAE classification (B2/stage 2) evaluation protocol: best official test Score every epoch (no Se gate — selection criterion not specified in the paper; toolkit standard), resumable
 trainer:
   params:
     callbacks:

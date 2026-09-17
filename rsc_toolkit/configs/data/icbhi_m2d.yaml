@@ -1,4 +1,4 @@
-# M2D 미세조정 ICBHI 데이터: sclmeta 파형 전처리(구간 리샘플·fade·순환 패딩) + torchaudio dB-mel 80 (400/160, 50–8000 Hz).
+# M2D fine-tuning ICBHI data: sclmeta waveform preprocessing (segment resampling · fade · circular padding) + torchaudio dB-mel 80 (400/160, 50–8000 Hz).
 name: icbhi_m2d
 params:
   datamodule_name: index
@@ -19,10 +19,10 @@ params:
   val_splits: [test]
   test_splits: [test]
 
-  batch_size: 64                 # --bs 64 (split_iter 4 → 부분배치 16)
+  batch_size: 64                 # --bs 64 (split_iter 4 → sub-batches of 16)
   num_workers: 8
   shuffle_train: true
-  drop_last_train: false         # 원본 DataLoader drop_last 없음 (마지막 배치 46 → 44 사용)
+  drop_last_train: false         # the official DataLoader has no drop_last (last batch 46 → 44 used)
   pin_memory: true
 
   features:

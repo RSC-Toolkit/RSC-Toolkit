@@ -1,26 +1,26 @@
 """
-PC-MCL(arXiv 2601.17080; 공식 코드 wa976/PC-MCL util/dataset_pcmcl.py ConcatenationMultilabelDataset) 의
-학습 데이터셋 — 원 길이 호흡 사이클 보관 + __getitem__ 시점 동적 연결(11 조합) + PM(환자 매칭) 쌍 생성.
+Training dataset of PC-MCL (arXiv 2601.17080; official code wa976/PC-MCL util/dataset_pcmcl.py ConcatenationMultilabelDataset)
+-- keeps respiratory cycles at original length + dynamic concatenation at __getitem__ time (11 combinations) + PM (patient matching) pair generation.
 
-공식 코드 실체 (P0, 전부 기본값으로 유지):
-- 공식 60/40 스플릿 train 파일을 stem 정렬 순서로 돌며 사이클을 **원 길이 그대로** 추출
-  (torchaudio.load → 16 kHz 리샘플 → 녹음 전체에 fade in/out sr/16 → [start,end) 절단; icbhi_util.py get_individual_cycles_torchaudio_beats)
-  → 툴킷 datasets/icbhi/processing.py load_audio(fade 1/16) + slice_audio 와 동일.
-- 클래스별 리스트(normal/crackle/wheeze/both; both 는 crackle·wheeze 리스트에도 들어감) 와
-  '짧은 사이클'(길이 < T/2) 리스트, 환자별 사이클 dict(삽입 순서).
-- 에폭당 크기 = N + int(N·mixing_prob) + int(N·ssl_prob). index < N 원본, 다음 구간 연결 샘플, 마지막 구간 PM 샘플.
-- 연결: 11 개 additive 조합에서 균등 선택 → 각 클래스의 **짧은** 사이클만 무작위(환자 무관) 로 뽑아 torch.cat →
-  T 초 cut_pad(앞 절단 / repeat + fade_out sr/16). 조건(짧은 사이클 부족) 미충족 시 원본 사이클 무작위 반환.
-- PM: 50% 양성 = 같은 patient_id 의 두 사이클(70% 비연속 gap≥2 / 30% 연속, 길이 제한 없음, 라벨 OR),
-  50% 하드 음성 = 병리 프로필이 같은 두 '환자' — dict 삽입 순서(normal_only 부터) 로 첫 ≥2 그룹에서 즉시 반환하는 quirk.
-  PM 샘플의 주 라벨(OR) 은 주 BCE 손실에도 포함된다(마스킹 없음).
-- **patient_id quirk**: 공식 스플릿 모드에서 patient_id = 파일명 전체(=녹음). 논문 의도(환자 번호) 는 patient_id_mode="patient".
-- 테스트(train=False) 는 원본 사이클만 (cut_pad 후 단독 입력) — 툴킷에서는 기존 IndexDataset(repeat_fade 10 s) 를 재사용한다.
+Behaviour of the official code (exact port verified against goldens; all kept as defaults):
+- Iterates the train files of the official 60/40 split in sorted stem order and extracts cycles **at original length**
+  (torchaudio.load -> 16 kHz resample -> fade in/out sr/16 over the whole recording -> crop [start,end); icbhi_util.py get_individual_cycles_torchaudio_beats)
+  -> identical to the toolkit's datasets/icbhi/processing.py load_audio(fade 1/16) + slice_audio.
+- Per-class lists (normal/crackle/wheeze/both; both also goes into the crackle and wheeze lists),
+  a 'short cycle' (length < T/2) list, and a per-patient cycle dict (insertion order).
+- Size per epoch = N + int(N*mixing_prob) + int(N*ssl_prob). index < N original, next range concatenated samples, last range PM samples.
+- Concatenation: uniform choice among 11 additive combinations -> randomly draw only **short** cycles of each class (regardless of patient), torch.cat ->
+  T s cut_pad (crop from the front / repeat + fade_out sr/16). If the condition is not met (too few short cycles), a random original cycle is returned.
+- PM: 50% positive = two cycles of the same patient_id (70% non-consecutive gap>=2 / 30% consecutive, no length limit, labels OR-ed),
+  50% hard negative = two 'patients' with the same pathology profile -- quirk: returns immediately from the first group with >=2 in dict insertion order (starting from normal_only).
+  The main label (OR) of PM samples also enters the main BCE loss (no masking).
+- **patient_id quirk**: in official split mode, patient_id = the whole file name (= recording). The paper's intent (patient number) is patient_id_mode="patient".
+- Test (train=False) uses original cycles only (single input after cut_pad) -- the toolkit reuses the existing IndexDataset (repeat_fade 10 s).
 
-난수: 원본은 python `random` 모듈을 __getitem__ 에서 쓴다(num_workers=0 기본 → 단일 스트림). 여기서는 전용
-random.Random 인스턴스를 쓰며 호출 순서를 원본과 같게 유지했으므로 rng_seed 를 주고 num_workers=0 으로 돌리면
-같은 seed 에서 같은 샘플 열이 나온다(골든으로 고정). num_workers>0 이면 워커마다 torch.initial_seed()(Lightning
-seed_everything(workers=True) 가 파생) 로 시드된 별도 스트림 → 원본과 '동일 분포' 이지 동일 열은 아니다.
+RNG: the original uses the python `random` module in __getitem__ (num_workers=0 by default -> a single stream). Here a dedicated
+random.Random instance is used with the same call order as the original, so with rng_seed set and num_workers=0
+the same seed yields the same sample sequence (pinned by goldens). With num_workers>0 each worker gets a separate stream seeded from torch.initial_seed() (derived by Lightning
+seed_everything(workers=True)) -> 'same distribution' as the original, not the same sequence.
 """
 from __future__ import annotations
 import os
@@ -44,7 +44,7 @@ CLASS_NAMES = ("normal", "crackle", "wheeze", "both")
 
 
 def convert_to_multilabel(original_label: int) -> List[int]:
-    """원본 _convert_to_multilabel: 0→[1,0,0], 1→[0,1,0], 2→[0,0,1], 3→[0,1,1]."""
+    """Original _convert_to_multilabel: 0->[1,0,0], 1->[0,1,0], 2->[0,0,1], 3->[0,1,1]."""
     multilabel = [0, 0, 0]
     if original_label == 0:
         multilabel[0] = 1
@@ -59,7 +59,7 @@ def convert_to_multilabel(original_label: int) -> List[int]:
 
 
 def multilabel_mixing_combinations(strategy: str = "additive") -> List[tuple]:
-    """원본 _get_multilabel_mixing_combinations 와 같은 순서·내용 (random.choice 인덱스가 같아야 한다)."""
+    """Same order and content as the original _get_multilabel_mixing_combinations (random.choice indices must match)."""
     combinations: List[tuple] = []
     if strategy == "additive":
         combinations.extend([(0, 1, 1, 1, 0, 1.0), (0, 2, 1, 0, 1, 1.0), (1, 2, 0, 1, 1, 1.0)])
@@ -86,7 +86,7 @@ def single_label_mixing_combinations() -> List[tuple]:
 
 
 def _cat(*audios: torch.Tensor) -> torch.Tensor:
-    """원본 _concatenate_two/three_audios: (1, L) 로 맞춰 시간축 연결 (다채널이면 첫 채널)."""
+    """Original _concatenate_two/three_audios: shape to (1, L) and concatenate along time (first channel if multi-channel)."""
     parts = []
     for a in audios:
         if a.dim() == 1:
@@ -109,20 +109,20 @@ class PCMCLConcatDataset(Dataset):
         desired_length_sec: float = 10.0,
         output_kind: str = "waveform",          # waveform (BEATs) | fbank (AST: (n_mels, frames) freq_time)
         n_mels: int = 128,
-        # ---- 원본 인자 ----
-        label_space: str = "icbhi4",            # icbhi4(저자 정의 3속성) | sprsound7(툴킷 정의 6속성)
+        # ---- original arguments ----
+        label_space: str = "icbhi4",            # icbhi4 (3 attributes defined by the authors) | sprsound7 (6 attributes defined by the toolkit)
         mode: str = "default",                  # default(concat+multi[+PM]) | concat_single | noconcat_multi
-        mixing_prob: float = 1.0,               # 논문 '원본당 증강 1개' = 1.0 (argparse 기본 0.5)
-        conditional_mixing: bool = False,       # 원본 --conditional_mixing (store_true; 켜면 random.random() 한 번 더 소비, 확률은 전부 1.0)
+        mixing_prob: float = 1.0,               # paper 'one augmentation per original' = 1.0 (argparse default 0.5)
+        conditional_mixing: bool = False,       # original --conditional_mixing (store_true; when on, consumes one extra random.random(), all probabilities 1.0)
         mixing_label_strategy: str = "additive",
         enable_ssl: bool = True,
         ssl_prob: float = 0.3,
         ssl_method: str = "coherence",
-        # ---- 논문-코드 불일치 플래그 (기본 = 코드) ----
-        patient_id_mode: str = "recording",     # recording(공식 모드 quirk: 파일명 전체) | patient(환자 번호 split('_')[0])
-        hard_negative_mode: str = "dict_order", # dict_order(quirk: 첫 ≥2 그룹) | random_profile(≥2 그룹 중 무작위) | basic(임의 다른 환자)
-        # ---- 툴킷 ----
-        rng_seed: Optional[int] = None,         # None: 워커별 torch.initial_seed() 파생 (학습). 정수: 고정 스트림 (골든/테스트)
+        # ---- paper-vs-code mismatch flags (default = code) ----
+        patient_id_mode: str = "recording",     # recording (official mode quirk: whole file name) | patient (patient number split('_')[0])
+        hard_negative_mode: str = "dict_order", # dict_order (quirk: first group with >=2) | random_profile (random among groups with >=2) | basic (any other patient)
+        # ---- toolkit ----
+        rng_seed: Optional[int] = None,         # None: derived per worker from torch.initial_seed() (training). Integer: fixed stream (goldens/tests)
         cache_dir: Optional[Union[str, pathlib.Path]] = "outputs/pcmcl/cache",
         fade: bool = True,
     ):
@@ -140,10 +140,10 @@ class PCMCLConcatDataset(Dataset):
         self.ls = get_label_space(label_space)
         if mode == "concat_single" and self.ls.name != "icbhi4":
             raise NotImplementedError(
-                "concat_single 은 4-class dominant 라벨을 쓰는 저자 ablation 이라 icbhi4 에서만 정의된다"
+                "concat_single is an ablation by the authors using 4-class dominant labels and is defined only for icbhi4"
             )
         if ssl_method != "coherence":
-            raise NotImplementedError("ssl_method 는 논문이 쓰는 'coherence'(PM) 만 이식했다 (concat_single SSL 은 범위 밖)")
+            raise NotImplementedError("only the 'coherence' (PM) ssl_method used by the paper is ported (concat_single SSL is out of scope)")
 
         self.index_csv = pathlib.Path(index_csv)
         self.data_root = pathlib.Path(data_root)
@@ -168,7 +168,7 @@ class PCMCLConcatDataset(Dataset):
         self._rng: Optional[random.Random] = random.Random(rng_seed) if rng_seed is not None else None
         self.fade = bool(fade)
         self.cache_dir = pathlib.Path(cache_dir) if cache_dir else None
-        # 원본 cut_pad_sample_torchaudio(pad_types='repeat') == 툴킷 repeat_fade (PAFA/patch-mix 골든으로 확인)
+        # original cut_pad_sample_torchaudio(pad_types='repeat') == toolkit repeat_fade (confirmed with the PAFA/patch-mix goldens)
         self.cut_pad = AudioPreprocessor(self.sample_rate, AudioPreprocessConfig(desired_length_sec=self.desired_length, pad_type="repeat_fade"))
 
         self.all_cycles: List[Dict[str, Any]] = self._load_cycles()
@@ -193,7 +193,7 @@ class PCMCLConcatDataset(Dataset):
             patient_id_mode, len(self.patient_cycles), self.n_mixed, self.n_ssl, self.dataset_size,
         )
 
-    # ------------------------------------------------------------------ 적재
+    # ------------------------------------------------------------------ loading
     def _cache_path(self) -> Optional[pathlib.Path]:
         if self.cache_dir is None:
             return None
@@ -201,13 +201,13 @@ class PCMCLConcatDataset(Dataset):
         return self.cache_dir / f"cycles_{self.split}_{self.sample_rate}_{'fade' if self.fade else 'nofade'}_{key}.pt"
 
     def _load_cycles(self) -> List[Dict[str, Any]]:
-        # 스플릿 적용은 IndexDataset 에 맡긴다 (split_file 우선순위 규칙 동일)
+        # Split filtering is delegated to IndexDataset (same split_file priority rules)
         ds = IndexDataset(index_csv=self.index_csv, data_root=self.data_root, sampling_rate=self.sample_rate,
                           sample_level="cycle", split=self.split, split_file=self.split_file, fade=self.fade)
         df = ds.df.copy()
         df["_stem"] = df["recording_path"].map(lambda p: pathlib.Path(str(p)).stem)
         df["_row"] = range(len(df))
-        # 원본: filenames = sorted(stem) 순회, 파일 안에서는 주석 행 순서
+        # Original: iterate filenames = sorted(stem), annotation row order within a file
         df = df.sort_values(["_stem", "_row"], kind="stable").reset_index(drop=True)
         sample_ids = df["sample_id"].astype(str).tolist()
 
@@ -217,11 +217,11 @@ class PCMCLConcatDataset(Dataset):
                 blob = torch.load(cache, weights_only=False)
                 if blob.get("sample_ids") == sample_ids:
                     cycles = blob["cycles"]
-                    logger.info("사이클 캐시 적재 %s (%d)", cache, len(cycles))
+                    logger.info("Loaded cycle cache %s (%d)", cache, len(cycles))
                     return self._attach_ids(cycles)
-                logger.warning("사이클 캐시 %s 의 sample_id 가 인덱스와 달라 다시 만든다", cache)
+                logger.warning("Cycle cache %s has sample_ids that differ from the index; rebuilding", cache)
             except Exception as exc:  # pragma: no cover
-                logger.warning("사이클 캐시 %s 적재 실패(%s) — 다시 만든다", cache, exc)
+                logger.warning("Failed to load cycle cache %s (%s) -- rebuilding", cache, exc)
 
         cycles: List[Dict[str, Any]] = []
         for stem, g in df.groupby("_stem", sort=False):
@@ -233,7 +233,7 @@ class PCMCLConcatDataset(Dataset):
                 audio = slice_audio(wav, float(r["t0"]), float(r["t1"]), self.sample_rate).clone()
                 label4 = int(r["label"])
                 cycles.append({
-                    "audio": audio,                       # (1, L) 원 길이
+                    "audio": audio,                       # (1, L) original length
                     "original_label": label4,
                     "filename": stem,
                     "sample_id": str(r["sample_id"]),
@@ -241,10 +241,10 @@ class PCMCLConcatDataset(Dataset):
                 })
         if cache is not None:
             cache.parent.mkdir(parents=True, exist_ok=True)
-            tmp = cache.with_name(f"{cache.name}.{os.getpid()}.tmp")  # 동시 첫 run 들의 캐시 생성 경합 방지 (pid 별 tmp → 원자적 replace)
+            tmp = cache.with_name(f"{cache.name}.{os.getpid()}.tmp")  # avoids races between concurrent first runs creating the cache (per-pid tmp -> atomic replace)
             torch.save({"sample_ids": sample_ids, "cycles": cycles}, tmp)
             tmp.replace(cache)
-            logger.info("사이클 캐시 저장 %s (%d)", cache, len(cycles))
+            logger.info("Saved cycle cache %s (%d)", cache, len(cycles))
         return self._attach_ids(cycles)
 
     def _attach_ids(self, cycles: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -253,7 +253,7 @@ class PCMCLConcatDataset(Dataset):
                 c["label"] = c["original_label"]                      # 4-class single label
             else:
                 c["label"] = self.ls.to_multilabel(c["original_label"])
-            # 원본 dataset_pcmcl.py:112 — 공식 모드: filename.split('.')[0] == 파일명 전체(녹음 단위)
+            # Original dataset_pcmcl.py:112 -- official mode: filename.split('.')[0] == whole file name (per recording)
             c["patient_id"] = c["filename"].split("_")[0] if self.patient_id_mode == "patient" else c["filename"]
         return cycles
 
@@ -266,19 +266,19 @@ class PCMCLConcatDataset(Dataset):
             self.patient_cycles.setdefault(c["patient_id"], []).append(c)
             short = c["length"] < self.half_target_samples
             if self.mode == "concat_single":
-                # ConcatenationSingleLabelDataset: 4-class 각각 한 리스트에만
+                # ConcatenationSingleLabelDataset: each of the 4 classes goes into exactly one list
                 self.classwise_cycle_list[c["original_label"]].append(c)
                 if short:
                     self.short_classwise_cycle_list[c["original_label"]].append(c)
                 continue
-            # 포함(⊇) 규칙 — ICBHI 에서는 원본의 "0·1·2 는 비트, 3 은 original_label==3" 과 비트 단위로 같다
-            # (both `[0,1,1]` 만이 class 3 의 `[0,1,1]` 을 포함한다). pcmcl_labelspace 모듈 docstring 참조.
+            # Containment (⊇) rule -- for ICBHI this is bit-identical to the original "0/1/2 by bit, 3 if original_label==3"
+            # (only both `[0,1,1]` contains class 3's `[0,1,1]`). See the pcmcl_labelspace module docstring.
             for k in self.ls.buckets_for(c["label"]):
                 self.classwise_cycle_list[k].append(c)
                 if short:
                     self.short_classwise_cycle_list[k].append(c)
 
-    # ------------------------------------------------------------------ 난수
+    # ------------------------------------------------------------------ RNG
     @property
     def rng(self) -> random.Random:
         if self._rng is None:
@@ -292,7 +292,7 @@ class PCMCLConcatDataset(Dataset):
     def reseed(self, seed: int) -> None:
         self._rng = random.Random(seed)
 
-    # ---------------------------------------------------------------- 연결
+    # ---------------------------------------------------------------- concatenation
     def _should_apply_mixing(self, combination) -> bool:
         if not self.conditional_mixing:
             return True
@@ -335,7 +335,7 @@ class PCMCLConcatDataset(Dataset):
         return rng.choice(self.all_cycles)
 
     def _generate_mixed_single(self, combination) -> Dict[str, Any]:
-        """ablation concat_single: 4-class dominant 라벨 (원본 ConcatenationSingleLabelDataset._generate_mixed_sample)."""
+        """ablation concat_single: 4-class dominant label (original ConcatenationSingleLabelDataset._generate_mixed_sample)."""
         rng = self.rng
         c1, c2, result, _ = combination
         short = self.short_classwise_cycle_list
@@ -376,7 +376,7 @@ class PCMCLConcatDataset(Dataset):
                 return None
         pid = rng.choice(valid)
         cs = self.patient_cycles[pid]
-        # 원본: `random.random() < 0.7 and len(cs) >= 3` — random() 이 먼저 소비된다
+        # Original: `random.random() < 0.7 and len(cs) >= 3` -- random() is consumed first
         if rng.random() < 0.7 and len(cs) >= 3:
             gap_options = [(i, j) for i in range(len(cs)) for j in range(i + 2, len(cs))]
             if gap_options:
@@ -437,8 +437,8 @@ class PCMCLConcatDataset(Dataset):
             return self._generate_basic_negative_coherence_sample()
         groups = self._pathology_groups()
         if self.hard_negative_mode == "dict_order":
-            order = list(groups.items())                         # quirk: 삽입 순서 → 사실상 normal_only
-        else:  # random_profile (논문 의도 추정 — 저자 확인 전)
+            order = list(groups.items())                         # quirk: insertion order -> effectively normal_only
+        else:  # random_profile (presumed paper intent -- not confirmed by the authors)
             eligible = [(k, v) for k, v in groups.items() if len(v) >= 2]
             order = [rng.choice(eligible)] if eligible else []
         for ptype, patients in order:
@@ -465,7 +465,7 @@ class PCMCLConcatDataset(Dataset):
                 "patient_id": f"{p1}+{p2}", "mix_info": "basic_negative", "concat_classes": [c1["original_label"], c2["original_label"]],
                 "concat_ids": [c1["sample_id"], c2["sample_id"]], "length": audio.shape[-1]}
 
-    # -------------------------------------------------------------- 출력
+    # -------------------------------------------------------------- output
     def _process_audio(self, audio: torch.Tensor) -> torch.Tensor:
         if audio.dim() == 1:
             audio = audio.unsqueeze(0)
@@ -476,11 +476,11 @@ class PCMCLConcatDataset(Dataset):
             return audio.squeeze(0).float()               # (T,)
         from rsc_toolkit.processors.mel import generate_fbank
 
-        # 원본 generate_fbank (kaldi 128 mel, mean -4.2677393 / std 4.5689974, /(2·std)) → (frames, n_mels); 툴킷 배치 규약 (n_mels, frames)
+        # Original generate_fbank (kaldi 128 mel, mean -4.2677393 / std 4.5689974, /(2*std)) -> (frames, n_mels); toolkit batch convention (n_mels, frames)
         return generate_fbank(audio, sampling_rate=self.sample_rate, n_mels=self.n_mels).transpose(0, 1).contiguous()
 
     def get_sample(self, index: int) -> Dict[str, Any]:
-        """원본 __getitem__ 의 분기 (가공 전 샘플 dict + ssl 정보). 골든 대조용으로 공개."""
+        """Branching of the original __getitem__ (raw sample dict + ssl info). Public for golden comparison."""
         n = len(self.all_cycles)
         ssl_label, ssl_task = -1, "none"
         if index < n:
@@ -511,22 +511,22 @@ class PCMCLConcatDataset(Dataset):
         return self.dataset_size
 
 
-from rsc_toolkit.datasets import collate as _collate  # P2-6: collate 단일 구현
+from rsc_toolkit.datasets import collate as _collate  # single collate implementation
 
-# (x, y(3-label float | 4-class long) stack, ssl_label long -1/0/1 stack). PLAdapter 는 batch[2] 를 meta_labels 로 넘긴다.
+# (x, y(3-label float | 4-class long) stack, ssl_label long -1/0/1 stack). PLAdapter passes batch[2] as meta_labels.
 pcmcl_train_collate = _collate.pcmcl_train_collate
 
 
 # ====================================================================== datamodule
-from rsc_toolkit.trainer.data.index_datamodule import IndexDataModule  # noqa: E402  (lightning 의존은 여기서만)
+from rsc_toolkit.trainer.data.index_datamodule import IndexDataModule  # noqa: E402  (lightning dependency only here)
 
 
 class PCMCLDataModule(IndexDataModule):
-    meta_kind = "pcmcl_ssl_label"  # 학습 batch[2] = ssl_label long ∈ {-1,0,1} — ast_pcmcl/beats_pcmcl 전용
+    meta_kind = "pcmcl_ssl_label"  # train batch[2] = ssl_label long ∈ {-1,0,1} -- ast_pcmcl/beats_pcmcl only
     """
-    train = PCMCLConcatDataset(동적 연결·PM), val/test = 부모(IndexDataModule) 의 IndexDataset 경로
-    (desired_length_sec·pad_type=repeat_fade → 테스트 사이클 단독 cut_pad, features.kind 로 waveform/fbank).
-    train 의 출력 형식은 features.kind 를 따른다: waveform → (L,), fbank/mel → (n_mels, frames).
+    train = PCMCLConcatDataset (dynamic concatenation, PM), val/test = the parent (IndexDataModule) IndexDataset path
+    (desired_length_sec, pad_type=repeat_fade -> test cycles cut_pad individually, waveform/fbank via features.kind).
+    The train output format follows features.kind: waveform -> (L,), fbank/mel -> (n_mels, frames).
     """
 
     def __init__(self, *args, pcmcl: Optional[dict] = None, **kwargs):
@@ -540,9 +540,9 @@ class PCMCLDataModule(IndexDataModule):
         elif kind in {"mel", "fbank"}:
             output_kind = "fbank"
         else:
-            raise ValueError(f"pcmcl 데이터모듈은 features.kind waveform|fbank 만 지원한다: {kind!r}")
+            raise ValueError(f"pcmcl datamodule supports only features.kind waveform|fbank: {kind!r}")
         if len(self.train_splits) != 1:
-            raise ValueError("pcmcl train_splits 는 하나여야 한다")
+            raise ValueError("pcmcl train_splits must contain exactly one split")
         cfg = dict(self.pcmcl_cfg)
         cache_dir = cfg.pop("cache_dir", "outputs/pcmcl/cache")
         return PCMCLConcatDataset(
@@ -556,7 +556,7 @@ class PCMCLDataModule(IndexDataModule):
         if self.index_csv is None:
             self.index_csv = self._default_index_path()
         if not self.features_cfg.enabled:
-            raise ValueError("pcmcl 데이터모듈은 features.enabled=true (waveform 또는 fbank) 가 필요하다")
+            raise ValueError("pcmcl datamodule requires features.enabled=true (waveform or fbank)")
         if stage in (None, "fit"):
             self.train_ds = self._build_train_dataset()
             self.val_ds = self._wrap_with_features(self._build_index_dataset(splits=self.val_splits), feature_transform=None)

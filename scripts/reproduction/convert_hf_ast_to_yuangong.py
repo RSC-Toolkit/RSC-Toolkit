@@ -1,10 +1,10 @@
 """
-HF `MIT/ast-finetuned-audioset-16-16-0.442` → YuanGongND/ast 원본 형식(`audioset_16_16_0.4422.pth`, DataParallel 키
-module.v.* / module.mlp_head.*) 변환. 원 Dropbox 링크가 비활성이라 필요 (MVST 가 이 파일을 하드코딩).
+Converts HF `MIT/ast-finetuned-audioset-16-16-0.442` → the original YuanGongND/ast format (`audioset_16_16_0.4422.pth`, DataParallel keys
+module.v.* / module.mlp_head.*). Needed because the original Dropbox link is dead (MVST hard-codes this file).
 
   .venv/bin/python scripts/reproduction/convert_hf_ast_to_yuangong.py [--out pretrained_models/upstream/audioset_16_16_0.4422.pth]
 
-검증: 변환본을 16/16 스트라이드·128×1024 입력 AST(timm DeiT 골격)에 로드해 HF 모델 로짓과 대조(atol 1e-4).
+Verification: loads the converted weights into an AST (timm DeiT skeleton) with 16/16 stride and 128×1024 input and compares against the HF model logits (atol 1e-4).
 """
 import argparse
 import json
@@ -59,7 +59,7 @@ def main():
     out = pathlib.Path(args.out); out.parent.mkdir(parents=True, exist_ok=True)
     torch.save(state, out)
 
-    # ---- 검증: 128x1024 입력, 16/16 스트라이드 AST 골격에 로드해 HF 로짓과 대조 ----
+    # ---- verification: 128x1024 input, load into the 16/16-stride AST skeleton and compare with the HF logits ----
     from rsc_toolkit.models.ast_patchmix import PatchEmbed, _create_deit_skeleton
     v = _create_deit_skeleton("base384", pretrained=False)
     pe = PatchEmbed(img_size=(128, 1024), patch_size=16, in_chans=1, embed_dim=768)
@@ -71,10 +71,10 @@ def main():
     head.load_state_dict({k[len("module.mlp_head."):]: t for k, t in state.items() if k.startswith("module.mlp_head.")})
     v.eval(); head.eval()
     torch.manual_seed(0)
-    x = torch.randn(2, 1024, 128)  # (B, time, freq) — HF input_values 와 동일 레이아웃
+    x = torch.randn(2, 1024, 128)  # (B, time, freq) — same layout as HF input_values
     with torch.no_grad():
         ref = hf(input_values=x).logits
-        z = x.unsqueeze(1).transpose(2, 3)  # (B,1,128,1024) = YuanGong forward 의 transpose(2,3)
+        z = x.unsqueeze(1).transpose(2, 3)  # (B,1,128,1024) = transpose(2,3) in the YuanGong forward
         t = v.patch_embed(z)
         t = torch.cat((v.cls_token.expand(2, -1, -1), v.dist_token.expand(2, -1, -1), t), dim=1) + v.pos_embed
         for blk in v.blocks:
@@ -83,9 +83,9 @@ def main():
         ours = head((t[:, 0] + t[:, 1]) / 2)
     diff = float((ours - ref).abs().max())
     real_missing = [k for k in missing if not k.startswith(("head", "head_dist"))]
-    print(f"저장 {out} ({len(state)} 키) | 골격 missing(head 제외) {real_missing} unexpected {list(unexpected)} | HF 로짓 대비 max|diff| {diff:.2e}")
+    print(f"saved {out} ({len(state)} keys) | skeleton missing (excluding head) {real_missing} unexpected {list(unexpected)} | max|diff| vs HF logits {diff:.2e}")
     json.dump({"source": args.hf, "keys": len(state), "verify_max_abs_diff_vs_hf_logits": diff,
-               "note": "YuanGongND/ast 'Full AudioSet, 16 tstride, 16 fstride, no weight averaging, 0.442 mAP' 의 HF 미러를 원본 키 형식으로 변환"},
+               "note": "HF mirror of YuanGongND/ast 'Full AudioSet, 16 tstride, 16 fstride, no weight averaging, 0.442 mAP', converted to the original key format"},
               open(str(out) + ".provenance.json", "w"), indent=1)
     assert diff < 1e-3, diff
 

@@ -1,4 +1,4 @@
-"""P2-9 — rsc_toolkit.paths: RSCTK_PRETRAINED_ROOT / RSCTK_PROJECT_ROOT 해석 규칙."""
+"""rsc_toolkit.paths: resolution rules for RSCTK_PRETRAINED_ROOT / RSCTK_PROJECT_ROOT."""
 from __future__ import annotations
 
 import os
@@ -33,9 +33,9 @@ def test_resolve_pretrained_prefers_env_root(tmp_path, monkeypatch, no_env):
     monkeypatch.setenv(paths.PRETRAINED_ROOT_ENV, str(root))
     monkeypatch.chdir(tmp_path)
     assert paths.resolve_pretrained(("pretrained_models/upstream/a.pth",)) == root / "upstream" / "a.pth"
-    assert paths.resolve_pretrained(("pretrained_models/upstream/dass/b.pth",)) == root / "b.pth"  # basename 폴백
+    assert paths.resolve_pretrained(("pretrained_models/upstream/dass/b.pth",)) == root / "b.pth"  # basename fallback
     assert paths.download_target("pretrained_models/upstream/new.pth") == root / "upstream" / "new.pth"
-    # 명시 경로: 존재하면 그대로, 상대이고 없으면 ROOT 아래에서 찾고, 그래도 없으면 그 경로 그대로 (호출자 오류 메시지용)
+    # explicit path: used as is if it exists; if relative and missing, looked up under ROOT; otherwise returned unchanged (for the caller's error message)
     assert paths.resolve_pretrained(explicit=str(root / "b.pth")) == root / "b.pth"
     assert paths.resolve_pretrained(explicit="pretrained_models/upstream/a.pth") == root / "upstream" / "a.pth"
     assert paths.resolve_pretrained(explicit="pretrained_models/nope.pth") == pathlib.Path("pretrained_models/nope.pth")
@@ -53,16 +53,16 @@ def test_project_root_from_order(tmp_path, monkeypatch, no_env):
     work.mkdir()
     (work / "pyproject.toml").write_text("")
     monkeypatch.chdir(work)
-    assert paths.project_root_from(None) == work.resolve()  # cwd 에 저장소 표지가 있으면 cwd
+    assert paths.project_root_from(None) == work.resolve()  # cwd if it has repository markers
     bare = tmp_path / "bare"
     bare.mkdir()
     monkeypatch.chdir(bare)
-    r = paths.project_root_from(None)  # 표지 없는 cwd → 개발 checkout(패키지 상위에 pyproject) 또는 cwd
+    r = paths.project_root_from(None)  # cwd without markers -> dev checkout (pyproject above the package) or cwd
     assert r == bare.resolve() or (r / "pyproject.toml").exists()
 
 
 def test_model_resolvers_honor_env_root(tmp_path, monkeypatch, no_env):
-    """모델별 후보 목록 해석기가 공용 규칙을 쓴다 — ROOT 아래 파일을 찾는다."""
+    """Per-model candidate-list resolvers use the shared rule — they find files under ROOT."""
     from rsc_toolkit.models import ast_amsd, beats_pafa
 
     root = tmp_path / "w"

@@ -1,6 +1,6 @@
-# AMS-D(ICASSP 2026, CcnNnn/AMS-D) AST base384 16/16, 128×798 → 8×49 토큰, AudioSet 16/16 ckpt(HF 변환본) 통째 로드 + pos_embed 시간축 절단.
-# 공식 main.py 기본값: mask_ratio 0.39(153/392), mask_dense 0(하드), attentive, α 1.0 / β 0.03 / γ 0.3 / τ 1, soft 증류(이중 softmax teacher 유지).
-# method: amsd(기본) | sd_mask | sd_only | baseline (Table 3), mask_mode: attentive | random | time_inter | freq_inter (Table 2)
+# AMS-D (ICASSP 2026, CcnNnn/AMS-D) AST base384 16/16, 128×798 → 8×49 tokens, full load of the AudioSet 16/16 ckpt (HF-converted) + pos_embed truncated along time.
+# Official main.py defaults: mask_ratio 0.39 (153/392), mask_dense 0 (hard), attentive, α 1.0 / β 0.03 / γ 0.3 / τ 1, soft distillation (double-softmax teacher kept).
+# method: amsd (default) | sd_mask | sd_only | baseline (Table 3), mask_mode: attentive | random | time_inter | freq_inter (Table 2)
 name: ast_amsd
 params:
   n_cls: 4
@@ -15,14 +15,14 @@ params:
   mask_dense: 0.0
   mask_mode: attentive
   method: amsd
-  num_train_samples: 4142          # 공식 60/40 train cycle 수 (콜백이 datamodule 길이로 보정)
+  num_train_samples: 4142          # number of official 60/40 train cycles (the callback corrects it from the datamodule length)
   alpha: 1.0
   beta: 0.03
   gamma: 0.3
   tau: 1.0
   distillation_type: soft
-  teacher_is_prob: false           # 가정 플래그: true 면 논문 식 1 문자 그대로(이중 softmax 제거)
-  noise_enabled: true              # epoch ≥10 잡음+시간 roll (mydataset.py:126-129; 진폭·roll 은 파생 RNG 가정)
+  teacher_is_prob: false           # assumption flag: true = paper Eq. 1 taken literally (removes the double softmax)
+  noise_enabled: true              # noise + time roll from epoch ≥10 (mydataset.py:126-129; amplitude and roll use an assumed derived RNG)
   noise_start_epoch: 10
   noise_seed: 2345
   input_layout: freq_time

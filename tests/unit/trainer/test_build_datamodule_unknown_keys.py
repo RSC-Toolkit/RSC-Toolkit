@@ -1,5 +1,5 @@
-"""build_datamodule 의 미지 키 오류 — `data_defaults@data: base` 가 주입한 index 계열 키가 엄격한 datamodule 에 닿으면
-원인(주입한 defaults·제거 override)을 지목하는 TypeError 를 낸다 (REVIEW 2026-09-10 §7 P1)."""
+"""Unknown-key error in build_datamodule — when index-family keys injected by `data_defaults@data: base` reach a strict datamodule,
+it raises a TypeError that names the cause (injected defaults, removal override)."""
 from __future__ import annotations
 
 import pytest
@@ -34,7 +34,7 @@ def test_build_datamodule_names_the_injected_defaults(monkeypatch):
     msg = str(exc.value)
     assert "_strict_test" in msg and "data_defaults@data: base" in msg
     assert "~data.params.desired_length_sec" in msg and "~data.params.specaugment" in msg
-    # cfg 는 비파괴
+    # cfg is not mutated
     assert cfg["params"]["datamodule_name"] == "_strict_test"
 
 
@@ -48,7 +48,7 @@ def test_build_datamodule_typo_is_reported_without_defaults_hint(monkeypatch):
 
 
 def test_real_combination_bts_precomputed_with_base_defaults():
-    """실제 발견 조합: compose('default', ['data=bts_precomputed']) — 예전엔 원인 없는 TypeError."""
+    """Combination found in practice: compose('default', ['data=bts_precomputed']) — previously a TypeError with no cause."""
     pytest.importorskip("hydra")
     import pathlib
 

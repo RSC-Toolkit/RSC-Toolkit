@@ -74,11 +74,9 @@ class BaseRSCDatasetProcessor(ABC, BaseModel):
         
         # Include feature processor config in cache key if present.
         #
-        # 예전에는 `_get_processor_config()`(밑줄) 를 호출하고 AttributeError 를
-        # 통째로 삼켰다. 실제 이름은 밑줄 없는 `get_processor_config()` 라서
-        # 설정이 조용히 캐시 키에서 빠졌고, n_mels 가 달라도 같은 캐시를 쓰게 됐다.
-        # 메서드 유무는 getattr 로 보고, 메서드 안에서 난 AttributeError 는
-        # 삼키지 않고 그대로 드러낸다.
+        # The method is `get_processor_config()` (no leading underscore). Its presence is
+        # checked with getattr; an AttributeError raised inside the method is not swallowed,
+        # otherwise the config would silently drop out of the key (e.g. different n_mels sharing one cache).
         kwargs = {}
         if self.feature_processor is not None:
             getter = getattr(self.feature_processor, "get_processor_config", None)
@@ -86,8 +84,8 @@ class BaseRSCDatasetProcessor(ABC, BaseModel):
                 kwargs["feature_processor"] = getter()
             else:
                 logger.warning(
-                    "%s 에 get_processor_config() 가 없어 설정이 캐시 키에서 빠진다. "
-                    "설정이 다른 피처가 같은 캐시를 공유할 수 있다.",
+                    "%s has no get_processor_config(); its config is left out of the cache key. "
+                    "Features with different configs may share the same cache.",
                     type(self.feature_processor).__name__,
                 )
 
@@ -106,37 +104,37 @@ class BaseRSCDatasetProcessor(ABC, BaseModel):
         path.mkdir(parents=True, exist_ok=True)
         return path
 
-    # 인덱스 검증에서 찾아볼 sample_level 들. 데이터셋이 일부만 만들면 줄여서 재정의한다.
+    # sample_levels checked during index validation. Datasets that build only some of them override this.
     processed_sample_levels: Tuple[str, ...] = ("cycle", "clip")
 
-    # 인덱스 CSV 가 반드시 갖춰야 하는 컬럼 (IndexDataset 이 요구하는 것과 같다).
-    # Miika 가 추가한 `split` 컬럼은 옛 인덱스에 없을 수 있어 필수로 두지 않는다.
-    # 단일 출처: rsc_toolkit.datasets.sample_index.REQUIRED_INDEX_COLUMNS (CSV_COLUMNS 에서 split 을 뺀 것)
+    # Columns every index CSV must have (same as what IndexDataset requires).
+    # The `split` column may be missing from older indexes, so it is not required.
+    # Single source: rsc_toolkit.datasets.sample_index.REQUIRED_INDEX_COLUMNS (CSV_COLUMNS minus split)
     REQUIRED_INDEX_COLUMNS: ClassVar[Tuple[str, ...]] = _REQUIRED_INDEX_COLUMNS
 
     def processed_extra_files(self) -> List[str]:
         """
-        index 디렉토리에 인덱스와 함께 있어야 하는 보조 산출물 이름 목록.
-        데이터셋별로 재정의한다 (예: sprsound 의 official_split.txt).
+        Names of auxiliary artifacts that must sit next to the index in the index directory.
+        Overridden per dataset (e.g. official_split.txt for sprsound).
         """
         return []
 
     def validate_index_labels(self, df: Any, *, sample_level: str) -> bool:
         """
-        라벨 검증 훅. 라벨 공간은 데이터셋·과제마다 다르므로(ICBHI 4클래스, SPRSound
-        이벤트 7종, clip 레벨은 라벨이 없기도 함) 기본은 최소한만 본다:
-        cycle 레벨은 라벨 결측이 없어야 한다. 더 엄격한 규칙은 데이터셋이 재정의한다.
+        Label validation hook. The label space differs per dataset and task (ICBHI 4 classes, SPRSound
+        7 event types, clip level sometimes unlabeled), so the default checks only the minimum:
+        cycle-level rows must have no missing labels. Datasets override this for stricter rules.
         """
         if sample_level != "cycle":
             return True
         missing = int(df["label"].isna().sum())
         if missing:
-            logger.error("cycle 인덱스에 라벨 결측 %d/%d 행", missing, len(df))
+            logger.error("cycle index has missing labels in %d/%d rows", missing, len(df))
             return False
         return True
 
     def _processed_index_dir(self) -> pathlib.Path:
-        # index_dir_path 는 디렉토리를 만들어 버리므로(cached_property) 검증에서는 경로만 계산한다.
+        # index_dir_path creates the directory (cached_property), so validation only computes the path.
         return pathlib.Path(self.outputs_directory) / "index"
 
     def _validate_index_file(self, path: pathlib.Path, *, sample_level: str) -> bool:
@@ -145,22 +143,22 @@ class BaseRSCDatasetProcessor(ABC, BaseModel):
         try:
             df = pd.read_csv(path)
         except Exception as exc:
-            logger.error("인덱스를 읽을 수 없다: %s (%s)", path, exc)
+            logger.error("Cannot read index: %s (%s)", path, exc)
             return False
 
         missing_cols = [c for c in self.REQUIRED_INDEX_COLUMNS if c not in df.columns]
         if missing_cols:
-            logger.error("인덱스 컬럼 누락 %s: %s", missing_cols, path)
+            logger.error("Index is missing columns %s: %s", missing_cols, path)
             return False
 
         if len(df) == 0:
-            # build-index 가 exit 0 으로 끝나도 행이 0 이면 학습은 불가능하다 (실제로 겪은 결함).
-            logger.error("인덱스에 행이 없다: %s", path)
+            # Even if build-index exits 0, an index with 0 rows cannot be trained on.
+            logger.error("Index has no rows: %s", path)
             return False
 
         levels = set(df["sample_level"].astype(str).str.strip().str.lower())
         if levels != {sample_level}:
-            logger.error("인덱스 %s 의 sample_level 값이 %s 다 (기대: %s)", path.name, sorted(levels), sample_level)
+            logger.error("Index %s has sample_level values %s (expected: %s)", path.name, sorted(levels), sample_level)
             return False
 
         stats_path = path.with_name(f"index_{sample_level}_stats.json")
@@ -168,38 +166,38 @@ class BaseRSCDatasetProcessor(ABC, BaseModel):
             try:
                 total = json.loads(stats_path.read_text()).get("total_samples")
             except Exception as exc:
-                logger.error("stats 파일을 읽을 수 없다: %s (%s)", stats_path, exc)
+                logger.error("Cannot read stats file: %s (%s)", stats_path, exc)
                 return False
             if total is not None and int(total) != len(df):
-                logger.error("stats 의 total_samples=%s 와 인덱스 행수 %d 가 다르다 (stale?): %s", total, len(df), stats_path)
+                logger.error("stats total_samples=%s differs from index row count %d (stale?): %s", total, len(df), stats_path)
                 return False
         else:
-            logger.warning("stats 파일이 없다 (선택 사항): %s", stats_path)
+            logger.warning("No stats file (optional): %s", stats_path)
 
         if not self.validate_index_labels(df, sample_level=sample_level):
             return False
 
-        logger.info("인덱스 OK: %s (%d 행)", path.name, len(df))
+        logger.info("Index OK: %s (%d rows)", path.name, len(df))
         return True
 
     def validate_processed_files(self) -> Optional[bool]:
         """
-        전처리 산출물(인덱스와 보조 파일)이 온전한지 검사한다.
+        Check that the preprocessing artifacts (indexes and auxiliary files) are intact.
 
-        반환:
-          None  = 검사할 산출물이 아직 없다 (build-index 를 안 함). 실패가 아니다.
-          False = 산출물이 있는데 깨져 있다 (컬럼 누락, 0행, stats 불일치, 보조 파일 누락 ...).
-          True  = 존재하는 레벨의 인덱스가 모두 정상이고 보조 파일도 있다.
+        Returns:
+          None  = no artifacts to check yet (build-index has not run). Not a failure.
+          False = artifacts exist but are broken (missing columns, 0 rows, stats mismatch, missing auxiliary file, ...).
+          True  = the indexes of all present levels are valid and the auxiliary files exist.
 
-        존재하는 레벨만 검사한다 — cycle 만 쓰는 사용자가 clip 인덱스를 안 만들었다고
-        실패로 치지 않기 위해서다. 피처 캐시는 모델/피처 종류마다 모양이 달라 여기서
-        보지 않고 FeatureCache.validate_entries() 로 따로 본다.
+        Only levels that exist are checked, so a user who only uses cycle is not failed for
+        not building the clip index. The feature cache has model/feature-specific shapes and is
+        not checked here; use FeatureCache.validate_entries() for that.
         """
         index_dir = self._processed_index_dir()
         candidates = [(lvl, index_dir / f"index_{lvl}.csv") for lvl in self.processed_sample_levels]
         present = [(lvl, p) for lvl, p in candidates if p.exists()]
         if not present:
-            logger.info("처리 산출물 없음 (아직 build-index 를 안 함): %s", index_dir)
+            logger.info("No processed artifacts (build-index has not run yet): %s", index_dir)
             return None
 
         ok = True
@@ -209,7 +207,7 @@ class BaseRSCDatasetProcessor(ABC, BaseModel):
         for name in self.processed_extra_files():
             extra = index_dir / name
             if not extra.exists() or extra.stat().st_size == 0:
-                logger.error("보조 산출물이 없거나 비어 있다: %s", extra)
+                logger.error("Auxiliary artifact is missing or empty: %s", extra)
                 ok = False
 
         return ok
@@ -231,12 +229,10 @@ class BaseRSCDatasetProcessor(ABC, BaseModel):
         from rsc_toolkit.datasets.feature_cache import FeatureCache
         from rsc_toolkit.datasets.preprocessing import ParallelPreprocessor
 
-        # 캐시가 아직 없으면 붙인다.
+        # Attach a cache if there is none yet.
         #
-        # 예전에는 여기서 processor 의 `cache_features` / `cache_dir` /
-        # `_init_cache()` 를 건드렸는데, BaseAudioProcessor 에는 그런 속성이 없다.
-        # 실제 API 는 `feature_cache` 하나다. 그래서 이 경로는 실제 processor 로
-        # 부르면 AttributeError 로 죽었다.
+        # BaseAudioProcessor exposes a single cache attribute, `feature_cache`
+        # (there is no `cache_features` / `cache_dir` / `_init_cache()`).
         if self.feature_processor.feature_cache is None:
             cache = FeatureCache(cache_dir=self.cache_dir_path)
             cache.configure(

@@ -1,35 +1,37 @@
 """
-Lungmix(ICASSP 2025, Ge et al.) 의 AST 분류기 — **논문 명세 재구현** (공식 저장소에 모델·학습 코드 없음).
+AST classifier of Lungmix (ICASSP 2025, Ge et al.) — **re-implementation from the paper description** (the official repository has no model or training code).
 
-논문 §III-B: ImageNet+AudioSet 사전학습 AST, '첫 두 토큰(cls/dist) 대신 전 hidden state 평균' 풀링, 분류기 앞 BatchNorm,
-입력 128-mel × 1024 frames(9 s 파형), AudioSet mean/std 정규화. 학습 시 배치 안에서 파형 Lungmix(온라인) 후 fbank.
+Paper §III-B: ImageNet+AudioSet-pretrained AST, pooling by 'mean of all hidden states instead of the first two tokens (cls/dist)', BatchNorm before
+the classifier, input 128-mel × 1024 frames (9 s waveform), AudioSet mean/std normalization. During training, waveform Lungmix (online) within
+the batch, then fbank.
 
-구현: rsc_toolkit.models.ast_patchmix.PatchMixAST(AudioSet 10/10 ckpt 로딩·forward 골격·patch_mix) 를 상속하되,
-입력 레이아웃은 **원 AST(input_fdim=128, input_tdim=1024)** 로 되돌린다 → AudioSet pos_embed(12×101) 를 보간 없이 그대로 쓴다
-(patch-mix 의 뒤집힌 (798,128) quirk 는 물려받지 않는다 — 논문에 patch-mix 코드베이스 사용 근거 없음).
+Implementation: inherits rsc_toolkit.models.ast_patchmix.PatchMixAST (AudioSet 10/10 ckpt loading, forward skeleton, patch_mix), but
+restores the **original AST input layout (input_fdim=128, input_tdim=1024)** → the AudioSet pos_embed (12×101) is used as-is without interpolation
+(the swapped (798,128) quirk of patch-mix is not inherited — nothing in the paper indicates use of the patch-mix codebase).
 
-가정(저자 확인 전, 전부 플래그):
-- #8 stride 미기재 → fstride=tstride=10 (AudioSet 10/10 ckpt). 전 토큰 평균에 cls/dist 포함 여부 미기재 → pool='mean_all'(포함);
-     'mean_patches' 로 제외 가능. '전 hidden state' 는 최종 LayerNorm(v.norm) **뒤**의 토큰으로 가정(HF last_hidden_state 정의와 동일;
-     norm 앞 평균은 미구현). BatchNorm = BatchNorm1d(768) 하나.
-     head 미기재: 원 AST 분류기는 LayerNorm(768)+Linear 인데 논문은 '분류기 앞에 BatchNorm 추가' 만 적음 → 가정 head='bn_linear'
-     (BN 이 LN 을 **대체**); 'bn_ln_linear' 는 BN → LayerNorm → Linear(원 mlp_head 유지 + BN 추가).
-     SpecAugment 미언급 → specaugment.enabled=False (켜면 fbank 뒤 툴킷 SpecAugment, 정책 icbhi_ast_sup — 데이터 config 의
-     specaugment 블록은 kind: waveform 에서 무효라 여기서 처리).
-- #5 1024 frames: 9 s@10 ms ≈ 898 frame → 나머지 0-패딩. 패딩·정규화 순서 미기재 → fbank_pad_before_norm=True
-     (원 AST 데이터로더 순서: 패딩 후 (x−mean)/(2·std)).
-- #4 짝: 배치 내 randperm 짝·믹싱 샘플이 원본을 **대체** — **플래그 없음(고정)**; 믹싱 확률만 mix_prob=1.0 플래그.
-- #5 믹싱 후 길이(max_len+shift2) → repeat 후 앞 9 s 절단(fit_mode='cut_first'; cut_last|random_crop 대안). raw 단계에서는 출력이
-     ≤ 2×원 구간이라 대개 9 s 미만 → repeat 패딩이 지배하고 fit_mode 차이는 작다.
-- #5 믹싱 위치: 논문 식 3 의 M ∈ {0,λ,1}^{1×maxlen(x_i,x_j)} 표기(길이가 다른 두 입력) 와 공식 함수의 길이 맞춤 구조(등길이 입력엔 항등)는
-     '원 구간을 섞은 뒤 9 s' 를 시사 → mix_stage='raw'(**기본·주 런**): 배치 meta_labels 로 실린 원 구간 길이
-     (data.params.lungmix.emit_valid_len=true 필요) 만 섞은 뒤 9 s 로 맞춘다. mix_stage='padded'(대안): 데이터셋이 9 s repeat 패딩한
-     파형을 그대로 섞는다(공식 함수 구조상 shift2 상수 패딩 때문에 출력의 기대 25% 가 상수 mean(wav2)). 저자 확인 전.
-- #1 apply_loudness_mask=False 가 공식 코드 출력(random mask 만) — 기본(P0). True 가 논문 식 3 재구현. 식 3 경로의 마스크 겹침값은
-     overlap='lam'(공식 반환 mask, random∧loudness = λ) 기본 / 'one'(식 8 OR 해석 = 1) 대안.
-- 'Lungmix + Patch-mix': 파형 Lungmix → 패치 임베딩 patch_mix(β=1, 원본 patch-mix) → 라벨은 patchmix_label_mode 가정:
-     'mixup' = PatchMixLoss(y_or, y_or[index], λ) 선형 보간 / 'preserve' = CE(y_or) (§III-C 의 label-preservation Patch-mix 와 결합).
-     논문은 결합판이 어느 쪽인지 적지 않았다(비교군, P1 큐 밖).
+Assumptions (all exposed as flags):
+- stride not specified → fstride=tstride=10 (AudioSet 10/10 ckpt). Whether cls/dist are included in the all-token mean is not specified → pool='mean_all' (included);
+     'mean_patches' excludes them. 'All hidden states' is assumed to be the tokens **after** the final LayerNorm (v.norm) (same as the HF
+     last_hidden_state definition; mean before the norm is not implemented). BatchNorm = a single BatchNorm1d(768).
+     head not specified: the original AST classifier is LayerNorm(768)+Linear, but the paper only says 'BatchNorm added before the classifier' →
+     assumed head='bn_linear' (BN **replaces** LN); 'bn_ln_linear' is BN → LayerNorm → Linear (original mlp_head kept + BN added).
+     SpecAugment not mentioned → specaugment.enabled=False (when enabled, toolkit SpecAugment after fbank, policy icbhi_ast_sup — the data config's
+     specaugment block has no effect with kind: waveform, so it is handled here).
+- 1024 frames: 9 s@10 ms ≈ 898 frames → the rest is zero-padded. Padding/normalization order not specified → fbank_pad_before_norm=True
+     (original AST dataloader order: pad, then (x−mean)/(2·std)).
+- Pairing: in-batch randperm pairs; the mixed sample **replaces** the original — **no flag (fixed)**; only the mixing probability is a flag, mix_prob=1.0.
+- Length after mixing (max_len+shift2) → repeat, then cut the first 9 s (fit_mode='cut_first'; alternatives cut_last|random_crop). At the raw stage the
+     output is ≤ 2× the original segment and usually shorter than 9 s → repeat padding dominates and fit_mode differences are small.
+- Mixing stage: the notation M ∈ {0,λ,1}^{1×maxlen(x_i,x_j)} in paper Eq. 3 (two inputs of different length) and the length-matching structure of the
+     official function (identity for equal-length inputs) suggest 'mix the original segments, then fit to 9 s' → mix_stage='raw' (**default, main run**):
+     mixes only the original segment lengths carried in the batch meta_labels (requires data.params.lungmix.emit_valid_len=true), then fits to 9 s.
+     mix_stage='padded' (alternative): mixes the waveforms the dataset already repeat-padded to 9 s (due to the constant shift2 padding in the official
+     function, an expected 25% of the output is the constant mean(wav2)). Unconfirmed by the authors.
+- apply_loudness_mask=False is the official code output (random mask only) — default (matches the official code). True re-implements paper Eq. 3.
+     Mask overlap value on the Eq. 3 path: overlap='lam' (mask returned by the official code, random∧loudness = λ) default / 'one' (Eq. 8 OR interpretation = 1) alternative.
+- 'Lungmix + Patch-mix': waveform Lungmix → patch_mix on the patch embeddings (β=1, original patch-mix) → labels follow the assumed patchmix_label_mode:
+     'mixup' = PatchMixLoss(y_or, y_or[index], λ) linear interpolation / 'preserve' = CE(y_or) (combined with the label-preservation Patch-mix of §III-C).
+     The paper does not state which one the combined version uses (comparison variant; not a reproduction target).
 """
 from __future__ import annotations
 
@@ -53,7 +55,7 @@ AUDIOSET_MEAN, AUDIOSET_STD = -4.2677393, 4.5689974
 
 @ModelFactory.register_model_class("ast_lungmix")
 class ASTLungmix(PatchMixAST):
-    accepts_meta = ("lungmix_valid_len",)  # 학습 batch[2] = 원 구간 길이 (LungmixDataModule emit_valid_len)
+    accepts_meta = ("lungmix_valid_len",)  # training batch[2] = original segment length (LungmixDataModule emit_valid_len)
 
     def __init__(
         self,
@@ -67,33 +69,33 @@ class ASTLungmix(PatchMixAST):
         model_size: str = "base384",
         pretrained_path: Optional[str] = None,
         verbose: bool = False,
-        # ---- 풀링·헤드 (논문 §III-B) ----
-        pool: str = "mean_all",            # mean_all(cls/dist 포함 전 토큰 평균) | mean_patches | cls_dist(원 AST)
+        # ---- pooling / head (paper §III-B) ----
+        pool: str = "mean_all",            # mean_all (mean of all tokens incl. cls/dist) | mean_patches | cls_dist (original AST)
         use_bn: bool = True,
-        head: str = "bn_linear",           # bn_linear(가정: BN 이 원 LayerNorm 대체) | bn_ln_linear(BN → LN → Linear)
-        specaugment: Optional[dict] = None,  # {enabled: false, policy: icbhi_ast_sup, mask: mean} — 논문 미언급 → 기본 off
-        # ---- 온라인 fbank ----
+        head: str = "bn_linear",           # bn_linear (Assumption: BN replaces the original LayerNorm) | bn_ln_linear (BN → LN → Linear)
+        specaugment: Optional[dict] = None,  # {enabled: false, policy: icbhi_ast_sup, mask: mean} — not mentioned in the paper → off by default
+        # ---- online fbank ----
         sample_rate: int = 16000,
         n_mels: int = 128,
         target_frames: int = 1024,
         fbank_pad_before_norm: bool = True,
         fbank_mean: float = AUDIOSET_MEAN,
         fbank_std: float = AUDIOSET_STD,
-        # ---- 믹싱·손실 ----
+        # ---- mixing / loss ----
         variant: str = "non_linear",
         apply_loudness_mask: bool = False,
-        overlap: str = "lam",              # 식 3 경로 마스크 겹침: lam(공식 반환 mask) | one(식 8 OR 해석)
+        overlap: str = "lam",              # mask overlap on the Eq. 3 path: lam (mask returned by the official code) | one (Eq. 8 OR interpretation)
         smooth: bool = False,
         mix_prob: float = 1.0,
         out_len_sec: float = 9.0,
         fit_mode: str = "cut_first",
-        mix_stage: str = "raw",            # raw(기본·주 런; meta_labels=원 구간 길이 필요) | padded(대안)
+        mix_stage: str = "raw",            # raw (default, main run; requires meta_labels = original segment length) | padded (alternative)
         vanilla_alpha: float = 0.5,
         lambda1: float = 1.0,
         lambda2_mode: str = "ratio",
         lambda2: float = 1.0,
-        mix_beta: float = 1.0,             # lungmix_patchmix 의 patch_mix Beta(β,β)
-        patchmix_label_mode: str = "mixup",  # lungmix_patchmix: mixup(PatchMixLoss 선형 보간) | preserve(CE(y_or))
+        mix_beta: float = 1.0,             # patch_mix Beta(β,β) for lungmix_patchmix
+        patchmix_label_mode: str = "mixup",  # lungmix_patchmix: mixup (PatchMixLoss linear interpolation) | preserve (CE(y_or))
         time_domain: bool = False,
         class_layout: Optional[dict] = None,
         mix_num_threads: int = 1,
@@ -105,18 +107,18 @@ class ASTLungmix(PatchMixAST):
             time_domain=time_domain, input_layout="time_freq",
         )
         if variant not in VARIANTS:
-            raise ValueError(f"variant 는 {VARIANTS} 중 하나: {variant!r}")
+            raise ValueError(f"variant must be one of {VARIANTS}: {variant!r}")
         if pool not in ("mean_all", "mean_patches", "cls_dist"):
-            raise ValueError("pool 은 mean_all|mean_patches|cls_dist")
+            raise ValueError("pool must be mean_all|mean_patches|cls_dist")
         if head not in ("bn_linear", "bn_ln_linear"):
-            raise ValueError("head 는 bn_linear|bn_ln_linear")
+            raise ValueError("head must be bn_linear|bn_ln_linear")
         if mix_stage not in ("padded", "raw"):
-            raise ValueError("mix_stage 는 padded|raw")
+            raise ValueError("mix_stage must be padded|raw")
         if overlap not in OVERLAP_MODES:
-            raise ValueError(f"overlap 은 {OVERLAP_MODES} 중 하나")
+            raise ValueError(f"overlap must be one of {OVERLAP_MODES}")
         if patchmix_label_mode not in ("mixup", "preserve"):
-            raise ValueError("patchmix_label_mode 는 mixup|preserve")
-        # 부모의 mlp_head/classifier(LayerNorm+Linear) 는 쓰지 않는다 → 파라미터 수에서 제외
+            raise ValueError("patchmix_label_mode must be mixup|preserve")
+        # the parent's mlp_head/classifier (LayerNorm+Linear) is unused → excluded from the parameter count
         self.mlp_head = nn.Identity()
         self.classifier = nn.Identity()
         self.pool = pool
@@ -146,9 +148,9 @@ class ASTLungmix(PatchMixAST):
         self.lungmix_loss = LungmixLoss(variant=variant, lambda1=lambda1, lambda2_mode=lambda2_mode, lambda2=lambda2)
         self.f_dim, self.t_dim = self.get_shape(fstride, tstride, input_fdim, input_tdim)
 
-    # ------------------------------------------------------------------ 특징
+    # ------------------------------------------------------------------ features
     def compute_fbank(self, wav: torch.Tensor) -> torch.Tensor:
-        """(B, L) 파형 → (B, target_frames, n_mels) kaldi fbank(AudioSet 상수 정규화). 입력은 9 s(out_len) 로 맞춘 파형."""
+        """(B, L) waveform → (B, target_frames, n_mels) kaldi fbank (AudioSet constant normalization). Input is a waveform fitted to 9 s (out_len)."""
         if wav.dim() == 3:
             wav = wav.squeeze(1)
         outs, n_valid = [], []
@@ -164,17 +166,17 @@ class ASTLungmix(PatchMixAST):
         fb = torch.stack(outs, 0)
         fb = (fb - self.fbank_mean) / (self.fbank_std * 2)
         if not self.fbank_pad_before_norm:
-            # 정규화 후 0-패딩 (툴킷 MelBankAudioProcessor 순서) — 패딩 프레임이 0 이 된다
+            # zero-pad after normalization (toolkit MelBankAudioProcessor order) — padded frames become 0
             for i, n in enumerate(n_valid):
                 fb[i, n:] = 0.0
         return fb
 
     def forward_tokens(self, x: torch.Tensor, y=None, patch_mix: bool = False):
-        """부모 forward_features 와 동일한 경로, 풀링만 뺀 토큰 출력 (B, 2+N, 768)."""
+        """Same path as the parent forward_features, minus pooling; returns tokens (B, 2+N, 768)."""
         if x.dim() == 3:
             x = x.unsqueeze(1)
         x = x.transpose(2, 3)
-        # 부모는 stride 10 하드코딩 — 여기서는 fstride/tstride 플래그를 따른다 (patch_embed 의 stride 와 일치)
+        # the parent hard-codes stride 10 — here the fstride/tstride flags are used (matching the patch_embed stride)
         h_patch = int((x.size()[2] - 16) / self.fstride) + 1
         w_patch = int((x.size()[3] - 16) / self.tstride) + 1
         B = x.shape[0]
@@ -200,7 +202,7 @@ class ASTLungmix(PatchMixAST):
             return tokens[:, 2:].mean(dim=1)
         return (tokens[:, 0] + tokens[:, 1]) / 2
 
-    def forward_features(self, x, y=None, patch_mix=False, time_domain=False):  # noqa: D401 — 부모 시그니처 유지
+    def forward_features(self, x, y=None, patch_mix=False, time_domain=False):  # noqa: D401 — keeps the parent signature
         out = self.forward_tokens(x, y=y, patch_mix=patch_mix)
         if patch_mix:
             tokens, (y_a, y_b, lam, index) = out
@@ -211,21 +213,21 @@ class ASTLungmix(PatchMixAST):
         return self.head(self.ln(self.bn(feats)))
 
     def apply_specaugment(self, fb: torch.Tensor) -> torch.Tensor:
-        """(B, T, F) fbank 에 샘플별 SpecAugment (학습 시, enabled 일 때만)."""
+        """Per-sample SpecAugment on the (B, T, F) fbank (training only, when enabled)."""
         if self.specaugment is None or not self.training:
             return fb
         outs = [self.specaugment(fb[i].transpose(0, 1)).transpose(0, 1) for i in range(fb.shape[0])]
         return torch.stack(outs, 0)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """x: (B, L) 파형 → logits. (B, 1024, 128) fbank 를 직접 주면 그대로 쓴다."""
+        """x: (B, L) waveform → logits. A (B, 1024, 128) fbank passed directly is used as-is."""
         if x.dim() == 2 and x.shape[-1] != self.n_mels:
             x = self.compute_fbank(x)
         return self.classify(self.forward_features(x))
 
-    # ------------------------------------------------------------------ 학습
+    # ------------------------------------------------------------------ training
     def _mix_waveforms(self, audio_batch: torch.Tensor, labels: torch.Tensor, valid_len=None):
-        """배치 내 짝 믹싱(CPU, 전역 RNG — 공식 함수와 같은 난수 열). None 이면 믹싱 안 함."""
+        """In-batch pair mixing (CPU, global RNG — same random sequence as the official function). Returns None when no mixing is applied."""
         if self.variant == "none":
             return None
         if self.mix_prob < 1.0 and float(torch.rand(())) >= self.mix_prob:
@@ -234,11 +236,12 @@ class ASTLungmix(PatchMixAST):
         vl_cpu = None
         if self.mix_stage == "raw":
             if valid_len is None:
-                raise ValueError("mix_stage='raw' 는 배치 meta_labels 로 원 구간 길이가 필요하다 "
+                raise ValueError("mix_stage='raw' requires the original segment length in the batch meta_labels "
                                  "(data.params.lungmix.emit_valid_len=true)")
             vl_cpu = valid_len.detach().cpu()
-        # CPU 믹싱은 요소별 연산이라 단일 스레드가 가장 빠르다 — 기본 스레드(64)로는 서버 부하(load 270+)에서 배치당 5–7 s,
-        # 1 스레드로는 30 ms (OMP 경합). 수치 정의에는 무관 (mix_num_threads 로 조절, 0 이면 건드리지 않음).
+        # CPU mixing is element-wise, so a single thread is fastest — with the default thread count (64) under heavy load (load 270+) a batch
+        # takes 5–7 s, with 1 thread 30 ms (OMP contention). Does not affect the numerics (set via mix_num_threads; 0 leaves it untouched).
+
         prev_threads = torch.get_num_threads()
         if self.mix_num_threads > 0:
             torch.set_num_threads(self.mix_num_threads)

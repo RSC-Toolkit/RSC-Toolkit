@@ -1,6 +1,6 @@
 """
-RespireNet P1 결과 집계: outputs/respirenet/<run>/best.json (+ logs/<run>.done EXIT=0).
-best.json 은 원본 규칙(test cycle accuracy 최고)의 Sp/Se/Score 와 참고용 Score-최고(best_score_info)를 둘 다 담는다.
+RespireNet 5-seed reproduction check aggregation: outputs/respirenet/<run>/best.json (+ logs/<run>.done EXIT=0).
+best.json holds both the Sp/Se/Score under the original rule (highest test cycle accuracy) and the Score-best entry for reference (best_score_info).
 
   .venv/bin/python scripts/reproduction/aggregate_respirenet_results.py
 """
@@ -9,9 +9,9 @@ import pathlib
 import re
 import statistics
 
-PAPER = {  # README Quantitative Results = 논문 Table 1 (단일 run 추정). CNN / CNN+CBA+BRC
-    "icbhi-respirenet-fold4":    ("RespireNet CNN(+BRC) 80/20 fold-4", (78.8, None), (53.6, None), (66.2, None), "CNN+CBA+BRC 67.1 · 저자 ckpt 재평가 66.14"),
-    "icbhi-respirenet-official": ("RespireNet CNN(+BRC) 공식 60/40",  (71.4, None), (39.0, None), (55.2, None), "CNN+CBA+BRC 55.7 (프로토콜 가정: 툴킷 official_split)"),
+PAPER = {  # README Quantitative Results = paper Table 1 (presumably a single run). CNN / CNN+CBA+BRC
+    "icbhi-respirenet-fold4":    ("RespireNet CNN(+BRC) 80/20 fold-4", (78.8, None), (53.6, None), (66.2, None), "CNN+CBA+BRC 67.1 · re-evaluation of the authors' ckpt 66.14"),
+    "icbhi-respirenet-official": ("RespireNet CNN(+BRC) official 60/40 split",  (71.4, None), (39.0, None), (55.2, None), "CNN+CBA+BRC 55.7 (protocol assumption: toolkit official_split)"),
 }
 
 
@@ -35,7 +35,7 @@ def main():
             groups[base].append((seed, d["S_p"], d["S_e"], d["icbhi_score"], d.get("epoch"), d.get("cycle_acc"),
                                  b.get("icbhi_score"), b.get("epoch")))
     if partial:
-        print("(미완료 run — 집계 제외: " + ", ".join(partial) + ")")
+        print("(incomplete runs — excluded from aggregation: " + ", ".join(partial) + ")")
     for base, rows in groups.items():
         if not rows:
             continue
@@ -49,10 +49,10 @@ def main():
                 vals = [r[i] for r in rows]
                 return statistics.mean(vals), statistics.stdev(vals)
             sp, se, sc, bsc = ms(1), ms(2), ms(3), ms(6)
-            print(f"  우리 평균 (acc-best, 원본 규칙): Sp {sp[0]:6.2f}±{sp[1]:.2f}  Se {se[0]:6.2f}±{se[1]:.2f}  Score {sc[0]:6.2f}±{sc[1]:.2f}")
-            print(f"  우리 평균 (Score-best, 참고)   : Score {bsc[0]:6.2f}±{bsc[1]:.2f}")
-            print(f"  논문 보고 : Sp {psp[0]:6.2f}  Se {pse[0]:6.2f}  Score {psc[0]:6.2f}  ({note})")
-            print(f"  Score 차이: {sc[0]-psc[0]:+.2f}")
+            print(f"  ours mean (acc-best, original rule): Sp {sp[0]:6.2f}±{sp[1]:.2f}  Se {se[0]:6.2f}±{se[1]:.2f}  Score {sc[0]:6.2f}±{sc[1]:.2f}")
+            print(f"  ours mean (Score-best, reference)  : Score {bsc[0]:6.2f}±{bsc[1]:.2f}")
+            print(f"  paper     : Sp {psp[0]:6.2f}  Se {pse[0]:6.2f}  Score {psc[0]:6.2f}  ({note})")
+            print(f"  Score diff: {sc[0]-psc[0]:+.2f}")
 
 
 if __name__ == "__main__":

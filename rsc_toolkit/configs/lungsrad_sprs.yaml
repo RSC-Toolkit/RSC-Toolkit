@@ -1,13 +1,13 @@
-# Lung-SRAD(팀) 를 SPRSound 표준 태스크(7-class)로 확장. **논문 목표치 없음** — ICBHI 레시피 그대로.
-#   사다리: model.params.method=ce (FT) | ce_blur (SAR) | patchmix_cl (Lung-SRAD, cl_mode dual)
-#   축 정의: model.params.mix_layout=as_code (기본, 원본 동작) | as_paper (Eq.6-7)
+# Lung-SRAD extended to the standard SPRSound task (7-class). **No paper-reported value** — ICBHI recipe unchanged.
+#   Ladder: model.params.method=ce (FT) | ce_blur (SAR) | patchmix_cl (Lung-SRAD, cl_mode dual)
+#   Axis definition: model.params.mix_layout=as_code (default, official behavior) | as_paper (Eq.6-7)
 #   rsctk-train --config-name lungsrad_sprs model.params.method=patchmix_cl seed=N run.name=sprs-lungsrad-dual-sN
-# 지표는 표준 7-class(sprsound_metrics) — ICBHI 전용 2-class 파생은 쓰지 않는다.
+# Metrics are the standard 7-class ones (sprsound_metrics) — the ICBHI-only 2-class derived metrics are not used.
 defaults:
   - model: dass_lungsrad
   - data_defaults@data: base
   - data: sprsound_lungsrad
-  - loss: cross_entropy         # 원본 --weighted_loss 미사용 → SPRS 도 비가중
+  - loss: cross_entropy         # the official code does not use --weighted_loss → SPRS is also unweighted
   - metrics: sprsound_metrics
   - optimizer: adamw_addrsc
   - trainer: default

@@ -1,4 +1,4 @@
-# OPERA-CT(EMBC 경로) SPRSound 데이터: sclmeta SPRS 파형 전처리(ms 정수 온셋, 8 s 순환 패딩, 16 kHz) 파형 그대로. bs 256 (ev_sprs_opera.sh).
+# OPERA-CT (EMBC path) SPRSound data: sclmeta SPRS waveform preprocessing (integer-ms onsets, 8 s circular padding, 16 kHz), raw waveforms. bs 256 (ev_sprs_opera.sh).
 name: sprsound_opera
 params:
   datamodule_name: index

@@ -1,26 +1,26 @@
 """
-Domain Transfer(Wang & Wang, ICASSP 2022) 의 오디오 증강 4종 — 논문 명세 재구현 (코드 없음, 등급 C).
+Four audio augmentations of Domain Transfer (Wang & Wang, ICASSP 2022): re-implemented from the paper specification (no code released).
 
-출처: "A Domain Transfer Based Data Augmentation Method for Automated Respiratory Classification",
+Source: "A Domain Transfer Based Data Augmentation Method for Automated Respiratory Classification",
 ICASSP 2022 pp.9017–9020, DOI 10.1109/ICASSP43922.2022.9746941 (§2.1).
 
-논문이 명시한 것:
-- 전통 증강: **잡음 추가(백색잡음 + 사전 녹음 환경잡음, SNR 을 1–10 에서 무작위 추출)**, time stretching, pitch shifting
-- **Splicing**: 같은 클래스의 짧은 샘플들을 이어붙임 (클래스마다 같은 개수의 splice 샘플 생성 → 불균형 완화)
-- **Circular padding**: zero padding 을 대체하며 **test set 에도 적용**
-- **Mixup**: 스펙트로그램·라벨 선형결합, α = 0.2
+Stated in the paper:
+- Traditional augmentation: **noise addition (white noise + pre-recorded environmental noise, SNR randomly sampled from 1–10)**, time stretching, pitch shifting
+- **Splicing**: concatenates short samples of the same class (the same number of spliced samples per class → mitigates imbalance)
+- **Circular padding**: replaces zero padding and is **also applied to the test set**
+- **Mixup**: linear combination of spectrograms and labels, α = 0.2
 
-가정(논문 미기재 — 전부 플래그로 노출, AUTHOR_QUESTIONS 참조):
-- **SNR 단위는 dB**, 1–10 dB 를 균등 추출로 해석(논문은 "randomly sampled between 1 and 10" 만 기재).
-- **환경잡음은 사용하지 않는다(백색잡음만)** — 논문이 어떤 코퍼스인지 밝히지 않았고, 툴킷 데이터 범위(ICBHI·SPRSound)
-  밖의 외부 코퍼스를 끌어오지 않기 위함(사용자 결정 2026-08-30: "가장 단순한 형태로"). 표에 '환경잡음 미적용' 병기.
-- time stretch / pitch shift 의 배율 범위 미기재 → 흔한 값(0.9–1.1 배속, ±2 semitone)을 기본값으로 두고 플래그화.
-- splice 대상 "짧은 샘플" 기준·최대 개수 미기재 → 목표 길이 미만인 사이클을 목표 길이까지 이어붙이는 것으로 해석.
-- **리샘플 해석(2026-09-01 리뷰 지적 → 2026-09-07 `impl` 플래그로 분기)**: 기본 `linear` 는 선형보간 리샘플이라 길이와
-  피치가 함께 변한다(기존 run 의 동작). 관례적 의미(phase vocoder 의 피치 보존 스트레치)와 다르고, pitch_shift 도
-  같은 리샘플 위에 길이 복원만 얹은 것이라 **두 증강이 배율 범위만 다른 거의 동일한 연산**이 된다 —
-  논문이 별개로 나열한 두 증강의 독립 효과는 이 해석 아래서 재현되지 않는다. `impl="phase_vocoder"`(data.params.stretch_impl)
-  가 관례적 해석(피치 보존 stretch·길이 보존 pitch shift)이며 재실행 run(`*-dt-paper-pv-*`)이 이를 쓴다. AUTHOR_QUESTIONS 대상.
+Assumptions (not specified in the paper; all exposed as flags):
+- **SNR is in dB**, interpreted as uniform sampling over 1–10 dB (the paper only says "randomly sampled between 1 and 10").
+- **No environmental noise (white noise only)**: the paper does not name the corpus, and no external corpus outside the toolkit's
+  data scope (ICBHI, SPRSound) is pulled in.
+- Scale ranges of time stretch / pitch shift not specified → common values (0.9–1.1× speed, ±2 semitones) as defaults, exposed as flags.
+- Criterion and maximum count for the "short samples" to splice not specified → interpreted as concatenating cycles shorter than the target length up to the target length.
+- **Resampling interpretation (`impl` flag)**: the default `linear` is a linear-interpolation resample, so length and
+  pitch change together. This differs from the conventional meaning (pitch-preserving phase-vocoder stretch), and pitch_shift
+  only adds length restoration on top of the same resample, so **the two augmentations become nearly the same operation with different scale ranges**;
+  the independent effects of the two augmentations the paper lists separately are not reproduced under this interpretation. `impl="phase_vocoder"` (data.params.stretch_impl)
+  is the conventional interpretation (pitch-preserving stretch, length-preserving pitch shift).
 """
 from __future__ import annotations
 
@@ -32,16 +32,16 @@ import torch
 
 def add_white_noise(x: torch.Tensor, snr_db: float, generator: Optional[torch.Generator] = None) -> torch.Tensor:
     """
-    목표 SNR(dB)이 되도록 백색 가우시안 잡음을 더한다.
+    Adds white Gaussian noise at the target SNR (dB).
 
-    백색잡음 = 각 샘플이 서로 독립인 정규분포 난수(주파수축에서 전 대역 평탄한 전력 스펙트럼).
-    스케일은 신호 전력에 맞춰 정한다:
-        P_x = mean(x²)                     신호 전력
-        P_n = P_x / 10^(SNR_dB / 10)       목표 잡음 전력
-        n   = N(0,1) 난수 → P_n 이 되도록 재스케일
+    White noise = i.i.d. normal random samples (flat power spectrum over the whole band).
+    The scale is set from the signal power:
+        P_x = mean(x²)                     signal power
+        P_n = P_x / 10^(SNR_dB / 10)       target noise power
+        n   = N(0,1) samples → rescaled to power P_n
         out = x + n
-    SNR 1 dB 는 잡음 전력이 신호의 약 79 %, 10 dB 는 10 % 다(논문의 "strong noise augmentation" 과 부합).
-    무음 구간(P_x = 0)은 잡음만 남는 것을 막기 위해 원본을 그대로 돌려준다.
+    At SNR 1 dB the noise power is about 79 % of the signal, at 10 dB 10 % (consistent with the paper's "strong noise augmentation").
+    For silence (P_x = 0) the input is returned unchanged, so the output is not pure noise.
     """
     p_x = torch.mean(x.float() ** 2)
     if float(p_x) <= 0.0:
@@ -53,14 +53,14 @@ def add_white_noise(x: torch.Tensor, snr_db: float, generator: Optional[torch.Ge
 
 
 def sample_snr_db(low: float = 1.0, high: float = 10.0, generator: Optional[torch.Generator] = None) -> float:
-    """논문 §2.1 'SNR was randomly sampled between 1 and 10' — dB 균등 추출로 해석(가정)."""
+    """Paper §2.1 'SNR was randomly sampled between 1 and 10', interpreted as uniform sampling in dB (assumption)."""
     return float(torch.empty(1).uniform_(low, high, generator=generator).item())
 
 
 def circular_pad(x: torch.Tensor, target_len: int) -> torch.Tensor:
     """
-    논문 §2.1 Circular Padding — zero padding 대신 신호를 순환 반복해 목표 길이를 채운다.
-    **test set 에도 적용**(논문 명시). 길면 앞에서 자른다(논문 'truncate the too-long audio').
+    Paper §2.1 Circular Padding: fills the target length by repeating the signal cyclically instead of zero padding.
+    **Also applied to the test set** (stated in the paper). Longer signals are truncated from the start (paper: 'truncate the too-long audio').
     """
     n = int(x.shape[-1])
     if n == target_len:
@@ -73,11 +73,11 @@ def circular_pad(x: torch.Tensor, target_len: int) -> torch.Tensor:
 
 def splice_same_class(clips: Sequence[torch.Tensor], target_len: int) -> torch.Tensor:
     """
-    논문 §2.1 Splicing Audio — **같은 클래스**의 짧은 사이클들을 이어붙여 목표 길이를 만든다.
-    모자라면 순환 패딩으로 마무리(논문이 splice 후 길이 처리를 따로 적지 않아 circular padding 과 일관되게 처리).
+    Paper §2.1 Splicing Audio: concatenates short cycles of **the same class** to reach the target length.
+    If still short, finishes with circular padding (the paper does not describe length handling after splicing, so it is handled consistently with circular padding).
     """
     if not clips:
-        raise ValueError("splice_same_class: 빈 clip 목록")
+        raise ValueError("splice_same_class: empty clip list")
     out = torch.cat([c.reshape(1, -1) for c in clips], dim=-1)
     return circular_pad(out, target_len)
 
@@ -86,8 +86,8 @@ def mixup_batch(
     x: torch.Tensor, y_onehot: torch.Tensor, alpha: float = 0.2, generator: Optional[torch.Generator] = None
 ) -> Tuple[torch.Tensor, torch.Tensor]:
     """
-    논문 식 (1) — 스펙트로그램과 one-hot 라벨을 같은 λ 로 선형결합. λ ~ Beta(α, α), α = 0.2.
-    배치 안에서 무작위 순열 짝을 쓴다(논문은 'randomly draw another sample xb from the dataset').
+    Paper Eq. (1): linear combination of spectrogram and one-hot label with the same λ. λ ~ Beta(α, α), α = 0.2.
+    Pairs come from a random permutation within the batch (the paper says 'randomly draw another sample xb from the dataset').
     """
     if alpha <= 0:
         return x, y_onehot
@@ -97,17 +97,17 @@ def mixup_batch(
 
 
 def _stft_params(n: int):
-    """phase vocoder 용 STFT 설정 — 8 kHz 파형 기준 64 ms 창(n_fft 512)/16 ms hop. 짧은 파형은 창을 줄인다."""
+    """STFT settings for the phase vocoder: 64 ms window (n_fft 512) / 16 ms hop for an 8 kHz waveform. The window shrinks for short waveforms."""
     n_fft = min(512, max(32, 1 << (max(1, n).bit_length() - 1)))
     return n_fft, n_fft // 4
 
 
 def time_stretch(x: torch.Tensor, rate: float, impl: str = "linear") -> torch.Tensor:
     """
-    time stretching — 배율 rate 로 길이를 바꾼다 (rate > 1 이면 짧아진다). 논문은 배율 범위를 적지 않았다(가정: 0.9–1.1).
+    Time stretching: changes the length by factor rate (rate > 1 shortens). The paper does not give the range (assumption: 0.9–1.1).
 
-    impl="linear"        : 선형 보간 리샘플 — **피치도 함께 변한다** (2026-08-30 최초 구현; 기존 run 의 동작).
-    impl="phase_vocoder" : STFT phase vocoder — **피치를 보존**하는 관례적 time stretching (2026-09-07 사용자 결정으로 추가, 재실행용).
+    impl="linear"        : linear-interpolation resample; **pitch changes as well** (default).
+    impl="phase_vocoder" : STFT phase vocoder; conventional time stretching that **preserves pitch**.
     """
     n = int(x.shape[-1])
     new_n = max(1, int(round(n / rate)))
@@ -130,10 +130,10 @@ def time_stretch(x: torch.Tensor, rate: float, impl: str = "linear") -> torch.Te
 
 def pitch_shift(x: torch.Tensor, n_steps: float, sample_rate: int, impl: str = "linear") -> torch.Tensor:
     """
-    pitch shifting — 길이를 보존하며 피치를 n_steps 반음 옮긴다. 논문은 반음 범위를 적지 않았다(가정: ±2 semitone).
+    Pitch shifting: shifts pitch by n_steps semitones while preserving length. The paper does not give the range (assumption: ±2 semitones).
 
-    impl="linear"        : 리샘플로 피치를 옮긴 뒤 원 길이로 되돌린다(circular pad/절단) — time_stretch(linear) 와 같은 연산 위에 얹힌 것 (기존 동작).
-    impl="phase_vocoder" : torchaudio.functional.pitch_shift — phase vocoder 로 늘리고 리샘플로 되돌리는 관례적 pitch shift (2026-09-07 추가).
+    impl="linear"        : shifts pitch by resampling, then restores the original length (circular pad / truncation); built on the same operation as time_stretch(linear) (default).
+    impl="phase_vocoder" : torchaudio.functional.pitch_shift; conventional pitch shift that stretches with a phase vocoder and resamples back.
     """
     n = int(x.shape[-1])
     if impl == "phase_vocoder":
@@ -146,5 +146,5 @@ def pitch_shift(x: torch.Tensor, n_steps: float, sample_rate: int, impl: str = "
     if impl != "linear":
         raise ValueError(f"impl must be linear|phase_vocoder, got {impl!r}")
     factor = 2.0 ** (n_steps / 12.0)
-    stretched = time_stretch(x, 1.0 / factor)  # 길이 변경(피치 변화)
+    stretched = time_stretch(x, 1.0 / factor)  # length change (pitch changes)
     return circular_pad(stretched, n) if stretched.shape[-1] < n else stretched[..., :n]

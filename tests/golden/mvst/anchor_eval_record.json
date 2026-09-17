@@ -1,6 +1,6 @@
 {
  "date": "2026-08-25",
- "ckpt": "pretrained_models/upstream/mvst/16/best.pth (저자 배포 16x16 뷰)",
+ "ckpt": "pretrained_models/upstream/mvst/16/best.pth (16x16 view released by the authors)",
  "paper_table1_16x16": {
   "S_p": 78.48,
   "S_e": 46.62,
@@ -28,7 +28,7 @@
    "icbhi_score": 88.03
   }
  },
- "conclusion": "저자 폴더 구성(부속 파일 stem)을 모르면 seed-1 스플릿을 정확히 복원할 수 없다. 재구성 스플릿 결과가 논문보다 높고 공식 test 에서 88 이 나오는 것은 배포 ckpt 가 공식 test 녹음 다수를 학습에 썼음(환자 누수)을 뜻한다. 앵커는 근사(±3)로만 사용.",
+ "conclusion": "Without knowing the authors' folder layout (stems of the auxiliary files), the seed-1 split cannot be restored exactly. The reconstructed-split result is above the paper, and the official test gives 88, which means the released ckpt trained on many official test recordings (patient leakage). The paper-reported value is used only as an approximation (±3).",
  "fusion_author_ckpts_on_seed1_split_920": {
   "S_p": 81.03,
   "S_e": 54.22,
@@ -39,6 +39,6 @@
    "S_e": 51.1,
    "icbhi_score": 66.55
   },
-  "note": "저자 뷰 ckpt 5개 → 툴킷 특징 덤프·FuseMLP 융합(fusion.py 프로토콜). 단일 뷰와 같은 방향(+1)의 스플릿 불일치 편향."
+  "note": "5 author view ckpts -> toolkit feature dump + FuseMLP fusion (fusion.py protocol). Split-mismatch bias in the same direction (+1) as the single views."
  }
 }

@@ -1,15 +1,15 @@
 """
-Lungmix P0 골든 — 공식 lungmix() (outputs/reference/lungmix/lungmix.py, Tigerdwgth/ICASSP-2025-Lungmix) 를 그대로 import 해
-고정 seed 로 실행한 wav/label/lam/mask/max_length 를 저장한다. 툴킷 이식본(augmentations/lungmix.py) 과 비트 일치를
-tests/unit/models/test_ast_lungmix.py 가 검사한다.
+Lungmix official-code parity goldens — imports the official lungmix() (outputs/reference/lungmix/lungmix.py, Tigerdwgth/ICASSP-2025-Lungmix) as-is,
+runs it with fixed seeds and saves wav/label/lam/mask/max_length. tests/unit/models/test_ast_lungmix.py checks that the toolkit port
+(augmentations/lungmix.py) is bit-identical.
 
   .venv/bin/python scripts/reproduction/dump_lungmix_goldens.py --ref outputs/reference/lungmix --out tests/golden/lungmix
 
-케이스: 합성 파형(길이 다른 쌍·같은 길이·smooth on/off) + (있으면) ICBHI 공식 train 사이클 2개(9 s repeat, 16 kHz) 쌍.
-각 케이스는 np.random.seed(s); torch.manual_seed(s) 직후 한 번 호출한다 (전역 RNG 열 의존).
+Cases: synthetic waveforms (pairs of different length, same length, smooth on/off) + (if available) a pair of 2 ICBHI official train cycles (9 s repeat, 16 kHz).
+Each case is called once right after np.random.seed(s); torch.manual_seed(s) (depends on the global RNG streams).
 
-스레드 고정: torch.mean(wav2) 상수 패딩 값이 CPU 스레드 수에 따라 마지막 비트가 달라진다(긴 파형 리덕션 순서; icbhi 케이스에서
-64/16 스레드 vs 1/4 스레드 1.5e-10 차이). 덤프·테스트 모두 torch.set_num_threads(GOLDEN_THREADS=1) 로 고정한다.
+Thread pinning: the last bit of the torch.mean(wav2) constant padding value depends on the number of CPU threads (reduction order on long waveforms; in the icbhi case
+64/16 threads vs 1/4 threads differ by 1.5e-10). Both the dump and the tests pin torch.set_num_threads(GOLDEN_THREADS=1).
 """
 import argparse
 import json
@@ -32,7 +32,7 @@ def main():
     args = ap.parse_args()
     ref = pathlib.Path(args.ref).resolve()
     sys.path.insert(0, str(ref))
-    import lungmix as official  # noqa: E402  공식 파일 그대로
+    import lungmix as official  # noqa: E402  official file as-is
 
     out = pathlib.Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
@@ -82,7 +82,7 @@ def main():
                 "torch": torch.__version__, "numpy": np.__version__, "num_threads": GOLDEN_THREADS}, out / "lungmix_golden.pt")
     json.dump({"official_commit": commit, "official_file": str(ref / "lungmix.py"), "torch": torch.__version__,
                "numpy": np.__version__, "num_threads": GOLDEN_THREADS,
-               "note": "icbhi_pair_9s 의 wav1/wav2 는 ICBHI 공식 train 사이클 원 파형(CC BY 4.0 계열 공개 데이터; 6.3 MB) 을 그대로 담는다",
+               "note": "wav1/wav2 of icbhi_pair_9s contain the original ICBHI official train cycle waveforms (public data, CC BY 4.0 family; 6.3 MB) as-is",
                "cases": [{k: r[k] for k in ("name", "seed", "smooth", "label", "lam", "max_length")}
                                                   for r in results]}, open(out / "meta.json", "w"), indent=1, ensure_ascii=False)
     print("saved", out / "lungmix_golden.pt")

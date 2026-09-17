@@ -1,13 +1,13 @@
-# 논문은 SPRS 200ep 를 보고하지만 코드 기본값(args.py --epochs 400)을 따른다 (P0 원칙; 문서 참고).
-# SCL-metadata(ICASSP 2023) SPRSound(7-class, 2022 inter-patient) 재현 — 지도 학습 run (CE / Hybrid): 400ep, bs128, Adam 1e-4/wd 1e-4 + cosine(T_max 40), 가중 CE, 매 epoch test Sc 최고.
+# The paper reports 200 ep for SPRS, but the code default (args.py --epochs 400) is followed (official-code parity).
+# SCL-metadata (ICASSP 2023) SPRSound (7-class, 2022 inter-patient) reproduction — supervised run (CE / Hybrid): 400 ep, bs 128, Adam 1e-4/wd 1e-4 + cosine (T_max 40), weighted CE, best test Sc every epoch.
 #   CE     : rsctk-train --config-name sclmeta_sprs model.params.method=ce run.name=sprs-sclmeta-ce-s1 seed=1
 #   Hybrid : ... model.params.method=hybrid run.name=sprs-sclmeta-hybrid-s1
-# SCL/M-SCL 은 sclmeta_icbhi_pretrain → sclmeta_icbhi_linear 두 run.
+# SCL/M-SCL take two runs: sclmeta_icbhi_pretrain → sclmeta_icbhi_linear.
 defaults:
   - model: cnn6_sclmeta
   - data_defaults@data: base
   - data: sprsound_sclmeta
-  - loss: cross_entropy            # SPRS 는 비가중 CE (main.py:105-106)
+  - loss: cross_entropy            # SPRS uses unweighted CE (main.py:105-106)
   - metrics: sprsound_metrics
   - optimizer: adam_sclmeta
   - trainer: default

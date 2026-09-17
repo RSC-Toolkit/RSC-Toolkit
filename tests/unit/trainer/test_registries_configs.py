@@ -1,10 +1,10 @@
-"""리팩토링 P1 2~5단계 패리티 — 공용 registry 로 옮긴 뒤에도 기존 config 전부가 같은 클래스로 해석돼야 한다.
+"""Parity after moving to the shared registry — every existing config must resolve to the same class.
 
-고정하는 것:
-- 내장 목록 스냅샷 (수동 dict 시절 이름이 하나도 빠지지 않았다)
-- configs/{loss,optimizer,metrics,data}/*.yaml 과 최상위 config 의 adapter 가 전부 등록소에서 해석된다
-- build_* 팩토리의 비파괴·오류 메시지 계약, build_adapter 의 침묵 폴백 제거, split_iter 의 모델 계약 검사
-- data_registry import 가 논문 datamodule 을 eager import 하지 않는다 (선택 의존성 격리)
+Pinned:
+- built-in list snapshot (no name from the former manual dicts is missing)
+- configs/{loss,optimizer,metrics,data}/*.yaml and the adapter of each top-level config all resolve from the registry
+- non-mutation and error-message contract of the build_* factories, no silent fallback in build_adapter, model-contract check for split_iter
+- importing data_registry does not eagerly import the paper datamodules (optional-dependency isolation)
 """
 from __future__ import annotations
 
@@ -32,7 +32,7 @@ def _yaml(path: pathlib.Path):
     return yaml.safe_load(path.read_text()) or {}
 
 
-# ── 내장 목록 스냅샷 (수동 dict → lazy 허브 이전 시 누락 방지) ─────────────────────────────
+# ── built-in list snapshot (guards against omissions when moving manual dicts to the lazy hub) ─────────────
 def test_builtin_snapshot_matches_former_manual_dicts():
     assert set(DATAMODULES) == {
         "index", "bts_precomputed", "respirenet", "pcmcl", "amsd", "gapaug",
@@ -57,8 +57,8 @@ def test_legacy_registry_modules_expose_the_same_objects():
 
 
 def test_data_registry_import_is_lazy():
-    """예전엔 data_registry import 가 논문 datamodule 10개를 전부 끌고 왔다 — librosa 하나가 빠지면
-    전체 학습이 막혔다. 이제 선언만 있고 import 는 첫 조회 때다."""
+    """data_registry import used to pull in all 10 paper datamodules — one missing librosa
+    blocked all training. Now there are only declarations, and the import happens on first lookup."""
     code = (
         "import sys, rsc_toolkit.trainer.registries.data_registry as r; "
         "assert 'respirenet' in r.DATAMODULES; "
@@ -71,7 +71,7 @@ def test_data_registry_import_is_lazy():
     assert out.stdout.strip() == "ok"
 
 
-# ── config 전수 해석 ───────────────────────────────────────────────────────────────────
+# ── resolve every config ───────────────────────────────────────────────────────────────
 @pytest.mark.parametrize("path", sorted((CONFIGS / "loss").glob("*.yaml")), ids=lambda p: p.stem)
 def test_every_loss_config_builds(path):
     cfg = _yaml(path)
@@ -84,7 +84,7 @@ def test_every_optimizer_config_builds(path):
     cfg = _yaml(path)
     assert cfg["name"] in OPTIMIZERS
     assert issubclass(OPTIMIZERS.get(cfg["name"]), torch.optim.Optimizer)
-    # yaml 의 lr 은 ${...} 인터폴레이션일 수 있어(hydra 가 푼다) 여기서는 이름 해석까지만 본다.
+    # lr in the yaml can be a ${...} interpolation (resolved by hydra), so only name resolution is checked here.
     opt = build_optimizer({"name": cfg["name"], "params": {"lr": 0.01}}, [nn.Parameter(torch.zeros(1))])
     assert isinstance(opt, torch.optim.Optimizer)
 
@@ -103,7 +103,7 @@ def test_every_metrics_config_builds(path):
 def test_every_data_config_names_a_registered_datamodule(path):
     cfg = _yaml(path)
     name = (cfg.get("params") or {}).get("datamodule_name") or cfg.get("datamodule")
-    assert name in DATAMODULES, f"{path.name}: datamodule '{name}' 미등록 (등록: {sorted(DATAMODULES)})"
+    assert name in DATAMODULES, f"{path.name}: datamodule '{name}' not registered (registered: {sorted(DATAMODULES)})"
 
 
 @pytest.mark.parametrize("path", sorted(CONFIGS.glob("*.yaml")), ids=lambda p: p.stem)
@@ -113,10 +113,10 @@ def test_every_top_level_config_adapter_is_registered(path):
     if not adapter:
         return
     name = adapter.get("name") if isinstance(adapter, dict) else adapter
-    assert name in ADAPTERS, f"{path.name}: adapter '{name}' 미등록"
+    assert name in ADAPTERS, f"{path.name}: adapter '{name}' not registered"
 
 
-# ── build_* 계약 ───────────────────────────────────────────────────────────────────────
+# ── build_* contract ───────────────────────────────────────────────────────────────────
 def test_build_loss_and_model_do_not_mutate_cfg_and_report_unknown_names():
     cfg = {"name": "cross_entropy", "params": {"label_smoothing": 0.1}}
     loss = build_loss(cfg)
@@ -126,7 +126,7 @@ def test_build_loss_and_model_do_not_mutate_cfg_and_report_unknown_names():
         build_loss({"name": "_nope"})
     with pytest.raises(KeyError, match="Unknown metric '_nope'. Available"):
         build_train_val_metric_factories({"val": [{"name": "_nope"}]})
-    with pytest.raises(KeyError, match="'name' 이 없다"):
+    with pytest.raises(KeyError, match="has no 'name'"):
         build_train_val_metric_factories({"val": [{"params": {}}]})
 
 
@@ -141,10 +141,10 @@ def test_build_datamodule_is_non_destructive_and_names_the_failing_key():
         cfg = {"name": "icbhi", "params": {"datamodule_name": "_test_recording_dm", "batch_size": 8}}
         dm = build_datamodule(cfg)
         assert isinstance(dm, _RecordingDM) and dm.kwargs == {"batch_size": 8}
-        assert cfg["params"] == {"datamodule_name": "_test_recording_dm", "batch_size": 8}  # pop 안 함
-        build_datamodule(cfg)  # 재사용 가능 (예전엔 두 번째 호출이 KeyError)
+        assert cfg["params"] == {"datamodule_name": "_test_recording_dm", "batch_size": 8}  # not popped
+        build_datamodule(cfg)  # reusable (previously the second call raised KeyError)
 
-        # 최상위 datamodule 키도 인정
+        # a top-level datamodule key is accepted too
         dm2 = build_datamodule({"name": "icbhi", "datamodule": "_test_recording_dm", "params": {"x": 1}})
         assert dm2.kwargs == {"x": 1}
     finally:
@@ -152,7 +152,7 @@ def test_build_datamodule_is_non_destructive_and_names_the_failing_key():
 
     with pytest.raises(KeyError, match="datamodule_name"):
         build_datamodule({"name": "icbhi", "params": {"batch_size": 8}})
-    # 실패한 키를 정확히 지목 (예전엔 cfg["name"]='icbhi' 를 출력해 오진을 유도했다)
+    # names the failing key exactly (previously it printed cfg["name"]='icbhi', which was misleading)
     with pytest.raises(KeyError, match="Unknown datamodule '_no_such_dm' \\(data.params.datamodule_name\\). Available"):
         build_datamodule({"name": "icbhi", "params": {"datamodule_name": "_no_such_dm"}})
 

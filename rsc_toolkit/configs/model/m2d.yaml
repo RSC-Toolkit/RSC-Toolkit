@@ -1,6 +1,6 @@
-# M2D ViT-B(80x200, 패치 16x4) 미세조정 — nttcslab/m2d app/icbhi_sprs 재현 (툴킷 재구현).
-#   베이스 (M2D/0.7 16x4, 목표 61.93±0.25): pretrained_path=pretrained_models/upstream/m2d/m2d_vit_base-80x200p16x4-230529/checkpoint-300.pth
-#   M2D-X ICBHI s5 (η=0.3, 목표 63.29±0.22 — 4 시드 중 1개): pretrained_path=pretrained_models/upstream/m2d/m2d_x_vit_base-80x200p16x4-230814-Ddffsd50ks5blr0003bs128a2nr.3-e600/checkpoint-600.pth
+# M2D ViT-B (80x200, patch 16x4) fine-tuning — reproduction of nttcslab/m2d app/icbhi_sprs (toolkit re-implementation).
+#   Base (M2D/0.7 16x4, target 61.93±0.25): pretrained_path=pretrained_models/upstream/m2d/m2d_vit_base-80x200p16x4-230529/checkpoint-300.pth
+#   M2D-X ICBHI s5 (η=0.3, target 63.29±0.22 — 1 of 4 seeds): pretrained_path=pretrained_models/upstream/m2d/m2d_x_vit_base-80x200p16x4-230814-Ddffsd50ks5blr0003bs128a2nr.3-e600/checkpoint-600.pth
 name: m2d
 params:
   n_cls: 4

@@ -1,10 +1,10 @@
 """
-ADD-RSC P1 집계: outputs/addrsc/<run>/best.json (+ logs/<run>.done EXIT=0).
+ADD-RSC 5-seed reproduction check aggregation: outputs/addrsc/<run>/best.json (+ logs/<run>.done EXIT=0).
 
   .venv/bin/python scripts/reproduction/aggregate_addrsc_results.py
 
-논문(Interspeech 2025, Table 1) AST 변형 85.13/45.94/65.53 은 **단일 seed 0, 코드 스플릿(random.Random(1) 파일 단위 60/40)** 결과로 판단
-(논문은 공식 60/40 이라 기재). 주 결과 = 공식 60/40 (툴킷 목적), 비교 = 코드 스플릿 재구성.
+The paper (Interspeech 2025, Table 1) AST variant 85.13/45.94/65.53 is judged to be a **single seed 0, code split (random.Random(1) file-level 60/40)**
+result (the paper states the official 60/40 split). Main result = official 60/40 split (toolkit purpose); comparison = code-split reconstruction.
 """
 import json
 import pathlib
@@ -12,8 +12,8 @@ import re
 import statistics
 
 PAPER = {
-    "icbhi-addrsc":      ("ADD-RSC(AST) — 공식 60/40 (주 결과)", None),
-    "icbhi-addrsc-code": ("ADD-RSC(AST) — 코드 스플릿(random.Random(1) 파일 단위, 비교용)", (85.13, 45.94, 65.53)),
+    "icbhi-addrsc":      ("ADD-RSC(AST) — official 60/40 split (main result)", None),
+    "icbhi-addrsc-code": ("ADD-RSC(AST) — code split (random.Random(1) file-level, for comparison)", (85.13, 45.94, 65.53)),
 }
 
 
@@ -37,7 +37,7 @@ def main():
             d = json.loads(best.read_text())
             groups[base].append((seed, d["S_p"], d["S_e"], d["icbhi_score"], d.get("epoch")))
     if partial:
-        print("(미완료 run — 집계 제외: " + ", ".join(partial) + ")")
+        print("(incomplete runs — excluded from aggregation: " + ", ".join(partial) + ")")
     for base, rows in groups.items():
         if not rows:
             continue
@@ -49,11 +49,11 @@ def main():
         if len(rows) >= 2:
             ms = lambda i: (statistics.mean([r[i] for r in rows]), statistics.stdev([r[i] for r in rows]))  # noqa: E731
             sp, se, sc = ms(1), ms(2), ms(3)
-            print(f"  우리 평균 : Sp {sp[0]:6.2f}±{sp[1]:.2f}  Se {se[0]:6.2f}±{se[1]:.2f}  Score {sc[0]:6.2f}±{sc[1]:.2f}")
+            print(f"  ours mean : Sp {sp[0]:6.2f}±{sp[1]:.2f}  Se {se[0]:6.2f}±{se[1]:.2f}  Score {sc[0]:6.2f}±{sc[1]:.2f}")
             if paper is not None:
-                print(f"  논문 보고 : Sp {paper[0]:6.2f}  Se {paper[1]:6.2f}  Score {paper[2]:6.2f} (단일 seed 0)   Score 차이: {sc[0]-paper[2]:+.2f}")
+                print(f"  paper     : Sp {paper[0]:6.2f}  Se {paper[1]:6.2f}  Score {paper[2]:6.2f} (single seed 0)   Score diff: {sc[0]-paper[2]:+.2f}")
             else:
-                print("  논문 수치 없음 (논문 표기는 공식 스플릿이나 코드는 랜덤 파일 스플릿 — 코드 스플릿 결과와 비교)")
+                print("  no paper value (the paper states the official split, but the code uses a random file split — compare with the code-split result)")
 
 
 if __name__ == "__main__":

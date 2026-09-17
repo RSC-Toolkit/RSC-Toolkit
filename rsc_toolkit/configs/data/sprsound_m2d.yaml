@@ -1,4 +1,4 @@
-# M2D SPRSound 미세조정 데이터 (m2d app/icbhi_sprs eval_sprs.sh): sclmeta 파형 전처리 + dB-mel 80 (400/160, 50–8000 Hz).
+# M2D SPRSound fine-tuning data (m2d app/icbhi_sprs eval_sprs.sh): sclmeta waveform preprocessing + dB-mel 80 (400/160, 50–8000 Hz).
 name: sprsound_m2d
 params:
   datamodule_name: index
@@ -6,7 +6,7 @@ params:
   index_dataset_cls: rsc_toolkit.datasets.index_dataset.IndexDataset
   project_root: ${hydra:runtime.cwd}
   data_dir: .datasets/sprsound
-  raw_data_subdir: Classification   # recording_path 는 Classification/ 기준 상대경로
+  raw_data_subdir: Classification   # recording_path is relative to Classification/
   index_filename: index_cycle.csv
 
   sampling_rate: 16000
@@ -15,7 +15,7 @@ params:
   pad_type: sclmeta
   fade: false
   resample_after_slice: true
-  time_unit: ms_int              # 원본 dataset.py:202 — onset*int(sr/1000)
+  time_unit: ms_int              # official dataset.py:202 — onset*int(sr/1000)
 
   train_splits: [train]
   val_splits: [test]

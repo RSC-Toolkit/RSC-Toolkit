@@ -1,8 +1,8 @@
 """
-ADD-RSC(AST 변형) P0 골든·구성 테스트.
+Official-code parity golden and configuration tests for ADD-RSC (AST variant).
 
-골든 출처: scripts/reproduction/dump_addrsc_goldens.py — 공식 deegy666/ADD-RSC models/{adapt_diff_denoise,ast,bias_denoise_loss}.py 를
-timm 0.4.5 참조 venv 에서 실행 (난수 파라미터는 det_fill 로 결정화). 데이터 파이프라인은 patch-mix 골든이 이미 고정한다.
+Golden source: scripts/reproduction/dump_addrsc_goldens.py — the official deegy666/ADD-RSC models/{adapt_diff_denoise,ast,bias_denoise_loss}.py
+run in the timm 0.4.5 reference venv (random parameters made deterministic with det_fill). The data pipeline is already pinned by the patch-mix goldens.
 """
 import pathlib
 
@@ -18,14 +18,14 @@ def _repo_root() -> pathlib.Path:
     for c in pathlib.Path(__file__).resolve().parents:
         if (c / "pyproject.toml").exists():
             return c
-    raise RuntimeError("리포 루트를 찾지 못했다")
+    raise RuntimeError("repository root not found")
 
 
 REPO = _repo_root()
 GOLDEN = REPO / "tests" / "golden" / "addrsc" / "model.pt"
 CKPT = REPO / "pretrained_models/upstream/audioset_0.4593.pth"
-needs_golden = pytest.mark.skipif(not GOLDEN.exists(), reason="골든 없음")
-needs_ckpt = pytest.mark.skipif(not CKPT.exists(), reason="AudioSet ckpt 없음")
+needs_golden = pytest.mark.skipif(not GOLDEN.exists(), reason="golden missing")
+needs_ckpt = pytest.mark.skipif(not CKPT.exists(), reason="AudioSet ckpt missing")
 
 
 def _det_fill(t):
@@ -39,7 +39,7 @@ def test_denoise_layer_layout():
     assert sum(p.numel() for p in layer.parameters()) == 955204
     z, aux = layer(torch.randn(2, 1024, 256))
     assert z.shape == (2, 1024, 256) and aux.shape == (2, 4)
-    # 보조 로짓 = 앞 두 프레임 평균의 Linear
+    # auxiliary logits = Linear over the mean of the first two frames
     x1 = layer.aff(torch.randn(1, 1024, 256))
     assert torch.allclose(layer.classifier((x1[:, 0] + x1[:, 1]) / 2), layer.classifier(x1[:, :2].mean(1)))
 
@@ -63,11 +63,11 @@ def test_model_matches_reference():
     assert {k: list(v.shape) for k, v in m.v.state_dict().items()} == g["v_keys"]
     assert {k: list(v.shape) for k, v in m.classifier.state_dict().items()} == g["classifier_keys"]
     assert abs(m.bias_denoise_encoder.attn.lambda_init - g["lambda_init"]) < 1e-12
-    # AudioSet 로드: pos_embed 만 모양 불일치(미로드), 나머지 v.*·mlp_head(527) 로드
-    info = m.audioset_load_info  # 생성 시(527 헤드) 로드 결과 — 이후 mlp_head 는 n_cls 헤드로 대체됨
+    # AudioSet load: only pos_embed has a shape mismatch (not loaded); the remaining v.* and mlp_head (527) are loaded
+    info = m.audioset_load_info  # load result at construction (527 head) — mlp_head is later replaced by the n_cls head
     assert info["mismatch"] == g["audioset_mismatch"] == ["module.v.pos_embed"]
     assert sorted(info["loaded"]) == g["audioset_loaded"]
-    # 난수 파라미터 결정화 (골든과 동일)
+    # make random parameters deterministic (same as the golden)
     for p in m.bias_denoise_encoder.parameters():
         _det_fill(p)
     for p in m.classifier.parameters():
@@ -76,8 +76,8 @@ def test_model_matches_reference():
     m.eval()
     x = g["input"].squeeze(1)  # (2, 798, 128) = (time, freq)
     with torch.no_grad():
-        images = m.to_model_input(x.transpose(-2, -1))  # 툴킷 fbank 배치 (B,128,798) 경로
-        assert torch.allclose(images, g["images"].squeeze(1), atol=1e-6)  # torchvision Resize 와 동일
+        images = m.to_model_input(x.transpose(-2, -1))  # toolkit fbank batch (B,128,798) path
+        assert torch.allclose(images, g["images"].squeeze(1), atol=1e-6)  # same as torchvision Resize
         output, aux = m.forward_all(images)
         denoise_images, _ = m.bias_denoise_encoder(images)
     assert torch.allclose(denoise_images, g["denoise_images"], rtol=1e-4, atol=1e-3), (denoise_images - g["denoise_images"]).abs().max()
@@ -93,11 +93,11 @@ def test_model_matches_reference():
 @needs_ckpt
 def test_training_forward_amp_and_grads():
     if not torch.cuda.is_available():
-        pytest.skip("GPU 없음")
+        pytest.skip("no GPU")
     m = ADDRSC(n_cls=4, pretrained_path=str(CKPT)).cuda().train()
     x = torch.randn(2, 128, 798, device="cuda")
     logits, loss = m.training_forward(x, torch.tensor([0, 3], device="cuda"), F.cross_entropy)
     assert logits.dtype == torch.float32 and torch.isfinite(loss)
     loss.backward()
     assert m.bias_denoise_encoder.aff.w1.grad is not None and m.classifier[1].weight.grad is not None
-    assert m.mlp_head[1].weight.grad is None  # 원본처럼 forward 에서 미사용
+    assert m.mlp_head[1].weight.grad is None  # unused in forward, as in the original

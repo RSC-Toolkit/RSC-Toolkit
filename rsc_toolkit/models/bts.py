@@ -1,27 +1,27 @@
 """
-BTS 논문(Interspeech 2024)의 메타데이터-텍스트 융합 CLAP — 공식 코드 충실 이식 (P0).
+Metadata-text fusion CLAP from the BTS paper (Interspeech 2024) — exact port of the official code.
 
-출처:
-- 논문: BTS: Bridging Text and Sound Modalities for Metadata-Aided Respiratory Sound
+Sources:
+- Paper: BTS: Bridging Text and Sound Modalities for Metadata-Aided Respiratory Sound
   Classification (https://arxiv.org/abs/2406.06786)
-- 공식 코드: https://github.com/kaen2891/bts models/clap.py PretrainedCLAP + main.py set_model()
+- Official code: https://github.com/kaen2891/bts models/clap.py PretrainedCLAP + main.py set_model()
   (--model_type ClapModel --clap_final concat --meta_mode all)
 
-구조: HF ClapModel(laion/clap-htsat-unfused; 오디오 HTSAT + 텍스트 RoBERTa, 각 512-d
-투영·L2 정규화) → text_embeds ⊕ audio_embeds (concat 1024-d, 또는 add 가중합)
-→ nn.Linear(1024, n_cls). 텍스트는 환자 메타(나이·성별·청진 위치·장비)를 문장으로 만든 것
-(datasets/icbhi/meta_description.py)으로, 원본은 dataset __getitem__ 에서 토크나이즈
-(padding="max_length", max_length=64)한다 — 여기서는 모델이 배치의 meta 벡터를 받아
-같은 토크나이저로 같은 방식으로 인코딩한다 (수치 동일).
+Architecture: HF ClapModel (laion/clap-htsat-unfused; audio HTSAT + text RoBERTa, each with a 512-d
+projection and L2 normalization) → text_embeds ⊕ audio_embeds (1024-d concat, or weighted sum for add)
+→ nn.Linear(1024, n_cls). The text is a sentence built from patient metadata (age, sex, chest location, device)
+(datasets/icbhi/meta_description.py). The original tokenizes it in the dataset __getitem__
+(padding="max_length", max_length=64); here the model receives the batch meta vector and
+encodes it the same way with the same tokenizer (numerically identical).
 
-원본 유지 사항:
-- 속성 이름 audio_features (원본 PretrainedCLAP.audio_features) 를 그대로 둬서 저자
-  체크포인트(best.pth: model=audio_features.*, classifier=weight/bias)를 키 변환 없이 로드.
-- 학습 시 텍스트 인코더도 함께 미세조정된다 (원본 optimizer 에 model.parameters() 전부).
-- 손실은 비가중 CE (원본 set_model: nn.CrossEntropyLoss()).
+Kept from the original:
+- The attribute name audio_features (original PretrainedCLAP.audio_features) is kept so the authors'
+  checkpoints (best.pth: model=audio_features.*, classifier=weight/bias) load without key remapping.
+- The text encoder is fine-tuned jointly during training (the original optimizer gets all of model.parameters()).
+- The loss is unweighted CE (original set_model: nn.CrossEntropyLoss()).
 
-버전 차이: transformers 5.x 의 ClapModel 은 input_features 를 (B, 1, T, F) 4D 로만
-받는다(원본은 구버전에서 (B, T, F) 를 넘김). 3D 가 오면 채널 축을 붙인다.
+Version difference: ClapModel in transformers 5.x only accepts 4D input_features (B, 1, T, F)
+(the original passed (B, T, F) with an older version). A channel axis is added for 3D input.
 """
 from __future__ import annotations
 
@@ -49,7 +49,7 @@ def _as_4d(input_features: torch.Tensor) -> torch.Tensor:
 
 @ModelFactory.register_model_class("bts")
 class BTSModel(BaseRSCModel, nn.Module):
-    accepts_meta = ("bts_meta7",)  # batch[2] = meta7 float 벡터 (bts_precomputed · btscard_sprs), 검증에도 필요
+    accepts_meta = ("bts_meta7",)  # batch[2] = meta7 float vector (bts_precomputed · btscard_sprs), also required for validation
 
     def __init__(
         self,
@@ -57,12 +57,12 @@ class BTSModel(BaseRSCModel, nn.Module):
         pretrained_name: str = "laion/clap-htsat-unfused",
         final_feat_dim: int = 512,
         clap_final: str = "concat",     # "concat" | "add"
-        te_alpha: float = 0.5,          # add 일 때 텍스트 가중 (원본 기본값)
+        te_alpha: float = 0.5,          # text weight for add (original default)
         meta_mode: str = "all",
-        text_max_length: int = 64,      # 원본 icbhi_dataset.py:189
-        # 메타 문장 어휘. "icbhi" = 원본(흉부 위치 7종 + 청진기 4종).
-        # "sprsound" = 저자 util/sprsound_util.py 의 SPRSound 판(위치 p1~p4, 청진기 없음) —
-        # SPRSound 로 직접 학습할 때만 쓴다. 어휘를 안 바꾸면 없는 청진 위치를 지어내게 된다.
+        text_max_length: int = 64,      # original icbhi_dataset.py:189
+        # Metadata sentence vocabulary. "icbhi" = original (7 chest locations + 4 stethoscopes).
+        # "sprsound" = SPRSound version from the authors' util/sprsound_util.py (locations p1~p4, no stethoscope) —
+        # use only when training directly on SPRSound. Without switching, nonexistent chest locations would be generated.
         meta_dialect: str = "icbhi",
     ):
         super().__init__()
@@ -80,13 +80,13 @@ class BTSModel(BaseRSCModel, nn.Module):
         self.meta_dialect = meta_dialect
         self.text_max_length = int(text_max_length)
         head_dim = final_feat_dim * 2 if clap_final == "concat" else final_feat_dim
-        self.classifier = nn.Linear(head_dim, n_cls)  # 원본 main.py:191
-        # 원본은 ClapProcessor(...).tokenizer 를 쓴다 — 같은 객체로 맞춘다
+        self.classifier = nn.Linear(head_dim, n_cls)  # original main.py:191
+        # the original uses ClapProcessor(...).tokenizer — use the same object
         self.tokenizer = ClapProcessor.from_pretrained(pretrained_name).tokenizer
 
-    # ----------------------------------------------------------------- 텍스트
+    # ----------------------------------------------------------------- text
     def meta_field_dicts(self, meta7_batch: torch.Tensor) -> list:
-        """meta7 → 문장 필드 dict. 방언에 따라 어휘와 문장 틀이 갈린다."""
+        """meta7 → sentence field dicts. Vocabulary and sentence template depend on the dialect."""
         if self.meta_dialect == "sprsound":
             from rsc_toolkit.datasets.sprsound_ood import meta_fields_from_meta7_sprsound
 
@@ -94,7 +94,7 @@ class BTSModel(BaseRSCModel, nn.Module):
         return [select_meta_fields(meta_fields_from_meta7(m.tolist()), self.meta_mode) for m in meta7_batch]
 
     def render_meta_sentence(self, fields: dict) -> str:
-        """문장 생성기. SPRSound 는 저자의 util/sprsound_util.py 판을 쓴다(청진기 항이 없다)."""
+        """Sentence generator. SPRSound uses the authors' util/sprsound_util.py version (no stethoscope term)."""
         if self.meta_dialect == "sprsound":
             from rsc_toolkit.datasets.sprsound_ood import generate_meta_description_sprsound
 
@@ -117,9 +117,9 @@ class BTSModel(BaseRSCModel, nn.Module):
         )
         return enc["input_ids"].to(device), enc["attention_mask"].to(device)
 
-    # ------------------------------------------------------------------ 모델
+    # ------------------------------------------------------------------ model
     def forward_features(self, input_features, input_ids, attention_mask) -> torch.Tensor:
-        """원본 PretrainedCLAP.forward (models/clap.py:26-36)."""
+        """Original PretrainedCLAP.forward (models/clap.py:26-36)."""
         out = self.audio_features(
             input_ids=input_ids, attention_mask=attention_mask, input_features=_as_4d(input_features)
         )
@@ -134,18 +134,18 @@ class BTSModel(BaseRSCModel, nn.Module):
 
     def training_forward(self, audio_batch, labels, loss_func, meta_labels=None):
         if meta_labels is None:
-            raise ValueError("BTS 는 배치에 meta(7필드) 가 필요하다 — data=bts_precomputed 를 쓸 것")
+            raise ValueError("BTS requires meta (7 fields) in the batch — use data=bts_precomputed")
         logits = self.forward(audio_batch, meta_labels)
         return logits, loss_func(logits, labels)
 
-    # ----------------------------------------------------- 저자 체크포인트
+    # ----------------------------------------------------- authors' checkpoint
     def load_reference_checkpoint(self, path) -> None:
         """
-        원본 save_model 산출물(best.pth: {'model': audio_features.*, 'classifier': {...}})을
-        키 변환 없이 strict 로드한다 (구조 동일성의 증명이기도 하다).
+        Strictly loads the original save_model output (best.pth: {'model': audio_features.*, 'classifier': {...}})
+        without key remapping (this also proves the architectures are identical).
         """
         ckpt = torch.load(path, map_location="cpu", weights_only=False)
         state = dict(ckpt["model"])
         state.update({f"classifier.{k}": v for k, v in ckpt["classifier"].items()})
         self.load_state_dict(state, strict=True)
-        logger.info("BTS 저자 체크포인트 로드: %s (epoch %s)", path, ckpt.get("epoch"))
+        logger.info("Loaded BTS authors' checkpoint: %s (epoch %s)", path, ckpt.get("epoch"))

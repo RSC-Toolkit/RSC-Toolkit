@@ -1,9 +1,9 @@
 """
-RespireNet CBA(concatenation-based augmentation) 이식 동치 테스트.
+Port-equivalence test for RespireNet CBA (concatenation-based augmentation).
 
-원본 microsoft/RespireNet image_dataloader.py 의 new_augment(scale) 를 AST 로 뽑아 더미 객체에 바인딩하고,
-전역 random 을 seed 한 뒤 실행한 결과가 툴킷 concat_augment(classwise, scale, random.Random(seed)) 와
-(오디오·라벨·파일명·idx) 전부 일치하는지 본다. RNG 호출 순서까지 같아야 통과한다.
+new_augment(scale) from the original microsoft/RespireNet image_dataloader.py is extracted via AST and bound to a dummy object;
+after seeding the global random, its result must match the toolkit concat_augment(classwise, scale, random.Random(seed))
+in everything (audio, labels, file names, idx). The test passes only if even the RNG call order is the same.
 """
 import ast
 import pathlib
@@ -15,7 +15,7 @@ import pytest
 from rsc_toolkit.datasets.respirenet_chunks import concat_augment
 
 REF = pathlib.Path("/raid/doyoung/projects/RSC-Toolkit/outputs/reference/respirenet/image_dataloader.py")
-needs_ref = pytest.mark.skipif(not REF.exists(), reason="원본 RespireNet 저장소 없음")
+needs_ref = pytest.mark.skipif(not REF.exists(), reason="original RespireNet repository missing")
 
 
 def _load_original_new_augment():
@@ -59,7 +59,7 @@ def test_concat_augment_matches_original(seed, scale):
         assert lab == o[1] and name == o[2] and idx == o[3]
         assert fl == f"{name}_{idx}_{lab}"
         np.testing.assert_array_equal(a, o[0])
-    # scale=1: 비정상 3클래스가 normal 수까지 채워지고 normal 은 증식 0
+    # scale=1: the 3 abnormal classes are filled up to the normal count, normal gets 0 extra
     n0 = len(classwise[0])
     got = np.bincount([x[1] for x in ours], minlength=4)
     assert got[0] == (scale - 1) * n0

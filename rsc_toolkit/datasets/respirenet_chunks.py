@@ -1,20 +1,20 @@
 """
-RespireNet(EMBC 2021)의 데이터 구성 — 공식 image_dataloader.py / utils.py 충실 이식 (P0).
+Data pipeline of RespireNet (EMBC 2021) -- exact port of the official image_dataloader.py / utils.py (verified against goldens).
 
-원본 그대로: 녹음 txt 주석 읽기 → librosa.load(sr=4000) → cycle 슬라이스 → 8초 청킹
-(>8s: 50% 겹침 프레임 + 꼬리 패딩, ≤8s: 자기 반복 패딩, 앞/뒤 정렬은 random) → 스펙트로그램 이미지.
-identifier = f"{file}_{cycle_idx}_{label}" 로 청크→cycle 다수결 집계.
+As in the original: read recording txt annotations -> librosa.load(sr=4000) -> slice cycles -> 8 s chunking
+(>8 s: 50%-overlap frames + tail padding, <=8 s: self-repeat padding, front/back alignment random) -> spectrogram image.
+Chunk -> cycle majority vote via identifier = f"{file}_{cycle_idx}_{label}".
 
-원본과 다른 점 (수치 영향 없음, 재현성 확보):
-- 파일 순서를 os.listdir 대신 정렬 (원본은 파일시스템 순서).
-- 패딩 방향 난수를 seed 있는 random.Random 으로 (원본은 무시드 전역 random → run 마다 특징이 달라짐).
-- 리샘플 res_type 을 인자로 (기본 kaiser_best = 저자 환경 librosa 0.8 기본값; librosa 0.11 기본은 soxr_hq).
-스플릿: 환자 fold 파일(80/20, test_fold) 또는 ICBHI 공식 60/40 (official_split.txt, 원본에는 없는 경로 — 툴킷 확장).
-CBA(concatenation-based augmentation, 원본 new_augment) — 2026-09-08 사용자 결정으로 이식 (concat_augment).
-  배포 코드는 (a) range(float) TypeError, (b) 이어 붙인 파일명 "A-B" 의 장치 표 KeyError 로 실행 불가였다(이슈 #1).
-  (a) 는 int 강제, (b) 는 장치 표가 stage-1 학습에 쓰이지 않으므로(출력·stetho 필터 전용) 생략.
-  scale 값은 논문·README·스크립트 어디에도 없어 **가정**(scale=1: 비정상 3클래스를 normal 수까지 증식, normal 증식 0).
-  RNG 호출 순서(random()/randint)를 원본과 동일하게 유지 → tests/unit/datasets/test_respirenet_cba.py 에서 원본 함수와 동치 검증.
+Differences from the original (no numeric impact, for reproducibility):
+- File order is sorted instead of os.listdir (the original uses filesystem order).
+- The padding-direction RNG is a seeded random.Random (the original uses the unseeded global random -> features differ per run).
+- The resampling res_type is an argument (default kaiser_best = the librosa 0.8 default in the authors' environment; librosa 0.11 defaults to soxr_hq).
+Split: patient fold files (80/20, test_fold) or the official ICBHI 60/40 split (official_split.txt; not in the original code -- toolkit extension).
+CBA (concatenation-based augmentation, original new_augment) is ported (concat_augment).
+  The released code cannot run due to (a) a range(float) TypeError and (b) a device-table KeyError for the concatenated file name "A-B".
+  (a) is fixed by casting to int; (b) is skipped because the device table is not used in stage-1 training (only for output and the stetho filter).
+  The scale value appears nowhere in the paper, README or scripts, so it is **assumed** (scale=1: the 3 abnormal classes are grown up to the normal count, normal not grown).
+  The RNG call order (random()/randint) is kept identical to the original -> equivalence with the original function is tested in tests/unit/datasets/test_respirenet_cba.py.
 """
 from __future__ import annotations
 
@@ -36,7 +36,7 @@ from rsc_toolkit.processors.respirenet_image import DEFAULT_MEAN, DEFAULT_STD, R
 logger = logging.getLogger(__name__)
 
 
-# ---------------------------------------------------------------- 원본 utils.py
+# ---------------------------------------------------------------- original utils.py
 def slice_data(start, end, raw_data, sample_rate):
     max_ind = len(raw_data)
     start_ind = min(int(start * sample_rate), max_ind)
@@ -56,7 +56,7 @@ def get_label(crackle, wheeze):
 
 
 def generate_padded_samples(original, source, output_length, rng: random.Random):
-    """원본 utils.py:156-179 (types=1: aug=original). prob 는 rng.random()."""
+    """Original utils.py:156-179 (types=1: aug=original). prob is rng.random()."""
     copy = np.zeros(output_length, dtype=np.float32)
     src_length = len(source)
     left = output_length - src_length
@@ -75,7 +75,7 @@ def generate_padded_samples(original, source, output_length, rng: random.Random)
 
 def split_and_pad(soundclip: np.ndarray, desired_length: float, sample_rate: int, rng: random.Random
                   ) -> List[Tuple[np.ndarray, int, float]]:
-    """원본 utils.py:98-123 (types=1). 반환 [(chunk, chunk_idx, pad_times), ...]."""
+    """Original utils.py:98-123 (types=1). Returns [(chunk, chunk_idx, pad_times), ...]."""
     output_buffer_length = int(desired_length * sample_rate)
     soundclip = soundclip.copy()
     n_samples = len(soundclip)
@@ -102,8 +102,8 @@ def rollAudio(audio: np.ndarray, np_rng: np.random.RandomState) -> np.ndarray:
     return np.roll(audio, pivot, axis=0)
 
 
-# ---------------------------------------------------------------- CBA (원본 image_dataloader.py:124-236 new_augment)
-_CBA_PAIRS = {  # 클래스별 (누적 확률 상한, (첫 사이클 클래스, 둘째 사이클 클래스)) — 원본 하드코딩 그대로
+# ---------------------------------------------------------------- CBA (original image_dataloader.py:124-236 new_augment)
+_CBA_PAIRS = {  # per class (cumulative probability upper bound, (first cycle class, second cycle class)) -- hard-coded as in the original
     1: [(0.6, (1, 1)), (0.8, (1, 0)), (1.0, (0, 1))],
     2: [(0.6, (2, 2)), (0.8, (2, 0)), (1.0, (0, 2))],
     3: [(0.5, (3, 3)), (0.7, (1, 2)), (0.8, (2, 1)), (0.9, (3, 0)), (1.0, (0, 3))],
@@ -111,9 +111,9 @@ _CBA_PAIRS = {  # 클래스별 (누적 확률 상한, (첫 사이클 클래스, 
 
 
 def concat_augment(classwise: Sequence[Sequence[tuple]], scale: int, rng: random.Random) -> List[tuple]:
-    """원본 new_augment(scale) 의 충실 이식. classwise[c] = [(audio, label, file_name, cycle_idx), ...].
-    클래스 c 를 scale*len(normal) 개까지 두 사이클 연결로 증식(부족분만; 음수면 0). 반환 [(audio, c, "A-B", idx), ...].
-    RNG 호출 순서를 원본(전역 random)과 동일하게: normal 은 randint×2, 나머지는 random() → randint(i) → randint(j)."""
+    """Exact port of the original new_augment(scale). classwise[c] = [(audio, label, file_name, cycle_idx), ...].
+    Grows class c up to scale*len(normal) by concatenating two cycles (only the shortfall; 0 if negative). Returns [(audio, c, "A-B", idx), ...].
+    RNG call order identical to the original (global random): normal uses randint x2, others random() -> randint(i) -> randint(j)."""
     scale = int(scale)
     out: List[tuple] = []
     n_normal = len(classwise[0])
@@ -131,7 +131,7 @@ def concat_augment(classwise: Sequence[Sequence[tuple]], scale: int, rng: random
     return out
 
 
-# ---------------------------------------------------------------- 스플릿
+# ---------------------------------------------------------------- split
 def read_patient_folds(folds_file) -> dict:
     out = {}
     for line in pathlib.Path(folds_file).read_text().splitlines():
@@ -142,16 +142,16 @@ def read_patient_folds(folds_file) -> dict:
     return out
 
 
-from rsc_toolkit.datasets.splits import read_split_file as read_official_split  # noqa: E402  P2-6: 파서 단일 출처
+from rsc_toolkit.datasets.splits import read_split_file as read_official_split  # noqa: E402  single source of the parser
 
 
-# ---------------------------------------------------------------- 데이터셋
+# ---------------------------------------------------------------- dataset
 class RespireNetChunkDataset(Dataset):
     def __init__(
         self,
         data_dir,
         train_flag: bool,
-        split_mode: str = "fold",              # "fold" (환자 5-fold, 원본) | "official" (ICBHI 60/40)
+        split_mode: str = "fold",              # "fold" (patient 5-fold, original) | "official" (ICBHI 60/40)
         folds_file: Optional[str] = None,
         test_fold: int = 4,
         official_split_file: Optional[str] = None,
@@ -159,13 +159,13 @@ class RespireNetChunkDataset(Dataset):
         desired_length: float = 8.0,
         res_type: str = "kaiser_best",
         pad_seed: int = 0,
-        augment: bool = False,                 # 학습 증강 (nlpaug 5종 + roll) — 2단계에서 연결
+        augment: bool = False,                 # training augmentation (5 nlpaug ops + roll) -- wired in stage 2
         aug_seed: int = 0,
         mean: Optional[Sequence[float]] = DEFAULT_MEAN,
         std: Optional[Sequence[float]] = DEFAULT_STD,
         stetho_id: int = -1,
-        aug_scale: Optional[float] = None,     # CBA 배수 (원본 --aug_scale; None/0 = 끔). 학습셋에만.
-        cba_seed: Optional[int] = None,        # CBA 표본 RNG seed (None → aug_seed). 원본은 무시드 전역 random.
+        aug_scale: Optional[float] = None,     # CBA multiplier (original --aug_scale; None/0 = off). Training set only.
+        cba_seed: Optional[int] = None,        # CBA sampling RNG seed (None -> aug_seed). The original uses the unseeded global random.
     ):
         self.data_dir = pathlib.Path(data_dir)
         self.train_flag = bool(train_flag)
@@ -173,10 +173,10 @@ class RespireNetChunkDataset(Dataset):
         self.augment = bool(augment) and self.train_flag
         self.processor = RespireNetImageProcessor(sampling_rate=sample_rate, mean=mean or DEFAULT_MEAN, std=std or DEFAULT_STD)
 
-        # 녹음 파일만 (툴킷 데이터 디렉토리에는 filename_format.txt 같은 부속 txt 도 있다 — 원본 디렉토리엔 없음)
+        # recording files only (the toolkit data directory also contains auxiliary txt files such as filename_format.txt -- the original directory does not)
         filenames = sorted(s[:-4] for s in os.listdir(self.data_dir)
                            if s.endswith(".txt") and len(s[:-4].split("_")) == 5 and (self.data_dir / (s[:-4] + ".wav")).exists())
-        # 장치 id: 원본은 os.listdir 등장 순 — 저자 로그 순서를 고정값으로 쓴다
+        # device ids: the original uses os.listdir order -- the order from the authors' logs is used as a fixed value
         self.device_to_id = {"AKGC417L": 0, "Meditron": 1, "LittC2SE": 2, "Litt3200": 3}
         self.file_to_device = {f: self.device_to_id[f.split("_")[-1]] for f in filenames}
 
@@ -190,7 +190,7 @@ class RespireNetChunkDataset(Dataset):
             raise ValueError(f"split_mode must be fold|official, got {split_mode!r}")
         self.filenames = [f for f in filenames if keep(f) and (stetho_id < 0 or self.file_to_device[f] == stetho_id)]
 
-        # 1) cycle 추출 (원본 cycle_list / classwise_cycle_list)
+        # 1) cycle extraction (original cycle_list / classwise_cycle_list)
         cycles: List[tuple] = []                       # (audio, label, file_name, cycle_idx)
         classwise: List[List[tuple]] = [[], [], [], []]
         for file_name in self.filenames:
@@ -204,17 +204,17 @@ class RespireNetChunkDataset(Dataset):
                 classwise[label].append(cycles[-1])
         self.n_cycles_raw = len(cycles)
         self.n_cycles_cba = 0
-        # 2) CBA — 원본과 같이 cycle 추출 직후·청킹 전, 학습셋만 (test 는 절대 안 함)
+        # 2) CBA -- as in the original, right after cycle extraction and before chunking, training set only (never on test)
         self.aug_scale = float(aug_scale) if (aug_scale and self.train_flag) else 0.0
         if self.aug_scale:
             cba = concat_augment(classwise, self.aug_scale, random.Random(aug_seed if cba_seed is None else cba_seed))
             cycles.extend(cba)
             self.n_cycles_cba = len(cba)
-        # 3) 8초 청킹 (원본 split_and_pad; 패딩 방향 RNG = pad_seed) — 원본 cycle 순서 그대로, CBA 사이클은 뒤에
+        # 3) 8 s chunking (original split_and_pad; padding-direction RNG = pad_seed) -- original cycle order kept, CBA cycles appended
         rng = random.Random(pad_seed)
         self.audio_data: List[Tuple[np.ndarray, int, str, int, int, float]] = []  # chunk,label,file,cycle_idx,chunk_idx,pad_times
         self.identifiers: List[str] = []
-        self.cycle_ids: List[str] = []       # cycle 단위 identifier (다수결 대상)
+        self.cycle_ids: List[str] = []       # cycle-level identifier (majority vote unit)
         for chunk, label, file_name, cycle_idx in cycles:
             cid = f"{file_name}_{cycle_idx}_{label}"
             self.cycle_ids.append(cid)
@@ -226,7 +226,7 @@ class RespireNetChunkDataset(Dataset):
         self.class_probs = counts / counts.sum()
         self._np_rng = np.random.RandomState(aug_seed)
         self._py_rng = random.Random(aug_seed + 1)
-        logger.info("RespireNet %s: 녹음 %d, cycle %d (원본 %d + CBA %d, scale=%s), 청크 %d, 클래스 %s",
+        logger.info("RespireNet %s: recordings %d, cycles %d (original %d + CBA %d, scale=%s), chunks %d, classes %s",
                     "train" if train_flag else "test", len(self.filenames), len(self.cycle_ids), self.n_cycles_raw,
                     self.n_cycles_cba, self.aug_scale or "off", len(self.audio_data), counts.astype(int).tolist())
 
@@ -236,7 +236,7 @@ class RespireNetChunkDataset(Dataset):
     def chunk_audio(self, index: int) -> np.ndarray:
         audio = self.audio_data[index][0]
         if self.augment:
-            from rsc_toolkit.augmentations.respirenet_raw import gen_augmented  # 2단계
+            from rsc_toolkit.augmentations.respirenet_raw import gen_augmented  # stage 2
 
             if self._py_rng.random() > 0.5:
                 audio = gen_augmented(audio, self.sample_rate, self._np_rng, self._py_rng)
@@ -249,7 +249,7 @@ class RespireNetChunkDataset(Dataset):
         self.processor.mean, self.processor.std = tuple(float(v) for v in mean), tuple(float(v) for v in std)
 
     def raw_image_tensor(self, index: int) -> torch.Tensor:
-        """ToTensor 만 적용한 (3, H, W) — 원본 get_mean_and_std 입력."""
+        """(3, H, W) with only ToTensor applied -- input of the original get_mean_and_std."""
         img = self.processor.image(self.chunk_audio(index))
         return torch.from_numpy(np.ascontiguousarray(img)).permute(2, 0, 1).float().div(255.0)
 
@@ -260,12 +260,12 @@ class RespireNetChunkDataset(Dataset):
 
 
 class RespireNetIndexChunkDataset(Dataset):
-    """툴킷 인덱스(index_cycle*.csv)에서 사이클을 읽어 RespireNet 청크(4 kHz, 8 s repeat/pad, magma 이미지)로 만드는 **평가 전용** 데이터셋.
+    """**Evaluation-only** dataset that reads cycles from a toolkit index (index_cycle*.csv) and turns them into RespireNet chunks (4 kHz, 8 s repeat/pad, magma image).
 
-    ICBHI 로 학습한 RespireNet ckpt 를 SPRSound 2022 inter-patient test 에 제로샷 평가하기 위한 경로(2026-09-14, 사용자 결정).
-    체인은 RespireNetChunkDataset 의 test 경로와 동일(증강·CBA 없음, split_and_pad 의 패딩 RNG 는 pad_seed).
-    라벨은 인덱스 csv 의 label 열을 그대로 쓴다(SPRSound 는 7→4 병합된 파생 인덱스 index_cycle_icbhi4.csv 를 넘긴다).
-    cycle id 는 원본과 같은 "<파일>_<cycle_idx>_<label>" 꼴이라 RespireNetVoteEval 의 사이클 다수결이 그대로 동작한다.
+    Path for zero-shot evaluation of a RespireNet ckpt trained on ICBHI on the SPRSound 2022 inter-patient test.
+    The preprocessing chain is identical to the test path of RespireNetChunkDataset (no augmentation or CBA; split_and_pad padding RNG is pad_seed).
+    Labels come straight from the index csv label column (for SPRSound, pass the 7->4 merged derived index index_cycle_icbhi4.csv).
+    Cycle ids have the same "<file>_<cycle_idx>_<label>" form as the original, so the cycle majority vote of RespireNetVoteEval works unchanged.
     """
 
     def __init__(self, index_csv, data_dir, split: str = "test", sample_rate: int = 4000, desired_length: float = 8.0,
@@ -301,7 +301,7 @@ class RespireNetIndexChunkDataset(Dataset):
         counts = np.bincount(self.labels, minlength=n_classes).astype(np.float64)
         self.class_probs = counts / counts.sum()
         self.cycle_label_counts = np.bincount([int(c.split("_")[-1]) for c in self.cycle_ids], minlength=n_classes).tolist()
-        logger.info("RespireNet index(%s): 녹음 %d, cycle %d, 청크 %d, 사이클 클래스 %s", index_csv, len(self.filenames),
+        logger.info("RespireNet index(%s): recordings %d, cycles %d, chunks %d, cycle classes %s", index_csv, len(self.filenames),
                     len(self.cycle_ids), len(self.audio_data), self.cycle_label_counts)
 
     def __len__(self):
@@ -321,14 +321,14 @@ class RespireNetIndexChunkDataset(Dataset):
         audio = self.chunk_audio(index)
         return self.processor.make_features(audio), int(self.audio_data[index][1]), index
 
-from rsc_toolkit.datasets import collate as _collate  # P2-6: collate 단일 구현
+from rsc_toolkit.datasets import collate as _collate  # single collate implementation
 
-# (x, y, 청크 인덱스 long)
+# (x, y, chunk index long)
 respirenet_collate = _collate.index_meta_collate
 
 
 class RespireNetDataModule(L.LightningDataModule):
-    meta_kind = "respirenet_chunk_index"  # batch[2] = 청크 인덱스 (사이클 투표 콜백용) — respirenet 모델은 무시
+    meta_kind = "respirenet_chunk_index"  # batch[2] = chunk index (for the cycle-voting callback) -- ignored by the respirenet model
 
     def __init__(self, data_dir: str = ".datasets/icbhi", split_mode: str = "fold",
                  folds_file: str = "rsc_toolkit/datasets/icbhi/data/patient_list_foldwise.txt", test_fold: int = 4,
@@ -340,7 +340,7 @@ class RespireNetDataModule(L.LightningDataModule):
                  aug_scale: Optional[float] = None, cba_seed: Optional[int] = None,
                  ood_index_csv: Optional[str] = None, ood_data_dir: Optional[str] = None, ood_split: str = "test"):
         super().__init__()
-        # 제로샷(OOD) 평가: test 셋만 다른 데이터셋의 인덱스에서 만든다(학습·정규화 통계는 ICBHI 그대로)
+        # Zero-shot (OOD) evaluation: only the test set is built from another dataset's index (training and normalization statistics stay ICBHI)
         self.ood = dict(index_csv=ood_index_csv, data_dir=ood_data_dir, split=ood_split) if ood_index_csv else None
         self.kw = dict(data_dir=data_dir, split_mode=split_mode, folds_file=folds_file, test_fold=test_fold,
                        official_split_file=official_split_file, sample_rate=sample_rate, desired_length=desired_length,
@@ -353,7 +353,7 @@ class RespireNetDataModule(L.LightningDataModule):
         self.train_ds = self.test_ds = None
 
     def _compute_mean_std(self, ds) -> Tuple[Tuple[float, ...], Tuple[float, ...]]:
-        """원본 utils.get_mean_and_std — 증강이 켜진 학습셋의 이미지별 채널 mean/std 를 평균."""
+        """Original utils.get_mean_and_std -- averages per-image channel mean/std over the training set with augmentation enabled."""
         class _Stats(Dataset):
             def __len__(_s):
                 return len(ds)
@@ -366,7 +366,7 @@ class RespireNetDataModule(L.LightningDataModule):
         for m, sd in DataLoader(_Stats(), batch_size=32, num_workers=self.num_workers):
             mean += m.sum(0); std += sd.sum(0)
         mean /= len(ds); std /= len(ds)
-        logger.info("RespireNet 정규화 통계 (train, 증강 포함): mean %s std %s", mean.tolist(), std.tolist())
+        logger.info("RespireNet normalization statistics (train, with augmentation): mean %s std %s", mean.tolist(), std.tolist())
         return tuple(mean.tolist()), tuple(std.tolist())
 
     def setup(self, stage: Optional[str] = None) -> None:
@@ -383,14 +383,14 @@ class RespireNetDataModule(L.LightningDataModule):
                 self.test_ds.set_normalization(self.mean, self.std)
         if self.test_ds is None:
             self.test_ds = RespireNetChunkDataset(train_flag=False, augment=False, **self.kw)
-            if self.mean is None or self.std is None:  # 평가 전용 (fit 없이 test): eval.py 상수
+            if self.mean is None or self.std is None:  # evaluation only (test without fit): eval.py constants
                 self.mean, self.std = DEFAULT_MEAN, DEFAULT_STD
             self.test_ds.set_normalization(self.mean, self.std)
 
     def train_dataloader(self) -> DataLoader:
         sampler = None
         if self.weighted_sampler:
-            # 원본 train.py:114-118 — 청크 라벨의 클래스 확률 역수
+            # Original train.py:114-118 -- inverse class probability of chunk labels
             w = 1.0 / torch.tensor([self.train_ds.class_probs[l] for l in self.train_ds.labels], dtype=torch.float32)
             sampler = torch.utils.data.WeightedRandomSampler(w, len(self.train_ds))
         return DataLoader(self.train_ds, batch_size=self.batch_size, sampler=sampler, shuffle=sampler is None,

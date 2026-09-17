@@ -1,4 +1,4 @@
-# AMS-D: 표준 4-class ICBHIScore(S_p/S_e/icbhi_score) + 논문 이진 산식(paper_S_p/paper_S_e/paper_score, 비표준) 둘 다 기록
+# AMS-D: records both the standard 4-class ICBHIScore (S_p/S_e/icbhi_score) and the paper's binary formula (paper_S_p/paper_S_e/paper_score, non-standard)
 train:
   - name: topk_accuracy
     params:

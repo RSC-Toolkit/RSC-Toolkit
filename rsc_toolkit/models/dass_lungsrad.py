@@ -1,26 +1,26 @@
 """
 Lung-SRAD (Interspeech 2026, arXiv 2606.11922; RSC-Toolkit/Lung-SRAD d28d783) — DASS-medium(VMamba-S v2) + Spectral-Aware
-Regularization(Gaussian blur hook) + Dual-Axis Patch-Mix CL, 공식 코드 충실 이식 (P0).
+Regularization (Gaussian blur hook) + Dual-Axis Patch-Mix CL, exact port of the official code.
 
-원본 main.py set_model/train (--model dass, model_size medium 하드코딩):
+Original main.py set_model/train (--model dass, model_size medium hard-coded):
   images (B,798,128) fbank(per-sample (x−mean)/(2·std)) → [SpecAugment icbhi_ast_sup] → Resize((1024,128)) → (B,1024,128)
   DASS.forward: unsqueeze(1) → transpose(2,3) → (B,1,128,1024) → VSSM(patch_embed → (B,96,32,256) → 4 stage → norm/avgpool 768) → head(768,4)
-  method ce      : loss = CE(logits, y)                                   (= "DASS FT";  --gaussian_blur 없음 → blur 블록 ∅)
-  method ce_blur : 같은 손실, blur 블록 {2,3}@stage2 활성                 (= "SAR"; 원본 method ce + --gaussian_blur)
-  method patchmix_cl (cl_mode dual, 기본): L = CE + α_t·L_PM^time + α_f·L_PM^freq  (main.py:310-351)
-      proj1 = projector(features)  (target_type project_flow — 원본 경로엔 gradient 흐름)
-      time/freq 각각 독립 forward(독립 index·λ) → mix 특징 detach(=Eq.8 sg) → projector → PatchMixConLoss(τ 0.2, negative_pair all)
-      cl_mode time|freq 는 한 축만, cl_mode 2d 는 AST-style(원본은 **detach 없음**, α=alpha) — 원본 코드 그대로(detach_mix_2d=False).
-  autocast(fp16) 만, GradScaler 없음 (main.py:305, 364-370; ast_models.py:361 @autocast 이중 적용) → 모델 내부 autocast, trainer precision 32.
+  method ce      : loss = CE(logits, y)                                   (= "DASS FT";  no --gaussian_blur → no blur blocks)
+  method ce_blur : same loss, blur blocks {2,3}@stage2 enabled         (= "SAR"; original method ce + --gaussian_blur)
+  method patchmix_cl (cl_mode dual, default): L = CE + α_t·L_PM^time + α_f·L_PM^freq  (main.py:310-351)
+      proj1 = projector(features)  (target_type project_flow — gradient flows in the original path)
+      independent forward for time and freq (independent index·λ) → mix features detached (=Eq.8 sg) → projector → PatchMixConLoss(τ 0.2, negative_pair all)
+      cl_mode time|freq uses one axis only; cl_mode 2d is AST-style (the original has **no detach**, α=alpha) — kept as in the original code (detach_mix_2d=False).
+  autocast (fp16) only, no GradScaler (main.py:305, 364-370; ast_models.py:361 @autocast applied twice) → autocast inside the model, trainer precision 32.
 
-사전학습: DASS_medium_v2.pth (Saurabhbhati/DASS v0.2, 'module.v.' 접두어 제거·classifier.head 제외 → head 2키만 missing),
-  patch_embed[0] 은 Conv2d(1,48,3,2,1) 로 새로 만들어(imagenet_pretrain=False) ckpt 의 단일채널 가중치로 덮어씀 (ast_models.py:328-336).
+Pretraining: DASS_medium_v2.pth (Saurabhbhati/DASS v0.2, 'module.v.' prefix stripped, classifier.head excluded → only the 2 head keys are missing),
+  patch_embed[0] is rebuilt as Conv2d(1,48,3,2,1) (imagenet_pretrain=False) and overwritten with the ckpt's single-channel weights (ast_models.py:328-336).
 
-quirk (코드 기본값 유지, 플래그로 논문 정의 병행):
-  - mix_layout=as_code(기본): patch-mix 가 channel-first (B,96,32,256) 를 (B,H,W,C) 로 오인 → 'time' 은 주파수 32bin, 'freq' 는 채널 96 을 섞고
-    λ 분모도 32/96, 시간 축은 안 섞임. as_paper: Eq.6-7(시간 W=256 / 주파수 H=32). (backbone/vmamba/vssm.py 주석 참고)
-  - AdamW(코드 misc.py) vs Adam(논문) → 코드.  drop_path 0.3 유지.  blur 는 평가에도 적용되는 고정 연산.
-  - SpecAugment 는 **데이터 config(specaugment.enabled, icbhi_ast_sup/mean, randn 게이트)** 에서 datamodule 이 적용한다 — 모델 안에서는 적용하지 않는다(중복 금지).
+Quirks (code defaults kept; the paper definitions are available via flags):
+  - mix_layout=as_code (default): patch-mix treats channel-first (B,96,32,256) as (B,H,W,C) → 'time' mixes the 32 frequency bins, 'freq' mixes the 96 channels,
+    the λ denominators are 32/96, and the time axis is never mixed. as_paper: Eq.6-7 (time W=256 / frequency H=32). (see comments in backbone/vmamba/vssm.py)
+  - AdamW (code misc.py) vs Adam (paper) → code.  drop_path 0.3 kept.  blur is a fixed operation that also applies at evaluation.
+  - SpecAugment is applied by the datamodule from the **data config (specaugment.enabled, icbhi_ast_sup/mean, randn gate)** — not inside the model (to avoid applying it twice).
 """
 from __future__ import annotations
 
@@ -55,11 +55,11 @@ class DASSLungSRAD(BaseRSCModel, nn.Module):
     def __init__(
         self,
         n_cls: int = 4,
-        method: str = "ce",                       # ce (FT) | ce_blur (SAR) | patchmix_cl (Lung-SRAD 및 Table 2 변형)
-        cl_mode: str = "dual",                    # patchmix_cl: dual | time | freq | 2d | dual_seq(죽은 코드 변형)
-        mix_layout: str = "as_code",              # as_code (원본 동작) | as_paper (Eq.6-7)
-        train_projector: bool = True,             # False = main.py 동작(projector 를 optimizer 에 안 넣음)
-        gaussian_blur: Optional[bool] = None,     # None → method != 'ce' (원본 --gaussian_blur 스크립트 기본)
+        method: str = "ce",                       # ce (FT) | ce_blur (SAR) | patchmix_cl (Lung-SRAD and Table 2 variants)
+        cl_mode: str = "dual",                    # patchmix_cl: dual | time | freq | 2d | dual_seq (variant from dead code)
+        mix_layout: str = "as_code",              # as_code (original behavior) | as_paper (Eq.6-7)
+        train_projector: bool = True,             # False = main.py behavior (projector not in the optimizer)
+        gaussian_blur: Optional[bool] = None,     # None → method != 'ce' (original --gaussian_blur script default)
         blur_blocks: Sequence[int] = (2, 3),
         blur_stage: Sequence[int] = (2,),
         kernel_size: int = 5,
@@ -72,14 +72,14 @@ class DASSLungSRAD(BaseRSCModel, nn.Module):
         proj_dim: int = 768,
         alpha_time: float = 1.0,
         alpha_freq: float = 1.0,
-        alpha: float = 1.0,                       # cl_mode 2d 의 계수 (원본 --alpha)
-        detach_mix_2d: bool = False,              # 원본 2d 분기는 detach 없음 (quirk); True 면 Eq.8 처럼 sg
+        alpha: float = 1.0,                       # coefficient for cl_mode 2d (original --alpha)
+        detach_mix_2d: bool = False,              # the original 2d branch has no detach (quirk); True applies sg as in Eq.8
         drop_path_rate: float = 0.3,
         audioset_pretrain: bool = True,
         pretrained_path: Optional[str] = None,
-        input_layout: str = "freq_time",          # 툴킷 fbank (B,128,798)
-        resize_to: Tuple[int, int] = (128, 1024), # (F, T) — 원본 Resize((1024,128)) on (T,F)
-        amp: bool = True,                         # 원본 autocast fp16, GradScaler 없음 (trainer precision 32)
+        input_layout: str = "freq_time",          # toolkit fbank (B,128,798)
+        resize_to: Tuple[int, int] = (128, 1024), # (F, T) — original Resize((1024,128)) on (T,F)
+        amp: bool = True,                         # original autocast fp16, no GradScaler (trainer precision 32)
         ssm_backend: str = "auto",                # auto | torch | cuda_oflex
     ):
         super().__init__()
@@ -100,13 +100,13 @@ class DASSLungSRAD(BaseRSCModel, nn.Module):
         self.input_layout, self.resize_to, self.amp = input_layout, tuple(resize_to), bool(amp)
         self.final_feat_dim = 768
 
-        # ast_models.py:313-317 — VSSM(medium), blur 여부로 blur 블록 집합 결정 (원본은 blur 없으면 plain vmamba.VSSM = 같은 구조)
+        # ast_models.py:313-317 — VSSM(medium); the blur flag decides the set of blur blocks (without blur the original uses plain vmamba.VSSM = same structure)
         self.v = build_dass_medium_vssm(
             blur=self.gaussian_blur, blur_blocks=tuple(blur_blocks), blur_stage=tuple(blur_stage), kernel_size=kernel_size,
             sigma=sigma, blur_strength=blur_strength, enable_patch_mix=(method == "patchmix_cl"), mix_beta=mix_beta,
             mix_layout=mix_layout, ssm_backend=ssm_backend, drop_path_rate=drop_path_rate,
         )
-        # ast_models.py:325-336 — head 교체, patch_embed[0] = Conv2d(1,48,3,2,1) (무작위 초기화 → ckpt 로 덮음)
+        # ast_models.py:325-336 — head replaced, patch_embed[0] = Conv2d(1,48,3,2,1) (random init → overwritten by the ckpt)
         self.v.classifier.head = nn.Linear(self.v.classifier.head.in_features, self.n_cls)
         self.v.patch_embed[0] = nn.Conv2d(1, 48, kernel_size=(3, 3), stride=(2, 2), padding=(1, 1))
         self.dass_load_info = None
@@ -115,12 +115,12 @@ class DASSLungSRAD(BaseRSCModel, nn.Module):
 
         # main.py:265, 272
         self.projector = Projector(self.final_feat_dim, proj_dim) if method == "patchmix_cl" else nn.Identity()
-        # 원본 main.py:301 은 `optim_params = list(model.parameters())` 로 **projector 를 optimizer 에 넣지 않는다**
-        # — projector 가 model 과 별개 객체이기 때문이다. 따라서 대조손실용 투영 헤드는 **무작위 초기값 그대로 고정**된다.
-        # main_v2.py:279 는 `+ list(projector.parameters())` 로 넣는다. 저자 실측으로 이 차이가 크다:
-        #   main.py(미학습) 63.00±0.84 (59 run)  vs  main_v2.py(학습) 61.39±0.92 (40 run)  → **−1.61**
-        # 우리 이식은 projector 가 모델 서브모듈이라 `self.parameters()` 에 자동 포함돼 main_v2 쪽 동작이었다.
-        # train_projector=False 로 두면 main.py 를 따른다(가중치 갱신만 막고, 백본으로 가는 gradient 흐름은 유지).
+        # The original main.py:301 uses `optim_params = list(model.parameters())` and **does not put the projector in the optimizer**
+        # — the projector is a separate object from model. The contrastive projection head therefore **stays fixed at its random init**.
+        # main_v2.py:279 adds it with `+ list(projector.parameters())`. According to the authors' runs the difference is large:
+        #   main.py (not trained) 63.00±0.84 (59 runs)  vs  main_v2.py (trained) 61.39±0.92 (40 runs)  → **−1.61**
+        # In this port the projector is a model submodule, so `self.parameters()` includes it automatically (main_v2 behavior).
+        # train_projector=False follows main.py (blocks weight updates only; gradients still flow to the backbone).
         self.train_projector = bool(train_projector)
         if not self.train_projector:
             for prm in self.projector.parameters():
@@ -129,20 +129,20 @@ class DASSLungSRAD(BaseRSCModel, nn.Module):
         logger.info("dass_lungsrad: method=%s cl_mode=%s mix_layout=%s blur=%s selective_scan=%s(cuda kernel %s)", method, cl_mode, mix_layout,
                     self.gaussian_blur, ssm_backend, cuda_kernel_available())
 
-    # ----------------------------------------------------------------- 구성
+    # ----------------------------------------------------------------- construction
     def load_dass(self, path: Optional[str]) -> dict:
         from rsc_toolkit.paths import resolve_pretrained
 
-        p = resolve_pretrained(DASS_CKPT_CANDIDATES, explicit=path)  # RSCTK_PRETRAINED_ROOT → cwd 순
+        p = resolve_pretrained(DASS_CKPT_CANDIDATES, explicit=path)  # RSCTK_PRETRAINED_ROOT, then cwd
         if p is None or not p.exists():
-            raise FileNotFoundError(f"DASS ckpt 가 없다: {path or DASS_CKPT_CANDIDATES}")
+            raise FileNotFoundError(f"DASS ckpt not found: {path or DASS_CKPT_CANDIDATES}")
         info = load_dass_checkpoint(self.v, str(p))
-        logger.info("DASS ckpt 로드 %s: %d 키, missing %s", p, info["loaded"], info["missing"])
+        logger.info("Loaded DASS ckpt %s: %d keys, missing %s", p, info["loaded"], info["missing"])
         return info
 
-    # ------------------------------------------------------------------ 실행
+    # ------------------------------------------------------------------ execution
     def to_model_input(self, x: torch.Tensor) -> torch.Tensor:
-        """툴킷 fbank (B,128,798) → (B,1,128,798) → bilinear (128,1024) → (B,1,128,1024)  (= 원본 Resize((1024,128)) + unsqueeze/transpose)."""
+        """Toolkit fbank (B,128,798) → (B,1,128,798) → bilinear (128,1024) → (B,1,128,1024)  (= original Resize((1024,128)) + unsqueeze/transpose)."""
         if x.dim() == 3:
             x = x.unsqueeze(1)
         if self.input_layout != "freq_time":
@@ -152,7 +152,7 @@ class DASSLungSRAD(BaseRSCModel, nn.Module):
         return x
 
     def forward_features(self, images: torch.Tensor):
-        """(features 768, logits) — 원본 `features, output = model(images)`."""
+        """(features 768, logits) — original `features, output = model(images)`."""
         return self.v.forward_features(images)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -177,7 +177,7 @@ class DASSLungSRAD(BaseRSCModel, nn.Module):
         return self.patchmix_con_loss(proj1, proj_mix, labels, labels_b, lam, index)
 
     def training_forward(self, audio_batch, labels, loss_func, meta_labels=None):
-        """원본 main.py train() 의 method 분기 (평가 모드는 원본 validate 처럼 항상 CE 경로)."""
+        """method branches of the original main.py train() (eval mode always takes the CE path, as in the original validate)."""
         images = self.to_model_input(audio_batch)
         with torch.autocast(device_type=images.device.type, dtype=torch.float16, enabled=self.amp and images.is_cuda):
             feats, logits = self.forward_features(images)
@@ -189,8 +189,8 @@ class DASSLungSRAD(BaseRSCModel, nn.Module):
                 if self.cl_mode in ("freq", "dual"):
                     loss = loss + self.alpha_freq * self._axis_cl(images, labels, proj1, "freq")
                 if self.cl_mode == "dual_seq":
-                    # 죽은 코드 patch_mix_dual_axis 를 되살린 변형 — forward 1회·대조손실 1개.
-                    # 기본 dual(독립 forward 2회·손실 2개)과 **다른 방법**이므로 계수는 alpha 하나만 쓴다.
+                    # variant that revives the dead code patch_mix_dual_axis — one forward, one contrastive loss.
+                    # It is a **different method** from the default dual (2 independent forwards, 2 losses), so a single alpha coefficient is used.
                     loss = loss + self.alpha * self._axis_cl(images, labels, proj1, "dual_seq")
                 if self.cl_mode == "2d":
                     mix_feat, _, labels_b, lam, index = self.v.forward_features(images, y=labels, patch_mix=True, mix_type="2d")

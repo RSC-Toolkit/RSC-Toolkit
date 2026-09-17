@@ -3,5 +3,5 @@
   "ckpt": "/raid/doyoung/projects/RSC-Toolkit/pretrained_models/upstream/audioset_16_16_0.4422.pth",
   "torch": "2.13.0+cu130",
   "timm": "0.4.5",
-  "note": "CPU 강제(cuda.is_available=False, nn.Module.cuda no-op, DataParallel 대체, wget 스텁); mlp_head/gpredlayer/mask_embed 는 det_fill, token_weight 는 sin_fill 로 난수 파라미터 결정화(linspace 는 토큰 점수 전부 동률). augment.pt 는 .venv 에서 공식 loader/mydataset.py ICBHIDataset 을 실제 실행한 값(합성 wav; short=fbank 0-패딩 fallback, loop=8 s 반복 패딩)"
+  "note": "CPU forced (cuda.is_available=False, nn.Module.cuda no-op, DataParallel replaced, wget stub); random parameters made deterministic with det_fill for mlp_head/gpredlayer/mask_embed and sin_fill for token_weight (linspace makes all token scores tie). augment.pt holds values from actually running the official loader/mydataset.py ICBHIDataset in .venv (synthetic wav; short=fbank zero-padding fallback, loop=8 s repeat padding)"
 }

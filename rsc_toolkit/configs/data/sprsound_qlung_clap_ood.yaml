@@ -1,6 +1,6 @@
-# QLung **Audio-CLAP 판** 의 SPRSound OOD 평가 뷰(학습 미사용): 7→4 병합 파생 라벨(Rhonchi·Stridor 제외), ICBHI CLAP 판(icbhi_qlung_clap.yaml)과 같은
-# 오디오 체인(48 kHz → 녹음 fade → 구간 절단 → 8 s repeat_fade → ClapProcessor log-mel). 평가 범위·라벨 병합은 AST 판 OOD 뷰
-# (sprsound_qlung_ood.yaml)와 동일 — 2026-09-07 사용자 결정으로 CLAP 판 OOD 를 채운다.
+# SPRSound OOD evaluation view of the QLung **Audio-CLAP version** (not used for training): 7→4 merged derived labels (Rhonchi·Stridor excluded), same
+# audio chain as the ICBHI CLAP version (icbhi_qlung_clap.yaml) (48 kHz → recording fade → segment slicing → 8 s repeat_fade → ClapProcessor log-mel). Evaluation scope
+# and label merging are the same as the AST version's OOD view (sprsound_qlung_ood.yaml).
 name: sprsound_qlung_clap_ood
 params:
   datamodule_name: qlung
@@ -12,12 +12,12 @@ params:
   index_filename: index_cycle.csv
   label_map: sprsound_7to4
 
-  sampling_rate: 48000           # CLAP 경로 (AST 판 OOD 뷰는 16000)
+  sampling_rate: 48000           # CLAP path (16000 in the AST OOD view)
   sample_level: cycle
   desired_length_sec: 8.0
-  pad_type: repeat_fade          # 가정: ICBHI 와 동일 (녹음 fade in/out + 8 s repeat + fade_out)
+  pad_type: repeat_fade          # Assumption: same as ICBHI (recording fade in/out + 8 s repeat + fade_out)
   fade: true
-  resample_after_slice: false    # 가정: 녹음 전체를 48 kHz 로 리샘플 후 초 단위 절단 (ICBHI CLAP 판과 동일 체인)
+  resample_after_slice: false    # Assumption: resample the whole recording to 48 kHz, then slice in seconds (same chain as the ICBHI CLAP version)
   time_unit: s
 
   train_splits: [train]
@@ -33,7 +33,7 @@ params:
   features:
     enabled: true
     kind: clap
-    cache_dir: downloaded_datasets/features_cache_qlung_clap_ood   # 별도 캐시 (체인이 캐시 키에 안 들어가므로 AST 판·ICBHI CLAP 과 분리)
+    cache_dir: downloaded_datasets/features_cache_qlung_clap_ood   # separate cache (the chain is not part of the cache key, so kept apart from the AST version and ICBHI CLAP)
     clap_model_name: laion/clap-htsat-unfused
   feature_precompute: true
   feature_precompute_batch_size: 8
@@ -47,7 +47,7 @@ params:
     beta: 0.3
     entropy_source: rms
     formula: code
-    cache_dir: downloaded_datasets/aqs_cache_clap48k   # 48 kHz 파형 기준 (ICBHI CLAP 판과 동일 디렉터리; 파일명에 dataset 포함)
+    cache_dir: downloaded_datasets/aqs_cache_clap48k   # based on the 48 kHz waveform (same directory as the ICBHI CLAP version; file names include the dataset)
     precompute: true
     precompute_num_workers: 8
     attach_val: true

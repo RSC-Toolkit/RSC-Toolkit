@@ -1,4 +1,4 @@
-# SCL-metadata 선형 평가 run: 동결 인코더(encoder_ckpt) + Linear, 100ep, Adam 0.1/wd 1e-4, 가중 CE, 매 epoch test Sc 최고.
+# SCL-metadata linear evaluation run: frozen encoder (encoder_ckpt) + Linear, 100 ep, Adam 0.1/wd 1e-4, weighted CE, best test Sc every epoch.
 #   rsctk-train --config-name sclmeta_icbhi_linear model.params.encoder_ckpt=outputs/sclmeta/icbhi-sclmeta-mscl-pre-s1/final_state.pth run.name=icbhi-sclmeta-mscl-s1 seed=1
 defaults:
   - model: cnn6_sclmeta

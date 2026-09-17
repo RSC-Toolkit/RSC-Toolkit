@@ -1,10 +1,10 @@
 """
-RespireNet 평가·모델 선택 프로토콜 — 원본 train.py evaluate()/체크포인트 규칙 재현.
+RespireNet evaluation and model-selection protocol, reproducing evaluate() and the checkpoint rule of the original train.py.
 
-매 epoch 끝에 test 로더 전체를 다시 forward 해 청크 예측을 identifier(cycle) 별로 다수결
-(np.bincount argmax — 동률이면 낮은 클래스) 집계하고, cycle 단위 accuracy / Sp / Se / Score 를 로그한다.
-best 저장 기준은 **cycle accuracy 최고** (train.py:266 `if best_acc < acc`) — 다른 묶음의 Score·Se>5 와 다르다.
-Score 기준 best 도 참고로 함께 기록한다. 재개(EpochResumeCheckpoint)를 위해 상태를 state_dict 로 보존.
+At the end of every epoch the whole test loader is forwarded again, chunk predictions are aggregated per identifier (cycle) by majority
+vote (np.bincount argmax; ties go to the lower class), and cycle-level accuracy / Sp / Se / Score are logged.
+The best checkpoint is selected by **highest cycle accuracy** (train.py:266 `if best_acc < acc`), unlike the Score·Se>5 rule of other groups.
+The Score-based best is also recorded for reference. State is kept in state_dict for resume (EpochResumeCheckpoint).
 """
 from __future__ import annotations
 
@@ -47,7 +47,7 @@ class RespireNetVoteEval(L.Callback):
         self.model_attr = model_attr
         self.best_acc = float("-inf")
         self.best_info = None
-        self.best_score_info = None  # 참고용 (Score 기준)
+        self.best_score_info = None  # for reference (Score-based)
 
     def state_dict(self):
         return {"best_acc": self.best_acc, "best_info": self.best_info, "best_score_info": self.best_score_info}
@@ -81,15 +81,15 @@ class RespireNetVoteEval(L.Callback):
         info = {"epoch": epoch, **{k: v for k, v in res.items()}}
         if self.best_score_info is None or res["icbhi_score"] > self.best_score_info["icbhi_score"]:
             self.best_score_info = info
-        if res["cycle_acc"] > self.best_acc:  # 원본: if best_acc < acc
+        if res["cycle_acc"] > self.best_acc:  # original code: if best_acc < acc
             self.best_acc = res["cycle_acc"]
             self.best_info = info
             self.dirpath.mkdir(parents=True, exist_ok=True)
             model = getattr(pl_module, self.model_attr, pl_module)
             atomic_torch_save({"model": model.state_dict(), **info}, self.dirpath / self.filename)
             atomic_json_dump({**info, "best_score_info": self.best_score_info}, self.dirpath / "best.json")
-            logger.info("Best(cycle acc) 갱신: epoch %d acc %.2f | Sp %.2f Se %.2f Score %.2f",
+            logger.info("Best (cycle acc) updated: epoch %d acc %.2f | Sp %.2f Se %.2f Score %.2f",
                         epoch, res["cycle_acc"], res["S_p"], res["S_e"], res["icbhi_score"])
         elif self.best_info is not None:
-            # Score-best 참고 기록만 갱신
+            # update only the Score-best reference record
             atomic_json_dump({**self.best_info, "best_score_info": self.best_score_info}, self.dirpath / "best.json")

@@ -1,24 +1,24 @@
-# SG-SCL 논문(ICASSP 2024)의 AST — 공식 코드 충실 이식 (P0 골든 고정).
-# method 는 오버라이드로 고른다 (셋 다 loss=cross_entropy — 원본은 DAT/SG-SCL 에 비가중 CE):
-#   SG-SCL : model.params.method=sgscl (기본)
+# AST of the SG-SCL paper (ICASSP 2024) — faithful port of the official code (verified against goldens).
+# Select method with an override (all three use loss=cross_entropy — the official code uses unweighted CE for DAT/SG-SCL):
+#   SG-SCL : model.params.method=sgscl (default)
 #   DAT    : model.params.method=dat
-#   CE     : model.params.method=ce   (AST SFT 는 patchmix_icbhi config 쪽이 원본 스크립트와 일치)
+#   CE     : model.params.method=ce   (for AST SFT, the patchmix_icbhi config matches the official script)
 name: ast_sgscl
 params:
   n_cls: 4
   method: sgscl
-  m_cls: 4                       # meta=dev (청진기 4종)
+  m_cls: 4                       # meta=dev (4 stethoscope types)
   proj_dim: 768
   temperature: 0.06
   alpha: 1.0
   target_type: project1_project2block
-  grl_alpha: 1.0
-  cls_feat: feat0                # feat1 = 분류기 입력을 GRL(x) 로 (실험, 2026-08-28)
-  con_feat: feat0                # feat1 = 대조 특징을 GRL(x) 로 (GitHub HEAD 2ed1bac; feat0 = 클론 6656460 = 기존 P1)                 # 원본 스케줄이 공식 레시피에서 1.0 으로 포화 (methods/sgscl.py)
-  specaug_policy: icbhi_ast_sup  # 원본 train 루프의 배치 단위 SpecAugment (두 뷰 누적 마스킹)
+  grl_alpha: 1.0                 # the official GRL schedule saturates at 1.0 under the official recipe (methods/sgscl.py)
+  cls_feat: feat0                # feat1 = GRL(x) as the classifier input (experimental)
+  con_feat: feat0                # feat1 = GRL(x) as the contrastive feature (GitHub HEAD 2ed1bac); feat0 = clone 6656460 (default)
+  specaug_policy: icbhi_ast_sup  # per-batch SpecAugment of the official train loop (cumulative masking of the two views)
   specaug_mask: mean
-  # 툴킷 datamodule 은 (B, n_mels=128, frames=798) 로 준다
+  # the toolkit datamodule provides (B, n_mels=128, frames=798)
   input_layout: freq_time
-  # 아래 둘은 일부러 뒤집힌 원본 quirk (models/ast_patchmix.py docstring 참고)
+  # the two below are intentionally swapped, replicating an official-code quirk (see the models/ast_patchmix.py docstring)
   input_fdim: 798
   input_tdim: 128

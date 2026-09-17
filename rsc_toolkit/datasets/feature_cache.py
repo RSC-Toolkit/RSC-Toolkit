@@ -16,17 +16,18 @@ class FeatureCache:
 
     def configure(self, processor_config: Dict, processor_name: str, audio_chain: Optional[Dict] = None):
         """
-        캐시 키는 **프로세서 설정만** 으로 만든다(n_mels·target_frames·정규화 등).
+        The cache key is built from the **processor config only** (n_mels, target_frames, normalization, ...).
 
-        그런데 같은 프로세서 설정이라도 **그 앞단의 오디오 체인**(리샘플·구간 절단·패딩·fade·시간 단위)이 다르면
-        피처가 달라진다. 키에는 그 정보가 없으므로, 체인이 다른 두 config 가 같은 `cache_dir` 를 쓰면
-        **조용히 남의 피처를 읽는다**. 실제로 재현 결과를 통째로 무효화할 수 있는 종류의 사고다.
+        Features also depend on the **upstream audio chain** (resampling, segment cropping, padding, fade,
+        time units), even with an identical processor config. The key does not capture that, so two configs
+        with different chains sharing one `cache_dir` would **silently read each other's features** -- the kind
+        of error that can invalidate a whole set of reproduction results.
 
-        키 자체에 체인을 넣으면 기존 캐시가 전부 무효가 되어 수 시간을 다시 계산해야 하므로,
-        대신 **체인 대장(`_chain.json`)을 남기고 어긋나면 즉시 예외**를 던진다.
-        - 대장은 `{dataset_name: chain}` 형태다. **데이터셋이 다르면 sample_id 가 겹치지 않으므로**
-          같은 디렉터리를 공유해도 안전하다(ICBHI 와 SPRSound 가 features_cache 를 함께 쓰는 현재 구조).
-        - 같은 데이터셋인데 체인이 다르면 실행을 멈추고 `cache_dir` 분리를 요구한다.
+        Putting the chain into the key would invalidate every existing cache and force hours of recomputation,
+        so instead a **chain ledger (`_chain.json`) is written and any mismatch raises immediately**.
+        - The ledger has the form `{dataset_name: chain}`. **Sample ids never overlap across datasets**, so
+          different datasets can safely share one directory (ICBHI and SPRSound currently share features_cache).
+        - Same dataset with a different chain stops the run and requires a separate `cache_dir`.
         """
         self.cache_key = self._create_cache_key(processor_config, processor_name)
         self.features_dir = self.cache_dir / "features" / self.cache_key
@@ -34,16 +35,16 @@ class FeatureCache:
         if audio_chain:
             self._check_audio_chain(dict(audio_chain))
         else:
-            # P1-10: 체인 없는 configure 는 다음 릴리스에 필수 인자로 올린다. 지금은 경고만 —
-            # 체인 대장이 없으면 같은 캐시 키를 다른 전처리로 써도 아무도 막지 못한다.
+            # audio_chain becomes a required argument in the next release; for now only warn --
+            # without a chain ledger nothing prevents reusing one cache key with different preprocessing.
             logger.warning(
-                "FeatureCache.configure(%s, %s) 가 audio_chain 없이 불렸다 — 체인 대장이 없으면 다른 전처리의 피처를 "
-                "조용히 읽을 수 있다. 호출부에 audio_chain(dataset_name·sampling_rate·pad_type·fade… dict) 을 넘겨라 "
-                "(다음 릴리스부터 필수).",
+                "FeatureCache.configure(%s, %s) called without audio_chain -- without a chain ledger, features from "
+                "different preprocessing can be read silently. Pass audio_chain (dict of dataset_name, sampling_rate, "
+                "pad_type, fade, ...) at the call site (required from the next release).",
                 processor_name, self.features_dir,
             )
 
-    # ------------------------------------------------------------------ 체인 대장
+    # ------------------------------------------------------------------ chain ledger
     def _check_audio_chain(self, chain: Dict) -> None:
         dataset = str(chain.pop("dataset_name", "?"))
         path = self.features_dir / "_chain.json"
@@ -51,19 +52,19 @@ class FeatureCache:
         if path.exists():
             try:
                 ledger = json.loads(path.read_text())
-            except Exception as e:      # 손상된 대장은 경고만 하고 새로 쓴다(캐시 자체는 멀쩡할 수 있다)
-                logger.warning("체인 대장을 읽지 못했다 (%s: %s) — 새로 쓴다", path, e)
+            except Exception as e:      # a corrupted ledger only warns and is rewritten (the cache itself may be fine)
+                logger.warning("Could not read the chain ledger (%s: %s) -- rewriting it", path, e)
                 ledger = {}
         known = ledger.get(dataset)
         if known is not None and known != chain:
             raise RuntimeError(
-                f"피처 캐시 오디오 체인 불일치 — 같은 캐시 키를 서로 다른 전처리로 쓰려 한다.\n"
-                f"  캐시: {self.features_dir}\n"
-                f"  데이터셋: {dataset}\n"
-                f"  기존: {known}\n"
-                f"  요청: {chain}\n"
-                f"둘 중 하나의 config 에서 features.cache_dir 를 분리하라 "
-                f"(그대로 두면 다른 전처리로 만든 피처를 조용히 읽게 된다)."
+                f"Feature cache audio chain mismatch -- the same cache key is being used with different preprocessing.\n"
+                f"  cache: {self.features_dir}\n"
+                f"  dataset: {dataset}\n"
+                f"  existing: {known}\n"
+                f"  requested: {chain}\n"
+                f"Set a separate features.cache_dir in one of the two configs "
+                f"(otherwise features built with different preprocessing are read silently)."
             )
         if known is None:
             ledger[dataset] = chain
@@ -72,7 +73,7 @@ class FeatureCache:
                 tmp.write_text(json.dumps(ledger, sort_keys=True, indent=2, default=str))
                 os.replace(tmp, path)
             except Exception as e:
-                logger.warning("체인 대장을 쓰지 못했다 (%s: %s)", path, e)
+                logger.warning("Could not write the chain ledger (%s: %s)", path, e)
 
     def _create_cache_key(self, config: Dict, name: str) -> str:
         serialized = json.dumps(config, sort_keys=True, default=str)
@@ -114,11 +115,11 @@ class FeatureCache:
             
     def validate_entries(self, sample_ids) -> Dict[str, object]:
         """
-        주어진 sample_id 들의 캐시가 온전한지 본다.
+        Check that the cache entries for the given sample_ids are intact.
 
-        피처의 모양은 가정하지 않는다 — CLAP 임베딩(1, 512)과 fbank(1024, 128)처럼
-        모델/피처 종류마다 다르기 때문이다. 존재 여부와 로드 가능 여부만 본다.
-        모양까지 맞추고 싶으면 호출자가 반환된 항목을 직접 검사한다.
+        No feature shape is assumed -- shapes differ per model/feature type, e.g. CLAP embeddings (1, 512)
+        vs. fbank (1024, 128). Only existence and loadability are checked.
+        Callers that need shape checks inspect the returned entries themselves.
         """
         ids = [str(s) for s in sample_ids]
         missing = [sid for sid in ids if not self.is_cached(sid)]

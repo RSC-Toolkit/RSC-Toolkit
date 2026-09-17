@@ -6,7 +6,7 @@ params:
   index_dataset_cls: rsc_toolkit.datasets.index_dataset.IndexDataset
   project_root: ${hydra:runtime.cwd}
   split_file: sample_data/toy_dataset/official_split.txt
-  data_dir: downloaded_datasets/toy   # 먼저 `rsctk datasets build-index toy --data_dir downloaded_datasets/toy` 로 index/ 를 만든다 (원본 wav 는 번들 sample_data 로 폴백되지만 인덱스는 필요)
+  data_dir: downloaded_datasets/toy   # first build index/ with `rsctk datasets build-index toy --data_dir downloaded_datasets/toy` (raw wavs fall back to the bundled sample_data, but the index is required)
 
   sampling_rate: 16000
   sample_level: cycle
@@ -22,7 +22,7 @@ params:
   features:
     enabled: true
     kind: fbank
-    cache_dir: downloaded_datasets/features_cache_toy   # toy 전용 — ICBHI 파일과 sample_id 형식이 같아 공용 캐시를 쓰면 다른 config 의 피처를 읽을 수 있다 (REVIEW 2026-09-10 §7 P0)
+    cache_dir: downloaded_datasets/features_cache_toy   # toy only — the sample_id format matches ICBHI files, so a shared cache could read features of another config
     n_mels: 128
     target_frames: 1024
     frame_shift: 10

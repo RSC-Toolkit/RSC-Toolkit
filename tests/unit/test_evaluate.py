@@ -1,6 +1,6 @@
-"""rsc_toolkit.evaluate — 체크포인트 재평가 엔트리포인트의 순수 함수들 (P2-3).
+"""rsc_toolkit.evaluate — pure functions of the checkpoint re-evaluation entry point.
 
-설정 복구·정제·스냅샷 선택·override·버퍼 적응·대조 판정을 고정한다.
+Pins config recovery, sanitization, snapshot selection, overrides, buffer adaptation and the comparison verdict.
 """
 from __future__ import annotations
 
@@ -36,7 +36,7 @@ def test_find_and_pick_snapshot_by_run_name_and_ckpt_mtime(tmp_path):
     a = _write_snapshot(tmp_path, "2026-09-08", "10-00-00", "r1")
     b = _write_snapshot(tmp_path, "2026-09-08", "12-00-00", "r1")
     _write_snapshot(tmp_path, "2026-09-08", "13-00-00", "other")
-    # 기본 run.name(${data.name}-${model.name}) 도 조립해서 찾는다
+    # the default run.name (${data.name}-${model.name}) is also assembled and looked up
     c = _write_snapshot(tmp_path, "2026-09-08", "14-00-00", "${data.name}-${model.name}")
     assert ev.find_snapshot_dirs("r1", tmp_path) == [a, b]
     assert ev.find_snapshot_dirs("icbhi_patchmix-ast_patchmix", tmp_path) == [c]
@@ -47,7 +47,7 @@ def test_find_and_pick_snapshot_by_run_name_and_ckpt_mtime(tmp_path):
     best.write_bytes(b"x")
     import datetime, os
 
-    ts = datetime.datetime(2026, 9, 8, 11, 30).timestamp()  # a 이후, b 이전에 저장된 best.pth → a
+    ts = datetime.datetime(2026, 9, 8, 11, 30).timestamp()  # best.pth saved after a, before b -> a
     os.utime(best, (ts, ts))
     assert ev.pick_snapshot([a, b], best) == a
     ts = datetime.datetime(2026, 9, 8, 12, 30).timestamp()
@@ -87,7 +87,7 @@ def test_sanitize_config_drops_writing_callbacks_and_absolutizes(tmp_path):
         ]}},
     }
     out, dropped = ev.sanitize_config(cfg, tmp_path / "sb", "r1", tmp_path)
-    assert "resume" not in out and cfg.get("resume") == "auto"  # 원본 비파괴
+    assert "resume" not in out and cfg.get("resume") == "auto"  # original not mutated
     assert out["data"]["params"]["data_dir"] == str(tmp_path / ".datasets/icbhi")
     assert out["data"]["params"]["features"]["cache_dir"] == str(tmp_path / "downloaded_datasets/features_cache")
     assert out["model"]["params"]["encoder_ckpt"] == str(tmp_path / "outputs/x/best.pth")
@@ -112,7 +112,7 @@ def test_adapt_buffer_shapes_and_load_checkpoint(tmp_path):
         def __init__(self):
             super().__init__()
             self.lin = nn.Linear(2, 2)
-            self.register_buffer("all_predictions", torch.zeros(3))   # AMS-D per-sample 버퍼 (학습 샘플 수에 따라 다름)
+            self.register_buffer("all_predictions", torch.zeros(3))   # AMS-D per-sample buffer (size depends on the number of training samples)
 
     m = M()
     sd = {"lin.weight": torch.ones(2, 2), "lin.bias": torch.zeros(2), "all_predictions": torch.arange(5.0)}
@@ -123,7 +123,7 @@ def test_adapt_buffer_shapes_and_load_checkpoint(tmp_path):
 
 
 def test_adapt_buffer_shapes_leaves_other_buffers_alone(tmp_path):
-    """per-sample 버퍼가 아닌 모양 불일치(BN running stat 등)는 모델 구성이 다른 것 — 0 으로 덮지 말고 strict 실패."""
+    """Shape mismatches outside per-sample buffers (BN running stats etc.) mean a different model configuration — do not overwrite with 0; fail strictly."""
     class M(nn.Module):
         def __init__(self):
             super().__init__()
@@ -137,7 +137,7 @@ def test_adapt_buffer_shapes_leaves_other_buffers_alone(tmp_path):
     info = ev.load_checkpoint(m, tmp_path / "best.pth")
     assert info["load"] != "strict_ok"
 
-    torch.save({"lin.weight": torch.ones(2, 2)}, tmp_path / "partial.pth")  # state_dict 자체 + 키 누락
+    torch.save({"lin.weight": torch.ones(2, 2)}, tmp_path / "partial.pth")  # bare state_dict + missing keys
     info = ev.load_checkpoint(M(), tmp_path / "partial.pth")
     assert info["load"] == "strict_fail" and "lin.bias" in info["load_missing"]
 
@@ -160,7 +160,7 @@ def test_make_sandbox_symlinks_read_only_roots_only(tmp_path):
     ev.make_sandbox(sb, tmp_path)
     assert (sb / "rsc_toolkit").is_symlink() and not (sb / "outputs").exists()
     assert (sb / "lightning").is_dir() and (sb / "callback_out").is_dir()
-    ev.make_sandbox(sb, tmp_path)  # 멱등
+    ev.make_sandbox(sb, tmp_path)  # idempotent
 
 
 def test_readonly_chain_guard_records_instead_of_writing(tmp_path):
@@ -171,12 +171,12 @@ def test_readonly_chain_guard_records_instead_of_writing(tmp_path):
     ledger_path = cache.features_dir / "_chain.json"
     before = ledger_path.read_text()
     with ev.readonly_chain_guard() as notes:
-        cache.configure({"n_mels": 64}, processor_name="Mel", audio_chain={"dataset_name": "d", "sampling_rate": 8000})  # 어긋남
-        cache.configure({"n_mels": 32}, processor_name="Mel", audio_chain={"dataset_name": "d", "sampling_rate": 8000})  # 대장 없음
+        cache.configure({"n_mels": 64}, processor_name="Mel", audio_chain={"dataset_name": "d", "sampling_rate": 8000})  # mismatch
+        cache.configure({"n_mels": 32}, processor_name="Mel", audio_chain={"dataset_name": "d", "sampling_rate": 8000})  # no ledger
     assert len(notes) == 1 and notes[0]["dataset"] == "d" and notes[0]["requested"] == {"sampling_rate": 8000}
     assert ledger_path.read_text() == before
-    assert not (cache.features_dir / "_chain.json").exists()  # 새 키 디렉터리에 대장을 쓰지 않았다
-    with pytest.raises(RuntimeError):  # 가드 해제 후엔 원래대로 예외
+    assert not (cache.features_dir / "_chain.json").exists()  # no ledger written into the new key directory
+    with pytest.raises(RuntimeError):  # after the guard is released, raises as usual
         FeatureCache(cache_dir=tmp_path).configure({"n_mels": 64}, processor_name="Mel", audio_chain={"dataset_name": "d", "sampling_rate": 8000})
 
 
@@ -201,7 +201,7 @@ def test_cli_parses_and_reports_skip(tmp_path, capsys):
 
 
 def test_evaluate_run_with_overrides_reports_diffs_but_status_ok(tmp_path, monkeypatch):
-    """override 가 있으면 판정(PASS/MISMATCH) 대신 OK 이되 best.json 대조값은 돌려준다 (튜토리얼의 공개 weight 재평가가 쓴다)."""
+    """With overrides, status is OK instead of a verdict (PASS/MISMATCH), but best.json comparison values are still returned (used by the tutorial's re-evaluation of released weights)."""
     import json
     from rsc_toolkit import evaluate as ev
     run_dir = tmp_path / "outputs" / "g" / "r"; run_dir.mkdir(parents=True)
@@ -209,7 +209,7 @@ def test_evaluate_run_with_overrides_reports_diffs_but_status_ok(tmp_path, monke
     (run_dir / "best.json").write_text(json.dumps({"epoch": 1, "S_p": 80.0, "S_e": 40.0, "icbhi_score": 60.0}))
     (run_dir / ".hydra").mkdir(); (run_dir / ".hydra" / "config.yaml").write_text("data: {params: {data_dir: a}}\ntrainer: {params: {}}\n")
     monkeypatch.setattr(ev, "build_and_validate", lambda cfg, ckpt, sandbox, name: {"load": "strict_ok", "metrics": {"S_p": 80.0, "S_e": 40.0, "icbhi_score": 60.0}})
-    monkeypatch.setattr(ev, "install_readonly_chain_guard", lambda notes: (lambda: None))   # restore 콜백을 돌려줘야 한다
+    monkeypatch.setattr(ev, "install_readonly_chain_guard", lambda notes: (lambda: None))   # must return a restore callback
     rec = ev.evaluate_run(run_dir, project_root=tmp_path, sandbox=tmp_path / "sb", overrides=["data.params.data_dir=b"])
     assert rec["status"] == "OK" and rec["compared_with_overrides"] is True and rec["max_abs_diff"] == 0.0 and "S_e" in rec["diffs"]
     rec2 = ev.evaluate_run(run_dir, project_root=tmp_path, sandbox=tmp_path / "sb2")

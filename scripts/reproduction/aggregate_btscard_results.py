@@ -1,12 +1,12 @@
 """
-btscard P1 결과 집계: outputs/btscard/<run>/best.json (+ outputs/btscard/logs/<run>.done EXIT=0) 의 ICBHI IND 지표와
-outputs/btscard/<run>/ood.json (eval_btscard_checkpoint.py 산출) 의 SPRSound OOD 지표를 seed 평균±표준편차로 모아
-논문 Table 2/3 앵커와 나란히 찍는다.
+BTS-CARD 5-seed reproduction check aggregation: collects the ICBHI IND metrics from outputs/btscard/<run>/best.json (+ outputs/btscard/logs/<run>.done EXIT=0)
+and the SPRSound OOD metrics from outputs/btscard/<run>/ood.json (produced by eval_btscard_checkpoint.py) as seed mean±std,
+and prints them next to the paper-reported values of Table 2/3.
 
   .venv/bin/python scripts/reproduction/aggregate_btscard_results.py [--root outputs/btscard]
 
-프로토콜 표기: 툴킷 주 결과 = α=0 고정 · ICBHI 공식 test 기준 best(Score 최고 & Se>5, best-on-test) · seed 1–5 ·
-SPRSound OOD = 그 ICBHI-best ckpt 를 2022 inter-patient 4-class 병합 셋에서 평가. 논문 Full 은 α 스윕 중 최고값(Table 3 각주).
+Protocol: toolkit main result = α=0 fixed · best on the ICBHI official test (highest Score & Se>5, best-on-test) · seeds 1–5 ·
+SPRSound OOD = that ICBHI-best ckpt evaluated on the 2022 inter-patient 4-class merged set. The paper's Full is the best value over an α sweep (Table 3 footnote).
 """
 import argparse
 import json
@@ -14,9 +14,9 @@ import pathlib
 import re
 import statistics
 
-PAPER = {  # (이름, IND Sp/Se/Score, OOD Sp/Se/Score) — 논문 Table 2/3 (5 runs, ± 표기는 분산/표준편차 불명)
-    "icbhi-btscard":       ("BTS-CARD Full (코드 레시피 15ep adam)", (84.42, 3.47), (44.83, 2.94), (64.63, 0.57), (82.02, 3.28), (41.90, 4.96), (61.96, 1.50)),
-    "icbhi-btscard-paper": ("BTS-CARD Full (논문 레시피 30ep adamw)", (84.42, 3.47), (44.83, 2.94), (64.63, 0.57), (82.02, 3.28), (41.90, 4.96), (61.96, 1.50)),
+PAPER = {  # (name, IND Sp/Se/Score, OOD Sp/Se/Score) — paper Table 2/3 (5 runs; unclear whether ± is variance or std)
+    "icbhi-btscard":       ("BTS-CARD Full (code recipe 15ep adam)", (84.42, 3.47), (44.83, 2.94), (64.63, 0.57), (82.02, 3.28), (41.90, 4.96), (61.96, 1.50)),
+    "icbhi-btscard-paper": ("BTS-CARD Full (paper recipe 30ep adamw)", (84.42, 3.47), (44.83, 2.94), (64.63, 0.57), (82.02, 3.28), (41.90, 4.96), (61.96, 1.50)),
     "icbhi-btscard-woa":   ("w/o (a) counterfactual", (83.49, None), (43.02, None), (63.25, None), (70.83, None), (46.27, None), (58.55, None)),
     "icbhi-btscard-wob":   ("w/o (b) adversarial", (82.84, None), (45.94, None), (64.33, None), (72.50, None), (46.27, None), (59.39, None)),
     "icbhi-btscard-woc":   ("w/o (c) meta augmentation", (83.55, None), (43.81, None), (63.68, None), (66.99, None), (47.73, None), (56.96, None)),
@@ -37,7 +37,7 @@ def _fmt(v):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--root", default="outputs/btscard")
-    ap.add_argument("--ood_source", default="author", help="ood.json 의 sprsound_<source> 키")
+    ap.add_argument("--ood_source", default="author", help="sprsound_<source> key in ood.json")
     ap.add_argument("--alpha", default="0.0")
     args = ap.parse_args()
     root = pathlib.Path(args.root)
@@ -61,8 +61,8 @@ def main():
                 ood = (o["S_p"], o["S_e"], o["icbhi_score"])
         groups[base].append((seed, d["S_p"], d["S_e"], d["icbhi_score"], d.get("epoch"), ood))
     if partial:
-        print("(미완료 run — 집계 제외: " + ", ".join(partial) + ")")
-    print(f"프로토콜: α={args.alpha} 고정 · ICBHI 공식 test 기준 best(Se>5, best-on-test) · OOD = ICBHI-best ckpt → SPRSound 2022 inter 4-class ({args.ood_source})")
+        print("(incomplete runs — excluded from aggregation: " + ", ".join(partial) + ")")
+    print(f"protocol: α={args.alpha} fixed · best on the ICBHI official test (Se>5, best-on-test) · OOD = ICBHI-best ckpt → SPRSound 2022 inter 4-class ({args.ood_source})")
     for base, rows in groups.items():
         if not rows:
             continue
@@ -70,21 +70,21 @@ def main():
         rows.sort()
         print(f"\n== {name} ({base}) — {len(rows)}/5 seeds ==")
         for seed, sp, se, sc, ep, ood in rows:
-            o = f"  | OOD Sp {ood[0]:6.2f}  Se {ood[1]:6.2f}  Score {ood[2]:6.2f}" if ood else "  | OOD (ood.json 없음)"
+            o = f"  | OOD Sp {ood[0]:6.2f}  Se {ood[1]:6.2f}  Score {ood[2]:6.2f}" if ood else "  | OOD (no ood.json)"
             print(f"  seed {seed}: IND Sp {sp:6.2f}  Se {se:6.2f}  Score {sc:6.2f}  (epoch {ep}){o}")
         if len(rows) >= 2:
             def ms(vals):
                 return statistics.mean(vals), statistics.stdev(vals)
             sp, se, sc = ms([r[1] for r in rows]), ms([r[2] for r in rows]), ms([r[3] for r in rows])
-            print(f"  우리 IND  : Sp {_fmt(sp)}  Se {_fmt(se)}  Score {_fmt(sc)}")
-            print(f"  논문 IND  : Sp {_fmt(psp)}  Se {_fmt(pse)}  Score {_fmt(psc)}   Score 차이 {sc[0]-psc[0]:+.2f}")
+            print(f"  ours IND  : Sp {_fmt(sp)}  Se {_fmt(se)}  Score {_fmt(sc)}")
+            print(f"  paper IND : Sp {_fmt(psp)}  Se {_fmt(pse)}  Score {_fmt(psc)}   Score diff {sc[0]-psc[0]:+.2f}")
             oods = [r[5] for r in rows if r[5]]
             if len(oods) >= 2:
                 a, b, c = ms([o[0] for o in oods]), ms([o[1] for o in oods]), ms([o[2] for o in oods])
-                print(f"  우리 OOD  : Sp {_fmt(a)}  Se {_fmt(b)}  Score {_fmt(c)}  ({len(oods)} seeds)")
-                print(f"  논문 OOD  : Sp {_fmt(osp)}  Se {_fmt(ose)}  Score {_fmt(osc)}   Score 차이 {c[0]-osc[0]:+.2f}")
-    print("\n앵커(논문 Table 2 베이스라인): " + "; ".join(f"{k} IND {v[0]} / OOD {v[1]}" for k, v in BASELINES.items()))
-    print("툴킷 BTS P1(outputs/bts/SUMMARY.txt): 63.91±0.87 (IND)")
+                print(f"  ours OOD  : Sp {_fmt(a)}  Se {_fmt(b)}  Score {_fmt(c)}  ({len(oods)} seeds)")
+                print(f"  paper OOD : Sp {_fmt(osp)}  Se {_fmt(ose)}  Score {_fmt(osc)}   Score diff {c[0]-osc[0]:+.2f}")
+    print("\nReference (paper Table 2 baselines): " + "; ".join(f"{k} IND {v[0]} / OOD {v[1]}" for k, v in BASELINES.items()))
+    print("Toolkit BTS 5-seed run (outputs/bts/SUMMARY.txt): 63.91±0.87 (IND)")
 
 
 if __name__ == "__main__":

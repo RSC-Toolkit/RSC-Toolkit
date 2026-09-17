@@ -1,7 +1,7 @@
-# MVST 를 SPRSound 표준 태스크(7-class)로 확장. **논문 목표치 없음** — ICBHI 레시피 그대로.
-#   뷰 5개를 각각 학습한 뒤 융합 MLP 를 얹는 3단계 구성이라 seed 당 6 run 이다.
+# MVST extended to the standard SPRSound task (7-class). **No paper-reported value** — ICBHI recipe unchanged.
+#   Each of the 5 views is trained separately and a fusion MLP is then added on top, so there are 6 runs per seed.
 #   rsctk-train --config-name mvst_sprs model.params.view=16 seed=N run.name=sprs-mvst-v16-sN
-#   ... view=32|64|128|256 → 마지막에 fusion
+#   ... view=32|64|128|256 → fusion at the end
 defaults:
   - model: ast_mvst
   - data_defaults@data: base

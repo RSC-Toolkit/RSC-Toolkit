@@ -1,5 +1,5 @@
-# patch-mix --weighted_loss 재현: 1/(n/합) 정규화 가중 CE.
-# class_nums 는 ICBHI 공식 60/40 train (4-class cycle) 분포 — 서버 실데이터로 재검증됨 (합 4,142).
+# Reproduces patch-mix --weighted_loss: CE weighted by the normalized 1/(n/sum).
+# class_nums is the official ICBHI 60/40 train distribution (4-class cycles) — re-verified on the actual data (sum 4,142).
 name: cross_entropy_from_counts
 params:
   class_nums: [2063, 1215, 501, 363]

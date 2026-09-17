@@ -1,15 +1,15 @@
-# BTS-CARD 를 **SPRSound 로 직접 학습**할 때 쓰는 데이터 설정 (SPR→SPR, 7-class).
+# Data config for **training BTS-CARD directly on SPRSound** (SPR→SPR, 7-class).
 #
-# 기존 sprsound_btscard.yaml 과 다른 파일이다 — 그쪽은 ICBHI 학습 ckpt 를 SPRSound 에 얹는
-# **제로샷 OOD 평가 뷰**(7→4 병합, sprsound_ood.py 가 자체 절단)이고, 이 config 는 SPRSound 를 학습한다.
-#   · datamodule_name: btscard_sprs  → meta7 모양 벡터를 **train·val 양쪽** 배치에 붙인다
-#     (기본 index 경로는 val 에 meta 를 안 붙여서 BTS 계열이 validation_step 에서 죽는다 — sprs-bts-s1/s2 EXIT=1 의 원인)
-#   · label_map 없음 → 7-class 원 라벨
-#   · shuffle_train/drop_last_train 켜짐 (ICBHI 원본 train loader 와 동일)
+# This is a different file from sprsound_btscard.yaml — that one is the **zero-shot OOD evaluation view** that applies an ICBHI-trained ckpt to SPRSound
+# (7→4 merge, with its own slicing in sprsound_ood.py); this config trains on SPRSound.
+#   · datamodule_name: btscard_sprs  → attaches meta7-shaped vectors to the batches of **both train and val**
+#     (the default index path does not attach meta to val, so BTS-family models crash in validation_step)
+#   · no label_map → original 7-class labels
+#   · shuffle_train/drop_last_train on (same as the official ICBHI train loader)
 #
-# 오디오·특징 체인은 sprsound_bts.yaml 과 같다 (48 kHz → 녹음 fade → 구간 절단 → 8 s repeat+fade_out → CLAP log-mel 1001×64).
-# 이 체인이 저자 배포 텐서와 일치함은 ICBHI 에서 확인했다(data/bts_precomputed.yaml 주석).
-# 캐시도 sprsound_bts 와 같은 것을 쓴다 — time_unit·패딩·샘플링레이트가 전부 같아 같은 파형이 나온다.
+# The audio/feature chain matches sprsound_bts.yaml (48 kHz → recording fade → segment slicing → 8 s repeat+fade_out → CLAP log-mel 1001×64).
+# This chain was verified on ICBHI to match the authors' released tensors (see the comments in data/bts_precomputed.yaml).
+# The cache is also shared with sprsound_bts — time_unit, padding and sampling rate are all identical, giving the same waveforms.
 name: sprsound_btscard_train
 params:
   datamodule_name: btscard_sprs
@@ -29,19 +29,19 @@ params:
   time_unit: ms_int
 
   train_splits: [train]
-  val_splits: [test]             # best-on-test — 다른 30행과 같은 프로토콜
+  val_splits: [test]             # best-on-test — same protocol as the other rows
   test_splits: [test]
 
   batch_size: 8
   num_workers: 8
   shuffle_train: true
-  drop_last_train: true          # ICBHI 원본 train loader drop_last=True
+  drop_last_train: true          # official ICBHI train loader uses drop_last=True
   pin_memory: true
 
   features:
     enabled: true
     kind: clap
-    cache_dir: downloaded_datasets/features_cache_bts_sprs   # sprsound_bts 와 동일 체인 → 캐시 공유
+    cache_dir: downloaded_datasets/features_cache_bts_sprs   # same chain as sprsound_bts → shared cache
     clap_model_name: laion/clap-htsat-unfused
 
   feature_precompute: true

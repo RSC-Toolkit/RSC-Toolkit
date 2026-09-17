@@ -1,6 +1,6 @@
-# OPERA-CT 동결 + Tfm 헤드, SPRSound 7-class (EMBC'25; ev_sprs_opera.sh): 50ep, bs256, Adam 3e-4/wd 1e-4 + cosine(T_max 40),
-#   비가중 CE, SpecAug(20/40 배치 공유), fp32, best-on-test Score. 목표(EMBC Table): 71.62±0.84.
-#   실행: rsctk-train --config-name opera_embc_sprs run.name=sprs-operact-frozen-s1 seed=1
+# Frozen OPERA-CT + Tfm head, SPRSound 7-class (EMBC'25; ev_sprs_opera.sh): 50 ep, bs 256, Adam 3e-4/wd 1e-4 + cosine (T_max 40),
+#   unweighted CE, SpecAug (20/40, shared across the batch), fp32, best-on-test Score. Target (EMBC table): 71.62±0.84.
+#   Run: rsctk-train --config-name opera_embc_sprs run.name=sprs-operact-frozen-s1 seed=1
 defaults:
   - model: opera_ct
   - data_defaults@data: base

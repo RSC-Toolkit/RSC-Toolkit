@@ -1,8 +1,8 @@
 """
-OPERA-CT(HTSAT-Swin) + EMBC'25 동결 평가 경로의 P0 골든·구성 테스트.
+Official-code parity golden and configuration tests for OPERA-CT (HTSAT-Swin) + the EMBC'25 frozen evaluation path.
 
-골든 출처: scripts/reproduction/dump_opera_goldens.py — 공식 evelyn0414/OPERA Cola(htsat) 와 eval-audio-repr evar/ar_opera·solve.py 를
-우리 venv 에서 실행. 백본은 툴킷 재구현(models/opera/htsat.py)이며 공식 ckpt 를 strict 로드해 임베딩을 대조한다.
+Golden source: scripts/reproduction/dump_opera_goldens.py — the official evelyn0414/OPERA Cola(htsat) and eval-audio-repr evar/ar_opera, solve.py
+run in our venv. The backbone is a toolkit re-implementation (models/opera/htsat.py); the official ckpt is loaded strictly and embeddings are compared.
 """
 import pathlib
 
@@ -18,14 +18,14 @@ def _repo_root() -> pathlib.Path:
     for c in pathlib.Path(__file__).resolve().parents:
         if (c / "pyproject.toml").exists():
             return c
-    raise RuntimeError("리포 루트를 찾지 못했다")
+    raise RuntimeError("repository root not found")
 
 
 REPO = _repo_root()
 GOLDEN = REPO / "tests" / "golden" / "opera"
 CKPT = REPO / "pretrained_models/upstream/opera/encoder-operaCT.ckpt"
-needs_golden = pytest.mark.skipif(not (GOLDEN / "features.pt").exists(), reason="골든 없음")
-needs_ckpt = pytest.mark.skipif(not CKPT.exists(), reason="OPERA-CT ckpt 없음")
+needs_golden = pytest.mark.skipif(not (GOLDEN / "features.pt").exists(), reason="golden missing")
+needs_ckpt = pytest.mark.skipif(not CKPT.exists(), reason="OPERA-CT ckpt missing")
 
 
 def test_htsat_layout():
@@ -33,7 +33,7 @@ def test_htsat_layout():
     sd = m.state_dict()
     assert len(sd) == 197 and m.num_features == 768 and m.freq_ratio == 4
     assert m.patch_embed.grid_size == (64, 64)
-    # 마지막 stage(8×8) 는 창 8 = 해상도 → shift 0 (원본 quirk)
+    # last stage (8×8): window 8 = resolution -> shift 0 (original quirk)
     assert all(b.shift_size == 0 for b in m.layers[3].blocks)
     assert m.layers[0].blocks[1].shift_size == 4 and m.layers[0].blocks[1].attn_mask is not None
     m.eval()
@@ -50,7 +50,7 @@ def test_trim_matches_librosa():
         assert [s, e] == g["trim_indices"][name], name
     mel = OperaBatchMel()
     with pytest.raises(RuntimeError):
-        mel(g["wav_synth"])  # 원본은 2-D 패딩에서 죽는다 → 명시적 에러
+        mel(g["wav_synth"])  # the original dies on 2-D padding -> explicit error
 
 
 @needs_golden
@@ -62,7 +62,7 @@ def test_batch_mel_matches_reference():
         ref = g[f"feat_{name}"]
         assert ours.shape == ref.shape == (6, 64, 251)
         assert torch.allclose(ours, ref, atol=2e-3), (name, (ours - ref).abs().max())
-    # 배치 의존 정규화: 앞 3개만 넣으면 값이 달라지고, 그것도 원본과 일치한다
+    # batch-dependent normalization: feeding only the first 3 changes the values, which also match the original
     half = mel(g["wav_icbhi"][:3])
     assert torch.allclose(half, g["feat_icbhi_half"], atol=2e-3)
     assert not torch.allclose(half, g["feat_icbhi"][:3], atol=1e-3)
@@ -77,7 +77,7 @@ def test_specaug_batch_shared_masks_match_reference():
     v1 = model.timemask(model.freqmask(x.clone()))
     v2 = model.timemask(model.freqmask(x.clone()))
     assert torch.equal(v1, g["specaug_view1"]) and torch.equal(v2, g["specaug_view2"])
-    # 배치 공유 마스크 (torchaudio iid_masks=False 기본): 마스크 위치가 배치 전체에 하나
+    # batch-shared mask (torchaudio default iid_masks=False): one mask position for the whole batch
     assert model.freqmask.iid_masks is False and model.timemask.iid_masks is False
     changed = (v1 != x)
     assert torch.equal(changed[0], changed[-1] & (x[0] != 0)) or torch.equal(changed[0] & (x[-1] != 0), changed[-1] & (x[0] != 0))
@@ -100,7 +100,7 @@ def test_htsat_checkpoint_and_embeddings_match_reference():
         emb_s = m(f["feat_sprs"].transpose(-2, -1).unsqueeze(1))
     assert torch.allclose(emb, g["emb_icbhi"], atol=1e-4), (emb - g["emb_icbhi"]).abs().max()
     assert torch.allclose(emb_s, g["emb_sprs"], atol=1e-4)
-    # train 모드: bn0 배치통계 + DropPath (같은 시드 → 같은 난수 소비 순서)
+    # train mode: bn0 batch statistics + DropPath (same seed -> same random consumption order)
     for k, v in g["bn0_before"].items():
         assert torch.equal(m.bn0.state_dict()[k], v)
     m.train()
@@ -128,7 +128,7 @@ def test_heads_match_reference():
     tokens = h["emb_icbhi"].unsqueeze(1)
     torch.manual_seed(g["tfm_seed"])
     tfm = TfmEncHead(embed_dim=768, output_dim=4, depth=4, heads=1, mlp_ratio=1).eval()
-    _assert_state_meta(tfm, g["tfm_state_meta"])  # 같은 시드·같은 생성 순서 → 초기화 동일
+    _assert_state_meta(tfm, g["tfm_state_meta"])  # same seed and construction order -> identical initialization
     torch.manual_seed(g["mlp_seed"])
     mlp = MLPHead(768, (128,), 4).eval()
     _assert_state_meta(mlp, g["mlp_state_meta"])

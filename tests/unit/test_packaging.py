@@ -1,10 +1,10 @@
 """
-패키지에 번들되는 데이터 파일이 실제로 배포되도록 package-data 글롭을 검사한다.
+Checks the package-data globs so that data files bundled in the package are actually shipped.
 
-배경: pyproject 의 package-data 가 "metadata.csv" 로 적혀 있어 실제 위치인
-data/metadata.csv 를 잡지 못했고, 휠에서 sprsound/hflungv1 의 번들 metadata.csv 가
-빠졌다. editable 설치(-e)에서는 파일시스템을 그대로 보므로 드러나지 않았다.
-휠을 직접 빌드하는 대신, 글롭이 실제 파일과 맞는지만 빠르게 본다.
+Background: package-data in pyproject listed "metadata.csv", which did not match the actual location
+data/metadata.csv, so the bundled metadata.csv of sprsound/hflungv1 was missing from the wheel.
+An editable install (-e) reads the filesystem directly, so it did not show up there.
+Instead of building a wheel, this quickly checks that the globs match real files.
 """
 import pathlib
 
@@ -21,7 +21,7 @@ import rsc_toolkit
 REPO_ROOT = pathlib.Path(rsc_toolkit.__file__).resolve().parent.parent
 PYPROJECT = REPO_ROOT / "pyproject.toml"
 
-# 런타임 코드가 패키지 내부에서 읽는 파일들 — 반드시 어떤 글롭엔가 걸려야 한다.
+# Files runtime code reads from inside the package — each must be matched by some glob.
 RUNTIME_REQUIRED = [
     "rsc_toolkit/datasets/sprsound/data/metadata.csv",
     "rsc_toolkit/datasets/hflungv1/data/metadata.csv",
@@ -33,7 +33,7 @@ RUNTIME_REQUIRED = [
 
 def _package_data():
     if tomllib is None:
-        pytest.skip("tomllib 은 Python 3.11+ 에서만 제공된다")
+        pytest.skip("tomllib is only available in Python 3.11+")
     with open(PYPROJECT, "rb") as f:
         cfg = tomllib.load(f)
     return cfg["tool"]["setuptools"]["package-data"]
@@ -46,31 +46,31 @@ def _matched_files(package: str, pattern: str):
 
 def test_every_package_data_entry_matches_something():
     """
-    패키지 키마다 최소 한 글롭은 실제 파일을 잡아야 한다.
+    For each package key, at least one glob must match a real file.
 
-    글롭 하나하나를 강제하지는 않는다 — `configs/**/*.yml` 처럼 지금은 비어 있어도
-    전방 호환용으로 둔 패턴이 있다. 키 전체가 빈 결과면 오타일 가능성이 높다
-    (실제로 "rsc_toolkit.datasets.sprsound" = ["metadata.csv"] 가 그랬다).
+    Not every single glob is enforced — some patterns such as `configs/**/*.yml` are kept for
+    forward compatibility even though nothing matches yet. An empty result for a whole key is most likely a typo
+    (as actually happened with "rsc_toolkit.datasets.sprsound" = ["metadata.csv"]).
     """
     for package, patterns in _package_data().items():
         matched = [f for pattern in patterns for f in _matched_files(package, pattern)]
-        assert matched, f"package-data 항목이 아무 파일도 잡지 못한다: {package!r} / {patterns!r}"
+        assert matched, f"package-data entry matches no file: {package!r} / {patterns!r}"
 
 
 @pytest.mark.parametrize("relpath", RUNTIME_REQUIRED)
 def test_runtime_required_files_are_covered_by_package_data(relpath):
-    """런타임이 읽는 번들 파일이 어떤 글롭에든 걸리는지 본다."""
+    """Bundled files read at runtime are matched by some glob."""
     target = (REPO_ROOT / relpath).resolve()
-    assert target.exists(), f"소스 트리에 없다: {relpath}"
+    assert target.exists(), f"not in the source tree: {relpath}"
 
     covered = any(
         target in _matched_files(package, pattern)
         for package, patterns in _package_data().items()
         for pattern in patterns
     )
-    assert covered, f"package-data 글롭에 걸리지 않아 휠에서 빠진다: {relpath}"
+    assert covered, f"not matched by any package-data glob, so missing from the wheel: {relpath}"
 
 
 def test_get_data_remnant_is_gone():
-    """gdown 기반 잔재 스크립트가 패키지에 다시 들어오지 않는지 본다."""
+    """The leftover gdown-based script does not come back into the package."""
     assert not (REPO_ROOT / "rsc_toolkit/datasets/sprsound/get_data.py").exists()

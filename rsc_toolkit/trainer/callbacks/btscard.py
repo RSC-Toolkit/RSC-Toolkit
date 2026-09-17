@@ -1,11 +1,11 @@
 """
-BTS-CARD 전용 콜백.
+BTS-CARD callbacks.
 
-- BTSCARDWeightAveraging: 원본 main:325-331 의 매 step MA(β=0.5)가 model/classifier/projector/
-  meta_classifier 만 평균하고 판별기(loc/dev)·LearnableConstant 는 제외하는 것을 재현.
-  LiveWeightAveraging(patch-mix 계열 live MA)을 상속해 state_dict 키를 접두사로 거른다.
-- BTSCARDLossLogger: 모델이 training_forward 에서 남긴 항별 손실(o1/o2/kl/nde/loc/dev)을 로그로 내보낸다
-  (원본 train() 의 AverageMeter 출력에 해당).
+- BTSCARDWeightAveraging: reproduces the per-step MA (β=0.5) of the original main:325-331, which averages only
+  model/classifier/projector/meta_classifier and excludes the discriminators (loc/dev) and LearnableConstant.
+  Subclasses LiveWeightAveraging (patch-mix family live MA) and filters state_dict keys by prefix.
+- BTSCARDLossLogger: logs the per-term losses (o1/o2/kl/nde/loc/dev) left by the model's training_forward
+  (corresponds to the AverageMeter output of the original train()).
 """
 from typing import Optional, Sequence
 
@@ -41,7 +41,7 @@ class BTSCARDWeightAveraging(LiveWeightAveraging):
         with torch.no_grad():
             current = model.state_dict()
             blended = {k: self._prev[k] * self.beta + (1 - self.beta) * current[k] for k in self._prev}
-            model.load_state_dict(blended, strict=False)  # 판별기·상수 키는 그대로 둔다
+            model.load_state_dict(blended, strict=False)  # discriminator and constant keys are left unchanged
         self._prev = None
 
 

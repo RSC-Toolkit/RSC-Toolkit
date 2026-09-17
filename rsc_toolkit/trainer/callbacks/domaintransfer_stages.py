@@ -1,23 +1,23 @@
 """
-Domain Transfer(Wang & Wang, ICASSP 2022) 의 **2단계 학습**과 warm-up·클래스 가중 주입.
+**Two-stage training**, warm-up and class-weight injection of Domain Transfer (Wang & Wang, ICASSP 2022).
 
-논문이 명시한 것(§3.2):
+Stated in the paper (§3.2):
 - "Adam optimizer with learning rate 6e-4, batch size 64, weight decay 1e-3, and **warm-up**"
-- 증강 데이터로 학습한 뒤 **원본 데이터만으로 작은 learning rate 로 다시 미세조정**하는 단계가 따로 있다.
+- After training on augmented data, there is a separate stage that **fine-tunes again on the original data only with a small learning rate**.
 
-가정(논문 미기재 — 전부 인자로 노출):
-- **epoch 수 미기재** → 1단계 50 epoch, 2단계 10 epoch.
-- **warm-up 스케줄 미기재** → 1단계 앞 5 epoch 을 0 → lr 로 선형 증가시킨 뒤 cosine 으로 감쇠.
-- **2단계 lr 미기재** → 1단계 lr 의 0.1배(6e-5) 고정.
+Assumptions (not specified in the paper; all exposed as arguments):
+- **Number of epochs not specified** → stage 1: 50 epochs, stage 2: 10 epochs.
+- **Warm-up schedule not specified** → linear increase 0 → lr over the first 5 epochs of stage 1, then cosine decay.
+- **Stage-2 lr not specified** → fixed at 0.1× the stage-1 lr (6e-5).
 
-2단계에서 끄는 것(= "원본 데이터"의 해석):
-- splice 로 만든 추가 샘플 제거(`extra = []`)
-- 파형 증강 3종(잡음·time stretch·pitch shift) 해제
-- mixup 해제(`model.mixup_alpha = 0`)
-- circular padding 은 **끄지 않는다** — 논문이 test set 에도 적용한다고 못박은 전처리이지 증강이 아니다.
+Turned off in stage 2 (= interpretation of "original data"):
+- extra samples created by splicing are removed (`extra = []`)
+- the three waveform augmentations (noise, time stretch, pitch shift) are disabled
+- mixup is disabled (`model.mixup_alpha = 0`)
+- circular padding is **not** turned off: the paper states it is also applied to the test set, so it is preprocessing, not augmentation.
 
-데이터셋 길이가 2단계에서 줄어들므로 `trainer.params.reload_dataloaders_every_n_epochs: 1` 이 필요하다
-(config 에 함께 넣어 두었다).
+The dataset length shrinks in stage 2, so `trainer.params.reload_dataloaders_every_n_epochs: 1` is required
+(set in the same config).
 """
 from __future__ import annotations
 
@@ -46,20 +46,20 @@ class DomainTransferStages(L.Callback):
         self.eta_min = float(eta_min)
         self._switched = False
 
-    # ------------------------------------------------------------------ 가중치 주입
+    # ------------------------------------------------------------------ weight injection
     def setup(self, trainer, pl_module, stage=None):
         dm = getattr(trainer, "datamodule", None)
         w = getattr(dm, "train_class_weight", None)
         model = getattr(pl_module, "rsc_model", pl_module)
         if w is None or not hasattr(model, "set_class_weight"):
-            logger.warning("DomainTransferStages: class weight 주입 생략(datamodule 또는 모델에 없음)")
+            logger.warning("DomainTransferStages: skipping class weight injection (missing on datamodule or model)")
             return
         model.set_class_weight(w)
-        logger.info("DomainTransferStages: class weight 주입 %s", [round(float(x), 4) for x in w])
+        logger.info("DomainTransferStages: injected class weight %s", [round(float(x), 4) for x in w])
 
     # ------------------------------------------------------------------ lr
     def lr_at(self, epoch: int) -> float:
-        """epoch 는 0-based. 1단계는 warm-up→cosine, 2단계는 낮은 고정 lr."""
+        """epoch is 0-based. Stage 1: warm-up→cosine; stage 2: low fixed lr."""
         if epoch >= self.stage1_epochs:
             return self.stage2_lr
         if self.warmup_epochs > 0 and epoch < self.warmup_epochs:
@@ -71,13 +71,13 @@ class DomainTransferStages(L.Callback):
     def on_train_epoch_start(self, trainer, pl_module):
         epoch = trainer.current_epoch
         if epoch == 0:
-            # PaperCosineLR 와 같은 이유: 이 콜백이 매 epoch lr 을 덮어쓰므로
-            # optimizer 그룹과 어긋나면 CLI 스윕이 침묵 무효화된다 (fresh run 만 검사).
+            # Same reason as PaperCosineLR: this callback overwrites lr every epoch, so a mismatch with the
+            # optimizer group would silently nullify a CLI sweep (checked on fresh runs only).
             base_lr = float(trainer.optimizers[0].param_groups[0]["lr"])
             if not math.isclose(base_lr, self.lr, rel_tol=1e-9):
                 logger.warning(
-                    "DomainTransferStages.learning_rate=%.3g 가 optimizer 의 lr=%.3g 와 다르다 — "
-                    "실효 lr 은 %.3g 다. callbacks yaml 의 ${optimizer.params.lr} 보간을 확인하라.",
+                    "DomainTransferStages.learning_rate=%.3g differs from the optimizer lr=%.3g; "
+                    "the effective lr is %.3g. Check the ${optimizer.params.lr} interpolation in the callbacks yaml.",
                     self.lr, base_lr, self.lr,
                 )
         if epoch >= self.stage1_epochs and not self._switched:
@@ -87,7 +87,7 @@ class DomainTransferStages(L.Callback):
             for group in optimizer.param_groups:
                 group["lr"] = new_lr
 
-    # ------------------------------------------------------------------ 2단계 전환
+    # ------------------------------------------------------------------ stage-2 transition
     def _enter_stage2(self, trainer, pl_module) -> None:
         model = getattr(pl_module, "rsc_model", pl_module)
         if hasattr(model, "mixup_alpha"):
@@ -103,6 +103,6 @@ class DomainTransferStages(L.Callback):
                     setattr(base, flag, False)
         self._switched = True
         logger.info(
-            "Domain Transfer 2단계 진입(epoch %d): mixup·파형증강·splice 해제, lr %.2e — 학습 샘플 %d → %d",
+            "Domain Transfer entering stage 2 (epoch %d): mixup, waveform augmentation and splice disabled, lr %.2e; training samples %d → %d",
             trainer.current_epoch, self.stage2_lr, n_before, len(base) if base is not None else -1,
         )

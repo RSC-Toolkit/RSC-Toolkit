@@ -1,8 +1,8 @@
-# SG-SCL 저장소의 비-AST SFT 기준선 4종을 SPRSound 표준 태스크(7-class)로 확장.
+# The 4 non-AST SFT baselines of the SG-SCL repository, extended to the standard SPRSound task (7-class).
 #   rsctk-train --config-name sgscl_nonast_sprs model.name=resnet18_sft   seed=N run.name=sprs-resnet18-ce-sN
 #   ... model.name=resnet34_sft | efficientnet_b0_sft | cnn6_sft
-# **논문 목표치 없음** — 논문은 ICBHI 만 실험했다. 각 논문의 ICBHI 레시피를 그대로 쓴다(사용자 결정 2026-08-30).
-# ICBHI 가 가중 CE 이므로 SPRS 도 같은 산식의 가중 CE 를 SPRSound 분포로 계산해 쓴다.
+# **No paper-reported value** — the paper evaluates ICBHI only. Each paper's ICBHI recipe is used unchanged.
+# ICBHI uses weighted CE, so SPRS uses the same weighted-CE formula computed on the SPRSound distribution.
 defaults:
   - model: sft_backbone
   - data_defaults@data: base
@@ -23,10 +23,9 @@ trainer:
 
 optimizer:
   params:
-    lr: 1e-3                   # 스크립트 --learning_rate 1e-3 — icbhi 변형과 동일.
-                               # 이전에는 이 override 가 빠져 optimizer 그룹은 5e-5 를 말하는데
-                               # PaperCosineLR 콜백이 1e-3 으로 덮어써 실효 lr 은 1e-3 이었다
-                               # (기존 run 의 수치는 그대로 유효 — 메타데이터만 거짓이었다).
+    lr: 1e-3                   # script --learning_rate 1e-3 — same as the icbhi variant.
+                               # Required: the PaperCosineLR callback reads its lr from the optimizer group,
+                               # so without this override training would run at the adam default of 5e-5.
 
 run:
   name: sprs-nonast-sft

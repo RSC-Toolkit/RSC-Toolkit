@@ -1,4 +1,4 @@
-# MVST util/misc.py:69-72 — `--optimizer adam` 이 실제로는 AdamW (lr 5e-5, wd 1e-6). patch-mix/sgscl 계열(Adam)과 다르다.
+# MVST util/misc.py:69-72 — `--optimizer adam` is actually AdamW (lr 5e-5, wd 1e-6). Differs from the patch-mix/sgscl family (Adam).
 name: adamw
 params:
   lr: 5e-5

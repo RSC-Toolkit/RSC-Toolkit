@@ -1,5 +1,5 @@
-# Patch-Mix 논문(Interspeech 2023)의 AST — 공식 코드 충실 이식 (P0 골든 고정).
-# method 는 오버라이드로 고른다:
+# AST of the Patch-Mix paper (Interspeech 2023) — faithful port of the official code (verified against goldens).
+# select method with an override:
 #   AST SFT      : model.params.method=ce          + loss=cross_entropy_weighted_icbhi
 #   Patch-Mix CE : model.params.method=patchmix    + loss=cross_entropy
 #   Patch-Mix CL : model.params.method=patchmix_cl + loss=cross_entropy
@@ -14,8 +14,8 @@ params:
   negative_pair: all
   target_type: grad_block
   time_domain: false
-  # 툴킷 datamodule 은 (B, n_mels=128, frames=798) 로 준다
+  # the toolkit datamodule provides (B, n_mels=128, frames=798)
   input_layout: freq_time
-  # 아래 둘은 일부러 뒤집힌 원본 quirk (models/ast_patchmix.py docstring 참고)
+  # the two below are intentionally swapped, replicating an official-code quirk (see the models/ast_patchmix.py docstring)
   input_fdim: 798
   input_tdim: 128

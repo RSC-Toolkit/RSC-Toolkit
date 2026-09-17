@@ -1,15 +1,15 @@
 """
-OPERA-CT 분류 모델 — NTT EMBC'25(arXiv 2504.18004) 동결 평가 경로(eval-audio-repr app/icbhi_sprs/solve.py + evar/ar_opera.py) 재현.
+OPERA-CT classification model — reproduces the frozen evaluation path of NTT EMBC'25 (arXiv 2504.18004) (eval-audio-repr app/icbhi_sprs/solve.py + evar/ar_opera.py).
 
-TaskNetwork(solve.py): ar.encode_frames(파형 배치) → [B, 768, 1] → transpose → [B, 1, 768] → 헤드.
-  - AR_OPERA_CT.encode_frames: get_entire_signal_librosa(배치 trim·mel64·dB·배치 min-max) → augment_if_training(evar SpecAugment:
-    torchaudio FrequencyMasking(20)·TimeMasking(40), iid_masks=False → **배치가 마스크 1벌을 공유**) → (B,T,64) → Cola.extract_feature(768)
+TaskNetwork(solve.py): ar.encode_frames(waveform batch) → [B, 768, 1] → transpose → [B, 1, 768] → head.
+  - AR_OPERA_CT.encode_frames: get_entire_signal_librosa(batch trim·mel64·dB·batch min-max) → augment_if_training(evar SpecAugment:
+    torchaudio FrequencyMasking(20)·TimeMasking(40), iid_masks=False → **the whole batch shares one mask**) → (B,T,64) → Cola.extract_feature(768)
     = HTSAT latent_output.
-  - 헤드 'tfm' = TfmEncHead(sem 토큰 + timm Block×4, heads 1, mlp_ratio 1, xavier 초기화 뒤 Linear 는 기본 초기화 — 원본 순서 유지),
+  - Head 'tfm' = TfmEncHead(sem token + timm Block×4, heads 1, mlp_ratio 1, Linear gets default init after the xavier init — original order kept),
     'mlp' = MLP(BatchNorm1d(affine=False) → 768-128-n_cls, Dropout 0.5).
-  - freeze_body=True(EMBC --freeze_body): 백본 requires_grad=False 만 끈다. model.train() 은 그대로라 bn0 배치통계·running 갱신,
-    DropPath 가 살아 있다 (원본 quirk). freeze_body=False 는 툴킷 표준 태스크 전체 미세조정(논문 목표치 없음).
-학습 루프(scl ce.py, split_iter 1): 배치 전체 transform → forward → CE; best-on-test Score 는 콜백이 담당.
+  - freeze_body=True (EMBC --freeze_body): only sets requires_grad=False on the backbone. model.train() is unchanged, so bn0 uses batch statistics and updates running statistics,
+    and DropPath stays active (quirk of the original). freeze_body=False is full fine-tuning on the toolkit's standard task (no paper-reported value).
+Training loop (scl ce.py, split_iter 1): transform the whole batch → forward → CE; best-on-test Score is handled by a callback.
 """
 from __future__ import annotations
 
@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 
 
 class TfmEncHead(nn.Module):
-    """solve.py TfmEncHead — 그대로."""
+    """solve.py TfmEncHead — unchanged."""
 
     def __init__(self, embed_dim=768, output_dim=3, depth=2, heads=1, mlp_ratio=1):
         super().__init__()
@@ -39,7 +39,7 @@ class TfmEncHead(nn.Module):
         self.sem_blocks = nn.ModuleList([Block(embed_dim, heads, mlp_ratio, qkv_bias=True, norm_layer=nn.LayerNorm) for _ in range(depth)])
         self.norm = nn.LayerNorm(embed_dim)
         self.apply(self._init_weights)
-        self.linear = nn.Linear(embed_dim, output_dim)  # apply 이후 생성 → 기본 초기화 (원본 순서)
+        self.linear = nn.Linear(embed_dim, output_dim)  # created after apply → default init (original order)
 
     @staticmethod
     def _init_weights(m):
@@ -59,7 +59,7 @@ class TfmEncHead(nn.Module):
 
 
 class MLPHead(nn.Module):
-    """solve.py MLP — 그대로 (입력 [B,T,D] 를 T 평균 후 BatchNorm1d(affine=False))."""
+    """solve.py MLP — unchanged (input [B,T,D] averaged over T, then BatchNorm1d(affine=False))."""
 
     def __init__(self, input_size, hidden_sizes, output_size, hidden_dropout=0.5, mean=0.0, std=0.01, bias=0.0):
         super().__init__()
@@ -87,11 +87,11 @@ class OperaCT(BaseRSCModel, nn.Module):
     def __init__(
         self,
         n_cls: int = 4,
-        pretrained_path: Optional[str] = None,   # encoder-operaCT.ckpt (None 이면 랜덤 초기화)
+        pretrained_path: Optional[str] = None,   # encoder-operaCT.ckpt (random init if None)
         freeze_body: bool = True,                # EMBC --freeze_body
         head: str = "tfm",                       # tfm | mlp
         head_depth: int = 4, head_heads: int = 1, head_mlp_ratio: int = 1,
-        freq_mask: int = 20, time_mask: int = 40,  # scl args 기본 (evar SpecAugment, 배치 공유 마스크)
+        freq_mask: int = 20, time_mask: int = 40,  # scl args defaults (evar SpecAugment, mask shared across the batch)
         input_sec: float = 8.0, sample_rate: int = 16000,
         drop_path_rate: float = 0.1,
     ):
@@ -100,8 +100,8 @@ class OperaCT(BaseRSCModel, nn.Module):
         if pretrained_path is not None:
             from rsc_toolkit.paths import resolve_pretrained
 
-            dropped = load_opera_ct_checkpoint(self.htsat, str(resolve_pretrained(explicit=pretrained_path)))  # RSCTK_PRETRAINED_ROOT 인정
-            logger.info("OPERA-CT ckpt 로드 %s (버린 키 %d개: torchlibrosa 프론트엔드·COLA 프로젝터)", pretrained_path, len(dropped))
+            dropped = load_opera_ct_checkpoint(self.htsat, str(resolve_pretrained(explicit=pretrained_path)))  # honors RSCTK_PRETRAINED_ROOT
+            logger.info("Loaded OPERA-CT ckpt %s (dropped %d keys: torchlibrosa front end, COLA projector)", pretrained_path, len(dropped))
         self.freeze_body = bool(freeze_body)
         if self.freeze_body:
             for p in self.htsat.parameters():
@@ -112,12 +112,12 @@ class OperaCT(BaseRSCModel, nn.Module):
         elif head == "mlp":
             self.head = MLPHead(self.feature_d, (128,), n_cls)
         else:
-            raise ValueError(f"head 는 tfm|mlp: {head!r}")
+            raise ValueError(f"head must be tfm|mlp: {head!r}")
         self.mel = OperaBatchMel(sample_rate=sample_rate, input_sec=input_sec)
         self.freqmask = torchaudio.transforms.FrequencyMasking(freq_mask) if freq_mask > 0 else None
         self.timemask = torchaudio.transforms.TimeMasking(time_mask) if time_mask > 0 else None
 
-    # ---- transform (배치 단위) ----
+    # ---- transform (per batch) ----
     def val_transform(self, wave: torch.Tensor) -> torch.Tensor:
         return self.mel(wave)  # (B, 64, T)
 
@@ -131,11 +131,11 @@ class OperaCT(BaseRSCModel, nn.Module):
         return x
 
     def encode(self, feats: torch.Tensor) -> torch.Tensor:
-        """(B, 64, T) → HTSAT latent (B, 768) — AR_OPERA_CT.encode_frames 의 백본 부분."""
+        """(B, 64, T) → HTSAT latent (B, 768) — backbone part of AR_OPERA_CT.encode_frames."""
         return self.htsat(feats.transpose(-2, -1).unsqueeze(1))
 
     def forward(self, feats: torch.Tensor) -> torch.Tensor:
-        return self.head(self.encode(feats).unsqueeze(1))  # [B,D] → [B,1,D] 토큰 1개
+        return self.head(self.encode(feats).unsqueeze(1))  # [B,D] → [B,1,D] single token
 
     def training_forward(self, audio_batch, labels, loss_func, meta_labels=None):
         x = self.train_transform(audio_batch) if self.training else self.val_transform(audio_batch)

@@ -1,6 +1,6 @@
-# Lungmix(ICASSP 2025) ICBHI 데이터 — 논문 명세 재구현: 16 kHz, 밴드패스 50–1500 Hz(가정: butter 4차 zero-phase, 패딩 전),
-# 9 s pad/cut(가정: repeat; 전처리 순서는 가정, 믹싱은 원 구간 단위(raw) 후 9 s), 파형 그대로(kind: waveform, 캐시 없음 — 믹싱·fbank 는 모델 안에서 온라인). 공식 60/40, best-on-test.
-# batch 4 (+ trainer accumulate_grad_batches 8 = 32 상당, 논문 §III-B).
+# Lungmix (ICASSP 2025) ICBHI data — re-implementation from the paper specification: 16 kHz, band-pass 50–1500 Hz (assumption: 4th-order butter, zero-phase, before padding),
+# 9 s pad/cut (assumption: repeat; preprocessing order assumed, mixing on raw segments then 9 s), raw waveform (kind: waveform, no cache — mixing and fbank run online inside the model). Official 60/40 split, best-on-test.
+# batch 4 (+ trainer accumulate_grad_batches 8 = effective 32, paper §III-B).
 name: icbhi_lungmix
 params:
   datamodule_name: lungmix
@@ -13,9 +13,9 @@ params:
   sampling_rate: 16000
   sample_level: cycle
   desired_length_sec: 9.0
-  pad_type: repeat               # 가정 (#5)
+  pad_type: repeat               # assumption
   fade: false
-  resample_after_slice: true     # 구간만 읽어 리샘플 (캐시 없는 파형 경로라 전체 녹음 리샘플은 느림; icbhi_opera 선례)
+  resample_after_slice: true     # reads and resamples only the segment (whole-recording resampling is slow on the uncached waveform path; as in icbhi_opera)
 
   train_splits: [train]
   val_splits: [test]
@@ -34,12 +34,12 @@ params:
 
   lungmix:
     label_map: none
-    emit_valid_len: true       # train 배치 meta_labels 에 원 구간 길이(패딩 전) 를 실음 (model mix_stage=raw 기본 경로; padded 대안이면 false 가능)
+    emit_valid_len: true       # puts the original segment length (before padding) into meta_labels of train batches (default path for model mix_stage=raw; can be false for the padded alternative)
     bandpass:
       enabled: true
-      kind: butter               # 가정 (#6)
+      kind: butter               # assumption
       order: 4
       zero_phase: true
       low_hz: 50.0
       high_hz: 1500.0
-      before_pad: true           # 사이클 구간 단위 적용(가정; 녹음 단위 대안 미구현)
+      before_pad: true           # applied per cycle segment (assumption; per-recording alternative not implemented)

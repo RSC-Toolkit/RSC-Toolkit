@@ -1,15 +1,15 @@
 # @package _global_
-# LungAdapter 학습 프로토콜 — 논문 'mostly follows [13]'(Bae Patch-Mix) 상속 **추정**:
-#   - MA 0.5 live 평균 (Bae --ma_update --ma_beta 0.5; 동결 파라미터는 값 불변이라 무해) — 끄려면 callbacks=... 에서 제거
-#   - epoch cosine LR (논문 'cosine scheduling'; eta_min = lr·0.1³, warmup 없음 은 Bae 상속 추정), lr 5e-4 (논문 명시)
-#   - best-on-test: Score 최고 && Se > 5 (Bae validate 규칙; 논문 모델 선택 기준 미기재)
+# LungAdapter training protocol — **assumed** to be inherited per the paper's 'mostly follows [13]' (Bae Patch-Mix):
+#   - MA 0.5 live average (Bae --ma_update --ma_beta 0.5; harmless since frozen parameters do not change) — remove it from callbacks=... to disable
+#   - per-epoch cosine LR (paper: 'cosine scheduling'; eta_min = lr·0.1³ and no warmup assumed from Bae), lr 5e-4 (stated in the paper)
+#   - best-on-test: best Score && Se > 5 (Bae validate rule; model selection not specified in the paper)
 trainer:
   params:
     callbacks:
       - _target_: rsc_toolkit.trainer.callbacks.ma_update.LiveWeightAveraging
         beta: 0.5
       - _target_: rsc_toolkit.trainer.callbacks.paper_cosine_lr.PaperCosineLR
-        learning_rate: ${optimizer.params.lr}        # 단일 출처 — optimizer 그룹. 하드코딩 복사본이 CLI 스윕을 침묵 무효화했다
+        learning_rate: ${optimizer.params.lr}        # single source: the optimizer group (a hard-coded copy would silently ignore CLI sweeps)
         epochs: ${trainer.params.max_epochs}
       - _target_: rsc_toolkit.trainer.callbacks.icbhi_best_checkpoint.ICBHIBestScoreCheckpoint
         dirpath: outputs/lungadapter/${run.name}

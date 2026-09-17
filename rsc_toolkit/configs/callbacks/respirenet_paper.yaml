@@ -1,6 +1,6 @@
 # @package _global_
-# RespireNet 학습 프로토콜: 매 epoch test 셋을 청크→cycle 다수결로 평가, **cycle accuracy 최고** 일 때 best 저장
-# (train.py:266 — Score 기준 아님). MA/cosine 없음. epoch 재개 지원.
+# RespireNet training protocol: every epoch the test set is evaluated by chunk→cycle majority vote; best is saved at the **best cycle accuracy**
+# (train.py:266 — not Score-based). No MA/cosine. Epoch resume supported.
 trainer:
   params:
     callbacks:

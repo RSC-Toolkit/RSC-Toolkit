@@ -1,19 +1,19 @@
-# Prototype Learning for Interpretable Respiratory Sound Analysis (ICASSP 2022) — 공식 코드 충실 이식.
-# method 는 오버라이드로 고른다:
-#   CNN-8 기준선 (Table 3 첫 행) : model.params.method=cnn8
-#   ProtoNet "Ours"(EleSim w/BN) : model.params.method=proto model.params.proto_form=vector2d  (기본)
-#   기타 변형: proto_form = vector1d | vector2d_att | vector2d_avgp | vector2d_maxp | vector2d_maxp_att
+# Prototype Learning for Interpretable Respiratory Sound Analysis (ICASSP 2022) — faithful port of the official code.
+# select method with an override:
+#   CNN-8 baseline (Table 3 first row)  : model.params.method=cnn8
+#   ProtoNet "Ours" (EleSim w/BN)       : model.params.method=proto model.params.proto_form=vector2d  (default)
+#   Other variants: proto_form = vector1d | vector2d_att | vector2d_avgp | vector2d_maxp | vector2d_maxp_att
 name: protonet
 params:
   n_cls: 4
   method: proto
-  proto_form: vector2d           # 논문 "Ours" = Pt-2D-EleSim-Van w/ BN
-  n_proto_per_class: 1           # 공식 main_pytorch_prototype.py:24
-  sample_rate: 4000              # 공식 config.py
+  proto_form: vector2d           # paper "Ours" = Pt-2D-EleSim-Van w/ BN
+  n_proto_per_class: 1           # official main_pytorch_prototype.py:24
+  sample_rate: 4000              # official config.py
   win_length: 256
   hop_length: 128
   mel_bins: 128
   fmin: 20
   fmax: 2000
   cycle_len: 16000               # 4 s @4 kHz
-  diverse_weight: 0.1            # 원본 main: loss + 0.1 * loss_diverse
+  diverse_weight: 0.1            # official main: loss + 0.1 * loss_diverse

@@ -4,7 +4,7 @@
  "repo": "/raid/doyoung/projects/RSC-Toolkit/outputs/reference/btscard",
  "n": 4,
  "device": "cpu",
- "note": "fp32, eval 모드(dropout off). 원본 train() 은 CLAP 만 autocast 지만 골든은 fp32 로 통일",
+ "note": "fp32, eval mode (dropout off). The original train() autocasts only CLAP, but the golden uses fp32 throughout",
  "ckpt": {
   "path": "pretrained_models/upstream/btscard/best.pth",
   "alpha": 0.0,

@@ -1,6 +1,6 @@
-# QLung SPRSound OOD 평가 뷰(학습 미사용): 7→4 병합 파생 라벨(**Rhonchi·Stridor 제외** — 2026-09-16 사용자 규칙), 16 kHz fbank 128×798,
-#   ICBHI 와 같은 전처리 체인(가정 — 논문 미명시).
-#   평가 범위: eval_qlung_ood.py 가 test_splits 를 [test](inter 1,429; 두 클래스 0 건이라 불변) 와 [train, test](8,031; 옛 병합 기준은 8,085) 로 바꿔 두 번 집계한다.
+# QLung SPRSound OOD evaluation view (not used for training): 7→4 merged derived labels (**Rhonchi·Stridor excluded**), 16 kHz fbank 128×798,
+#   same preprocessing chain as ICBHI (assumption — not stated in the paper).
+#   Evaluation scope: eval_qlung_ood.py switches test_splits to [test] (inter, 1,429; unaffected since both excluded classes have 0 events there) and [train, test] (8,031) and aggregates twice.
 name: sprsound_qlung_ood
 params:
   datamodule_name: qlung
@@ -15,9 +15,9 @@ params:
   sampling_rate: 16000
   sample_level: cycle
   desired_length_sec: 8.0
-  pad_type: repeat_fade          # 가정: ICBHI 와 동일 (녹음 fade in/out + 8 s repeat + fade_out)
+  pad_type: repeat_fade          # Assumption: same as ICBHI (recording fade in/out + 8 s repeat + fade_out)
   fade: true
-  resample_after_slice: false    # 가정: 녹음 전체를 16 kHz 로 리샘플 후 초 단위 절단 (ICBHI 체인)
+  resample_after_slice: false    # Assumption: resample the whole recording to 16 kHz, then slice in seconds (ICBHI chain)
   time_unit: s
 
   train_splits: [train]
@@ -33,7 +33,7 @@ params:
   features:
     enabled: true
     kind: fbank
-    cache_dir: downloaded_datasets/features_cache_qlung_ood   # 별도 캐시 (전처리 체인이 캐시 키에 안 들어가므로)
+    cache_dir: downloaded_datasets/features_cache_qlung_ood   # separate cache (the preprocessing chain is not part of the cache key)
     n_mels: 128
     target_frames: 798
     frame_shift: 10

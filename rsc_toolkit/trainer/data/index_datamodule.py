@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 class FeatureConfig:
     enabled: bool = False
     cache_dir: Optional[str] = None
-    kind: str = "clap"  # registries.PROCESSORS 의 이름: clap | mel | fbank | sclmeta_mel | waveform | (플러그인)
+    kind: str = "clap"  # name in registries.PROCESSORS: clap | mel | fbank | sclmeta_mel | waveform | (plugin)
     # clap params
     clap_model_name: str = "laion/clap-htsat-unfused"
     # mel params
@@ -34,15 +34,15 @@ class FeatureConfig:
     window_type: str = "hanning"
     dither: float = 0.0
     normalize: bool = True
-    per_sample_stats: bool = False  # 비-AST 계열 논문 재현용 (샘플별 mean/std)
-    # sclmeta_mel (torchaudio MelSpectrogram) 파라미터
+    per_sample_stats: bool = False  # for non-AST paper reproductions (per-sample mean/std)
+    # sclmeta_mel (torchaudio MelSpectrogram) parameters
     n_fft: int = 1024
     win_length: Optional[int] = None
     hop_length: int = 512
     f_min: float = 50.0
     f_max: float = 2000.0
-    # 새 kind(플러그인) 전용 파라미터 — 위 flat 필드는 내장 kind 하위호환용이고 더 늘리지 않는다.
-    # from_options 에는 flat 필드와 params 를 합친 dict 가 들어간다 (params 가 우선).
+    # Parameters for new kinds (plugins); the flat fields above exist for backward compatibility of built-in kinds and are not extended.
+    # from_options receives a dict merging the flat fields and params (params take precedence).
     params: Dict[str, Any] = field(default_factory=dict)
 
 
@@ -53,9 +53,9 @@ class SpecAugmentOptions:
     mask: str = "mean"
 
 
-from rsc_toolkit.datasets import collate as _collate  # P2-6: collate 단일 구현
+from rsc_toolkit.datasets import collate as _collate  # single collate implementation
 
-# IndexDataModule 기본 collate: (x, y[, meta long]) — 4번째 원소가 있을 때만 meta (sgscl 계열)
+# IndexDataModule default collate: (x, y[, meta long]); meta only when a 4th element is present (sgscl family)
 _tuple_collate = _collate.tuple_collate
 
 
@@ -74,18 +74,17 @@ class IndexDataModule(L.LightningDataModule):
     Provide an `index_dataset_cls` (dotted import path) that builds samples from an index CSV
     and returns dicts containing at least: {"audio": Tensor, "label": Optional[int], "sample_id": str}.
 
-    batch[2](meta) 사이드채널 선언: `meta_kind` 는 이 datamodule 이 배치 3번째 원소로 무엇을 보내는지
-    이름 붙인 것이다 (범용 경로는 `meta_label_mode` 그대로; 서브클래스는 클래스 속성으로 덮어쓴다 —
-    예: "qlung_aqs", "pcmcl_ssl_label", "bts_meta7"). 모델 쪽 `accepts_meta` 와 어댑터 setup 에서 대조된다.
+    batch[2] (meta) side-channel declaration: `meta_kind` names what this datamodule sends as the third batch element
+    (the generic path uses `meta_label_mode` as-is; subclasses override it as a class attribute,
+    e.g. "qlung_aqs", "pcmcl_ssl_label", "bts_meta7"). It is checked against the model's `accepts_meta` in the adapter setup.
 
-    확장 통로 (전부 additive — 기본값이면 예전 코드 경로와 동일):
-    - `index_dataset_params`: 커스텀 `index_dataset_cls` 생성자에 그대로 넘길 추가 인자 dict
-      (예전에는 클래스 속성 주입·메서드 복붙·`__new__` 바꿔치기로 우회했다).
-    - `collate_fn`: dotted path 또는 callable — 세 dataloader 의 collate 를 바꾼다 (기본 `_tuple_collate`).
-    - `dataset_wrapper_cls`: dotted path 또는 클래스 — 피처 래퍼(`IndexFeatureDataset`) 교체.
-      `(index_ds, feature_processor, feature_transform=, meta_label_fn=)` 시그니처를 따라야 한다.
-    서브클래스용 훅: `_index_dataset_kwargs(split)` 로 생성 인자를 더하고, `_wrap_with_features(..., split_role=)`
-    로 train/val/test 역할을 명시적으로 받는다 (`base_ds is self.train_ds` identity 비교 불필요).
+    Extension points (all additive; with defaults the code path is unchanged):
+    - `index_dataset_params`: dict of extra arguments passed as-is to the constructor of a custom `index_dataset_cls`.
+    - `collate_fn`: dotted path or callable; replaces the collate of all three dataloaders (default `_tuple_collate`).
+    - `dataset_wrapper_cls`: dotted path or class; replaces the feature wrapper (`IndexFeatureDataset`).
+      Must follow the `(index_ds, feature_processor, feature_transform=, meta_label_fn=)` signature.
+    Hooks for subclasses: add constructor arguments via `_index_dataset_kwargs(split)`, and receive the train/val/test role explicitly
+    via `_wrap_with_features(..., split_role=)` (no need for an identity check like `base_ds is self.train_ds`).
     """
 
     @property
@@ -128,8 +127,8 @@ class IndexDataModule(L.LightningDataModule):
         fade: bool = True,
         resample_after_slice: bool = False,
         time_unit: str = "s",
-        raw_data_subdir: Optional[str] = None,   # 원음이 data_dir 하위 폴더에 있을 때 (예: SPRSound 'Classification')
-        # 확장 통로 (P1-9, additive)
+        raw_data_subdir: Optional[str] = None,   # when raw audio lives in a subfolder of data_dir (e.g. SPRSound 'Classification')
+        # extension points (additive)
         index_dataset_params: Optional[dict] = None,
         collate_fn: Optional[Union[str, Callable]] = None,
         dataset_wrapper_cls: Optional[Union[str, type]] = None,
@@ -175,7 +174,7 @@ class IndexDataModule(L.LightningDataModule):
         self.batch_size = int(batch_size)
         self.num_workers = int(num_workers)
         self.shuffle_train = bool(shuffle_train)
-        self.drop_last_train = bool(drop_last_train)  # 논문 프로토콜 재현용 (원본 train loader drop_last=True)
+        self.drop_last_train = bool(drop_last_train)  # for paper protocol reproduction (original train loader drop_last=True)
         self.pin_memory = bool(pin_memory)
         self.persistent_workers = bool(persistent_workers)
 
@@ -186,8 +185,8 @@ class IndexDataModule(L.LightningDataModule):
         self.feature_precompute_batch_size = int(feature_precompute_batch_size)
         self.feature_precompute_num_workers = int(feature_precompute_num_workers)
         self.specaugment_cfg = SpecAugmentOptions(**(specaugment or {}))
-        # sgscl 계열(DAT·SG-SCL)용 meta 라벨 (예: "dev" = ICBHI 청진기 4종).
-        # 원본처럼 train 배치에만 (x, y, meta) 로 붙는다.
+        # meta labels for the sgscl family (DAT, SG-SCL) (e.g. "dev" = the 4 ICBHI stethoscopes).
+        # As in the original code, attached as (x, y, meta) to train batches only.
         self.meta_label_mode = meta_label_mode
         self.fade = bool(fade)
         self.resample_after_slice = bool(resample_after_slice)
@@ -292,9 +291,9 @@ class IndexDataModule(L.LightningDataModule):
 
     def _index_dataset_kwargs(self, *, split: str, role: Optional[str] = None) -> Dict[str, Any]:
         """
-        `index_dataset_cls(**kwargs)` 의 인자 조립 — 서브클래스는 이것을 override 해 dict 에 더하기만 하면 된다
-        (예전엔 이 블록을 통째로 복붙했다). config 의 `index_dataset_params` 가 마지막에 덮어쓴다.
-        `role` ∈ {"train","val","test"} 은 setup 이 넘긴다 — 학습용 데이터셋만 다르게 만들 때(ProtoNet 크롭, DT 증강·splice) 쓴다.
+        Assembles the arguments of `index_dataset_cls(**kwargs)`; subclasses override this and only add to the dict.
+        `index_dataset_params` from the config overrides last.
+        `role` ∈ {"train","val","test"} is passed by setup; use it to build only the training dataset differently (ProtoNet crops, DT augmentation/splice).
         """
         kwargs: Dict[str, Any] = dict(
             index_csv=self.index_csv,
@@ -304,7 +303,7 @@ class IndexDataModule(L.LightningDataModule):
             split=split,
             audio_preprocessor=self.audio_preprocessor,
         )
-        # 기본값이 아닐 때만 넘긴다 — 커스텀 index_dataset_cls 가 이 인자를 모를 수 있다
+        # passed only when not default; a custom index_dataset_cls may not know this argument
         if not self.fade:
             kwargs["fade"] = False
         if self.resample_after_slice:
@@ -321,7 +320,7 @@ class IndexDataModule(L.LightningDataModule):
             self.index_csv = self._default_index_path()
         if not self.index_csv.exists():
             raise FileNotFoundError(
-                f"Index csv not found: {self.index_csv} — 먼저 인덱스를 만들어라: "
+                f"Index csv not found: {self.index_csv}. Build the index first: "
                 f"rsctk datasets build-index {self.dataset_name} --data_dir {self.outputs_directory} --sample_level {self.sample_level}"
             )
         return self.index_dataset_cls(**self._index_dataset_kwargs(split=split, role=role))
@@ -334,14 +333,14 @@ class IndexDataModule(L.LightningDataModule):
         return ConcatDataset(datasets)
 
     def _feature_options(self) -> Dict[str, Any]:
-        """from_options 에 넘길 dict: FeatureConfig 의 flat 필드 + params (params 가 우선)."""
+        """dict passed to from_options: the flat fields of FeatureConfig + params (params take precedence)."""
         opts = asdict(self.features_cfg)
         params = opts.pop("params", None) or {}
         opts.update(params)
         return opts
 
     def _feature_processor_cls(self):
-        """features.kind → 프로세서 클래스 (registries.PROCESSORS). 미지 kind 는 가용 목록과 함께 KeyError."""
+        """features.kind → processor class (registries.PROCESSORS). An unknown kind raises KeyError listing the available kinds."""
         from rsc_toolkit.registries import PROCESSORS
 
         try:
@@ -353,12 +352,12 @@ class IndexDataModule(L.LightningDataModule):
             ) from None
 
     def _build_feature_processor(self, feature_cache: FeatureCache):
-        # 예전의 kind 별 if-elif 는 각 프로세서의 from_options 로 옮겼다 (생성 인자 동일 → 캐시 키 동일).
+        # Each processor's from_options builds it (same constructor arguments → same cache key).
         cls = self._feature_processor_cls()
         return cls.from_options(self._feature_options(), sampling_rate=self.sampling_rate, feature_cache=feature_cache)
 
     def _make_feature_processor_with_cache(self):
-        """피처 캐시(디렉터리·키·체인 대장)를 구성한 프로세서 — 래퍼 종류와 무관한 공통 부분."""
+        """Processor with the feature cache (directory, key, chain ledger) configured; the part shared by all wrapper types."""
         cache_dir = (
             Path(self.features_cfg.cache_dir)
             if self.features_cfg.cache_dir
@@ -369,10 +368,10 @@ class IndexDataModule(L.LightningDataModule):
         feature_cache = FeatureCache(cache_dir=cache_dir)
         fp = self._build_feature_processor(feature_cache)
         if getattr(fp, "feature_cache", None) is None:
-            # 캐시를 쓰지 않는 프로세서(waveform 등 — from_options 가 feature_cache=None 으로 만든다)는 캐시 키도 체인 대장도
-            # 필요 없다. 예전엔 여기서 무조건 configure 해 공용 캐시 디렉터리의 대장과 대조했고, 다른 waveform config
-            # (다른 길이·리샘플 규칙)가 남긴 대장과 어긋나면 **캐시를 읽지도 않는 학습**이 "체인 불일치"로 죽었다(09-01 리뷰 F, GaP-Aug 재발).
-            logger.debug("features.kind=%s 는 캐시를 쓰지 않는다 — 캐시 키·체인 대장 생략", self.features_cfg.kind)
+            # Processors that do not use a cache (waveform etc.; from_options builds them with feature_cache=None) need neither a cache key nor a
+            # chain ledger. Configuring anyway would compare against the ledger in the shared cache directory, and a ledger left by another waveform config
+            # (different length or resampling rule) would make **training that never reads the cache** fail with a chain mismatch.
+            logger.debug("features.kind=%s does not use a cache; skipping cache key and chain ledger", self.features_cfg.kind)
             return fp
         feature_cache.configure(fp.get_processor_config(), processor_name=fp.__class__.__name__,
                                 audio_chain=self._audio_chain())
@@ -380,8 +379,8 @@ class IndexDataModule(L.LightningDataModule):
 
     def _wrap_with_features(self, base_ds, *, feature_transform=None, meta_label_fn=None, split_role: Optional[str] = None):
         """
-        인덱스 데이터셋을 피처 래퍼로 감싼다. `split_role` ∈ {"train","val","test"} 는 setup 이 넘긴다 —
-        서브클래스는 `base_ds is self.train_ds` 같은 identity 비교 대신 이것을 보라.
+        Wraps the index dataset with the feature wrapper. `split_role` ∈ {"train","val","test"} is passed by setup;
+        subclasses should check this instead of an identity comparison like `base_ds is self.train_ds`.
         """
         fp = self._make_feature_processor_with_cache()
         wrapper = self.dataset_wrapper_cls or IndexFeatureDataset
@@ -389,13 +388,13 @@ class IndexDataModule(L.LightningDataModule):
 
     def _resolve_feature_cache_dir(self, cache_dir: str) -> "Path":
         """
-        피처 캐시 위치. config 의 상대 경로는 프로젝트 루트 기준이지만,
-        환경변수 **`RSCTK_FEATURE_CACHE_ROOT`** 가 있으면 그 아래로 옮겨 붙인다.
+        Feature cache location. Relative paths in the config are relative to the project root,
+        but if the environment variable **`RSCTK_FEATURE_CACHE_ROOT`** is set, they are re-rooted under it.
 
-        캐시는 수십 GB 라 저장소 트리 밖(다른 볼륨)에 두고 싶을 때가 있는데,
-        config 를 열 몇 개씩 고치면 재현 기록이 지저분해진다. 경로만 갈아끼우는 이 방법이면
-        **config 는 그대로 두고** 환경변수 하나로 옮길 수 있다(디렉터리 이름은 그대로라 이동도 `mv` 한 번).
-        절대 경로가 config 에 박혀 있으면 그대로 존중한다.
+        The cache can be tens of GB, so it may need to live outside the repository tree (on another volume);
+        editing a dozen configs would clutter the reproduction record. Swapping only the root lets it move
+        with a single environment variable **while the configs stay unchanged** (directory names are kept, so moving is a single `mv`).
+        Absolute paths in the config are respected as-is.
         """
         import os
 
@@ -407,8 +406,8 @@ class IndexDataModule(L.LightningDataModule):
 
     def _audio_chain(self) -> dict:
         """
-        피처 캐시 키에 들어가지 않는 **앞단 오디오 체인**. FeatureCache 가 대장에 남겨
-        같은 데이터셋을 서로 다른 전처리로 캐시하는 사고를 막는다(feature_cache.configure 주석 참조).
+        The **upstream audio chain** that is not part of the feature cache key. FeatureCache records it in the ledger
+        to prevent caching the same dataset with different preprocessing (see the comment in feature_cache.configure).
         """
         return {
             "dataset_name": getattr(self, "dataset_name", "?"),
@@ -426,8 +425,8 @@ class IndexDataModule(L.LightningDataModule):
             return None
         if not self.specaugment_cfg.enabled:
             return None
-        # 스펙트로그램 kind 에만 건다 — 예전 {"mel","fbank"} 화이트리스트와 같은 진리표이지만
-        # 이제 플러그인 kind 도 is_spectrogram=True 선언만으로 통과한다.
+        # Applied only to spectrogram kinds (same truth table as a {"mel","fbank"} whitelist),
+        # but a plugin kind passes just by declaring is_spectrogram=True.
         if not getattr(self._feature_processor_cls(), "is_spectrogram", False):
             return None
         from rsc_toolkit.registries import AUGMENTATIONS
@@ -497,11 +496,11 @@ class IndexDataModule(L.LightningDataModule):
                 self.inner = inner
                 self.sample_ids = list(sample_ids)
                 if len(self.sample_ids) != len(inner):
-                    # id 는 인덱스 df 기준, 항목은 inner 기준 — 둘이 어긋나면 워커 안에서 IndexError 로 죽거나
-                    # 다른 샘플의 피처를 남의 id 로 저장한다 (REVIEW 2026-09-10 §2 P2).
+                    # ids come from the index df, items from inner; if they disagree, a worker dies with IndexError or
+                    # stores one sample's features under another sample's id.
                     raise RuntimeError(
-                        f"피처 웜업: sample_id 수({len(self.sample_ids)})와 데이터셋 길이({len(inner)})가 다르다 — "
-                        "index_dataset 이 인덱스 행을 걸러내는 서브클래스라면 _collect_sample_ids 를 같은 규칙으로 맞춰라."
+                        f"feature warmup: number of sample_ids ({len(self.sample_ids)}) differs from dataset length ({len(inner)}); "
+                        "if index_dataset is a subclass that filters index rows, make _collect_sample_ids apply the same rule."
                     )
 
             def __len__(self) -> int:

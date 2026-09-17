@@ -1,9 +1,8 @@
-# Lungmix(ICASSP 2025) SPRSound 데이터 — 논문 §III-A 이벤트 7-class → ICBHI 식 4-class 병합(파생 라벨: Normal→0,
-# Fine/Coarse Crackle→1, Wheeze→2, Both→3). **Rhonchi·Stridor 는 제외**(2026-09-16 사용자 규칙; 논문은 wheeze 병합 서술).
-#   주의: 2026-08-26~30 의 sprs-lungmix-{none,nonlinear}-s1..5 (15 run) 은 옛 병합 맵(Rhonchi·Stridor→wheeze, train 54 건 포함)으로
-#   학습된 것이라 이 config 로 재실행하면 train 6,602 건으로 달라진다. 해당 run 은 논문 표에서 제외됨(model_meta include 0).
-# 가정(#7): 2022 inter-patient test(번들 official_split 'valid'→test).
-# **비표준**: 툴킷 표준 SPRSound 프로토콜(7-class)과 다르다. 전처리는 icbhi_lungmix 와 동일.
+# Lungmix (ICASSP 2025) SPRSound data — paper §III-A event 7-class → ICBHI-style 4-class merge (derived labels: Normal→0,
+# Fine/Coarse Crackle→1, Wheeze→2, Both→3). **Rhonchi·Stridor are excluded** (the paper describes merging them into wheeze).
+#   With this exclusion the train set has 6,602 events (merging Rhonchi·Stridor into wheeze would add 54 train events).
+# Assumption: 2022 inter-patient test (bundled official_split 'valid'→test).
+# **Non-standard**: differs from the toolkit's standard SPRSound protocol (7-class). Preprocessing is the same as icbhi_lungmix.
 name: sprsound_lungmix
 params:
   datamodule_name: lungmix
@@ -19,7 +18,7 @@ params:
   desired_length_sec: 9.0
   pad_type: repeat
   fade: false
-  resample_after_slice: true     # sprsound 계열 선례(8 kHz 원 구간 → 16 kHz)
+  resample_after_slice: true     # as in the other sprsound configs (native 8 kHz segment → 16 kHz)
   time_unit: ms_int
 
   train_splits: [train]
@@ -39,7 +38,7 @@ params:
 
   lungmix:
     label_map: sprsound_7to4
-    emit_valid_len: true       # train 배치 meta_labels 에 원 구간 길이(패딩 전) 를 실음 (model mix_stage=raw 기본 경로; padded 대안이면 false 가능)
+    emit_valid_len: true       # puts the original segment length (before padding) into meta_labels of train batches (default path for model mix_stage=raw; can be false for the padded alternative)
     bandpass:
       enabled: true
       kind: butter
@@ -47,4 +46,4 @@ params:
       zero_phase: true
       low_hz: 50.0
       high_hz: 1500.0
-      before_pad: true           # 사이클 구간 단위 적용(가정; 녹음 단위 대안 미구현)
+      before_pad: true           # applied per cycle segment (assumption; per-recording alternative not implemented)

@@ -1,7 +1,7 @@
-# OPERA-CT 동결 + Tfm 헤드, ICBHI 4-class (NTT EMBC'25 arXiv 2504.18004; eval-audio-repr app/icbhi_sprs/ev_icbhi_opera.sh):
-#   150ep, bs256, Adam 3e-3/wd 1e-4 + cosine(T_max 40, eta 1e-6), 가중 CE, SpecAug(20/40 배치 공유), fp32, best-on-test Score.
-#   목표(EMBC Table): Sp/Se/Score 48.97±1.21 (5회 반복, 시드 미고정 — 우리는 seed 1~5).
-#   실행: rsctk-train --config-name opera_embc_icbhi run.name=icbhi-operact-frozen-s1 seed=1
+# Frozen OPERA-CT + Tfm head, ICBHI 4-class (NTT EMBC'25 arXiv 2504.18004; eval-audio-repr app/icbhi_sprs/ev_icbhi_opera.sh):
+#   150 ep, bs 256, Adam 3e-3/wd 1e-4 + cosine (T_max 40, eta 1e-6), weighted CE, SpecAug (20/40, shared across the batch), fp32, best-on-test Score.
+#   Target (EMBC table): Sp/Se/Score 48.97±1.21 (5 repetitions, seeds not fixed — seeds 1~5 here).
+#   Run: rsctk-train --config-name opera_embc_icbhi run.name=icbhi-operact-frozen-s1 seed=1
 defaults:
   - model: opera_ct
   - data_defaults@data: base

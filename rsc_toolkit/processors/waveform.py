@@ -1,8 +1,8 @@
 """
-파형을 그대로 넘기는 '피처' 프로세서 — BEATs 처럼 모델 내부에서 fbank 를 만드는 백본용.
+A 'feature' processor that passes the waveform through — for backbones that compute fbank inside the model, such as BEATs.
 
-IndexDataModule 의 피처 경로(IndexFeatureDataset)를 그대로 타되 계산·캐시는 하지 않는다
-(feature_cache=None 으로 두면 make_features_cached 가 캐시를 건너뛴다).
+Uses the IndexDataModule feature path (IndexFeatureDataset) as is, but does no computation or caching
+(with feature_cache=None, make_features_cached skips the cache).
 """
 from typing import Any, Dict, Optional
 
@@ -18,7 +18,7 @@ class WaveformProcessor(BaseAudioProcessor):
 
     @classmethod
     def from_options(cls, opts, *, sampling_rate, feature_cache):
-        # 모델 내부에서 fbank 를 만드는 백본(BEATs 등): 파형 그대로, 캐시 없음 — feature_cache 는 무시한다
+        # Backbones that compute fbank inside the model (BEATs, etc.): raw waveform, no cache — feature_cache is ignored
         return cls(sampling_rate=sampling_rate, feature_cache=None)
 
     def get_processor_config(self) -> Dict[str, Any]:

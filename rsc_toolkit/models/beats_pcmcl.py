@@ -1,19 +1,19 @@
 """
-PC-MCL(arXiv 2601.17080; wa976/PC-MCL) 의 BEATs 모델 — 공식 코드 충실 이식 (P0). 주 결과(65.37) 백본.
+BEATs model of PC-MCL (arXiv 2601.17080; wa976/PC-MCL) — exact port of the official code. Backbone of the main result (65.37).
 
-원본 main.py set_model/train/validate 의 beats 분기:
+beats branch of the original main.py set_model/train/validate:
   features = BEATsTransferLearningModel(...)(images)          # extract_features → (B, T', 768)   (models/BEATs/beats.py)
-  features = features.mean(dim=1)                             # 토큰 평균 (main.py:526)  ※ PAFA 는 토큰별 Linear 후 평균 — 다르다
+  features = features.mean(dim=1)                             # token mean (main.py:526)  NB: PAFA applies a per-token Linear, then averages — different
   output   = classifier(features)                             # nn.Linear(768, n_cls=3) (main.py:345)
-  ssl_out  = ssl_classifier(features[ssl_label >= 0])          # nn.Linear(768, 2) (:368; --ssl_separate_training 이면 projector 앞에)
+  ssl_out  = ssl_classifier(features[ssl_label >= 0])          # nn.Linear(768, 2) (:368; placed after a projector with --ssl_separate_training)
   loss     = (1 - ssl_weight) * BCEWithLogits(output, labels) + ssl_weight * CE(ssl_out, ssl_label)   (:563-586)
-SpecAugment: --nospec 이 아니면 SpecAugment(args) 를 BEATs 내부 fbank 에 적용 (:319-322). 스크립트 부재 → 기본 off (가정).
-AMP 없음(main.py 에 autocast 없음) → trainer precision 32.
-평가(validate): 테스트 사이클 단독 → sigmoid > threshold → conversion.py 규칙으로 4-class → Sp/Se/Score.
+SpecAugment: unless --nospec, SpecAugment(args) is applied to the BEATs internal fbank (:319-322). No script is released → default off (assumption).
+No AMP (no autocast in main.py) → trainer precision 32.
+Evaluation (validate): test cycles only → sigmoid > threshold → 4-class via the conversion.py rules → Sp/Se/Score.
 
-툴킷 배선: 학습 배치 = (파형 (B,L), 3-label float (B,3), ssl_label long (B)) — PLAdapter 가 batch[2] 를 meta_labels 로 넘긴다.
-검증 배치 = (파형, 4-class long) — 4→3 변환 후 BCE 를 val_loss 로, 반환 logits 는 3-sigmoid→4-class one-hot (B,4)
-(ICBHIScore 의 argmax 와 맞도록; 메트릭 레지스트리 수정 없음).
+Toolkit wiring: training batch = (waveform (B,L), 3-label float (B,3), ssl_label long (B)) — PLAdapter passes batch[2] as meta_labels.
+Validation batch = (waveform, 4-class long) — BCE after the 4→3 conversion is val_loss; the returned logits are a 3-sigmoid→4-class one-hot (B,4)
+(to match the argmax in ICBHIScore; the metric registry is unchanged).
 """
 from __future__ import annotations
 
@@ -34,7 +34,7 @@ logger = logging.getLogger(__name__)
 
 
 class _BEATsFbankSpecAugment(nn.Module):
-    """원본 SpecAugment(args) 를 BEATs fbank [B,1,T,F] 에 적용: 원본은 squeeze→transpose 로 [B,F,T] 에 마스크한다."""
+    """Applies the original SpecAugment(args) to the BEATs fbank [B,1,T,F]: the original masks [B,F,T] via squeeze→transpose."""
 
     def __init__(self, policy: str = "icbhi_ast_sup", mask: str = "mean"):
         super().__init__()
@@ -49,21 +49,21 @@ class _BEATsFbankSpecAugment(nn.Module):
 
 @ModelFactory.register_model_class("beats_pcmcl")
 class BEATsPCMCL(BaseRSCModel, nn.Module):
-    accepts_meta = ("pcmcl_ssl_label",)  # 학습 batch[2] = ssl_label long -1/0/1 (PCMCLDataModule)
+    accepts_meta = ("pcmcl_ssl_label",)  # training batch[2] = ssl_label long -1/0/1 (PCMCLDataModule)
 
     def __init__(
         self,
         n_cls: int = 3,                        # 3-label (default/noconcat_multi) | 4 (ablation concat_single, CE)
         label_mode: str = "multilabel",        # multilabel | single
-        label_space: str = "icbhi4",           # icbhi4(3속성) | sprsound7(6속성) — n_cls 는 속성 수와 같아야 한다
+        label_space: str = "icbhi4",           # icbhi4 (3 attributes) | sprsound7 (6 attributes) — n_cls must equal the attribute count
         pretrained_path: Optional[str] = None,
-        enable_ssl: bool = True,               # PM 헤드 (Table 3 'Concat+Multi' ablation 은 false)
-        ssl_weight: float = 0.1,               # 논문 α=0.1 ↔ 코드 --ssl_weight (argparse 기본 0.5) — 가정
+        enable_ssl: bool = True,               # PM head (false for the Table 3 'Concat+Multi' ablation)
+        ssl_weight: float = 0.1,               # paper α=0.1 ↔ code --ssl_weight (argparse default 0.5) — assumption
         ssl_separate_training: bool = False,
         ssl_projection_dim: int = 256,
         loss_combine: str = "code",            # code: (1-w)·main + w·ssl | paper: main + w·ssl
         threshold: float = 0.5,
-        specaug: bool = False,                 # 원본 기본은 on(--nospec 아니면) — 스크립트 부재로 PAFA 계보 nospec 가정
+        specaug: bool = False,                 # original default is on (unless --nospec); no script released, so nospec is assumed as in PAFA
         specaug_policy: str = "icbhi_ast_sup",
         specaug_mask: str = "mean",
     ):
@@ -73,8 +73,8 @@ class BEATsPCMCL(BaseRSCModel, nn.Module):
         self.ls = get_label_space(label_space)
         if label_mode == "multilabel" and n_cls != self.ls.n_attrs:
             raise ValueError(
-                f"multilabel 의 n_cls 는 라벨 공간의 속성 수와 같아야 한다 — "
-                f"{self.ls.name} 는 n_cls={self.ls.n_attrs} ({', '.join(self.ls.attr_names)}), 받은 값 {n_cls}"
+                f"for multilabel, n_cls must equal the number of attributes in the label space — "
+                f"{self.ls.name} has n_cls={self.ls.n_attrs} ({', '.join(self.ls.attr_names)}), got {n_cls}"
             )
         spec_transform = _BEATsFbankSpecAugment(specaug_policy, specaug_mask) if specaug else None
         self.backbone = BEATsTransferLearningModel(num_target_classes=n_cls, model_path=pretrained_path, spec_transform=spec_transform)
@@ -101,15 +101,15 @@ class BEATsPCMCL(BaseRSCModel, nn.Module):
         logits = self.classifier(features)
         if self.label_mode == "single":
             return logits, loss_func(logits, labels)
-        if labels.dtype.is_floating_point:                 # 학습 배치: 3-label (+ PM 라벨)
+        if labels.dtype.is_floating_point:                 # training batch: 3-label (+ PM label)
             loss, _, _ = pcmcl_training_loss(logits, features, labels, loss_func, self.pm_head,
                                              meta_labels, self.ssl_weight, self.loss_combine)
             return logits, loss
-        if self.training:  # 계약(datasets/contract.py pcmcl_ssl_label) 위반 — 오조합을 조용히 학습하지 않는다
+        if self.training:  # contract violation (datasets/contract.py pcmcl_ssl_label) — do not silently train a mismatched combination
             raise TypeError(
-                f"PC-MCL label_mode=multilabel 학습 배치는 float (B, 3) 멀티라벨이어야 하는데 {labels.dtype} 가 왔다 — "
-                "pcmcl datamodule 의 mode 가 concat_single 이면 model.params.label_mode=single 로 맞추라."
+                f"PC-MCL label_mode=multilabel expects float (B, 3) multi-label training batches, got {labels.dtype} — "
+                "if the pcmcl datamodule mode is concat_single, set model.params.label_mode=single."
             )
-        # 검증 배치: 4-class long → 3-label BCE(원본 validate 의 criterion(output, labels)) + 4-class one-hot 예측
+        # validation batch: 4-class long → 3-label BCE (criterion(output, labels) in the original validate) + 4-class one-hot prediction
         loss = loss_func(logits, self.ls.encode(labels))
         return self.ls.logits_to_onehot(logits, self.threshold), loss

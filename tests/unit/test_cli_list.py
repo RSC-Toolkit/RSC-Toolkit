@@ -1,4 +1,4 @@
-"""`rsc-toolkit list` — 등록소 목록 서브커맨드 (README·scripts/train.sh 가 안내하던 명령; 예전엔 없었다)."""
+"""`rsc-toolkit list` — registry listing subcommand (the command referenced by README and scripts/train.sh)."""
 from __future__ import annotations
 
 import io

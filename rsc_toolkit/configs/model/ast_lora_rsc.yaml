@@ -1,15 +1,15 @@
-# LoRA-RSC(ICASSP 2025): HF AST(AudioSet 10/10, max_length 500, pos_embed 0·동결) + K,V LoRA(768→8→768, scaling 8/96) + 최종 LN + Linear(768→4).
-# 학습 파라미터 299,524 (README 0.299M). method=full_ft 는 README 기준선(85.71M; README 표기 85.74M 과 불일치 — 정찰 정정).
+# LoRA-RSC (ICASSP 2025): HF AST (AudioSet 10/10, max_length 500, pos_embed zero and frozen) + K,V LoRA (768→8→768, scaling 8/96) + final LN + Linear(768→4).
+# 299,524 trainable parameters (README 0.299M). method=full_ft is the README baseline (85.71M; differs from the 85.74M stated in the README).
 name: ast_lora_rsc
 params:
   n_cls: 4
-  method: lora                   # lora | full_ft | linear (full_ft: optimizer.params.lr=5e-5, linear: optimizer.params.lr=1e-3 오버라이드 필요 — 원본 train.yaml; linear 는 백본/헤드 두 그룹 모두 1e-3 이라 단일 그룹과 동치)
-  max_length: 500                # train.yaml max_len_AST_ICBHI — 특징 앞 500 프레임(5 s) 만 사용 (원본 quirk)
-  pretrained_dir: null           # 기본 pretrained_models/upstream/hf/ast-finetuned-audioset-10-10-0.4593
-  lora_reduction: 96             # --reduction_rate_lora (실제 rank = round(768/96) = 8)
+  method: lora                   # lora | full_ft | linear (requires overriding optimizer.params.lr=5e-5 for full_ft and optimizer.params.lr=1e-3 for linear — official train.yaml; for linear both backbone and head groups use 1e-3, equivalent to a single group)
+  max_length: 500                # train.yaml max_len_AST_ICBHI — only the first 500 feature frames (5 s) are used (official quirk)
+  pretrained_dir: null           # default pretrained_models/upstream/hf/ast-finetuned-audioset-10-10-0.4593
+  lora_reduction: 96             # --reduction_rate_lora (actual rank = round(768/96) = 8)
   lora_alpha: 8                  # --alpha_lora (scaling = 8/96)
-  lora_targets: [k, v]           # 원본 K,V (PETL_AST 원형·통례는 Q,V)
-  lora_init: hf_fast_init        # transformers 4.28.1 from_pretrained fast-init quirk: down/up 모두 trunc_normal(0.02). 'paper' = zeros/kaiming
-  pos_embed: zeros               # 원본 quirk (AudioSet pos_embed 미로드). 'interpolate' 는 툴킷 확장
+  lora_targets: [k, v]           # official K,V (the PETL_AST original and common practice use Q,V)
+  lora_init: hf_fast_init        # transformers 4.28.1 from_pretrained fast-init quirk: both down/up use trunc_normal(0.02). 'paper' = zeros/kaiming
+  pos_embed: zeros               # official quirk (AudioSet pos_embed not loaded). 'interpolate' is a toolkit extension
   final_output: CLS
   attn_implementation: eager

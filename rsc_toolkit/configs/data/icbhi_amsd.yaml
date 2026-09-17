@@ -1,14 +1,14 @@
-# AMS-D ICBHI 4-class, 공식 60/40 (툴킷 목적). 공식 loader/mydataset.py 재현:
-#   클립 → kaldi fbank 128/10 ms → (798 프레임 미만이면 raw 영역 0-패딩 / 초과면 절단: 코드 fallback) → [train] torchaudio
-#   FrequencyMasking(freqm//2)·TimeMasking(timem//2) 값 0 → 정규화 (x-mean)/(2·std). epoch ≥10 잡음/roll 은 모델(ast_amsd) 이 적용.
-#   dataset_aug(시간영역 증강으로 클래스 불균형 보정, 논문 §3.1; 생성 스크립트·내용 미상) 는 **쓰지 않는다** → 앵커 대비 알려진 결손.
+# AMS-D ICBHI 4-class, official 60/40 split (toolkit goal). Reproduces the official loader/mydataset.py:
+#   clip → kaldi fbank 128/10 ms → (below 798 frames: zero-pad in the raw domain / above: truncate — code fallback) → [train] torchaudio
+#   FrequencyMasking(freqm//2)·TimeMasking(timem//2) with value 0 → normalize (x-mean)/(2·std). Noise/roll from epoch ≥10 are applied by the model (ast_amsd).
+#   dataset_aug (time-domain augmentation correcting class imbalance, paper §3.1; generation script and content unknown) is **not used** → known gap vs. the paper-reported values.
 #
-# 클립 길이 — 가정(저자 질문 #10, 저자 확인 전): 공식 코드에 클립 생성 스크립트가 없다. 논문 §3.1 "16 kHz 리샘플 + 8 s loop-pad" 를 기본값으로
-#   채택 (desired_length_sec 8.0, pad_type repeat = 반복 패딩·fade 없음; 8 s = 정확히 798 프레임이라 코드의 fbank 0-패딩 분기는 실행되지 않음).
-#   두 번째 가정(파형 패딩 없이 fbank 영역 무음 0-패딩, 패딩값 +0.467):  data.params.desired_length_sec=null data.params.pad_type=zero
-#   캐시는 AMSDDataModule 이 cache_dir/pad-<pad_type>-<desired_length_sec>-fade<fade>/ 로 자동 분리한다 (가정 전환 시 재생성, 8 워커 수십 초).
-# 가정값(누락 config_train.yaml, 질문 #3): amsd_freqm 48 / amsd_timem 192 (AST AudioSet 관례; 코드 //2 로 실효 24/96) — 논문 §3.1 은 SpecAugment 를
-#   언급하지 않으므로 0/0 도 동등한 후보 (data.params.amsd_freqm=0 data.params.amsd_timem=0). mean/std 는 논문 미기재 → AST 상수 가정.
+# Clip length — assumption (not confirmed by the authors): the official code has no clip-generation script. The paper §3.1 "16 kHz resample + 8 s loop-pad" is the default
+#   (desired_length_sec 8.0, pad_type repeat = repeat padding without fade; 8 s = exactly 798 frames, so the code's fbank zero-padding branch never runs).
+#   Second assumption (no waveform padding, silent zero-padding in the fbank domain, pad value +0.467):  data.params.desired_length_sec=null data.params.pad_type=zero
+#   AMSDDataModule automatically separates the cache into cache_dir/pad-<pad_type>-<desired_length_sec>-fade<fade>/ (switching assumptions regenerates it, tens of seconds with 8 workers).
+# Assumed values (config_train.yaml is missing): amsd_freqm 48 / amsd_timem 192 (AST AudioSet convention; effectively 24/96 after the code's //2) — paper §3.1 does not mention
+#   SpecAugment, so 0/0 is an equally valid candidate (data.params.amsd_freqm=0 data.params.amsd_timem=0). mean/std not specified in the paper → AST constants assumed.
 name: icbhi_amsd
 params:
   datamodule_name: amsd
@@ -21,12 +21,12 @@ params:
 
   sampling_rate: 16000
   sample_level: cycle
-  desired_length_sec: 8.0        # 가정(질문 #10): 논문 §3.1 8 s loop-pad. null 이면 코드 fallback(fbank 0-패딩) 가정
-  pad_type: repeat               # 논문 'loop-padded' = 반복 패딩 (fade 없음)
-  fade: false                    # 원본 로더는 fade 없음
+  desired_length_sec: 8.0        # Assumption: paper §3.1 8 s loop-pad. null assumes the code fallback (fbank zero-padding)
+  pad_type: repeat               # paper 'loop-padded' = repeat padding (no fade)
+  fade: false                    # the official loader has no fade
 
   train_splits: [train]
-  val_splits: [test]             # 매 epoch 공식 test 평가 (툴킷 프로토콜 best-on-test; 공식 코드의 train 80/20 valid 선택·epoch 45 는 문서화만)
+  val_splits: [test]             # official test evaluation every epoch (toolkit protocol, best-on-test; the official code's train 80/20 valid selection and epoch 45 are documented only)
   test_splits: [test]
 
   batch_size: 24
@@ -38,23 +38,23 @@ params:
   features:
     enabled: true
     kind: fbank
-    cache_dir: downloaded_datasets/features_cache_amsd   # fade 없음·normalize 없음 → 전용 캐시; 실제 경로는 /pad-*/ 하위 (AMSDDataModule)
+    cache_dir: downloaded_datasets/features_cache_amsd   # no fade, no normalize → dedicated cache; the actual path is under /pad-*/ (AMSDDataModule)
     n_mels: 128
     target_frames: 798
     frame_shift: 10
     window_type: hanning
     dither: 0.0
-    normalize: false             # raw fbank 캐시 — 정규화는 마스킹 뒤 AMSDFeatureDataset 이
+    normalize: false             # raw fbank cache — AMSDFeatureDataset normalizes after masking
 
   feature_precompute: true
   feature_precompute_batch_size: 8
-  feature_precompute_num_workers: 8   # 첫 캐시 생성 가속 — 워커 0 이면 사이클당 녹음 전체 로드로 ~2 h
+  feature_precompute_num_workers: 8   # speeds up the first cache build — with 0 workers each cycle loads the whole recording, ~2 h
 
   specaugment:
-    enabled: false               # 툴킷 SpecAugment 정책과 다름 — AMSDFeatureDataset 의 torchaudio 마스킹 사용
+    enabled: false               # differs from the toolkit SpecAugment policy — uses the torchaudio masking of AMSDFeatureDataset
 
-  amsd_freqm: 48                 # 가정 (저자 확인 전; 논문 미언급 → 0 도 후보)
-  amsd_timem: 192                # 가정 (저자 확인 전; 논문 미언급 → 0 도 후보)
-  amsd_mean: -4.2677393          # 가정 (AST AudioSet 상수; 논문 미기재)
-  amsd_std: 4.5689974            # 가정
-  amsd_return_index: true        # train 배치 4번째 원소 = 샘플 인덱스 (PS-KD 버퍼·잡음 시드)
+  amsd_freqm: 48                 # assumption (not confirmed by the authors; not mentioned in the paper → 0 is also a candidate)
+  amsd_timem: 192                # assumption (not confirmed by the authors; not mentioned in the paper → 0 is also a candidate)
+  amsd_mean: -4.2677393          # assumption (AST AudioSet constant; not specified in the paper)
+  amsd_std: 4.5689974            # assumption
+  amsd_return_index: true        # 4th element of the train batch = sample index (PS-KD buffer, noise seed)

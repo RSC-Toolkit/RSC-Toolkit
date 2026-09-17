@@ -12,18 +12,18 @@ logger = logging.getLogger(__name__)
 
 
 class BaseAudioProcessor(ABC):
-    """피처 프런트엔드 계약.
+    """Feature front-end contract.
 
-    registry(`rsc_toolkit.registries.PROCESSORS`, `data.params.features.kind`)로 조회되는 프로세서는
-    두 가지를 더 선언한다:
+    Processors looked up through the registry (`rsc_toolkit.registries.PROCESSORS`, `data.params.features.kind`)
+    declare two more things:
 
-    - `is_spectrogram`: True 면 datamodule 이 학습 배치에 SpecAugment 를 걸 수 있다
-      (내장은 mel/fbank 만 True — 예전 `{"mel","fbank"}` 화이트리스트와 같은 진리표).
-    - `from_options(opts, *, sampling_rate, feature_cache)`: `features` config(dict) 로부터 자신을
-      만든다. 어떤 키를 읽을지는 각 kind 가 안다. 새 kind 의 전용 파라미터는 `features.params` 에 넣는다.
+    - `is_spectrogram`: if True, the datamodule may apply SpecAugment to training batches
+      (among built-ins only mel/fbank are True).
+    - `from_options(opts, *, sampling_rate, feature_cache)`: builds the processor from the `features` config (dict).
+      Each kind knows which keys it reads. Parameters specific to a new kind go into `features.params`.
 
-    `get_processor_config()` 는 **피처 캐시 키**다 — 생성 경로가 바뀌어도 이 dict 가 같으면 캐시가
-    그대로 적중한다. 손대지 말 것.
+    `get_processor_config()` is the **feature cache key** — as long as this dict stays the same, the cache
+    still hits even if the construction path changes. Do not modify it.
     """
 
     is_spectrogram: ClassVar[bool] = False
@@ -37,9 +37,9 @@ class BaseAudioProcessor(ABC):
 
     @classmethod
     def from_options(cls, opts: Mapping[str, Any], *, sampling_rate: int, feature_cache: Optional[FeatureCache]):
-        """`features` config 로부터 프로세서를 만든다. 내장 kind 는 각자 구현; 기본은 미구현 오류."""
+        """Build the processor from the `features` config. Built-in kinds implement it; the default raises NotImplementedError."""
         raise NotImplementedError(
-            f"{cls.__name__} 은 from_options 를 구현하지 않았다 — features.kind 로 쓰려면 구현하라"
+            f"{cls.__name__} does not implement from_options — implement it to use this class as features.kind"
         )
 
     def get_processor_config(self) -> Dict[str, Any]:

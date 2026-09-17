@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
-# notebooks/tutorial.ipynb 를 생성하고 nbconvert 로 실행한다. 기본은 Part A(toy, CPU) 만 — CI 가 이렇게 돈다. --full 은 Part B(ICBHI, GPU)까지.
+# Generates notebooks/tutorial.ipynb and executes it with nbconvert. Default: Part A (toy, CPU) only, as in CI. --full also runs Part B (ICBHI, GPU).
 #   scripts/tutorial/run_tutorial.sh            # RSC_TUTORIAL_QUICK=1
 #   scripts/tutorial/run_tutorial.sh --full
-# 실행된 노트북(출력 포함)은 $WORK/tutorial.executed.ipynb 에 남는다 (WORK 기본 outputs/tutorial).
+# The executed notebook (with outputs) is written to $WORK/tutorial.executed.ipynb (WORK defaults to outputs/tutorial).
 set -euo pipefail
 ROOT=$(cd "$(dirname "$0")/../.." && pwd); cd "$ROOT"
-# 인터프리터: PY 환경변수 > .venv/bin/python > PATH 의 python/python3  (set -e 아래에서 command -v 실패가 조용히 죽이지 않게 || true)
+# Interpreter: PY env var > .venv/bin/python > python/python3 on PATH  (|| true so a failing command -v does not silently exit under set -e)
 if [ -z "${PY:-}" ]; then
   if [ -x "$ROOT/.venv/bin/python" ]; then PY="$ROOT/.venv/bin/python"; else PY=$(command -v python || command -v python3 || true); fi
 fi
-[ -n "$PY" ] || { echo "python 을 찾지 못했다 — PY=<interpreter> 로 지정하라" >&2; exit 1; }
+[ -n "$PY" ] || { echo "python not found — set PY=<interpreter>" >&2; exit 1; }
 export RSC_TUTORIAL_QUICK=1
 [ "${1:-}" = "--full" ] && export RSC_TUTORIAL_QUICK=0
 WORK=${RSC_TUTORIAL_WORK:-$ROOT/outputs/tutorial}; mkdir -p "$WORK"; export RSC_TUTORIAL_WORK="$WORK"

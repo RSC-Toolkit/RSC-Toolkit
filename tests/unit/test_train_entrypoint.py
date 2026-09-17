@@ -1,9 +1,9 @@
 """
-학습 엔트리포인트의 재현성 관련 동작 테스트.
+Tests for reproducibility-related behavior of the training entry point.
 
-- config 의 seed 가 실제로 적용되는지 (이전에는 아무도 읽지 않아 무효였다)
-- train.py 의 타입 어노테이션에 미정의 이름이 없는지
-- EMA 콜백이 config 그룹으로 붙고 beta 가 정상값인지
+- the seed in the config is actually applied (previously nothing read it, so it had no effect)
+- the type annotations in train.py contain no undefined names
+- the EMA callback is attached via a config group and beta has a sane value
 """
 import logging
 import typing
@@ -25,7 +25,7 @@ def _compose(name: str, overrides=None):
 
 
 def test_seed_is_applied_and_makes_rng_reproducible():
-    """_apply_seed 를 부르면 이후 난수열이 결정된다."""
+    """Calling _apply_seed makes the subsequent random sequence deterministic."""
     train_mod._apply_seed({"seed": 123})
     first = torch.randn(8)
 
@@ -46,7 +46,7 @@ def test_different_seeds_give_different_rng():
 
 
 def test_missing_seed_warns(caplog):
-    """seed 가 없으면 조용히 넘어가지 말고 경고한다."""
+    """A missing seed triggers a warning instead of being silently skipped."""
     with caplog.at_level(logging.WARNING):
         train_mod._apply_seed({})
 
@@ -59,11 +59,11 @@ def test_missing_seed_warns(caplog):
 )
 def test_annotations_resolve(func):
     """
-    어노테이션의 이름이 전부 실제로 정의돼 있는지 확인한다.
+    Checks that every name in the annotations is actually defined.
 
-    train.py 는 `from __future__ import annotations` 를 쓰므로 미정의 이름이
-    있어도 import 시점에는 조용하다. 이전에 lightning 을 import 하지 않은 채
-    `L.Trainer` 를 어노테이션으로 쓰고 있었고, get_type_hints 에서 NameError 가 났다.
+    train.py uses `from __future__ import annotations`, so undefined names
+    stay silent at import time. `L.Trainer` was once used as an annotation
+    without importing lightning, and get_type_hints raised NameError.
     """
     typing.get_type_hints(func)
 
@@ -71,31 +71,31 @@ def test_annotations_resolve(func):
 @pytest.mark.parametrize("config_name", ["default", "default_ast"])
 def test_ema_callback_is_configured_with_sane_beta(config_name):
     """
-    EMA 콜백이 실제로 붙고 beta 가 정상값인지 확인한다.
+    Checks that the EMA callback is actually attached and beta has a sane value.
 
-    이전에는 trainer/default.yaml 에 beta: 0.5 가 인라인으로 박혀 있었다.
-    0.5 는 반감기가 1 스텝이라 사실상 EMA 가 아니다. 한편 callbacks/ema.yaml
-    (0.999) 은 어느 defaults 에도 연결돼 있지 않아 쓰이지 않았다.
+    trainer/default.yaml used to hard-code beta: 0.5 inline.
+    0.5 has a half-life of 1 step, so it is effectively not an EMA. Meanwhile callbacks/ema.yaml
+    (0.999) was not wired into any defaults and went unused.
     """
     cfg = _compose(config_name)
     callbacks = OmegaConf.to_container(cfg.trainer.params.callbacks, resolve=True)
 
     ema = [c for c in callbacks if "EMACallback" in c.get("_target_", "")]
-    assert len(ema) == 1, f"EMA 콜백이 정확히 하나여야 한다: {callbacks}"
+    assert len(ema) == 1, f"there must be exactly one EMA callback: {callbacks}"
     assert ema[0]["beta"] == 0.999
 
 
 @pytest.mark.parametrize("config_name", ["default", "default_ast"])
 def test_callbacks_can_be_disabled(config_name):
-    """`callbacks=none` 으로 콜백을 끌 수 있어야 한다."""
+    """Callbacks can be disabled with `callbacks=none`."""
     cfg = _compose(config_name, overrides=["callbacks=none"])
     assert list(cfg.trainer.params.callbacks) == []
 
 
 def test_callbacks_group_does_not_leak_top_level_key():
     """
-    callbacks 그룹이 `# @package _global_` 없이 로드되면 cfg.callbacks 아래에
-    통째로 들어가고 trainer 에는 반영되지 않는다. 그 상태를 막는다.
+    If the callbacks group is loaded without `# @package _global_`, it lands entirely under
+    cfg.callbacks and is not applied to the trainer. This guards against that.
     """
     cfg = _compose("default")
     assert "callbacks" not in cfg

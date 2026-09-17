@@ -1,4 +1,4 @@
-"""VMamba VSSM 백본 (Lung-SRAD / DASS-medium) — 순수 torch selective scan 폴백 + 선택적 CUDA 커널."""
+"""VMamba VSSM backbone (Lung-SRAD / DASS-medium) — pure-torch selective scan fallback + optional CUDA kernel."""
 from .cross_scan import CrossMerge, CrossScan
 from .selective_scan import cuda_kernel_available, resolve_backend, selective_scan, selective_scan_torch
 from .vssm import (

@@ -8,6 +8,6 @@
  "gpu": "NVIDIA RTX A6000",
  "selective_scan_kernel": true,
  "patches": [
-  "P1..P6 in docstring (클론 무수정; P3 blur_blocks=∅, P4 symlink cwd, P5 shims, P6 fallback only if --no-kernel)"
+  "P1..P6 in docstring (clone unmodified; P3 blur_blocks=∅, P4 symlink cwd, P5 shims, P6 fallback only if --no-kernel)"
  ]
 }

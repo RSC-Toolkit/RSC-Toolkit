@@ -1,21 +1,21 @@
 """
-BTS 논문(Interspeech 2024)의 메타데이터 → 텍스트 설명 — 공식 코드 충실 이식 (P0).
+Metadata -> text description of the BTS paper (Interspeech 2024) -- exact port of the official code (verified against goldens).
 
-출처: https://github.com/kaen2891/bts util/meta_description.py generate_meta_description()
-      + util/icbhi_util.py get_meta_text_descriptions() (학습·기본 평가 경로).
+Source: https://github.com/kaen2891/bts util/meta_description.py generate_meta_description()
+      + util/icbhi_util.py get_meta_text_descriptions() (training and default evaluation path).
 
-원본 그대로 유지하는 quirk:
-- 나이는 19세 이상이면 'adult', 아니면 'pediatric'. 나이 결측(원본은 NaN→-1)도 -1 < 19
-  라서 'pediatric' 이 된다 — 원본 학습/평가 경로에 unknown 처리가 없다.
-- 성별은 0(M)→'male', 그 외→'female'.
-- 원본의 테스트 전용 ablation 플래그(test_drop_key / test_unknown_all / test_bmi /
-  test_wrong_label)는 논문 재현 수치와 무관해 이식하지 않는다.
+Quirks kept as in the original code:
+- Age 19 or older is 'adult', otherwise 'pediatric'. Missing age (NaN -> -1 in the original) also satisfies -1 < 19
+  and becomes 'pediatric' -- the original training/evaluation path has no unknown handling.
+- Sex 0 (M) -> 'male', anything else -> 'female'.
+- The original test-only ablation flags (test_drop_key / test_unknown_all / test_bmi /
+  test_wrong_label) do not affect the paper's reproduction numbers and are not ported.
 """
 from __future__ import annotations
 
 from typing import Any, Dict, Mapping, Optional, Sequence
 
-# 원본 icbhi_dataset.py 의 7필드 meta 텐서: age, sex, adult_BMI, child_weight, child_height, chest_location, device
+# 7-field meta tensor of the original icbhi_dataset.py: age, sex, adult_BMI, child_weight, child_height, chest_location, device
 LOC_ID_TO_STR = {
     0: "trachea", 1: "left anterior chest", 2: "right anterior chest", 3: "left posterior chest",
     4: "right posterior chest", 5: "left lateral chest", 6: "right lateral chest",
@@ -32,7 +32,7 @@ META_MODES = (
 
 
 def generate_meta_description(age=None, sex=None, loc=None, dev=None):
-    """원본 meta_description.py:6-69 그대로."""
+    """Same as the original meta_description.py:6-69."""
     # set up the prefix
     if loc or dev:
         output_sent = "This sound was recorded"
@@ -99,7 +99,7 @@ def generate_meta_description(age=None, sex=None, loc=None, dev=None):
 
 
 def meta_fields_from_meta7(meta7: Sequence[float]) -> Dict[str, str]:
-    """원본 get_meta_text_descriptions 의 정수→문자열 변환 (icbhi_util.py:130-171)."""
+    """Integer -> string conversion of the original get_meta_text_descriptions (icbhi_util.py:130-171)."""
     age, sex, loc, dev = int(meta7[0]), int(meta7[1]), int(meta7[5]), int(meta7[6])
     return {
         "age": "adult" if age >= ADULT_AGE else "pediatric",
@@ -110,7 +110,7 @@ def meta_fields_from_meta7(meta7: Sequence[float]) -> Dict[str, str]:
 
 
 def select_meta_fields(fields: Mapping[str, str], meta_mode: str) -> Dict[str, Optional[str]]:
-    """원본의 meta_mode 별 meta_dict 구성 (icbhi_util.py:209-239): 포함 안 되는 항목은 None."""
+    """meta_dict construction per meta_mode as in the original (icbhi_util.py:209-239): excluded fields are None."""
     if meta_mode not in META_MODES:
         raise ValueError(f"meta_mode must be one of {META_MODES}, got {meta_mode!r}")
     keep = {"age", "sex", "loc", "dev"} if meta_mode == "all" else set(meta_mode.split("_"))
@@ -118,21 +118,21 @@ def select_meta_fields(fields: Mapping[str, str], meta_mode: str) -> Dict[str, O
 
 
 def describe_meta7(meta7: Sequence[float], meta_mode: str = "all") -> str:
-    """저자 전처리 .pt 의 7필드 meta 텐서 → 텍스트 설명 (학습·기본 평가 경로와 동일)."""
+    """7-field meta tensor from the authors' preprocessed .pt -> text description (same as the training and default evaluation path)."""
     return generate_meta_description(**select_meta_fields(meta_fields_from_meta7(meta7), meta_mode))
 
 
 def meta7_from_index_meta(meta: Mapping[str, Any]) -> list:
     """
-    툴킷 ICBHI 인덱스의 meta dict(age, sex, adult_BMI, child_weight, child_height,
-    chest_location, device) → 원본과 같은 7필드 벡터. 결측은 원본처럼 -1.
+    Toolkit ICBHI index meta dict (age, sex, adult_BMI, child_weight, child_height,
+    chest_location, device) -> the same 7-field vector as the original. Missing values are -1, as in the original.
     """
     def num(v):
         try:
             f = float(v)
         except (TypeError, ValueError):
             return -1.0
-        return -1.0 if f != f else f  # NaN → -1
+        return -1.0 if f != f else f  # NaN -> -1
 
     sex = str(meta.get("sex", ""))
     return [

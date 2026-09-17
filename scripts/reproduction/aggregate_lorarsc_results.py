@@ -1,9 +1,9 @@
 """
-LoRA-RSC P1 집계: outputs/lorarsc/<run>/best.json (+ outputs/lorarsc/logs/<run>.done EXIT=0 게이팅).
+LoRA-RSC 5-seed reproduction check aggregation: outputs/lorarsc/<run>/best.json (gated on EXIT=0 in outputs/lorarsc/logs/<run>.done).
 
   .venv/bin/python scripts/reproduction/aggregate_lorarsc_results.py
 
-앵커 = 저장소 README 표(논문 본문 미확보; run 수·± 미상, 코드 기본 seed 10 단일 run·best-on-test 로 추정):
+Paper-reported value = repository README table (paper body not available; number of runs/± unknown, presumably a single run with the code default seed 10, best-on-test):
   LoRA(K,V r8 α8) Sp 85.31 / Se 36.11 / Score 60.71,  full-FT Sp 82.84 / Se 36.70 / Score 59.77.
 """
 import json
@@ -12,10 +12,10 @@ import re
 import statistics
 
 PAPER = {
-    "icbhi-lorarsc":        ("LoRA-RSC (K,V r=8 α=8, 0.299M) — 공식 60/40, seed 1–5", (85.31, 36.11, 60.71)),
-    "icbhi-lorarsc-seed10": ("LoRA-RSC — 코드 기본 seed 10 (README 단일 run 비교)", (85.31, 36.11, 60.71)),
-    "icbhi-lorarsc-fullft": ("full fine-tuning 기준선 (lr 5e-5)", (82.84, 36.70, 59.77)),
-    "icbhi-lorarsc-noise":  ("LoRA-RSC — 파형 잡음 1D 해석(샘플별 N(0,0.3²), data=icbhi_lorarsc_noise; 저자 질문 #6 대안)", (85.31, 36.11, 60.71)),
+    "icbhi-lorarsc":        ("LoRA-RSC (K,V r=8 α=8, 0.299M) — official 60/40 split, seed 1–5", (85.31, 36.11, 60.71)),
+    "icbhi-lorarsc-seed10": ("LoRA-RSC — code default seed 10 (compare with the README single run)", (85.31, 36.11, 60.71)),
+    "icbhi-lorarsc-fullft": ("full fine-tuning baseline (lr 5e-5)", (82.84, 36.70, 59.77)),
+    "icbhi-lorarsc-noise":  ("LoRA-RSC — 1D waveform-noise interpretation (per-sample N(0,0.3²), data=icbhi_lorarsc_noise; alternative interpretation)", (85.31, 36.11, 60.71)),
 }
 
 
@@ -39,7 +39,7 @@ def main():
             d = json.loads(best.read_text())
             groups[base].append((seed, d["S_p"], d["S_e"], d["icbhi_score"], d.get("epoch")))
     if partial:
-        print("(미완료 run — 집계 제외: " + ", ".join(partial) + ")")
+        print("(incomplete runs — excluded from aggregation: " + ", ".join(partial) + ")")
     for base, rows in groups.items():
         if not rows:
             continue
@@ -51,10 +51,10 @@ def main():
         if len(rows) >= 2:
             ms = lambda i: (statistics.mean([r[i] for r in rows]), statistics.stdev([r[i] for r in rows]))  # noqa: E731
             sp, se, sc = ms(1), ms(2), ms(3)
-            print(f"  우리 평균 : Sp {sp[0]:6.2f}±{sp[1]:.2f}  Se {se[0]:6.2f}±{se[1]:.2f}  Score {sc[0]:6.2f}±{sc[1]:.2f}")
-            print(f"  README    : Sp {paper[0]:6.2f}  Se {paper[1]:6.2f}  Score {paper[2]:6.2f} (run 수·± 미상)   Score 차이: {sc[0]-paper[2]:+.2f}")
+            print(f"  ours mean : Sp {sp[0]:6.2f}±{sp[1]:.2f}  Se {se[0]:6.2f}±{se[1]:.2f}  Score {sc[0]:6.2f}±{sc[1]:.2f}")
+            print(f"  README    : Sp {paper[0]:6.2f}  Se {paper[1]:6.2f}  Score {paper[2]:6.2f} (number of runs/± unknown)   Score diff: {sc[0]-paper[2]:+.2f}")
         else:
-            print(f"  README    : Sp {paper[0]:6.2f}  Se {paper[1]:6.2f}  Score {paper[2]:6.2f} (run 수·± 미상)   Score 차이: {rows[0][3]-paper[2]:+.2f}")
+            print(f"  README    : Sp {paper[0]:6.2f}  Se {paper[1]:6.2f}  Score {paper[2]:6.2f} (number of runs/± unknown)   Score diff: {rows[0][3]-paper[2]:+.2f}")
 
 
 if __name__ == "__main__":

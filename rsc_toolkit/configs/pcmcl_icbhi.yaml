@@ -1,9 +1,9 @@
-# PC-MCL (arXiv 2601.17080, wa976/PC-MCL) BEATs 주 결과 — ICBHI 공식 60/40 4-class. 앵커(5 seed): 79.04/51.71/65.37±0.73.
-# 하이퍼파라미터: 학습 스크립트(.gitignore /scripts) 부재 → 논문 명시값(10 s, α↔w 0.1, mixing_prob 1.0, threshold 0.5, hard negative)
-#   + **가정(저자 확인 전)** PAFA 계보(100 ep, bs 32, Adam 5e-5/wd 1e-6, cosine, MA 0.5, nospec, seed 1-5). 결과는 '가정 런' 으로 표기.
-#   argparse 기본값(참고): 400 ep / lr 1e-3 / wd 1e-4 / 8 s / mixing_prob 0.5 / ssl_prob 0.3 / ssl_weight 0.5 / ma_beta 0.
-# AMP 없음(main.py 에 autocast 없음) → precision 32. cudnn.deterministic=True 는 미재현(툴킷 관례).
-#   실행: rsctk-train --config-name pcmcl_icbhi run.name=icbhi-pcmcl-beats-s1 seed=1
+# PC-MCL (arXiv 2601.17080, wa976/PC-MCL) BEATs main result — official ICBHI 60/40 split, 4-class. Paper-reported (5 seeds): 79.04/51.71/65.37±0.73.
+# Hyperparameters: no training script (.gitignore /scripts) → values stated in the paper (10 s, α↔w 0.1, mixing_prob 1.0, threshold 0.5, hard negative)
+#   + **assumptions (not confirmed by the authors)** from the PAFA lineage (100 ep, bs 32, Adam 5e-5/wd 1e-6, cosine, MA 0.5, nospec, seeds 1-5). Results are labeled as an 'assumption run'.
+#   argparse defaults (for reference): 400 ep / lr 1e-3 / wd 1e-4 / 8 s / mixing_prob 0.5 / ssl_prob 0.3 / ssl_weight 0.5 / ma_beta 0.
+# No AMP (no autocast in main.py) → precision 32. cudnn.deterministic=True is not reproduced (toolkit convention).
+#   Run: rsctk-train --config-name pcmcl_icbhi run.name=icbhi-pcmcl-beats-s1 seed=1
 defaults:
   - model: beats_pcmcl
   - data_defaults@data: base

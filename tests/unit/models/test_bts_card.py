@@ -1,11 +1,11 @@
 """
-BTS-CARD (ICASSP 2026) P0 테스트.
+Official-code parity tests for BTS-CARD (ICASSP 2026).
 
-골든 출처 (tests/golden/btscard/, scripts/reproduction/dump_btscard_goldens.py — 공식 코드 a9982a0 을
-transformers 4.40.0 / CPU fp32 로 실행):
-- forward_golden.pt : training.pt 앞 4 배치의 o_multi/o_text/o1/o2/판별기 로짓·6항 손실·TIE(α 0/0.5/1) + 랜덤 헤드 가중치
-- text_golden.json  : 마스킹 dict·문장(random.seed 7)·4.40.0 토크나이저 id (CLAP·tiny-bert)
-- sprsound_parity.json : 저자 valid_spr.pt vs 툴킷 파이프라인(sprsound_btscard.yaml) 특징·라벨·문장 대조 기록
+Golden sources (tests/golden/btscard/, scripts/reproduction/dump_btscard_goldens.py — official code a9982a0 run with
+transformers 4.40.0 / CPU fp32):
+- forward_golden.pt : o_multi/o_text/o1/o2/discriminator logits, 6-term loss, TIE (alpha 0/0.5/1) for the first 4 batches of training.pt + random head weights
+- text_golden.json  : masking dicts, sentences (random.seed 7), 4.40.0 tokenizer ids (CLAP, tiny-bert)
+- sprsound_parity.json : comparison record of features, labels and sentences, authors' valid_spr.pt vs the toolkit pipeline (sprsound_btscard.yaml)
 """
 import json
 import pathlib
@@ -31,7 +31,7 @@ def _repo_root() -> pathlib.Path:
     for c in pathlib.Path(__file__).resolve().parents:
         if (c / "pyproject.toml").exists():
             return c
-    raise RuntimeError("리포 루트를 찾지 못했다")
+    raise RuntimeError("repository root not found")
 
 
 REPO = _repo_root()
@@ -45,9 +45,9 @@ def _hf_clap_cached() -> bool:
     return any(p.name.startswith("models--laion--clap-htsat-unfused") for p in hub.glob("models--*"))
 
 
-needs_models = pytest.mark.skipif(not (_hf_clap_cached() and (BERT_LOCAL / "config.json").exists()),   # 새 clone 엔 provenance.json 만 추적돼 폴더는 있다
-                                  reason="laion/clap-htsat-unfused 캐시 또는 tiny-clinicalbert 로컬 사본 없음")
-needs_golden = pytest.mark.skipif(not (GOLDEN / "forward_golden.pt").exists(), reason="골든 없음")
+needs_models = pytest.mark.skipif(not (_hf_clap_cached() and (BERT_LOCAL / "config.json").exists()),   # a fresh clone tracks only provenance.json, so the folder exists
+                                  reason="laion/clap-htsat-unfused cache or local tiny-clinicalbert copy missing")
+needs_golden = pytest.mark.skipif(not (GOLDEN / "forward_golden.pt").exists(), reason="golden missing")
 
 
 @pytest.fixture(scope="module")
@@ -65,13 +65,13 @@ def model():
     return m.eval()
 
 
-# ------------------------------------------------------------------ 골든(모델)
+# ------------------------------------------------------------------ goldens (model)
 @needs_models
 @needs_golden
 def test_forward_matches_reference_golden(model):
     g = torch.load(GOLDEN / "forward_golden.pt", map_location="cpu", weights_only=False)
     t = json.load(open(GOLDEN / "text_golden.json"))
-    # 토크나이저(5.15.1 vs 4.40.0) 동일성
+    # tokenizer (5.15.1 vs 4.40.0) identity
     ids_c, _ = model.encode_clap_texts(t["clap_texts"], "cpu")
     ids_b, mask_b = model.encode_bert(t["bert_texts_masked"], "cpu")
     assert torch.equal(ids_c, g["clap_input_ids"])
@@ -92,13 +92,13 @@ def test_forward_matches_reference_golden(model):
 
 @needs_golden
 def test_masking_omit_format_matches_reference_text():
-    """icbhi_util.py:137-144 마스킹(None) → meta_description 생략 문장 (골든은 random.seed 7 의 마스크)."""
+    """icbhi_util.py:137-144 masking (None) -> sentence omitting meta_description (the golden uses the masks from random.seed 7)."""
     t = json.load(open(GOLDEN / "text_golden.json"))
     for meta7, mask, ref in zip(t["meta7"], t["masks"], t["bert_texts_masked"]):
         d = apply_mask(meta_fields_from_meta7(meta7), mask)
         assert generate_meta_description(**d) == ref
-    assert any(any(m) for m in t["masks"]), "골든에 마스킹된 샘플이 하나는 있어야 형식 검증이 된다"
-    # 'unknown' 치환(논문형 플래그)은 다른 문장을 만든다
+    assert any(any(m) for m in t["masks"]), "the golden needs at least one masked sample to verify the format"
+    # 'unknown' substitution (paper-style flag) produces a different sentence
     d = apply_mask({"age": "adult", "sex": "male", "loc": "trachea", "dev": "Meditron"}, [True, False, False, False], "unknown")
     assert generate_meta_description(**d) == \
         "This sound was recorded from the trachea of a male patient with unknown age, using a Meditron stethoscope."
@@ -116,9 +116,9 @@ def test_randomly_mask_metadata_is_seed_dependent_and_ordered():
     assert list(randomly_mask_metadata(d, 0.25, g1).keys()) == ["age", "sex", "loc", "dev"]
 
 
-# ------------------------------------------------------------------ quirk 고정
+# ------------------------------------------------------------------ pinned quirks
 def test_kl_term_has_no_gradient_in_reference_form():
-    """원본 main:285 — kl(o1, fusion(c, o_text.detach())): 학습 파라미터 어디에도 그래디언트가 없다."""
+    """Original main:285 — kl(o1, fusion(c, o_text.detach())): no gradient reaches any trainable parameter."""
     torch.manual_seed(0)
     o_multi = torch.randn(4, 4, requires_grad=True)
     o_text = torch.randn(4, 4, requires_grad=True)
@@ -126,19 +126,19 @@ def test_kl_term_has_no_gradient_in_reference_form():
     o1 = fusion_function(o_multi, o_text)
     o2_dead = fusion_function(c.dummy_vector * torch.ones_like(o1), o_text.detach())
     kl = kl_loss_function(o1, o2_dead)
-    assert not kl.requires_grad  # 그래프 자체가 없다
+    assert not kl.requires_grad  # there is no graph at all
     assert c.dummy_vector.requires_grad is False and c.dummy_vector.grad is None
-    # 논문형(kl_dead=False)은 o_text 에 그래디언트가 흐른다
+    # paper-style (kl_dead=False): gradient flows to o_text
     kl_live = kl_loss_function(o1, fusion_function(c.dummy_vector * torch.ones_like(o1), o_text))
     kl_live.backward()
     assert o_text.grad is not None and o_text.grad.abs().sum() > 0
-    assert o_multi.grad is None  # target 쪽 o1 은 detach
+    assert o_multi.grad is None  # o1 on the target side is detached
 
 
 def test_constant_excluded_from_optimizer_and_ma():
     c = LearnableConstant(1.0)
     opt = torch.optim.Adam(c.parameters(), lr=1.0)
-    (c.dummy_vector * 2).sum()  # 그래프 없음 — requires_grad False
+    (c.dummy_vector * 2).sum()  # no graph — requires_grad False
     opt.step()
     assert float(c.dummy_vector) == 1.0
     keys = ["audio_features.text_model.x", "classifier.weight", "meta_classifier.bert.y", "meta_classifier.classifier.0.weight",
@@ -171,7 +171,7 @@ def test_alpha_zero_equals_o1_and_ma_callback_targets(model):
     sd_keys = list(model.state_dict())
     cb = BTSCARDWeightAveraging(beta=0.5)
 
-    class _PL:  # pl_module 대역
+    class _PL:  # pl_module stand-in
         rsc_model = model
 
     targets = set(cb.target_keys(_PL()))
@@ -188,7 +188,7 @@ def test_training_forward_masks_only_bert_and_exposes_terms(model):
     try:
         x = torch.randn(2, 1001, 64)
         meta = torch.tensor([[70., 1., 33., -1., -1., 2., 1.], [5., 0., -1., 20., 110., 0., 3.]])
-        model.p_mask = 1.0  # 전부 마스킹 → BERT 문장은 빈 문장 형식, CLAP 문장은 그대로
+        model.p_mask = 1.0  # mask everything -> BERT sentence uses the empty format, CLAP sentence unchanged
         assert model.describe_bert(meta, masking=True) == ["This patient is.", "This patient is."]
         assert model.describe(meta)[0].startswith("This sound was recorded from the right anterior chest")
         model.p_mask = 0.25
@@ -214,13 +214,13 @@ def test_sprsound_4class_mapping_distribution():
     counts = [0, 0, 0, 0]
     for lab in v["Label"]:
         counts[sprsound_label_to_4class(lab)] += 1
-    assert counts == [1040, 83, 305, 1]  # 논문 Table 1 SPRSound valid
+    assert counts == [1040, 83, 305, 1]  # paper Table 1 SPRSound valid
     assert sprsound_label_to_4class("Rhonchi") is None and sprsound_label_to_4class("Stridor") is None
-    with pytest.raises(ValueError):                       # 2026-09-16 확정: wheeze 병합 옵션은 지원하지 않는다
+    with pytest.raises(ValueError):                       # the wheeze-merge option is not supported
         sprsound_label_to_4class("Stridor", "wheeze")
     tr = df[df["Split"] == "train"]
     assert sum(sprsound_label_to_4class(l) == 2 for l in tr["Label"] if sprsound_label_to_4class(l) is not None) == 452
-    assert sum(sprsound_label_to_4class(l) is None for l in tr["Label"]) == 39 + 15   # train 의 Rhonchi·Stridor 는 제외(wheeze 506 이 아니라 452)
+    assert sum(sprsound_label_to_4class(l) is None for l in tr["Label"]) == 39 + 15   # train Rhonchi/Stridor are excluded (wheeze 452, not 506)
 
 
 def test_sprsound_sentence_template():
@@ -229,7 +229,7 @@ def test_sprsound_sentence_template():
     assert describe_meta3_sprsound([25.0, 0, 1]) == "This sound was recorded from the left lateral of an adult male patient."
 
 
-@pytest.mark.skipif(not AUTHOR_SPR.exists(), reason="저자 valid_spr.pt 없음")
+@pytest.mark.skipif(not AUTHOR_SPR.exists(), reason="authors' valid_spr.pt missing")
 def test_author_sprsound_pt_layout():
     from rsc_toolkit.datasets.sprsound_ood import SPRSoundOODAuthorDataset, sprsound_ood_collate
 
@@ -245,13 +245,13 @@ def test_author_sprsound_pt_layout():
     assert counts == [1040, 83, 305, 1]
 
 
-@pytest.mark.skipif(not (GOLDEN / "sprsound_parity.json").exists(), reason="parity 기록 없음")
+@pytest.mark.skipif(not (GOLDEN / "sprsound_parity.json").exists(), reason="parity record missing")
 def test_sprsound_pipeline_parity_record():
     r = json.load(open(GOLDEN / "sprsound_parity.json"))
     assert r["n_compared"] == 1429 and r["label_mismatch"] == 0 and r["meta_mismatch"] == 0 and r["text_mismatch"] == 0
     assert r["class_counts_toolkit"] == [1040, 83, 305, 1]
-    # 비트 일치가 아니라 근사 일치: max|diff| 6.7e-3 (24/1429 > 1e-3) — 원인 미확인(추정: 저자 환경 torch 2.0.1/Windows 의
-    # 수치 차이; 실측 미수행). 아래 허용치는 관측값에 맞춘 사후 경계. 라벨·메타·문장은 전수 일치.
+    # approximate, not bit-identical: max|diff| 6.7e-3 (24/1429 > 1e-3) — cause unconfirmed (presumably numeric differences in the authors'
+    # environment, torch 2.0.1/Windows; not measured). The tolerance below is a post-hoc bound fit to the observations. Labels, meta and sentences match exactly.
     assert r["max_abs_diff"] < 1e-2 and r["n_diff_gt_1e-3"] <= 30
 
 
@@ -259,9 +259,9 @@ AUTHOR_CKPT = REPO / "pretrained_models" / "upstream" / "btscard" / "best.pth"
 
 
 @needs_models
-@pytest.mark.skipif(not (AUTHOR_CKPT.exists() and (GOLDEN / "ckpt_forward_golden.pt").exists()), reason="저자 best.pth 또는 ckpt 골든 없음")
+@pytest.mark.skipif(not (AUTHOR_CKPT.exists() and (GOLDEN / "ckpt_forward_golden.pt").exists()), reason="authors' best.pth or ckpt golden missing")
 def test_author_checkpoint_loads_and_matches_reference_outputs():
-    """저자 best.pth 를 키 변환 없이 로드(판별기·상수만 missing) → 공식 코드(4.40.0) 출력과 1e-4 일치."""
+    """Loads the authors' best.pth without key conversion (only discriminator/constants missing) -> matches the official code (4.40.0) output at 1e-4."""
     from rsc_toolkit.models.bts_card import BTSCARDModel
 
     g = torch.load(GOLDEN / "forward_golden.pt", map_location="cpu", weights_only=False)

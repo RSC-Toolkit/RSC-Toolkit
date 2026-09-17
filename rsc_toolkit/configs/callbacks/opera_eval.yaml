@@ -1,5 +1,5 @@
 # @package _global_
-# EMBC 동결 평가 프로토콜(scl ce.py train_ce): 매 epoch test Score 최고 (strict >, Se 게이트 없음), 재개 지원
+# EMBC frozen-evaluation protocol (scl ce.py train_ce): best test Score every epoch (strict >, no Se gate), resumable
 trainer:
   params:
     callbacks:

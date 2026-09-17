@@ -1,8 +1,8 @@
-"""리팩토링 P1 9단계 — IndexDataModule 의 확장 통로 3개(additive) + split_role + 서브클래스 훅.
+"""IndexDataModule: 3 extension points (additive) + split_role + subclass hooks.
 
-기본값이면 예전 코드 경로와 동일해야 하고(생성 인자·collate·래퍼), 값을 주면 포크 없이 주입된다.
-QLung·Lungmix 는 `_index_dataset_kwargs` 훅으로 옮겨 kwargs 블록 복붙과 identity 비교가 사라졌다 — 부모 규칙
-(fade/resample_after_slice/time_unit/split_file) 이 자동 승계되는지 여기서 본다.
+With defaults the code path must equal the former one (constructor arguments, collate, wrapper); given values, they are injected without a fork.
+QLung and Lungmix moved to the `_index_dataset_kwargs` hook, removing the copy-pasted kwargs block and the identity comparison — this checks that the
+parent rules (fade/resample_after_slice/time_unit/split_file) are inherited automatically.
 """
 from __future__ import annotations
 
@@ -17,7 +17,7 @@ from rsc_toolkit.trainer.data.index_datamodule import IndexDataModule, _tuple_co
 
 
 class _RecordingIndexDataset:
-    """index_dataset_cls 대역 — 생성 인자만 기록한다."""
+    """Stand-in for index_dataset_cls — records only the constructor arguments."""
 
     instances = []
 
@@ -61,7 +61,7 @@ def test_index_dataset_params_are_passed_through_and_win(tmp_path):
     dm = _make_dm(tmp_path, index_dataset_params={"bandpass_hz": [25, 400], "fade": False})
     ds = dm._build_index_dataset_single(split="train")
     assert ds.kwargs["bandpass_hz"] == [25, 400]
-    assert ds.kwargs["fade"] is False  # 명시 해제가 부모 규칙(True 면 생략)을 이긴다
+    assert ds.kwargs["fade"] is False  # explicit disable beats the parent rule (omitted when True)
 
 
 def test_collate_fn_accepts_dotted_path_or_callable(tmp_path):
@@ -109,7 +109,7 @@ def test_setup_passes_split_roles(tmp_path, monkeypatch):
 
 
 def test_subclass_hooks_inherit_parent_rules():
-    """QLung·Lungmix 의 _index_dataset_kwargs 가 부모 규칙 위에 자기 인자만 더한다 (복붙 제거의 증거)."""
+    """QLung/Lungmix _index_dataset_kwargs add only their own arguments on top of the parent rules (evidence the copy-paste is gone)."""
     from rsc_toolkit.datasets.lungmix_data import LungmixDataModule
     from rsc_toolkit.datasets.qlung_data import QLungDataModule
 
@@ -118,7 +118,7 @@ def test_subclass_hooks_inherit_parent_rules():
     for name in ("train_dataloader", "val_dataloader", "test_dataloader", "_loader"):
         assert name not in QLungDataModule.__dict__
 
-    fake = LungmixDataModule.__new__(LungmixDataModule)  # __init__ 없이 속성만 (super() 가 인스턴스를 요구한다)
+    fake = LungmixDataModule.__new__(LungmixDataModule)  # attributes only, no __init__ (super() needs an instance)
     fake.index_csv, fake.raw_data_directory, fake.sampling_rate = "i.csv", "/raw", 16000
     fake.sample_level, fake.audio_preprocessor = "cycle", None
     fake.fade, fake.resample_after_slice, fake.time_unit, fake.split_file = False, False, "ms_int", None

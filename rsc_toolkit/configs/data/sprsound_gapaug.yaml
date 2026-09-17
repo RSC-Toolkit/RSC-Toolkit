@@ -1,6 +1,6 @@
-# GaP-Aug 의 ICBHI 레시피를 SPRSound 2022 inter-patient(7-class) 에 그대로 적용 — 툴킷 확장 관찰값(논문 대응값 없음; 2026-09-14 사용자 결정).
-# icbhi_gapaug.yaml 과 체인 동일(16 kHz, 사이클 10 s repeat/앞 절단, 파형 입력·캐시 없음, 클래스 균형 배치 per_class×n_cls).
-# 데이터셋 키만 SPRSound 로: index_cycle.csv 의 split 열(train / test=inter-patient)을 쓰고 split_file 은 없다.
+# GaP-Aug's ICBHI recipe applied unchanged to SPRSound 2022 inter-patient (7-class) — toolkit extension (no paper counterpart).
+# Same chain as icbhi_gapaug.yaml (16 kHz, 10 s cycles repeat / cut to the first 10 s, waveform input, no cache, class-balanced batches per_class×n_cls).
+# Only the dataset keys change to SPRSound: the split column of index_cycle.csv (train / test=inter-patient) is used, with no split_file.
 name: sprsound_gapaug
 params:
   datamodule_name: gapaug
@@ -16,9 +16,9 @@ params:
   pad_type: repeat
   fade: false
   train_splits: [train]
-  val_splits: [test]               # 2022 inter-patient test, 매 epoch(500 step) 평가 → best-on-test (ICBHI 와 동일 프로토콜)
+  val_splits: [test]               # 2022 inter-patient test, evaluated every epoch (500 steps) → best-on-test (same protocol as ICBHI)
   test_splits: [test]
-  batch_size: 16                   # 평가 배치 / 참고값 (학습 배치는 gapaug.per_class × 7 = 28)
+  batch_size: 16                   # evaluation batch / reference value (the training batch is gapaug.per_class × 7 = 28)
   num_workers: 8
   shuffle_train: true
   drop_last_train: false

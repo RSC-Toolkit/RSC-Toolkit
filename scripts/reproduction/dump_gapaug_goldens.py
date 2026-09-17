@@ -1,18 +1,18 @@
 """
-GaP-Aug 백본 골든 — 공식 PANNs 코드(qiuqiangkong/audioset_tagging_cnn) 의 Cnn14 를 공식 16 kHz 설정(512/160/64 mel/50–8000)
-으로 실행해 특징·임베딩·로짓을 저장한다. GaP-Aug 자체는 코드가 없어 골든이 없다(논문 명세 재구현).
+GaP-Aug backbone goldens — runs Cnn14 from the official PANNs code (qiuqiangkong/audioset_tagging_cnn) with the official 16 kHz settings (512/160/64 mel/50–8000)
+and saves features, embeddings and logits. GaP-Aug itself has no code and therefore no goldens (paper-spec re-implementation).
 
   PYTHONPATH=<scratch pylib(torchlibrosa)> .venv/bin/python scripts/reproduction/dump_gapaug_goldens.py \
       --panns outputs/reference/panns --ckpt pretrained_models/upstream/Cnn14_16k_mAP=0.438.pth --out tests/golden/gapaug
 
-골든 backbone.pt:
-  wav        : (3, 160000) — ICBHI 공식 train 사이클 2개(10 s repeat 패딩, 16 kHz) + 고정 seed 잡음 1개
-  logmel     : (3, 1, T, 64) — spectrogram_extractor→logmel_extractor 출력
-  embedding  : (3, 2048) — eval 모드 fc1 ReLU 출력 (output_dict['embedding'], eval 이라 dropout 없음)
-  logits     : (3, 527) — fc_audioset 전 활성(sigmoid 전). fc_audioset.{weight,bias}(PANNs 파라미터 ≈4.3 MB) 는 재배포 회피를
-               위해 저장하지 않는다 — 테스트가 ckpt 에서 읽어 대조한다.
-  state_keys : 공식 state_dict 키 목록, n_params_total / n_params_wo_audioset
-meta.json / provenance.json: PANNs 저장소 커밋 해시·torchlibrosa/torch 버전·ckpt 경로 (opera 골든 선례).
+Goldens in backbone.pt:
+  wav        : (3, 160000) — 2 ICBHI official train cycles (10 s repeat padding, 16 kHz) + 1 fixed-seed noise clip
+  logmel     : (3, 1, T, 64) — spectrogram_extractor→logmel_extractor output
+  embedding  : (3, 2048) — eval-mode fc1 ReLU output (output_dict['embedding']; no dropout in eval)
+  logits     : (3, 527) — fc_audioset output before the sigmoid. fc_audioset.{weight,bias} (PANNs parameters, ≈4.3 MB) are not saved
+               to avoid redistribution — the test reads them from the ckpt for the comparison.
+  state_keys : list of official state_dict keys, n_params_total / n_params_wo_audioset
+meta.json / provenance.json: PANNs repository commit hash, torchlibrosa/torch versions, ckpt path (same convention as the OPERA goldens).
 """
 import argparse
 import json
@@ -34,17 +34,17 @@ def main():
     sys.path.insert(0, str(pathlib.Path(args.panns).resolve() / "pytorch"))
     sys.path.insert(0, str(pathlib.Path(args.panns).resolve() / "utils"))
     from models import Cnn14  # noqa: E402
-    import torchlibrosa  # noqa: E402  (scratch pylib 전용 — 툴킷 런타임 의존성 아님)
+    import torchlibrosa  # noqa: E402  (scratch pylib only — not a toolkit runtime dependency)
 
     panns_dir = pathlib.Path(args.panns).resolve()
     try:
         panns_commit = subprocess.check_output(["git", "-C", str(panns_dir), "rev-parse", "HEAD"], text=True).strip()
         panns_dirty = bool(subprocess.check_output(["git", "-C", str(panns_dir), "status", "--porcelain"], text=True).strip())
-    except Exception:  # git 정보 없으면 기록만 생략
+    except Exception:  # if git info is unavailable, just skip recording it
         panns_commit, panns_dirty = None, None
 
     torch.manual_seed(0)
-    # --- 파형: 툴킷 IndexDataset(공식 split train, 16 kHz, 10 s repeat) 의 앞 2개 + 잡음 1개 ---
+    # --- waveforms: first 2 items of the toolkit IndexDataset (official split train, 16 kHz, 10 s repeat) + 1 noise clip ---
     from rsc_toolkit.datasets.index_dataset import IndexDataset
     from rsc_toolkit.processors.audio import AudioPreprocessConfig, AudioPreprocessor
 
@@ -73,7 +73,7 @@ def main():
     n_total = sum(v.numel() for v in sd.values())
     n_wo = sum(v.numel() for k, v in sd.items() if not k.startswith(("fc_audioset.", "spectrogram_extractor.", "logmel_extractor.")))
     torch.save({"wav": wav, "sample_ids": ids, "labels": labels, "logmel": logmel, "embedding": emb, "logits": logits,
-                "note": "fc_audioset.{weight,bias} 는 재배포 회피를 위해 제외 — 테스트가 ckpt 에서 읽는다",
+                "note": "fc_audioset.{weight,bias} excluded to avoid redistribution — the test reads them from the ckpt",
                 "state_keys": list(sd.keys()), "state_shapes": {k: list(v.shape) for k, v in sd.items()},
                 "n_params_total": n_total, "n_params_wo_audioset_and_frontend": n_wo,
                 "config": dict(sample_rate=16000, window_size=512, hop_size=160, mel_bins=64, fmin=50, fmax=8000)},

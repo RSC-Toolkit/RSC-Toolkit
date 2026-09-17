@@ -4,7 +4,7 @@
  "torch": "2.7.0+cu126",
  "numpy": "2.4.6",
  "num_threads": 1,
- "note": "icbhi_pair_9s 의 wav1/wav2 는 ICBHI 공식 train 사이클 원 파형(CC BY 4.0 계열 공개 데이터; 6.3 MB) 을 그대로 담는다",
+ "note": "wav1/wav2 of icbhi_pair_9s hold the original waveforms of official ICBHI train cycles unchanged (public data under CC BY 4.0; 6.3 MB)",
  "cases": [
   {
    "name": "synth_diff_len",

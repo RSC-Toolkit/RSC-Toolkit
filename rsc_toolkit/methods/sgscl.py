@@ -1,23 +1,22 @@
 """
-SG-SCL 논문(ICASSP 2024)의 학습 방법 — 공식 코드 충실 이식 (P0).
+Training method of the SG-SCL paper (ICASSP 2024): a faithful port of the official code (official-code parity).
 
-출처:
-- 논문: Stethoscope-Guided Supervised Contrastive Learning for Cross-Domain
+Sources:
+- Paper: Stethoscope-Guided Supervised Contrastive Learning for Cross-Domain
   Adaptation on Respiratory Sound Classification (https://arxiv.org/abs/2312.09603)
-- 공식 코드: https://github.com/kaen2891/stethoscope-guided_supervised_contrastive_learning
-  method/mcl.py (MetaCL), main.py train() 의 domain_adaptation/domain_adaptation2 분기.
+- Official code: https://github.com/kaen2891/stethoscope-guided_supervised_contrastive_learning
+  method/mcl.py (MetaCL), the domain_adaptation/domain_adaptation2 branches of main.py train().
 
-원본과의 비구조적 차이 (수치 영향 없음):
-- .cuda() 대신 입력 텐서의 device 를 따른다.
-- 원본 SpecAugment(util/augmentation.py)는 in-place 로 배치를 덮어쓰기 때문에
-  train() 의 두 번째 `args.transforms(images)` 는 첫 뷰의 마스크 **위에** 추가
-  마스킹한다(뷰2 = 뷰1 + 추가 마스크; 마스크값 mean 도 뷰1 마스킹 후 평균).
-  AMP autocast 가 conv 입력을 half 로 복사해 두므로 backward 는 뷰1/뷰2 값
-  그대로 진행된다. 여기서는 같은 semantics 를 함수형으로 재현한다
-  (sgscl_training_losses 의 view2 = specaug(view1)).
-- 원본의 미사용 projector(도메인 분기에서 생성만 되고 손실에 안 쓰이며 MA 로
-  classifier[1] 스냅샷과 섞이는 것)는 학습에 영향이 없어 재현하지 않는다
-  (HANDOFF 문서 판정 참고).
+Non-structural differences from the original code (no numerical effect):
+- The device of the input tensor is used instead of .cuda().
+- The original SpecAugment (util/augmentation.py) overwrites the batch in place, so
+  the second `args.transforms(images)` in train() adds masking **on top of** the first view's
+  mask (view2 = view1 + extra mask; the mask value mean is also taken after view1 masking).
+  AMP autocast keeps a half-precision copy of the conv input, so backward proceeds with the view1/view2
+  values as they were. The same semantics are reproduced functionally here
+  (view2 = specaug(view1) in sgscl_training_losses).
+- The original code's unused projector (created in the domain branch, never used in the loss, and mixed
+  with the classifier[1] snapshot by MA) has no effect on training and is not reproduced.
 """
 from __future__ import annotations
 
@@ -27,7 +26,7 @@ import torch.nn.functional as F
 
 
 class MetaCL(nn.Module):
-    """원본 method/mcl.py — SupCon 형식이되 mask 를 meta 라벨(청진기) 동일 여부로 구성."""
+    """Original method/mcl.py: SupCon form, but the mask is built from whether meta labels (stethoscope) match."""
 
     def __init__(self, temperature: float = 0.06, weights=None):
         super().__init__()
@@ -73,7 +72,7 @@ class MetaCL(nn.Module):
 
 
 def sgscl_projections(feat1, feat2, projector, target_type: str):
-    """원본 main.py:382-415 의 target_type 분기 그대로 (deepcopy(t.detach()) ≡ detach().clone())."""
+    """Same as the target_type branches of the original main.py:382-415 (deepcopy(t.detach()) ≡ detach().clone())."""
     if target_type == "project_flow_all":
         return projector(feat1), projector(feat2)
     if target_type == "representation_all":
@@ -88,7 +87,7 @@ def sgscl_projections(feat1, feat2, projector, target_type: str):
         return projector(feat1), feat2.detach().clone()
     if target_type == "project1_r2":
         return projector(feat1), feat2
-    if target_type == "project1_project2block":  # 논문/스크립트 기본값
+    if target_type == "project1_project2block":  # paper/script default
         return projector(feat1), projector(feat2).detach().clone()
     if target_type == "project_block_all":
         return projector(feat1).detach().clone(), projector(feat2).detach().clone()
@@ -97,10 +96,10 @@ def sgscl_projections(feat1, feat2, projector, target_type: str):
 
 def apply_specaug_paper(specaug: nn.Module, x_paper: torch.Tensor) -> torch.Tensor:
     """
-    페이퍼 레이아웃 (B, time, freq) 배치에 SpecAugment 1회 (배치 전체에 마스크 1벌).
+    Applies SpecAugment once to a paper-layout (B, time, freq) batch (one mask set for the whole batch).
 
-    원본 SpecAugment.forward 는 [B,1,T,F]→[B,F,T] 로 뒤집어 마스킹 후 되돌린다.
-    우리 포팅본(augmentations/specaugment.py)은 (B,F,T) 를 받으므로 같은 래핑을 한다.
+    The original SpecAugment.forward permutes [B,1,T,F]→[B,F,T], masks, and permutes back.
+    The port (augmentations/specaugment.py) takes (B,F,T), so the same wrapping is done here.
     """
     return specaug(x_paper.transpose(-2, -1)).transpose(-2, -1)
 
@@ -108,36 +107,36 @@ def apply_specaug_paper(specaug: nn.Module, x_paper: torch.Tensor) -> torch.Tens
 def sgscl_training_losses(
     *,
     method: str,                 # "ce" | "dat" | "sgscl"
-    paper_features,              # (B, T, F) 페이퍼 레이아웃 → (B, feat_dim) 특징
+    paper_features,              # (B, T, F) paper layout → (B, feat_dim) features
     x_paper: torch.Tensor,
-    specaug,                     # None 이면 증강 없이 (원본 validate 경로에는 없음)
+    specaug,                     # None means no augmentation (absent in the original validate path)
     classifier: nn.Module,
-    domain_classifier,           # dat: 도메인 분류 헤드 / sgscl: Projector
-    metacl,                      # sgscl 일 때 MetaCL
+    domain_classifier,           # dat: domain classification head / sgscl: Projector
+    metacl,                      # MetaCL for sgscl
     loss_func,
     labels: torch.Tensor,
     meta_labels,
-    alpha: float,                # 손실 가중 (--alpha, 기본 1.0)
-    grl_alpha: float,            # GRL 계수 — 공식 레시피에선 항상 1.0 (아래 참고)
+    alpha: float,                # loss weight (--alpha, default 1.0)
+    grl_alpha: float,            # GRL coefficient; always 1.0 in the official recipe (see below)
     target_type: str,
-    cls_feat: str = "feat0",     # 분류기 입력: "feat0"=x (공식 main.py:374) | "feat1"=GRL(x) (실험, 2026-08-28 사용자 지시)
-    con_feat: str = "feat0",     # sgscl 대조 특징: "feat0"=x (클론 6656460, 기존 P1) | "feat1"=GRL(x) (GitHub HEAD 2ed1bac)
+    cls_feat: str = "feat0",     # classifier input: "feat0"=x (official main.py:374) | "feat1"=GRL(x) (experimental)
+    con_feat: str = "feat0",     # sgscl contrastive features: "feat0"=x (commit 6656460, default) | "feat1"=GRL(x) (GitHub HEAD 2ed1bac)
 ):
     """
-    원본 main.py train() 의 method=='ce' 아래 세 분기와 동일한 손실 구성.
+    Same loss composition as the three branches under method=='ce' in the original main.py train().
 
-    GRL 계수: 원본은 p = (idx + epoch*len(loader))/epochs + 1/len(loader),
-    alpha = 2/(1+exp(-10p))-1 로 매 반복 계산하지만, 공식 DAT 레시피
-    (bs8→len=517, epochs=50, epoch 는 1부터)에서는 최솟값 p≈10.3 이라
-    exp(-103) 이 언더플로해 **모든 반복에서 정확히 1.0** 이다. 그래서 상수로 둔다.
+    GRL coefficient: the original code computes p = (idx + epoch*len(loader))/epochs + 1/len(loader),
+    alpha = 2/(1+exp(-10p))-1 every iteration, but in the official DAT recipe
+    (bs8→len=517, epochs=50, epochs start at 1) the minimum is p≈10.3, so
+    exp(-103) underflows and alpha is **exactly 1.0 in every iteration**. It is therefore kept constant.
     """
     if cls_feat not in {"feat0", "feat1"} or con_feat not in {"feat0", "feat1"}:
         raise ValueError(f"cls_feat/con_feat must be feat0|feat1, got {cls_feat!r}/{con_feat!r}")
-    from rsc_toolkit.models.grl import ReverseLayerF  # 지연 임포트 (아래 dat 분기와 동일 사유)
+    from rsc_toolkit.models.grl import ReverseLayerF  # deferred import (same reason as the dat branch below)
 
     view1 = apply_specaug_paper(specaug, x_paper) if specaug is not None else x_paper
     feats1 = paper_features(view1)
-    # 원본 forward(training=True)의 features = (x, GRL(x)) — features[1] 은 값이 같고 기울기만 −grl_alpha 배.
+    # features of the original forward(training=True) = (x, GRL(x)); features[1] has the same values, only the gradient is scaled by −grl_alpha.
     cls_in = ReverseLayerF.apply(feats1, grl_alpha) if cls_feat == "feat1" else feats1
     logits = classifier(cls_in)
     class_loss = loss_func(logits, labels)
@@ -147,22 +146,22 @@ def sgscl_training_losses(
 
     if meta_labels is None:
         raise ValueError(
-            f"method={method!r} 에는 meta_labels 가 필요하다 "
-            "(datamodule 의 meta_label_mode 설정을 확인)"
+            f"method={method!r} requires meta_labels "
+            "(check the datamodule's meta_label_mode setting)"
         )
 
     if method == "dat":
         domain_feats = ReverseLayerF.apply(feats1, grl_alpha)
-        meta_loss = F.cross_entropy(domain_classifier(domain_feats), meta_labels)  # 원본 criterion2: 비가중 CE
+        meta_loss = F.cross_entropy(domain_classifier(domain_feats), meta_labels)  # original criterion2: unweighted CE
         return logits, class_loss + alpha * meta_loss
 
     if method == "sgscl":
-        # 원본은 in-place SpecAugment 라 두 번째 호출이 뷰1 위에 마스크를 쌓는다.
+        # The original SpecAugment is in place, so the second call stacks masks on top of view1.
         view2 = apply_specaug_paper(specaug, view1) if specaug is not None else x_paper
         feats2 = paper_features(view2)
         if con_feat == "feat1":
-            # GitHub HEAD 2ed1bac(main.py:379-380): feat1/feat2 = features[1] = GRL(x) — 값 동일, 대조 손실의
-            # 백본 기울기만 반전. 클론 6656460(우리 기존 P1)은 features[0].
+            # GitHub HEAD 2ed1bac (main.py:379-380): feat1/feat2 = features[1] = GRL(x); same values, only the
+            # backbone gradient of the contrastive loss is reversed. Commit 6656460 uses features[0].
             f1, f2 = ReverseLayerF.apply(feats1, grl_alpha), ReverseLayerF.apply(feats2, grl_alpha)
         else:
             f1, f2 = feats1, feats2

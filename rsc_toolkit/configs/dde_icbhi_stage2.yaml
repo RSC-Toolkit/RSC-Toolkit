@@ -1,6 +1,6 @@
-# DDE-MAE 2단계(분류 FT, 논문 §2.3 (ii)): 1단계 final_state 의 E_R 만 로드 → CE, 50 ep, AdamW 1e-3/wd 5e-4, bs 8(가정), best-on-test.
+# DDE-MAE stage 2 (classification FT, paper §2.3 (ii)): loads only E_R from the stage-1 final_state → CE, 50 ep, AdamW 1e-3/wd 5e-4, bs 8 (assumed), best-on-test.
 #   S3: rsctk ... --config-name dde_icbhi_stage2 model.params.encoder_ckpt=outputs/ddemae/icbhi-ddemae-s3-pre-s1/final_state.pth seed=1 run.name=icbhi-ddemae-s3-s1
-#   S2: 같은 형식으로 icbhi-ddemae-s2-pre-s1/final_state.pth → run.name=icbhi-ddemae-s2-s1
+#   S2: same form with icbhi-ddemae-s2-pre-s1/final_state.pth → run.name=icbhi-ddemae-s2-s1
 defaults:
   - model: audiomae_dde_cls
   - data_defaults@data: base
@@ -16,7 +16,7 @@ seed: 1
 
 model:
   params:
-    encoder_ckpt: ???              # 필수: outputs/ddemae/<stage1 run>/final_state.pth
+    encoder_ckpt: ???              # required: outputs/ddemae/<stage1 run>/final_state.pth
 
 trainer:
   params:

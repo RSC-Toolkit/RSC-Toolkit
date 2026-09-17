@@ -1,7 +1,7 @@
 """
-Gradient Reversal Layer — SG-SCL/DAT 계열 논문의 공식 코드 충실 이식.
+Gradient Reversal Layer — exact port of the official code of the SG-SCL/DAT family of papers.
 
-출처: kaen2891/stethoscope-guided_supervised_contrastive_learning models/functions.py
+Source: kaen2891/stethoscope-guided_supervised_contrastive_learning models/functions.py
 (ICASSP 2024, https://arxiv.org/abs/2312.09603)
 """
 from torch.autograd import Function

@@ -217,12 +217,12 @@ def _write_clip_index(index_csv: pathlib.Path, recording_ids) -> None:
 
 def test_split_uses_sibling_official_split_file(tmp_path: pathlib.Path):
     """
-    split 컬럼이 비어 있으면 인덱스 CSV 옆의 official_split.txt 로 거른다.
+    If the split column is empty, filter with official_split.txt next to the index CSV.
 
-    ICBHI 인덱스는 split 컬럼을 채우지 않는다. 예전에는 컬럼 존재만 확인하고
-    그 경로를 타서 매칭이 0건이 되고 `No data found for split test` 로 죽었다.
-    (sprsound·hflungv1 processor 는 이미 index_dir 에 이 파일을 쓰고,
-    ICBHI processor 도 이제 패키지본을 같은 위치에 복사한다.)
+    The ICBHI index does not fill the split column. Previously only the column's existence was checked,
+    that path was taken, zero rows matched and it died with `No data found for split test`.
+    (The sprsound and hflungv1 processors already write this file into index_dir,
+    and the ICBHI processor now copies the packaged copy to the same location.)
     """
     index_csv = tmp_path / "index_clip.csv"
     _write_clip_index(index_csv, ["rec_a", "rec_b"])
@@ -238,7 +238,7 @@ def test_split_uses_sibling_official_split_file(tmp_path: pathlib.Path):
 
 
 def test_explicit_split_file_wins_over_sibling(tmp_path: pathlib.Path):
-    """명시적으로 준 split_file 이 옆 파일보다 우선한다."""
+    """An explicitly given split_file takes precedence over the sibling file."""
     index_csv = tmp_path / "index_clip.csv"
     _write_clip_index(index_csv, ["rec_a", "rec_b"])
     (tmp_path / "official_split.txt").write_text("rec_a train\nrec_b test\n")
@@ -251,7 +251,7 @@ def test_explicit_split_file_wins_over_sibling(tmp_path: pathlib.Path):
 
 
 def test_split_errors_clearly_when_nothing_to_use(tmp_path: pathlib.Path):
-    """split 컬럼도 비었고 옆 파일도 없으면 무엇이 필요한지 알려주며 실패한다."""
+    """If the split column is empty and there is no sibling file, it fails and says what is needed."""
     index_csv = tmp_path / "index_clip.csv"
     _write_clip_index(index_csv, ["rec_a"])
 
@@ -261,9 +261,9 @@ def test_split_errors_clearly_when_nothing_to_use(tmp_path: pathlib.Path):
 
 def test_populated_split_column_is_preferred_over_sibling(tmp_path: pathlib.Path):
     """
-    split 컬럼에 값이 있으면 그걸 쓴다 (sprsound·hflungv1 경로).
+    If the split column has values, they are used (sprsound and hflungv1 path).
 
-    옆에 official_split.txt 가 있어도 컬럼이 우선이다.
+    The column takes precedence even if official_split.txt exists next to it.
     """
     import pandas as pd
 
@@ -274,7 +274,7 @@ def test_populated_split_column_is_preferred_over_sibling(tmp_path: pathlib.Path
     df["split"] = ["train", "test"]
     df.to_csv(index_csv, index=False)
 
-    # 컬럼과 반대로 적어둔다. 컬럼이 이기면 이 파일은 무시된다.
+    # written opposite to the column. If the column wins, this file is ignored.
     (tmp_path / "official_split.txt").write_text("rec_a test\nrec_b train\n")
 
     ds_train = IndexDataset(index_csv=index_csv, split="train")

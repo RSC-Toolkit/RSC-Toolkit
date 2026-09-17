@@ -1,6 +1,6 @@
-# Prototype 를 SPRSound 표준 태스크(7-class)로 확장. ICBHI 레시피 그대로:
-# 4 kHz 리샘플 → Butterworth 밴드패스 100–1800 Hz(녹음 전체) → 이벤트 분할 → 4 s 랜덤(train)/센터(eval) 크롭·wrap 패딩.
-# 모델이 torchlibrosa 로 log-mel 을 직접 계산하므로 파형을 그대로 넘긴다.
+# Prototype extended to the standard SPRSound task (7-class). ICBHI recipe unchanged:
+# resample to 4 kHz → Butterworth band-pass 100–1800 Hz (whole recording) → event segmentation → 4 s random (train) / center (eval) crop · wrap padding.
+# The model computes log-mel directly with torchlibrosa, so the waveform is passed as is.
 name: sprsound_protonet
 params:
   datamodule_name: protonet

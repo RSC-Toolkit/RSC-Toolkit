@@ -1,14 +1,14 @@
 """
-SCL-metadata(ilyassmoummad/scl_icbhi2017) P0 골든 — 공식 코드를 우리 venv 에서 실행 (torch/torchaudio 만 필요).
+SCL-metadata (ilyassmoummad/scl_icbhi2017) official-code parity goldens — runs the official code in our venv (only torch/torchaudio needed).
 
-  .venv/bin/python scripts/reproduction/dump_sclmeta_goldens.py --repo <클론> --data .datasets/icbhi --out tests/golden/sclmeta
+  .venv/bin/python scripts/reproduction/dump_sclmeta_goldens.py --repo <clone> --data .datasets/icbhi --out tests/golden/sclmeta
 
-골든:
-- audio.pt        : metadata.csv 의 train 사이클 몇 개(짧은 것·8초 초과 포함)를 dataset.py 경로(구간 로드→리샘플→fade→순환→fade_out)로 → 128000 샘플
-- features.pt     : 위 파형 배치 → 샘플별 dB-mel(캐시 단계), val_transform 출력(배치 min-max+Standardize), seed 고정 train_transform 두 뷰
-- cnn6.pt         : PANN 부분 로드 CNN6 의 state_dict 모양 + val 특징 → 512-d 임베딩
-- losses.pt       : 고정 proj/라벨/메타로 SupCon(labels/None)·SupConCE(α .5, 가중치)·M-SCL 합성 스칼라
-- meta_sa.json    : metadata.csv 전 행의 (filepath, onset, offset) → sa_class_num (툴킷 meta 'sa' 대조용)
+Goldens:
+- audio.pt        : a few train cycles from metadata.csv (including short ones and ones over 8 s) through the dataset.py path (segment load→resample→fade→circular→fade_out) → 128000 samples
+- features.pt     : batch of the waveforms above → per-sample dB-mel (cache stage), val_transform output (batch min-max + Standardize), two views of the fixed-seed train_transform
+- cnn6.pt         : state_dict shapes of the CNN6 with partially loaded PANN weights + val features → 512-d embeddings
+- losses.pt       : SupCon (labels/None), SupConCE (α .5, weights) and the M-SCL combined scalar on fixed proj/labels/meta
+- meta_sa.json    : (filepath, onset, offset) → sa_class_num for every row of metadata.csv (for comparison with the toolkit meta 'sa')
 """
 import argparse
 import json
@@ -29,7 +29,7 @@ def main():
     out = pathlib.Path(args.out); out.mkdir(parents=True, exist_ok=True)
     repo = pathlib.Path(args.repo).resolve()
     sys.path.insert(0, str(repo))
-    # args.py 는 import 시 argparse 를 파싱한다 — 기본값으로 파싱되게 argv 를 비운다
+    # args.py parses argparse at import time — clear argv so it parses with the defaults
     sys.argv = [sys.argv[0]]
     sys.modules.setdefault("torchinfo", types.ModuleType("torchinfo"))
     sys.modules["torchinfo"].summary = lambda *a, **k: types.SimpleNamespace(trainable_params=0)
@@ -42,7 +42,7 @@ def main():
     from models import CNN6, Projector  # noqa: E402
     from losses import SupConLoss, SupConCELoss  # noqa: E402
 
-    # ---- 1) 오디오: dataset.py get_sample + 패딩 경로를 몇 행에 대해 실행 ----
+    # ---- 1) audio: run dataset.py get_sample + the padding path on a few rows ----
     df = pd.read_csv(repo / "data/ICBHI/metadata.csv")
     df["dur"] = df["offset"] - df["onset"]
     tr = df[df["split"] == "train"]
@@ -61,7 +61,7 @@ def main():
     torch.save(audio_golden, out / "audio.pt")
     print("audio golden", len(audio_golden), [a["filepath"] for a in audio_golden[:2]], tuple(data.shape))
 
-    # ---- 2) 특징 ----
+    # ---- 2) features ----
     melspec = T.MelSpectrogram(n_fft=1024, n_mels=64, win_length=1024, hop_length=512, f_min=50, f_max=2000)
     normalize = Normalize()
     standardize = Standardize()
@@ -70,7 +70,7 @@ def main():
     val_transform = torch.nn.Sequential(torch.nn.Sequential(melspec, normalize), standardize)
     x = data  # (N, 1, 128000)
     with torch.no_grad():
-        dbmel = normalize.power_to_db(melspec(x))          # 샘플별 캐시 단계
+        dbmel = normalize.power_to_db(melspec(x))          # per-sample cache stage
         val = val_transform(x)
         torch.manual_seed(5)
         v1 = train_transform(x)
@@ -85,7 +85,7 @@ def main():
     torch.save({"state_dict_shapes": {k: list(v.shape) for k, v in enc.state_dict().items()}, "emb": emb}, out / "cnn6.pt")
     print("cnn6 emb", tuple(emb.shape), "keys", len(enc.state_dict()))
 
-    # ---- 4) 손실 ----
+    # ---- 4) losses ----
     torch.manual_seed(11)
     p1, p2 = torch.randn(8, 128), torch.randn(8, 128)
     y = torch.tensor([0, 1, 2, 3, 0, 1, 2, 3]); meta = torch.tensor([0, 0, 1, 1, 2, 2, 3, 3])
@@ -100,11 +100,11 @@ def main():
     torch.save(losses, out / "losses.pt")
     print("losses", {k: round(float(v), 4) for k, v in losses.items() if v.dim() == 0})
 
-    # ---- 5) meta sa 라벨 전수 ----
+    # ---- 5) all meta sa labels ----
     meta_rows = [{"filepath": r.filepath, "onset": float(r.onset), "offset": float(r.offset), "split": r.split,
                   "sa": int(r.sa_class_num), "sex": r.sex, "age_group": r.age_group} for r in df.itertuples()]
     json.dump(meta_rows, open(out / "meta_sa.json", "w"))
-    print("meta rows", len(meta_rows), "완료:", out)
+    print("meta rows", len(meta_rows), "done:", out)
 
 
 if __name__ == "__main__":

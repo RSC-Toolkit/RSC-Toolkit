@@ -1,16 +1,16 @@
-# ADD-RSC(Interspeech 2025) AST 변형: DiffTransformerLayer(256, 8, depth 6 → λ_init 0.7008) + AST(16/16, 1024×256) — 공식 코드 기본값.
+# ADD-RSC (Interspeech 2025) AST variant: DiffTransformerLayer(256, 8, depth 6 → λ_init 0.7008) + AST (16/16, 1024×256) — official code defaults.
 name: ast_addrsc
 params:
   n_cls: 4
   fstride: 16
   tstride: 16
-  input_fdim: 1024               # 원본 ASTModel 인자 (실제 격자는 transpose 로 16×64 — quirk 유지)
+  input_fdim: 1024               # official ASTModel argument (the actual grid is 16×64 via transpose — quirk kept)
   input_tdim: 256
-  audioset_pretrain: true        # YuanGong audioset_10_10_0.4593 에서 이름·모양 일치 키만 (pos_embed 미로드)
+  audioset_pretrain: true        # only keys matching in name and shape from YuanGong audioset_10_10_0.4593 (pos_embed not loaded)
   pretrained_path: null
   denoise_d_model: 256
   denoise_num_heads: 8
   denoise_depth: 6
   loss_beta: 0.5
   label_smoothing: 0.20
-  amp: true                      # 원본 autocast fp16, GradScaler 없음 (trainer precision 32)
+  amp: true                      # official autocast fp16, no GradScaler (trainer precision 32)

@@ -1,4 +1,4 @@
-# patch-mix 계열 논문의 ICBHI 데이터 설정 (P0 골든으로 대조된 체인).
+# ICBHI data config for the patch-mix family papers (preprocessing chain verified by golden comparison with the official code).
 name: icbhi_patchmix
 params:
   datamodule_name: index
@@ -12,16 +12,16 @@ params:
   sampling_rate: 16000
   sample_level: cycle
   desired_length_sec: 8.0
-  pad_type: repeat_fade          # 원본 cut_pad_sample_torchaudio (fade_out 포함)
+  pad_type: repeat_fade          # official cut_pad_sample_torchaudio (includes fade_out)
 
   train_splits: [train]
-  val_splits: [test]             # 논문 프로토콜: 매 epoch 공식 test 평가 (best-on-test)
+  val_splits: [test]             # paper protocol: official test evaluation every epoch (best-on-test)
   test_splits: [test]
 
   batch_size: 8
   num_workers: 8
   shuffle_train: true
-  drop_last_train: true          # 원본 train loader drop_last=True
+  drop_last_train: true          # official train loader uses drop_last=True
   pin_memory: true
 
   features:
@@ -29,7 +29,7 @@ params:
     kind: fbank
     cache_dir: downloaded_datasets/features_cache
     n_mels: 128
-    target_frames: 798           # 8초 -> kaldi fbank 798 프레임 (원본 h=798)
+    target_frames: 798           # 8 s -> 798 kaldi fbank frames (official h=798)
     frame_shift: 10
     window_type: hanning
     dither: 0.0

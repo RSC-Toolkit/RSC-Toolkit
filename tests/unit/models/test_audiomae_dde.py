@@ -1,9 +1,9 @@
 """
-DDE-MAE 묶음 테스트.
+Tests for the DDE-MAE group.
 
-P0 골든(백본 Audio-MAE): scripts/reproduction/dump_ddemae_goldens.py — 공식 facebookresearch/AudioMAE models_mae.py/models_vit.py 를
-별도 venv(timm 0.4.5, CPU) 에서 실행. 인코더 latent·디코더 pred·손실·fc_norm 특징을 1e-4 로 대조.
-DDE 부분(2 인코더·concat·Siamese·vCLUB·time-shuffle)은 논문 명세 재구현 — 골든 없음, 구성·불변식 테스트만.
+Official-code parity goldens (backbone Audio-MAE): scripts/reproduction/dump_ddemae_goldens.py — the official facebookresearch/AudioMAE models_mae.py/models_vit.py
+run in a separate venv (timm 0.4.5, CPU). Encoder latent, decoder pred, loss and fc_norm features are compared at 1e-4.
+The DDE part (2 encoders, concat, Siamese, vCLUB, time-shuffle) is re-implemented from the paper description — no golden, only configuration/invariant tests.
 """
 import pathlib
 
@@ -21,14 +21,14 @@ def _repo_root() -> pathlib.Path:
     for c in pathlib.Path(__file__).resolve().parents:
         if (c / "pyproject.toml").exists():
             return c
-    raise RuntimeError("리포 루트를 찾지 못했다")
+    raise RuntimeError("repository root not found")
 
 
 REPO = _repo_root()
 GOLDEN = REPO / "tests" / "golden" / "ddemae"
 CKPT = REPO / AUDIOMAE_CKPT
-needs_golden = pytest.mark.skipif(not (GOLDEN / "mae.pt").exists(), reason="골든 없음")
-needs_ckpt = pytest.mark.skipif(not CKPT.exists(), reason="Audio-MAE ckpt 없음")
+needs_golden = pytest.mark.skipif(not (GOLDEN / "mae.pt").exists(), reason="golden missing")
+needs_ckpt = pytest.mark.skipif(not CKPT.exists(), reason="Audio-MAE ckpt missing")
 
 
 def _det_fill(t):
@@ -36,7 +36,7 @@ def _det_fill(t):
         t.copy_(torch.linspace(-0.5, 0.5, t.numel()).reshape(t.shape))
 
 
-# ----------------------------------------------------------------------------------------- 구조 (골든·ckpt 불필요)
+# ----------------------------------------------------------------------------------------- structure (no golden/ckpt needed)
 def test_encoder_layout_and_pos_embed():
     enc = AudioMAEEncoder()
     assert enc.patch_embed.grid_size == (64, 8) and enc.patch_hw == (8, 64) and enc.patch_embed.num_patches == 512
@@ -71,10 +71,10 @@ def test_decoder_layout_and_patchify():
 def test_param_counts():
     n = lambda m: sum(p.numel() for p in m.parameters()) / 1e6
     enc, dec = AudioMAEEncoder(), MAEDecoder(in_dim=768, decoder_mode=1)
-    assert abs(n(enc) - 85.6497) < 0.01  # ViT-B 인코더 (85.65M, fc_norm 포함)
-    assert abs(n(dec) - 51.3446) < 0.01  # Swin x16 디코더 (51.34M)
+    assert abs(n(enc) - 85.6497) < 0.01  # ViT-B encoder (85.65M, including fc_norm)
+    assert abs(n(dec) - 51.3446) < 0.01  # Swin x16 decoder (51.34M)
     dde = DDEMAE(variant="s3", pretrained_path=None)
-    assert abs(n(dde) - 224.6126) < 0.01  # E_R + E_I + 디코더(1536 입력) + q_θ
+    assert abs(n(dde) - 224.6126) < 0.01  # E_R + E_I + decoder (1536 input) + q_θ
     s2 = DDEMAE(variant="s2", pretrained_path=None)
     assert abs(n(s2) - 136.9943) < 0.01
 
@@ -84,10 +84,10 @@ def test_time_shuffle_invertible_and_mask_sync():
     x = torch.randn(3, 1, 1024, 128)
     xs, perm = time_shuffle(x, "patch", 16)
     assert xs.shape == x.shape and torch.equal(time_unshuffle(xs, perm, "patch", 16), x)
-    assert not torch.equal(xs, x) and torch.allclose(xs.sum(dim=2), x.sum(dim=2), atol=1e-4, rtol=1e-4)  # 스펙트럼 합 보존 (fp32 합산 순서 차 ~2e-5)
+    assert not torch.equal(xs, x) and torch.allclose(xs.sum(dim=2), x.sum(dim=2), atol=1e-4, rtol=1e-4)  # spectral sum preserved (fp32 summation order difference ~2e-5)
     xf, pf = time_shuffle(x, "frame")
     assert torch.equal(time_unshuffle(xf, pf, "frame"), x)
-    # 물리 동기화: 순열된 noise 의 argsort 가 X̃ 에서 같은 물리 패치를 같은 순위로 남긴다
+    # physical synchronization: argsort of the permuted noise keeps the same physical patch at the same rank in X̃
     noise = torch.rand(3, 512)
     ns = permute_token_noise(noise, perm, 64, 8)
     ks = torch.argsort(ns, dim=1)[:, :103]
@@ -115,7 +115,7 @@ def test_vclub_bound_and_aux_step_isolation():
     assert torch.allclose(mi, mi_d)
     mi_d.backward()
     assert all(p.grad is None for p in club.parameters()) and zr.grad is not None and zi.grad is not None
-    # 보조 스텝: q_θ 만 바뀌고 입력(주 파라미터 대리)은 그대로
+    # auxiliary step: only q_θ changes, the input (proxy for the main parameters) stays the same
     m = DDEMAE(variant="s3", pretrained_path=None, club_hidden=8)
     main_before = {k: v.clone() for k, v in m.encoder_r.state_dict().items()}
     q_before = {k: v.clone() for k, v in m.club.state_dict().items()}
@@ -127,7 +127,7 @@ def test_vclub_bound_and_aux_step_isolation():
 
 def test_dde_variants_and_grad_routing():
     torch.manual_seed(0)
-    x = torch.randn(2, 128, 1024) * 0.3  # 툴킷 특징 배치 (B, F, T)
+    x = torch.randn(2, 128, 1024) * 0.3  # toolkit feature batch (B, F, T)
     s3 = DDEMAE(variant="s3", pretrained_path=None, club_hidden=8, siamese_margin=0.0)
     assert s3.decoder.decoder_embed.in_features == 1536 and s3.encoder_i is not None
     s3.train()
@@ -155,7 +155,7 @@ def test_stage2_loads_only_encoder_r(tmp_path):
     s3 = DDEMAE(variant="s3", pretrained_path=None, club_hidden=8)
     with torch.no_grad():
         for p in s3.encoder_i.parameters():
-            p.add_(1.0)  # E_I 를 오염시켜 로드되면 티 나게
+            p.add_(1.0)  # corrupt E_I so that loading it is noticeable
     torch.save({"model": s3.state_dict(), "epoch": 0}, tmp_path / "final_state.pth")
     cls = AudioMAEClassifier(n_cls=4, pretrained_path=None, encoder_ckpt=str(tmp_path / "final_state.pth"))
     for k, v in s3.encoder_r.state_dict().items():
@@ -166,7 +166,7 @@ def test_stage2_loads_only_encoder_r(tmp_path):
         AudioMAEClassifier(n_cls=4, pretrained_path=None, encoder_ckpt=str(tmp_path / "final_state.pth"), encoder_key="encoder_x.")
 
 
-# ----------------------------------------------------------------------------------------- P0 골든 (공식 Audio-MAE)
+# ----------------------------------------------------------------------------------------- official-code parity goldens (official Audio-MAE)
 @needs_golden
 @needs_ckpt
 def test_checkpoint_coverage_and_pos_embed():
@@ -178,7 +178,7 @@ def test_checkpoint_coverage_and_pos_embed():
     ours = {**{k: list(v.shape) for k, v in enc.state_dict().items() if not k.startswith("fc_norm.")},
             **{k: list(v.shape) for k, v in dec.state_dict().items()}}
     assert ours == g["ckpt_shapes"]
-    # DDE concat 디코더: decoder_embed 만 건너뛰고 나머지 디코더 키 전부 로드
+    # DDE concat decoder: only decoder_embed is skipped, all other decoder keys are loaded
     dec2 = MAEDecoder(in_dim=1536, decoder_mode=1)
     info2 = load_audiomae_checkpoint(None, CKPT, dec2, skip_decoder_embed=True)
     assert set(info2["dropped"]) >= {"decoder_embed.weight", "decoder_embed.bias"} and "decoder_blocks.15.mlp.fc2.weight" in info2["decoder_used"]
@@ -199,7 +199,7 @@ def test_encoder_decoder_loss_match_reference():
         assert torch.allclose(pred, g["pred"], atol=1e-4), float((pred - g["pred"]).abs().max())
         assert torch.allclose(mae_recon_loss(i["x"], pred, mask, False), g["loss"], atol=1e-4)
         assert torch.allclose(mae_recon_loss(i["x"], pred, mask, True), g["loss_norm_pix"], atol=1e-4)
-        # recon_scope='all' (가정 플래그, 식 5 전체 MSE) = 마스크 무관 전 패치 평균
+        # recon_scope='all' (assumption flag, full MSE of Eq. 5) = mean over all patches regardless of mask
         all_ = mae_recon_loss(i["x"], pred, mask, False, scope="all")
         assert torch.isfinite(all_) and torch.allclose(all_, ((pred - patchify(i["x"])) ** 2).mean(), atol=1e-6)
         assert torch.equal(patchify(i["x"]), g["target_patches"])
@@ -218,6 +218,6 @@ def test_finetune_features_and_head_match_reference():
     with torch.no_grad():
         feat = m.encoder.forward_features(i["x"])
         assert torch.allclose(feat, g["feat_gap"], atol=1e-4), float((feat - g["feat_gap"]).abs().max())
-        logits = m(i["x"].squeeze(1).transpose(1, 2))  # 툴킷 입력 (B, F, T) 경로
+        logits = m(i["x"].squeeze(1).transpose(1, 2))  # toolkit input (B, F, T) path
         assert torch.allclose(logits, g["logits"], atol=1e-4)
         assert torch.allclose(torch.nn.functional.cross_entropy(logits, g["labels"]), g["loss"], atol=1e-4)

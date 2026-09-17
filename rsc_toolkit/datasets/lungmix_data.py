@@ -1,26 +1,26 @@
 """
-Lungmix(ICASSP 2025) 데이터 경로 — **논문 명세 재구현** (공식 저장소에 데이터·전처리 코드 없음).
+Lungmix (ICASSP 2025) data path -- **re-implementation from the paper description** (the official repository has no data or preprocessing code).
 
-논문 §III-A/B 가 **나열만** 한 항목: 16 kHz 리샘플, 밴드패스 50–1500 Hz, 9 s pad/cut, fbank 128×1024. 논문은 이들의 **순서와 믹싱 위치를
-적지 않았다** → 아래 순서는 가정: 리샘플 → 밴드패스 → 9 s pad/cut(+원 구간 길이 n_valid 동봉) → (믹싱: 모델 training_forward 안, 온라인;
-기본 raw = n_valid 만큼의 원 구간을 섞은 뒤 9 s) → fbank. 믹싱 위치만은 논문 식 3 표기에 근거(아래 #5).
-SPRSound 는 이벤트 7-class 를 ICBHI 식 4-class 로 통일(Fine/Coarse Crackle→crackle, Both→both; Normal·Wheeze 그대로).
-**Rhonchi·Stridor 는 4-class 뷰에서 제외**한다(2026-09-16 사용자 규칙) — 논문 §III-A 는 wheeze 병합이라 서술하지만 툴킷은 따르지 않는다.
-2022 inter-test 에는 두 클래스가 0 건이라 시험 수치는 같고, train 에서만 54 건(Rhonchi 39 + Stridor 15)이 빠진다.
+Items the paper (Sec. III-A/B) **only lists**: 16 kHz resampling, 50-1500 Hz band-pass, 9 s pad/cut, fbank 128x1024. The paper **does not state their order or
+where mixing happens** -> the order below is assumed: resample -> band-pass -> 9 s pad/cut (+ original segment length n_valid attached) -> (mixing: online, inside the model's training_forward;
+default raw = mix the original segments of length n_valid, then 9 s) -> fbank. Only the mixing position is grounded in the notation of the paper's Eq. 3 (see below).
+SPRSound's 7 event classes are unified into the ICBHI-style 4 classes (Fine/Coarse Crackle -> crackle, Both -> both; Normal and Wheeze unchanged).
+**Rhonchi and Stridor are excluded from the 4-class view** -- the paper (Sec. III-A) describes merging them into wheeze, but the toolkit does not follow that.
+Both classes have 0 events in the 2022 inter-patient test, so test numbers are unchanged; only 54 train events (Rhonchi 39 + Stridor 15) are dropped.
 
-가정(저자 확인 전, 전부 config 플래그):
-- #5 9 s 패딩 방식 미기재 → pad_type repeat(툴킷 AudioPreprocessor), 밴드패스는 **패딩 전** 원 구간에 적용(bandpass.before_pad).
-- #5 믹싱 위치: 논문 식 3 의 maxlen(x_i,x_j) 표기와 공식 함수의 길이 맞춤 구조는 '원 구간을 섞은 뒤 9 s' 를 시사 → 기본·주 런은
-  model mix_stage='raw': 이 데이터셋이 lungmix.emit_valid_len=true(기본) 로 배치에 실어 주는 원 구간 길이(n_valid, 패딩 전 샘플 수;
-  train 만, meta_labels 자리) 를 모델이 써서 원 구간만 섞은 뒤 9 s 로 맞춘다. 대안 mix_stage='padded' 는 패딩된 파형을 섞는다.
-- #6 밴드패스 종류·차수 미기재 → Butterworth 4차 zero-phase (processors/bandpass.py). 적용 **단위**도 미기재(논문 §III-B '리샘플 후
-  밴드패스' 는 녹음 전체 기준일 수 있음) → 여기서는 resample_after_slice 로 읽은 **사이클 구간 단위** sosfiltfilt (1–3 s 구간에
-  50 Hz 하이패스 zero-phase 라 양끝 과도응답 가능; 녹음 단위 대안은 미구현).
-- #7 SPRSound test 가 inter/intra 미기재 → 2022 inter-patient test(툴킷 번들 official_split.txt 'valid' → 'test') 가정.
-  7→4 매핑은 **파생 라벨**(df 의 label 열만 치환; 원본 index·wav 는 불변).
+Assumptions (not confirmed by the authors; all exposed as config flags):
+- 9 s padding method not specified -> pad_type repeat (toolkit AudioPreprocessor); band-pass is applied to the original segment **before padding** (bandpass.before_pad).
+- Mixing position: the maxlen(x_i,x_j) notation in the paper's Eq. 3 and the length-matching structure of the official function suggest 'mix the original segments, then 9 s' -> the default/main run
+  uses model mix_stage='raw': the model uses the original segment length (n_valid, sample count before padding; train only, in the meta_labels slot) that this dataset
+  puts into the batch with lungmix.emit_valid_len=true (default), mixes only the original segments and then fits them to 9 s. The alternative mix_stage='padded' mixes padded waveforms.
+- Band-pass type and order not specified -> 4th-order zero-phase Butterworth (processors/bandpass.py). The application **unit** is not specified either (the paper's
+  'band-pass after resampling' in Sec. III-B may refer to whole recordings) -> here sosfiltfilt is applied **per cycle segment** read with resample_after_slice (a zero-phase
+  50 Hz high-pass on 1-3 s segments may show edge transients; the per-recording alternative is not implemented).
+- SPRSound test not specified as inter/intra -> the 2022 inter-patient test is assumed (toolkit-bundled official_split.txt 'valid' -> 'test').
+  The 7->4 mapping is a **derived label** (only the df label column is replaced; the original index and wav files are unchanged).
 
-데이터 흐름: LungmixDataModule(IndexDataModule 서브클래스, data_registry 'lungmix') → LungmixIndexDataset(index_dataset_cls) 에
-bandpass/label_map 인자를 넘긴다. features.kind: waveform 이라 캐시 없음(학습은 온라인 믹싱이라 캐시 불가, 평가도 파형→모델 내부 fbank).
+Data flow: LungmixDataModule (IndexDataModule subclass, data_registry 'lungmix') -> passes bandpass/label_map arguments to LungmixIndexDataset (index_dataset_cls).
+features.kind: waveform, so no cache (training mixes online, which rules out caching; evaluation also goes waveform -> in-model fbank).
 """
 from __future__ import annotations
 
@@ -36,13 +36,13 @@ from rsc_toolkit.trainer.data.index_datamodule import IndexDataModule
 
 logger = logging.getLogger(__name__)
 
-# 툴킷 SPRSound 이벤트 인덱스(.datasets/sprsound/index/index_cycle.csv, LabelEncoder 첫 등장 순) — 라벨 id ↔ 이름.
-# 검증: 번들 metadata.csv 의 이벤트 라벨 개수(Normal 6199 / Fine Crackle 992 / Wheeze 757 / Coarse Crackle 52 / Both 31 /
-# Rhonchi 39 / Stridor 15, 전부 서로 다름)가 인덱스 id 별 개수와 일치 (tests/unit/models/test_ast_lungmix.py).
+# Toolkit SPRSound event index (.datasets/sprsound/index/index_cycle.csv, LabelEncoder first-appearance order) -- label id <-> name.
+# Verified: the event label counts of the bundled metadata.csv (Normal 6199 / Fine Crackle 992 / Wheeze 757 / Coarse Crackle 52 / Both 31 /
+# Rhonchi 39 / Stridor 15, all distinct) match the per-id counts of the index (tests/unit/models/test_ast_lungmix.py).
 SPRSOUND_EVENT_ID_TO_NAME = {0: "Normal", 1: "Fine Crackle", 2: "Wheeze", 3: "Coarse Crackle", 4: "Both", 5: "Rhonchi", 6: "Stridor"}
-# ICBHI 4-class 뷰 (normal 0 / crackle 1 / wheeze 2 / both 3). Rhonchi·Stridor 는 ICBHI 에 대응 클래스가 없어 **제외**한다
-# (2026-09-16 사용자 규칙: wheeze 로 넣지 않는다. LungMix §III-A·QLung §3.1·BTS-CARD §3.1 의 'wheeze 병합' 서술과 다르며,
-#  BTS-CARD 공식 노트북의 제거 처리와 같다). 맵에 없는 라벨의 행은 apply_label_map 이 데이터프레임에서 걸러낸다.
+# ICBHI 4-class view (normal 0 / crackle 1 / wheeze 2 / both 3). Rhonchi and Stridor have no ICBHI counterpart and are **excluded**
+# (not merged into wheeze; this differs from the 'merged into wheeze' description in LungMix Sec. III-A, QLung Sec. 3.1 and BTS-CARD Sec. 3.1,
+#  and matches the removal in the official BTS-CARD notebook). apply_label_map filters rows whose label is not in the map out of the dataframe.
 SPRSOUND_4CLASS_EXCLUDED = ("Rhonchi", "Stridor")
 SPRSOUND_NAME_TO_4CLASS = {"Normal": 0, "Fine Crackle": 1, "Coarse Crackle": 1, "Wheeze": 2, "Both": 3}
 SPRSOUND_7_TO_4 = {i: SPRSOUND_NAME_TO_4CLASS[n] for i, n in SPRSOUND_EVENT_ID_TO_NAME.items() if n in SPRSOUND_NAME_TO_4CLASS}
@@ -50,7 +50,7 @@ LABEL_MAPS = {"none": None, "sprsound_7to4": SPRSOUND_7_TO_4}
 
 
 def map_labels(labels, label_map: Optional[Dict[int, int]]):
-    """라벨 열을 맵으로 치환한다. 맵에 없는 라벨(제외 클래스)은 None — 행 단위 제거는 apply_label_map 을 쓰라."""
+    """Replace the label column using the map. Labels not in the map (excluded classes) become None -- use apply_label_map to drop rows."""
     if label_map is None:
         return labels
     return [label_map.get(int(v)) if not pd.isna(v) else v for v in labels]
@@ -58,8 +58,8 @@ def map_labels(labels, label_map: Optional[Dict[int, int]]):
 
 def apply_label_map(df: pd.DataFrame, label_map: Dict[int, int], *, where: str = "") -> tuple[pd.DataFrame, int]:
     """
-    인덱스 데이터프레임에 파생 라벨 맵을 적용한다: 맵에 없는 라벨의 행을 **제거**하고(reset_index) 나머지를 치환.
-    원 라벨은 label_original 열에 남긴다. 반환 (새 df, 제거된 행 수). 원본 df 는 바꾸지 않는다.
+    Apply a derived label map to an index dataframe: **drop** rows whose label is not in the map (reset_index) and replace the rest.
+    The original label is kept in the label_original column. Returns (new df, number of dropped rows). The input df is not modified.
     """
     labels = pd.to_numeric(df["label"], errors="coerce")
     keep = labels.isna() | labels.isin(list(label_map.keys()))
@@ -69,14 +69,14 @@ def apply_label_map(df: pd.DataFrame, label_map: Dict[int, int], *, where: str =
     out["label"] = map_labels(out["label"].tolist(), label_map)
     if dropped:
         excluded = sorted({int(v) for v in labels[~keep].dropna().unique()})
-        logger.info("apply_label_map%s: 맵에 없는 라벨 %s 인 %d 행 제외 → %d 행", f"({where})" if where else "", excluded, dropped, len(out))
+        logger.info("apply_label_map%s: labels %s not in the map, dropped %d rows -> %d rows", f"({where})" if where else "", excluded, dropped, len(out))
     return out, dropped
 
 
 class _BandpassThenPreprocess:
     """
-    IndexDataset.audio_preprocessor 자리에 끼우는 래퍼: (선택) 밴드패스(패딩 전) → 원 전처리(9 s pad/cut).
-    호출마다 패딩 전 원 구간 길이를 last_raw_len 에 남긴다(LungmixIndexDataset 이 n_valid 로 배치에 싣는다; 워커마다 순차 호출이라 안전).
+    Wrapper plugged into IndexDataset.audio_preprocessor: (optional) band-pass (before padding) -> original preprocessing (9 s pad/cut).
+    Each call stores the original segment length before padding in last_raw_len (LungmixIndexDataset puts it into the batch as n_valid; safe because calls are sequential per worker).
     """
 
     def __init__(self, bandpass, inner, before_pad: bool = True):
@@ -95,9 +95,9 @@ class _BandpassThenPreprocess:
 
 
 class LungmixIndexDataset(IndexDataset):
-    """IndexDataset + (선택) 밴드패스 + (선택) 파생 라벨 매핑. 원본 인덱스/파일은 읽기만 한다."""
+    """IndexDataset + (optional) band-pass + (optional) derived label mapping. The original index/files are only read."""
 
-    N_CLS = 4   # 논문 4-class 고정 (ClassLayout normal/crackle/wheeze/both)
+    N_CLS = 4   # fixed 4 classes as in the paper (ClassLayout normal/crackle/wheeze/both)
 
     def __init__(self, *args, bandpass: Optional[dict] = None, label_map: Optional[str] = "none", **kwargs):
         super().__init__(*args, **kwargs)
@@ -114,17 +114,17 @@ class LungmixIndexDataset(IndexDataset):
         self.audio_preprocessor = self._pre
         self.label_map_name = str(label_map or "none")
         if self.label_map_name not in LABEL_MAPS:
-            raise ValueError(f"label_map 은 {sorted(LABEL_MAPS)} 중 하나여야 한다: {label_map!r}")
+            raise ValueError(f"label_map must be one of {sorted(LABEL_MAPS)}: {label_map!r}")
         self.label_map = LABEL_MAPS[self.label_map_name]
         labels = pd.to_numeric(self.df["label"], errors="coerce").dropna()
         if self.label_map is None and len(labels) and int(labels.max()) >= self.N_CLS:
             raise ValueError(
-                f"label_map='none' 은 4-class 인덱스(ICBHI) 전용인데 라벨 최대값 {int(labels.max())} 이 있다 — SPRSound 7-class 는 "
-                "lungmix.label_map=sprsound_7to4 를 쓰라 (툴킷 표준 7-class 는 이 데이터 경로 밖)")
+                f"label_map='none' is for 4-class indexes (ICBHI) only, but the maximum label is {int(labels.max())} -- for SPRSound 7-class "
+                "use lungmix.label_map=sprsound_7to4 (the toolkit's standard 7-class setup is outside this data path)")
         if self.label_map is not None:
             self.df, dropped = apply_label_map(self.df, self.label_map, where=f"LungmixIndexDataset split={self.split}")
             counts = self.df["label"].value_counts().sort_index().to_dict()
-            logger.info("LungmixIndexDataset(split=%s): 라벨 매핑 %s 적용 → %s (제외 %d 행)", self.split, self.label_map_name, counts, dropped)
+            logger.info("LungmixIndexDataset(split=%s): applied label map %s -> %s (dropped %d rows)", self.split, self.label_map_name, counts, dropped)
 
     def __getitem__(self, idx: int) -> Dict[str, Any]:
         out = super().__getitem__(idx)
@@ -134,24 +134,24 @@ class LungmixIndexDataset(IndexDataset):
 
 
 def valid_len_meta(item: Dict[str, Any]) -> int:
-    """meta_label_fn: 원 구간 길이(샘플 수) 를 meta_labels 자리에 싣는다 (mix_stage='raw')."""
+    """meta_label_fn: puts the original segment length (sample count) into the meta_labels slot (mix_stage='raw')."""
     return int(item["n_valid"])
 
 
 class LungmixDataModule(IndexDataModule):
-    """IndexDataModule + lungmix 블록(bandpass·label_map) 을 LungmixIndexDataset 에 전달."""
+    """IndexDataModule + passes the lungmix block (bandpass, label_map) to LungmixIndexDataset."""
 
-    meta_kind = "lungmix_valid_len"  # 학습 batch[2] = 원 구간 길이 (emit_valid_len) — ast_lungmix mix_stage=raw 용
+    meta_kind = "lungmix_valid_len"  # train batch[2] = original segment length (emit_valid_len) -- for ast_lungmix mix_stage=raw
 
     def __init__(self, *args, lungmix: Optional[dict] = None, **kwargs):
         super().__init__(*args, **kwargs)
         cfg = dict(lungmix or {})
         self.lungmix_bandpass = dict(cfg.get("bandpass") or {})
         self.lungmix_label_map = str(cfg.get("label_map", "none"))
-        self.emit_valid_len = bool(cfg.get("emit_valid_len", True))    # train 배치 meta_labels = 원 구간 길이 (mix_stage raw 기본 경로)
+        self.emit_valid_len = bool(cfg.get("emit_valid_len", True))    # train batch meta_labels = original segment length (default mix_stage raw path)
 
     def _wrap_with_features(self, base_ds, *, feature_transform=None, meta_label_fn=None, split_role=None):
-        if split_role is None:  # 직접 호출(setup 밖) 하위호환 — 예전 identity 비교
+        if split_role is None:  # direct call (outside setup), backward compatible -- identity comparison
             split_role = "train" if base_ds is getattr(self, "train_ds", None) else "val"
         if self.emit_valid_len and meta_label_fn is None and split_role == "train":
             meta_label_fn = valid_len_meta
@@ -159,14 +159,14 @@ class LungmixDataModule(IndexDataModule):
                                            split_role=split_role)
 
     def _index_dataset_kwargs(self, *, split: str, role: Optional[str] = None) -> Dict[str, Any]:
-        # 부모의 조립(fade/resample_after_slice/time_unit/split_file 규칙 포함)에 lungmix 전용 인자만 더한다
+        # Add only the lungmix-specific arguments to the parent's assembly (including the fade/resample_after_slice/time_unit/split_file rules)
         kwargs = super()._index_dataset_kwargs(split=split, role=role)
         kwargs.update(bandpass=self.lungmix_bandpass, label_map=self.lungmix_label_map)
         return kwargs
 
 
 def sprsound_4class_counts(metadata_csv) -> Dict[str, Dict[int, int]]:
-    """번들 metadata.csv 의 split 별 이벤트 라벨 → 4-class 개수 (테스트·문서용). 제외 클래스(Rhonchi·Stridor)는 집계에 안 들어간다."""
+    """Event labels per split of the bundled metadata.csv -> 4-class counts (for tests/docs). Excluded classes (Rhonchi, Stridor) are not counted."""
     df = pd.read_csv(metadata_csv)
     out: Dict[str, Dict[int, int]] = {}
     for split, sub in df.groupby("Split"):
