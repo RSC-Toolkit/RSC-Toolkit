@@ -1,4 +1,4 @@
-# QLung **Audio-CLAP 판** 의 SPRSound OOD 평가 뷰(학습 미사용): 7→4 병합 파생 라벨, ICBHI CLAP 판(icbhi_qlung_clap.yaml)과 같은
+# QLung **Audio-CLAP 판** 의 SPRSound OOD 평가 뷰(학습 미사용): 7→4 병합 파생 라벨(Rhonchi·Stridor 제외), ICBHI CLAP 판(icbhi_qlung_clap.yaml)과 같은
 # 오디오 체인(48 kHz → 녹음 fade → 구간 절단 → 8 s repeat_fade → ClapProcessor log-mel). 평가 범위·라벨 병합은 AST 판 OOD 뷰
 # (sprsound_qlung_ood.yaml)와 동일 — 2026-09-07 사용자 결정으로 CLAP 판 OOD 를 채운다.
 name: sprsound_qlung_clap_ood

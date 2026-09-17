@@ -1,7 +1,7 @@
 # QLung 을 **SPRSound 표준 태스크(2022 inter-patient, 7-class)로 직접 학습**할 때 쓰는 데이터 설정 (SPR→SPR).
 #
 # 기존 sprsound_qlung_ood.yaml 과의 차이 — 그쪽은 ICBHI 로 학습한 ckpt 를 SPRSound 에 제로샷으로 얹는
-# **평가 전용 뷰**라 label_map(7→4 병합)을 걸고 train 셔플도 끄지만, 이 config 는 SPRSound 로 **학습**하므로
+# **평가 전용 뷰**라 label_map(7→4 병합, Rhonchi·Stridor 제외)을 걸고 train 셔플도 끄지만, 이 config 는 SPRSound 로 **학습**하므로
 #   · label_map 없음 → 7-class 원 라벨 그대로 (SPRSound 를 주 태스크로 쓴 논문들의 공식 정의)
 #   · shuffle_train/drop_last_train 켜짐 (ICBHI QLung 의 train loader 와 동일)
 #

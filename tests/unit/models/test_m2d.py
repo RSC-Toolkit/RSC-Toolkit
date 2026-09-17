@@ -132,3 +132,44 @@ def test_split_iter_adapter_matches_manual_accumulation():
     adapter.training_step((x, y), 0)
     for p_ref, p_ad in zip(ref.parameters(), ad.parameters()):
         assert torch.allclose(p_ref, p_ad, atol=1e-6)
+
+
+def test_split_iter_adapter_validation_covers_remainder():
+    """검증은 D=B//K 서브배치 K 개 + 나머지 1 개 → 배치의 모든 샘플이 지표에 들어간다(원본 ce.py 는 나머지를 버렸다; 2026-09-16 수정).
+    앞 K·D 건은 원본과 같은 서브배치 구성이라 로짓이 동일해야 한다(기존 1,428 건 예측 불변)."""
+    from rsc_toolkit.trainer.adapters.split_iter_adapter import SplitIterAdapter
+
+    class Tiny(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.lin = nn.Linear(6, 3)
+
+        def train_transform(self, x):
+            return x
+
+        def val_transform(self, x):
+            return x
+
+        def forward(self, x):
+            return self.lin(x.mean(dim=1))
+
+    seen = {}
+
+    class Rec(nn.Module):
+        def update(self, logits, target):
+            seen["logits"], seen["y"] = logits, target
+
+    torch.manual_seed(0)
+    x = torch.randn(21, 2, 6); y = torch.randint(0, 3, (21,))       # SPRSound 마지막 배치와 같은 21 건
+    model = Tiny(); ce = nn.CrossEntropyLoss()
+    adapter = SplitIterAdapter(rsc_model=model, loss_func=ce, optimizer_cfg={"name": "sgd", "params": {"lr": 0.1}}, split_iter=4)
+    adapter.log = lambda *a, **k: None
+    adapter.val_metrics = nn.ModuleList([Rec()])
+    assert adapter.val_chunks(21) == [(0, 5), (5, 10), (10, 15), (15, 20), (20, 21)]
+    assert adapter.val_chunks(64) == [(0, 16), (16, 32), (32, 48), (48, 64)]   # 나머지 없음 → 원본과 동일
+    assert adapter.val_chunks(3) == [(0, 3)]                                    # B < K
+    adapter.validation_step((x, y), 0)
+    assert seen["y"].shape[0] == 21 and torch.equal(seen["y"], y)
+    with torch.no_grad():
+        ref = torch.cat([model(x[i * 5:(i + 1) * 5]) for i in range(4)])     # 원본 방식의 앞 20 건
+    assert torch.allclose(seen["logits"][:20], ref)

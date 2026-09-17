@@ -1,9 +1,11 @@
 """
-QLung 의 SPRSound OOD 평가 뷰 — 7-class 이벤트 → ICBHI 4-class 병합, 16 kHz kaldi fbank 128×798 (ICBHI 학습 모델 제로샷 평가 전용).
+QLung 의 SPRSound OOD 평가 뷰 — 7-class 이벤트 → ICBHI 4-class 병합(Rhonchi·Stridor 제외), 16 kHz kaldi fbank 128×798 (ICBHI 학습 모델 제로샷 평가 전용).
 
 논문 3.1: SPRSound 를 Normal 6,199 / Crackle 1,044 (Fine+Coarse) / Wheeze 811 (Wheeze+Rhonchi+Stridor) / Both 31 = 8,085 로 병합
   → 툴킷 인덱스(.datasets/sprsound/index/index_cycle.csv) 의 train 6,656 + inter-patient test 1,429 와 클래스별로 정확히 일치.
   평가 범위(8,085 전체 vs inter-test 1,429)는 논문 미명시 → 둘 다 집계 (scripts/reproduction/eval_qlung_ood.py).
+  **툴킷 4-class 뷰는 Rhonchi 39·Stridor 15 를 wheeze 에 넣지 않고 제외한다**(2026-09-16 사용자 규칙) → 6,199 / 1,044 / 757 / 31 = 8,031;
+  inter-test 1,429 는 두 클래스가 0 건이라 동일(1,040 / 83 / 305 / 1). 옛 all-8,085 집계(ood.json 'all')는 병합 기준이라 비교 불가.
 저장소에 SPRSound 코드가 없어 전처리는 **가정**(플래그, configs/data/sprsound_qlung_ood.yaml):
   - 16 kHz 리샘플(녹음 전체, 8 kHz 원음), 녹음 fade in/out sr/16, 구간 절단(초 단위 int(t·sr)), 8 s repeat_fade — ICBHI 와 동일 체인
     (논문 3.1 '모든 실험 8 s 표준화' 는 명시; 리샘플·패딩·정규화 상수는 미명시 → ICBHI 와 같다고 가정)
@@ -23,13 +25,15 @@ from rsc_toolkit.datasets.qlung_data import QLungDataModule
 
 DATA_CONFIG_DEFAULT = "rsc_toolkit/configs/data/sprsound_qlung_ood.yaml"
 CLASS_NAMES_4 = ("normal", "crackle", "wheeze", "both")
-# 논문 3.1 병합 분포 (train 6,656 + inter-test 1,429)
+# 논문 3.1 병합 분포 (train 6,656 + inter-test 1,429; Rhonchi·Stridor → wheeze) — 논문 수치 기록용, 툴킷 뷰와 다르다
 PAPER_MERGED_COUNTS = (6199, 1044, 811, 31)
+# 툴킷 4-class 뷰 (Rhonchi 39·Stridor 15 제외 → 8,031 이벤트)
+TOOLKIT_4CLASS_COUNTS = (6199, 1044, 757, 31)
 
 
-def sprsound_label7_to_4(label_id: int) -> int:
-    """툴킷 SPRSound 인덱스 라벨 id(0 Normal/1 Fine/2 Wheeze/3 Coarse/4 Both/5 Rhonchi/6 Stridor) → 4-class."""
-    return SPRSOUND_7_TO_4[int(label_id)]
+def sprsound_label7_to_4(label_id: int) -> Optional[int]:
+    """툴킷 SPRSound 인덱스 라벨 id(0 Normal/1 Fine/2 Wheeze/3 Coarse/4 Both/5 Rhonchi/6 Stridor) → 4-class. 제외 클래스(5·6)는 None."""
+    return SPRSOUND_7_TO_4.get(int(label_id))
 
 
 def build_sprsound_ood_datamodule(splits: Sequence[str], data_config: str = DATA_CONFIG_DEFAULT,

@@ -72,7 +72,7 @@ def main():
     ap.add_argument("--icbhi_test", default="pretrained_models/upstream/bts/test.pt")
     ap.add_argument("--no_icbhi", action="store_true")
     ap.add_argument("--sprsound", default="author", help="쉼표 구분: author, toolkit, none")
-    ap.add_argument("--rhonchi_stridor", default="drop", choices=["drop", "wheeze"])
+    ap.add_argument("--rhonchi_stridor", default="drop", choices=["drop"], help="4-class 뷰: Rhonchi/Stridor 제외만 허용 (2026-09-16 결정; inter-test 엔 0 건)")
     ap.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
     ap.add_argument("--batch_size", type=int, default=8)
     ap.add_argument("--amp", action="store_true")

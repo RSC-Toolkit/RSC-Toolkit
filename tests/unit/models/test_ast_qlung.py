@@ -381,11 +381,13 @@ def test_aqs_cache_deterministic_and_variant_pure(tmp_path):
 @needs_sprs
 def test_sprsound_4class_mapping_counts_match_paper():
     from rsc_toolkit.datasets.lungmix_data import SPRSOUND_7_TO_4
-    from rsc_toolkit.datasets.sprsound_ood_fbank import PAPER_MERGED_COUNTS, build_sprsound_ood_datamodule, class_counts_4
+    from rsc_toolkit.datasets.sprsound_ood_fbank import (PAPER_MERGED_COUNTS, TOOLKIT_4CLASS_COUNTS, build_sprsound_ood_datamodule,
+                                                        class_counts_4)
 
-    assert SPRSOUND_7_TO_4 == {0: 0, 1: 1, 3: 1, 2: 2, 5: 2, 6: 2, 4: 3}
+    assert SPRSOUND_7_TO_4 == {0: 0, 1: 1, 3: 1, 2: 2, 4: 3}          # Rhonchi(5)·Stridor(6) 제외 (2026-09-16 사용자 규칙)
     dm = build_sprsound_ood_datamodule(["train", "test"], project_root=str(REPO), overrides={"qlung": {"precompute": False}})
     ds = dm._build_index_dataset(splits=["train", "test"])
-    assert tuple(class_counts_4(ds)) == PAPER_MERGED_COUNTS          # 6199/1044/811/31
+    assert len(ds) == 8085 - 39 - 15 and tuple(class_counts_4(ds)) == TOOLKIT_4CLASS_COUNTS   # 6199/1044/757/31 = 8,031
+    assert PAPER_MERGED_COUNTS == (6199, 1044, 811, 31)               # 논문 3.1 의 wheeze 병합 분포는 기록만 (툴킷 뷰와 다름)
     inter = dm._build_index_dataset(splits=["test"])
     assert len(inter) == 1429 and class_counts_4(inter) == [1040, 83, 305, 1]

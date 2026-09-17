@@ -262,9 +262,11 @@ def test_lungmix_index_dataset_bandpass_before_pad(tmp_path):
 def test_sprsound_7to4_mapping_counts():
     from rsc_toolkit.datasets.lungmix_data import SPRSOUND_7_TO_4, SPRSOUND_EVENT_ID_TO_NAME, sprsound_4class_counts
 
-    assert SPRSOUND_7_TO_4 == {0: 0, 1: 1, 2: 2, 3: 1, 4: 3, 5: 2, 6: 2}
+    # Rhonchi(5)·Stridor(6) 는 4-class 뷰에서 제외 (2026-09-16 사용자 규칙) — 맵에 없다
+    assert SPRSOUND_7_TO_4 == {0: 0, 1: 1, 2: 2, 3: 1, 4: 3}
+    assert 5 not in SPRSOUND_7_TO_4 and 6 not in SPRSOUND_7_TO_4
     counts = sprsound_4class_counts(SPRS_META)   # 번들 metadata (원본 라벨 분포 → 4-class 수치 고정)
-    assert counts["train"] == {0: 5159, 1: 961, 2: 506, 3: 30}
+    assert counts["train"] == {0: 5159, 1: 961, 2: 452, 3: 30}   # wheeze 452 = Rhonchi 39·Stridor 15 제외
     assert counts["valid"] == {0: 1040, 1: 83, 2: 305, 3: 1}
     if SPRS_INDEX.exists():
         import pandas as pd
@@ -275,6 +277,19 @@ def test_sprsound_7to4_mapping_counts():
         assert len(set(by_name.values())) == 7
         for i, name in SPRSOUND_EVENT_ID_TO_NAME.items():
             assert by_id[i] == by_name[name], (i, name)
+
+
+def test_apply_label_map_drops_excluded_rows():
+    import pandas as pd
+    from rsc_toolkit.datasets.lungmix_data import SPRSOUND_7_TO_4, apply_label_map, map_labels
+
+    df = pd.DataFrame({"sample_id": list("abcdefg"), "label": [0, 1, 2, 3, 4, 5, 6]})
+    out, dropped = apply_label_map(df, SPRSOUND_7_TO_4)
+    assert dropped == 2 and out["sample_id"].tolist() == list("abcde")
+    assert out["label"].tolist() == [0, 1, 2, 1, 3] and out["label_original"].tolist() == [0, 1, 2, 3, 4]
+    assert list(out.index) == [0, 1, 2, 3, 4]                       # reset_index — __getitem__(iloc) 는 연속 인덱스를 가정
+    assert len(df) == 7 and "label_original" not in df.columns      # 원본 df 불변
+    assert map_labels([5, 6], SPRSOUND_7_TO_4) == [None, None]
 
 
 # ------------------------------------------------------------------ 손실 variant

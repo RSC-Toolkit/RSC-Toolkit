@@ -15,7 +15,7 @@ QLung 데이터 경로 — AQS(음향 품질 점수) 를 sample_id 별로 캐시
     IndexFeatureDataset 대신 _QLungFeatureDataset 이 (feats, label, sample_id, aqs float) 를 내고 collate 가 float64 텐서로 만든다(공식 default_collate 와 동일).
     val 배치에도 AQS 를 붙인다(attach_val 기본 true; 원본 val loader 도 quality 를 돌려주되 미사용 — 모델 eval 경로는 무시).
   전처리키 = (sampling_rate, desired_length_sec, pad_type, fade, resample_after_slice, time_unit) — 파형이 다르면 캐시가 갈린다.
-SPRSound 도 같은 클래스로 동작한다(OOD 평가엔 AQS 가 필요 없지만 형식을 맞춘다; label_map 으로 7→4 파생 라벨).
+SPRSound 도 같은 클래스로 동작한다(OOD 평가엔 AQS 가 필요 없지만 형식을 맞춘다; label_map 으로 7→4 파생 라벨 — Rhonchi·Stridor 행은 제외).
 """
 from __future__ import annotations
 
@@ -25,7 +25,6 @@ import pathlib
 import time
 from typing import Any, Dict, List, Optional, Tuple
 
-import pandas as pd
 import torch
 from torch.utils.data import DataLoader, Dataset
 
@@ -101,11 +100,11 @@ class QLungAQSIndexDataset(IndexDataset):
         self.acoustic_cache = acoustic_cache or AcousticFeatureCache(pathlib.Path("/nonexistent/aqs.pt"))
         self.label_map = label_map
         if label_map is not None:
-            self.df = self.df.copy()
-            self.df["label_original"] = self.df["label"]
-            self.df["label"] = [label_map[int(v)] if not pd.isna(v) else v for v in self.df["label"].tolist()]
+            from rsc_toolkit.datasets.lungmix_data import apply_label_map
+
+            self.df, dropped = apply_label_map(self.df, label_map, where=f"QLungAQSIndexDataset split={self.split}")
             counts = self.df["label"].value_counts().sort_index().to_dict()
-            logger.info("QLungAQSIndexDataset(split=%s): 라벨 매핑 적용 → %s", self.split, counts)
+            logger.info("QLungAQSIndexDataset(split=%s): 라벨 매핑 적용 → %s (제외 %d 행)", self.split, counts, dropped)
 
     def sample_ids(self) -> List[str]:
         return self.df["sample_id"].astype(str).tolist()

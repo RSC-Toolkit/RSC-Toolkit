@@ -4,7 +4,9 @@ Lungmix(ICASSP 2025) 데이터 경로 — **논문 명세 재구현** (공식 �
 논문 §III-A/B 가 **나열만** 한 항목: 16 kHz 리샘플, 밴드패스 50–1500 Hz, 9 s pad/cut, fbank 128×1024. 논문은 이들의 **순서와 믹싱 위치를
 적지 않았다** → 아래 순서는 가정: 리샘플 → 밴드패스 → 9 s pad/cut(+원 구간 길이 n_valid 동봉) → (믹싱: 모델 training_forward 안, 온라인;
 기본 raw = n_valid 만큼의 원 구간을 섞은 뒤 9 s) → fbank. 믹싱 위치만은 논문 식 3 표기에 근거(아래 #5).
-SPRSound 는 이벤트 7-class 를 ICBHI 식 4-class 로 통일(Fine/Coarse Crackle→crackle, Stridor/Rhonchi→wheeze, Both→both).
+SPRSound 는 이벤트 7-class 를 ICBHI 식 4-class 로 통일(Fine/Coarse Crackle→crackle, Both→both; Normal·Wheeze 그대로).
+**Rhonchi·Stridor 는 4-class 뷰에서 제외**한다(2026-09-16 사용자 규칙) — 논문 §III-A 는 wheeze 병합이라 서술하지만 툴킷은 따르지 않는다.
+2022 inter-test 에는 두 클래스가 0 건이라 시험 수치는 같고, train 에서만 54 건(Rhonchi 39 + Stridor 15)이 빠진다.
 
 가정(저자 확인 전, 전부 config 플래그 — docs/AUTHOR_QUESTIONS_2026-08-26.md LungMix 절):
 - #5 9 s 패딩 방식 미기재 → pad_type repeat(툴킷 AudioPreprocessor), 밴드패스는 **패딩 전** 원 구간에 적용(bandpass.before_pad).
@@ -38,18 +40,37 @@ logger = logging.getLogger(__name__)
 # 검증: 번들 metadata.csv 의 이벤트 라벨 개수(Normal 6199 / Fine Crackle 992 / Wheeze 757 / Coarse Crackle 52 / Both 31 /
 # Rhonchi 39 / Stridor 15, 전부 서로 다름)가 인덱스 id 별 개수와 일치 (tests/unit/models/test_ast_lungmix.py).
 SPRSOUND_EVENT_ID_TO_NAME = {0: "Normal", 1: "Fine Crackle", 2: "Wheeze", 3: "Coarse Crackle", 4: "Both", 5: "Rhonchi", 6: "Stridor"}
-# 논문 §III-A 4-class 통일 (ICBHI 순서 normal 0 / crackle 1 / wheeze 2 / both 3)
-SPRSOUND_NAME_TO_4CLASS = {
-    "Normal": 0, "Fine Crackle": 1, "Coarse Crackle": 1, "Wheeze": 2, "Rhonchi": 2, "Stridor": 2, "Both": 3,
-}
-SPRSOUND_7_TO_4 = {i: SPRSOUND_NAME_TO_4CLASS[n] for i, n in SPRSOUND_EVENT_ID_TO_NAME.items()}
+# ICBHI 4-class 뷰 (normal 0 / crackle 1 / wheeze 2 / both 3). Rhonchi·Stridor 는 ICBHI 에 대응 클래스가 없어 **제외**한다
+# (2026-09-16 사용자 규칙: wheeze 로 넣지 않는다. LungMix §III-A·QLung §3.1·BTS-CARD §3.1 의 'wheeze 병합' 서술과 다르며,
+#  BTS-CARD 공식 노트북의 제거 처리와 같다). 맵에 없는 라벨의 행은 apply_label_map 이 데이터프레임에서 걸러낸다.
+SPRSOUND_4CLASS_EXCLUDED = ("Rhonchi", "Stridor")
+SPRSOUND_NAME_TO_4CLASS = {"Normal": 0, "Fine Crackle": 1, "Coarse Crackle": 1, "Wheeze": 2, "Both": 3}
+SPRSOUND_7_TO_4 = {i: SPRSOUND_NAME_TO_4CLASS[n] for i, n in SPRSOUND_EVENT_ID_TO_NAME.items() if n in SPRSOUND_NAME_TO_4CLASS}
 LABEL_MAPS = {"none": None, "sprsound_7to4": SPRSOUND_7_TO_4}
 
 
 def map_labels(labels, label_map: Optional[Dict[int, int]]):
+    """라벨 열을 맵으로 치환한다. 맵에 없는 라벨(제외 클래스)은 None — 행 단위 제거는 apply_label_map 을 쓰라."""
     if label_map is None:
         return labels
-    return [label_map[int(v)] if not pd.isna(v) else v for v in labels]
+    return [label_map.get(int(v)) if not pd.isna(v) else v for v in labels]
+
+
+def apply_label_map(df: pd.DataFrame, label_map: Dict[int, int], *, where: str = "") -> tuple[pd.DataFrame, int]:
+    """
+    인덱스 데이터프레임에 파생 라벨 맵을 적용한다: 맵에 없는 라벨의 행을 **제거**하고(reset_index) 나머지를 치환.
+    원 라벨은 label_original 열에 남긴다. 반환 (새 df, 제거된 행 수). 원본 df 는 바꾸지 않는다.
+    """
+    labels = pd.to_numeric(df["label"], errors="coerce")
+    keep = labels.isna() | labels.isin(list(label_map.keys()))
+    dropped = int((~keep).sum())
+    out = df.loc[keep].reset_index(drop=True).copy()
+    out["label_original"] = out["label"]
+    out["label"] = map_labels(out["label"].tolist(), label_map)
+    if dropped:
+        excluded = sorted({int(v) for v in labels[~keep].dropna().unique()})
+        logger.info("apply_label_map%s: 맵에 없는 라벨 %s 인 %d 행 제외 → %d 행", f"({where})" if where else "", excluded, dropped, len(out))
+    return out, dropped
 
 
 class _BandpassThenPreprocess:
@@ -101,11 +122,9 @@ class LungmixIndexDataset(IndexDataset):
                 f"label_map='none' 은 4-class 인덱스(ICBHI) 전용인데 라벨 최대값 {int(labels.max())} 이 있다 — SPRSound 7-class 는 "
                 "lungmix.label_map=sprsound_7to4 를 쓰라 (툴킷 표준 7-class 는 이 데이터 경로 밖)")
         if self.label_map is not None:
-            self.df = self.df.copy()
-            self.df["label_original"] = self.df["label"]
-            self.df["label"] = map_labels(self.df["label"].tolist(), self.label_map)
+            self.df, dropped = apply_label_map(self.df, self.label_map, where=f"LungmixIndexDataset split={self.split}")
             counts = self.df["label"].value_counts().sort_index().to_dict()
-            logger.info("LungmixIndexDataset(split=%s): 라벨 매핑 %s 적용 → %s", self.split, self.label_map_name, counts)
+            logger.info("LungmixIndexDataset(split=%s): 라벨 매핑 %s 적용 → %s (제외 %d 행)", self.split, self.label_map_name, counts, dropped)
 
     def __getitem__(self, idx: int) -> Dict[str, Any]:
         out = super().__getitem__(idx)
@@ -147,7 +166,7 @@ class LungmixDataModule(IndexDataModule):
 
 
 def sprsound_4class_counts(metadata_csv) -> Dict[str, Dict[int, int]]:
-    """번들 metadata.csv 의 split 별 이벤트 라벨 → 4-class 개수 (테스트·문서용)."""
+    """번들 metadata.csv 의 split 별 이벤트 라벨 → 4-class 개수 (테스트·문서용). 제외 클래스(Rhonchi·Stridor)는 집계에 안 들어간다."""
     df = pd.read_csv(metadata_csv)
     out: Dict[str, Dict[int, int]] = {}
     for split, sub in df.groupby("Split"):

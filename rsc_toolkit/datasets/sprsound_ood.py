@@ -7,8 +7,8 @@ SPRSound → ICBHI 4-class OOD 평가 전용 로더 (BTS-CARD; 학습 미사용)
 
 라벨 병합 (공식 노트북 data/Preprocessing_SPRSound.ipynb cell 2/5):
   Normal → 0, Fine Crackle / Coarse Crackle → 1(Crackle), Wheeze → 2, Both(Wheeze+Crackle) → 3,
-  Rhonchi / Stridor → 코드는 **제거**(map_annotation_type → None; 기본 rhonchi_stridor="drop")
-                       논문 §3.1 은 wheeze 병합 서술 → rhonchi_stridor="wheeze" 플래그.
+  Rhonchi / Stridor → **제거**(노트북 map_annotation_type → None). 툴킷 4-class 규칙(2026-09-16 사용자 최종 확정: 병합 근거 검토 후에도 배제):
+                       논문 §3.1 의 wheeze 병합은 지원하지 않는다 — rhonchi_stridor="wheeze" 를 넘기면 ValueError.
   2022 inter-test 에는 Rhonchi/Stridor 가 0건이라 OOD 셋은 어느 쪽이든 1040/83/305/1 로 같다.
   (노트북 quirk: 'wheeze + crackle' 분기는 원본 문자열 'Wheeze+Crackle' 과 매치되지 않아 else 로 통과한 뒤
    _get_lungsound_label('Wheeze+Crackle') → 3 으로 동작 — 결과는 같다.)
@@ -50,7 +50,7 @@ CLASS_NAMES_4 = ("normal", "crackle", "wheeze", "both")
 
 
 def sprsound_label_to_4class(label: str, rhonchi_stridor: str = "drop") -> Optional[int]:
-    """7-class 이름 → ICBHI 4-class id. Rhonchi/Stridor 는 drop→None, wheeze→2."""
+    """7-class 이름 → ICBHI 4-class id. Rhonchi/Stridor 는 제외(None). rhonchi_stridor 는 "drop" 만 허용(2026-09-16 확정)."""
     name = str(label).strip().lower()
     if name == "normal":
         return 0
@@ -63,9 +63,8 @@ def sprsound_label_to_4class(label: str, rhonchi_stridor: str = "drop") -> Optio
     if name in ("rhonchi", "stridor"):
         if rhonchi_stridor == "drop":
             return None
-        if rhonchi_stridor == "wheeze":
-            return 2
-        raise ValueError(f"rhonchi_stridor must be drop|wheeze, got {rhonchi_stridor!r}")
+        raise ValueError(f"rhonchi_stridor={rhonchi_stridor!r}: 4-class 뷰에서 Rhonchi/Stridor 는 제외만 허용한다 "
+                         "(2026-09-16 사용자 결정; 논문 §3.1 의 wheeze 병합은 지원하지 않는다)")
     raise KeyError(f"알 수 없는 SPRSound 라벨 {label!r}")
 
 

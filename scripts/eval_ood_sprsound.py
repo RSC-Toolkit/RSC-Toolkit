@@ -4,7 +4,8 @@ ICBHI 학습 체크포인트 → SPRSound 2022 inter-patient test 제로샷 OOD 
 
 원칙: 각 run 의 설정 스냅샷으로 **학습 때와 같은 팩토리**로 모델·데이터 체인을 재구성하고(best.pth strict 로드),
 데이터셋만 SPRSound 로 바꾼다 — 그 recipe 의 ICBHI 전처리 체인을 SPRSound 에 그대로 적용, 라벨은 7→4 병합
-(Normal→0, Fine/Coarse Crackle→1, Wheeze/Rhonchi/Stridor→2, Both→3; inter-test 는 1040/83/305/1). 지표 = ICBHI 4-class Sp/Se/Score.
+(Normal→0, Fine/Coarse Crackle→1, Wheeze→2, Both→3; **Rhonchi·Stridor 는 제외** — 2026-09-16 사용자 규칙, inter-test 엔 0 건이라
+1040/83/305/1 그대로). 지표 = ICBHI 4-class Sp/Se/Score.
 QLung·BTS-CARD 의 기존 ood.json(같은 정의) 은 건드리지 않는다.
 
   .venv/bin/python scripts/eval_ood_sprsound.py --out DIR [--families f1,f2] [--seeds 1,2,3,4,5] [--device cuda] [--no-write-run]
@@ -31,7 +32,8 @@ vw = importlib.util.module_from_spec(_spec); _spec.loader.exec_module(vw)  # typ
 
 import torch  # noqa: E402
 
-# 파생 인덱스: index_cycle.csv 의 label 을 7→4 로 병합해 둔 사본(.datasets/sprsound/index/index_cycle_icbhi4.csv).
+# 파생 인덱스: index_cycle.csv 를 4-class 뷰로 만든 사본(.datasets/sprsound/index/index_cycle_icbhi4.csv; Rhonchi·Stridor 행 제외 + 라벨 7→4).
+# 옛 사본(8,085 행, Rhonchi·Stridor→wheeze 병합)은 행 수가 달라 ensure_merged_index 가 자동 재생성한다.
 # 데이터모듈이 생성 시점에 라벨 수를 세는 경우(PC-MCL·Prototype·Domain Transfer)까지 한 경로로 처리하기 위해 CSV 단계에서 병합한다.
 SPRS = {"dataset_name": "sprsound", "data_dir": str(ROOT / ".datasets" / "sprsound"), "raw_data_subdir": "Classification",
         "index_filename": "index_cycle_icbhi4.csv"}
@@ -48,14 +50,22 @@ DEFAULT_FAMILIES = [
 
 
 def ensure_merged_index() -> pathlib.Path:
-    """.datasets/sprsound/index/index_cycle_icbhi4.csv — index_cycle.csv 의 label 을 7→4 병합한 파생 사본 (없으면 생성)."""
+    """
+    .datasets/sprsound/index/index_cycle_icbhi4.csv — index_cycle.csv 를 4-class 뷰로 만든 파생 사본
+    (Rhonchi·Stridor 행 제외 + 라벨 7→4 치환; 열 구성은 원본과 같다). 없거나 행 수·라벨 범위가 현재 규칙과 다르면(옛 병합 사본) 재생성.
+    """
     import pandas as pd
-    from rsc_toolkit.datasets.lungmix_data import SPRSOUND_7_TO_4
+    from rsc_toolkit.datasets.lungmix_data import SPRSOUND_7_TO_4, apply_label_map
     src = ROOT / ".datasets" / "sprsound" / "index" / "index_cycle.csv"
     dst = src.with_name("index_cycle_icbhi4.csv")
-    if not dst.exists():
-        df = pd.read_csv(src); df["label"] = [SPRSOUND_7_TO_4[int(v)] for v in df["label"]]
-        df.to_csv(dst, index=False)
+    derived, dropped = apply_label_map(pd.read_csv(src), SPRSOUND_7_TO_4, where="index_cycle_icbhi4")
+    derived = derived.drop(columns=["label_original"])
+    if dst.exists():
+        old = pd.read_csv(dst)
+        if len(old) == len(derived) and int(pd.to_numeric(old["label"], errors="coerce").max()) <= 3:
+            return dst
+        print(f"[ensure_merged_index] 기존 파생 사본({len(old)} 행)이 현재 규칙과 다름 → 재생성({len(derived)} 행, Rhonchi·Stridor {dropped} 행 제외)")
+    derived.to_csv(dst, index=False)
     return dst
 
 
@@ -132,15 +142,14 @@ def _iter_index_datasets(obj, seen=None, depth=0):
 
 
 def remap_labels(datamodule) -> list[int]:
-    """setup 후 val/test/train 의 IndexDataset df.label 을 7→4 로 (이미 0..3 이면 그대로). val 의 4-class 개수를 반환."""
-    from rsc_toolkit.datasets.lungmix_data import SPRSOUND_7_TO_4
+    """setup 후 val/test/train 의 IndexDataset df.label 을 7→4 로 (Rhonchi·Stridor 행 제외; 이미 0..3 이면 그대로). val 의 4-class 개수를 반환."""
+    from rsc_toolkit.datasets.lungmix_data import SPRSOUND_7_TO_4, apply_label_map
     counts = None
     for role in ("val_ds", "test_ds", "train_ds"):
         for ds in _iter_index_datasets(getattr(datamodule, role, None)):
             if not getattr(ds, "_ood_remapped", False):
-                labels = ds.df["label"]
-                if labels.max() > 3:
-                    ds.df["label"] = [SPRSOUND_7_TO_4[int(v)] for v in labels]
+                if int(ds.df["label"].max()) > 3:
+                    ds.df, _ = apply_label_map(ds.df, SPRSOUND_7_TO_4, where=f"ood {role}")
                 ds._ood_remapped = True
             if role == "val_ds" and counts is None:
                 counts = [int((ds.df["label"] == c).sum()) for c in range(4)]
@@ -179,7 +188,7 @@ def evaluate(cfg: dict, ckpt: pathlib.Path, family: str, sandbox: pathlib.Path, 
         from rsc_toolkit.trainer.adapters.split_iter_adapter import SplitIterAdapter
         pl_module = SplitIterAdapter(rsc_model=model, loss_func=loss_func, train_metric_fns=train_fns, val_metric_fns=val_fns,
                                      optimizer_cfg=cfg["optimizer"], **(adapter_cfg.get("params") or {}))
-        info["note"] = "split_iter: 평가 시 나머지 배치 폐기(원본 quirk)"
+        info["note"] = "split_iter: 나머지 서브배치 포함 전수 평가 (2026-09-16 수정; 원본 코드는 나머지 폐기)"
     else:
         pl_module = PLAdapter(rsc_model=model, loss_func=loss_func, train_metric_fns=train_fns, val_metric_fns=val_fns,
                               optimizer_cfg=cfg["optimizer"])
@@ -253,7 +262,7 @@ def main() -> int:
                 rec["status"] = "OK"
                 if not args.no_write_run:
                     payload = {"inter": {**m, "n": 1429, "class_counts": info["val_counts"]},
-                               "protocol": "ICBHI-trained best.pth → SPRSound 2022 inter-patient test, 7→4 merged; "
+                               "protocol": "ICBHI-trained best.pth → SPRSound 2022 inter-patient test, 7→4 merged (rhonchi/stridor excluded; none in the test set); "
                                            "recipe's ICBHI preprocessing chain applied to SPRSound",
                                "chain": info.get("chain"), "generated_by": "scripts/eval_ood_sprsound.py", "generated": time.strftime("%Y-%m-%d %H:%M")}
                     if info.get("note"):

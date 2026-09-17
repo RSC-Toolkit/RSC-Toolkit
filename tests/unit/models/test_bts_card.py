@@ -215,10 +215,12 @@ def test_sprsound_4class_mapping_distribution():
     for lab in v["Label"]:
         counts[sprsound_label_to_4class(lab)] += 1
     assert counts == [1040, 83, 305, 1]  # 논문 Table 1 SPRSound valid
-    assert sprsound_label_to_4class("Rhonchi") is None and sprsound_label_to_4class("Stridor", "wheeze") == 2
+    assert sprsound_label_to_4class("Rhonchi") is None and sprsound_label_to_4class("Stridor") is None
+    with pytest.raises(ValueError):                       # 2026-09-16 확정: wheeze 병합 옵션은 지원하지 않는다
+        sprsound_label_to_4class("Stridor", "wheeze")
     tr = df[df["Split"] == "train"]
     assert sum(sprsound_label_to_4class(l) == 2 for l in tr["Label"] if sprsound_label_to_4class(l) is not None) == 452
-    assert sum(sprsound_label_to_4class(l, "wheeze") == 2 for l in tr["Label"]) == 506
+    assert sum(sprsound_label_to_4class(l) is None for l in tr["Label"]) == 39 + 15   # train 의 Rhonchi·Stridor 는 제외(wheeze 506 이 아니라 452)
 
 
 def test_sprsound_sentence_template():

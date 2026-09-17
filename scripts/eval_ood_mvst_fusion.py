@@ -163,7 +163,7 @@ def main() -> int:
                     if not args.no_write_run:
                         payload = {"inter": {**m, "n": 1429, "class_counts": counts},
                                    "protocol": "ICBHI-trained MVST: five view best.pth → SPRSound 2022 inter-patient test features "
-                                               "(recipe's ICBHI fbank chain applied to SPRSound), ICBHI-trained FuseMLP best.pth applied; 7→4 merged",
+                                               "(recipe's ICBHI fbank chain applied to SPRSound), ICBHI-trained FuseMLP best.pth applied; 7→4 merged (rhonchi/stridor excluded; none in the test set)",
                                    "chain": note, "views": {str(v): ckpts[str(v)] for v in VIEWS},
                                    "generated_by": "scripts/eval_ood_mvst_fusion.py", "generated": time.strftime("%Y-%m-%d %H:%M")}
                         (run_dir / "ood.json").write_text(json.dumps(payload, indent=1, ensure_ascii=False))

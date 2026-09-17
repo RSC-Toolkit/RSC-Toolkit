@@ -1,6 +1,9 @@
 # Lungmix(ICASSP 2025) SPRSound 데이터 — 논문 §III-A 이벤트 7-class → ICBHI 식 4-class 병합(파생 라벨: Normal→0,
-# Fine/Coarse Crackle→1, Wheeze/Rhonchi/Stridor→2, Both→3). 가정(#7): 2022 inter-patient test(번들 official_split 'valid'→test).
-# **비표준**: 툴킷 표준 SPRSound 프로토콜(7-class)과 다르다 — 논문이 쓴 방식으로 먼저 재현. 전처리는 icbhi_lungmix 와 동일.
+# Fine/Coarse Crackle→1, Wheeze→2, Both→3). **Rhonchi·Stridor 는 제외**(2026-09-16 사용자 규칙; 논문은 wheeze 병합 서술).
+#   주의: 2026-08-26~30 의 sprs-lungmix-{none,nonlinear}-s1..5 (15 run) 은 옛 병합 맵(Rhonchi·Stridor→wheeze, train 54 건 포함)으로
+#   학습된 것이라 이 config 로 재실행하면 train 6,602 건으로 달라진다. 해당 run 은 논문 표에서 제외됨(model_meta include 0).
+# 가정(#7): 2022 inter-patient test(번들 official_split 'valid'→test).
+# **비표준**: 툴킷 표준 SPRSound 프로토콜(7-class)과 다르다. 전처리는 icbhi_lungmix 와 동일.
 name: sprsound_lungmix
 params:
   datamodule_name: lungmix

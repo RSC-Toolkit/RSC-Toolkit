@@ -1,5 +1,6 @@
-# QLung SPRSound OOD 평가 뷰(학습 미사용): 7→4 병합 파생 라벨, 16 kHz fbank 128×798, ICBHI 와 같은 전처리 체인(가정 — 논문 미명시).
-#   평가 범위: eval_qlung_ood.py 가 test_splits 를 [test](inter 1,429) 와 [train, test](8,085) 로 바꿔 두 번 집계한다.
+# QLung SPRSound OOD 평가 뷰(학습 미사용): 7→4 병합 파생 라벨(**Rhonchi·Stridor 제외** — 2026-09-16 사용자 규칙), 16 kHz fbank 128×798,
+#   ICBHI 와 같은 전처리 체인(가정 — 논문 미명시).
+#   평가 범위: eval_qlung_ood.py 가 test_splits 를 [test](inter 1,429; 두 클래스 0 건이라 불변) 와 [train, test](8,031; 옛 병합 기준은 8,085) 로 바꿔 두 번 집계한다.
 name: sprsound_qlung_ood
 params:
   datamodule_name: qlung
