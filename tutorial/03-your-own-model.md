@@ -7,11 +7,14 @@ Uses `WORK`, `ROOT` and `SANDBOX` from [part 1](01-setup.md#working-directory) a
 A model is one Python file plus a small config. The toolkit does not need to be forked; both live outside the repository.
 The full contract is documented in [`rsc_toolkit/models/base.py`](../rsc_toolkit/models/base.py).
 
-```
-$WORK/plugins/
-  my_model.py
-  configs/model/tutorial_cnn.yaml
-```
+You will create two files:
+
+| file | content |
+|---|---|
+| `$WORK/plugins/my_model.py` | the model code ([step 1](#1-model)) |
+| `$WORK/plugins/configs/model/my_model.yaml` | the model config ([step 2](#2-model-config)) |
+
+Create the directories first:
 
 ```bash
 mkdir -p "$WORK/plugins/configs/model"
@@ -24,13 +27,13 @@ The model file has three parts.
 **(a) Registration.** The decorator registers the class under a name:
 
 ```python
-@ModelFactory.register_model_class("tutorial_cnn")
-class TutorialCNN(BaseRSCModel, nn.Module):
+@ModelFactory.register_model_class("my_model")
+class MyModel(BaseRSCModel, nn.Module):
 ```
 
 - The name is how configs refer to the model: the `name:` in the model config (step 2) must be the same string.
 - The registered name is independent of the file name: the file `my_model.py` is the module `my_model`, which
-  `RSC_TOOLKIT_PLUGINS` imports in step 3, while configs use the registered name `tutorial_cnn`.
+  `RSC_TOOLKIT_PLUGINS` imports in step 3. Here both are `my_model`.
 - Inherit `BaseRSCModel` (the toolkit's model interface) and `nn.Module`.
 
 **(b) Constructor.** Its keyword arguments are filled from `params:` in the model config:
@@ -67,8 +70,8 @@ from rsc_toolkit.models.base import BaseRSCModel
 from rsc_toolkit.models.factory import ModelFactory
 
 
-@ModelFactory.register_model_class("tutorial_cnn")
-class TutorialCNN(BaseRSCModel, nn.Module):
+@ModelFactory.register_model_class("my_model")
+class MyModel(BaseRSCModel, nn.Module):
     def __init__(self, n_cls: int = 4, hidden: int = 16, **params):
         super().__init__()
         self.net = nn.Sequential(nn.Conv2d(1, hidden, 3, padding=1), nn.BatchNorm2d(hidden), nn.ReLU(), nn.MaxPool2d(4),
@@ -85,10 +88,10 @@ class TutorialCNN(BaseRSCModel, nn.Module):
 
 ## 2. Model config
 
-Save as `$WORK/plugins/configs/model/tutorial_cnn.yaml`:
+Save as `$WORK/plugins/configs/model/my_model.yaml`:
 
 ```yaml
-name: tutorial_cnn
+name: my_model
 params:
   n_cls: 4
   hidden: 16
@@ -104,7 +107,7 @@ export PYTHONPATH="$WORK/plugins" RSC_TOOLKIT_PLUGINS=my_model
 ```
 
 ```bash
-rsc-toolkit-train --config-name default --config-dir "$WORK/plugins/configs" data=toy_fbank model=tutorial_cnn callbacks=best_checkpoint \
+rsc-toolkit-train --config-name default --config-dir "$WORK/plugins/configs" data=toy_fbank model=my_model callbacks=best_checkpoint \
   data.params.project_root="$ROOT" data.params.data_dir="$WORK/toy" data.params.features.cache_dir="$WORK/cache_toy" \
   data.params.num_workers=0 trainer.params.max_epochs=1 trainer.params.accelerator=cpu \
   run.name=toy-mymodel run.group=tutorial hydra.run.dir="$WORK/hydra/toy-mymodel" +run.overwrite=true

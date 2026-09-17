@@ -324,13 +324,15 @@ name; the training and validation loops work unchanged. The full contract is doc
 [`rsc_toolkit/models/base.py`](rsc_toolkit/models/base.py).
 
 The example below trains a small CNN on the toy data (CPU, about a minute) after the [quick start](#quick-start-cpu-a-few-minutes).
-Keep your files in a directory outside the repository, for example next to the clone:
+Keep your files in a directory outside the repository; this example uses `../my_plugin/` next to the clone and
+creates two files:
 
-```
-../my_plugin/
-  my_model.py
-  configs/model/my_model.yaml
-```
+| file | content |
+|---|---|
+| `../my_plugin/my_model.py` | the model code (step 1) |
+| `../my_plugin/configs/model/my_model.yaml` | the model config (step 2) |
+
+Create the directories first:
 
 ```bash
 mkdir -p ../my_plugin/configs/model
@@ -349,7 +351,7 @@ class MyModel(BaseRSCModel, nn.Module):
 
 - The name is how configs refer to the model: the `name:` in the model config (step 2) must be the same string.
 - The registered name is independent of the file name: the file `my_model.py` is the module `my_model`, which
-  `RSC_TOOLKIT_PLUGINS` imports in step 3. Here both happen to be `my_model`.
+  `RSC_TOOLKIT_PLUGINS` imports in step 3. Here both are `my_model`.
 - Inherit `BaseRSCModel` (the toolkit's model interface) and `nn.Module`.
 
 **(b) Constructor.** Its keyword arguments are filled from `params:` in the model config:

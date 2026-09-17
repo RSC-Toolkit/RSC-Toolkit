@@ -181,8 +181,8 @@ from rsc_toolkit.models.base import BaseRSCModel
 from rsc_toolkit.models.factory import ModelFactory
 
 
-@ModelFactory.register_model_class("tutorial_cnn")
-class TutorialCNN(BaseRSCModel, nn.Module):
+@ModelFactory.register_model_class("my_model")
+class MyModel(BaseRSCModel, nn.Module):
     # Small 2-layer CNN. n_cls is injected via model.params.n_cls.
 
     def __init__(self, n_cls: int = 4, hidden: int = 16, **params):
@@ -204,8 +204,8 @@ class TutorialCNN(BaseRSCModel, nn.Module):
         logits = self.forward(audio_batch)
         return logits, loss_func(logits, labels)
 ''')
-(PLUG / "configs" / "model" / "tutorial_cnn.yaml").write_text('''
-name: tutorial_cnn
+(PLUG / "configs" / "model" / "my_model.yaml").write_text('''
+name: my_model
 params:
   n_cls: 4
   hidden: 16
@@ -213,7 +213,7 @@ params:
 ENV["RSC_TOOLKIT_PLUGINS"] = "my_model"                       # module name the toolkit imports
 ENV["PYTHONPATH"] = str(PLUG) + os.pathsep + ENV.get("PYTHONPATH", "")
 
-best_my = train_toy("toy-mymodel", "model=tutorial_cnn", config_dir=PLUG / "configs")
+best_my = train_toy("toy-mymodel", "model=my_model", config_dir=PLUG / "configs")
 res_my = evaluate(WORK / "outputs" / "tutorial" / "toy-mymodel", WORK / "hydra" / "toy-mymodel")
 assert res_my["status"] == "PASS", res_my
 """))
