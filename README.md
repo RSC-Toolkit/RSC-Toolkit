@@ -332,6 +332,10 @@ Keep your files in a directory outside the repository, for example next to the c
   configs/model/my_model.yaml
 ```
 
+```bash
+mkdir -p ../my_plugin/configs/model
+```
+
 **1. Model** — save as `../my_plugin/my_model.py`:
 
 ```python
