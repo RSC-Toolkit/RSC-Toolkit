@@ -1,3 +1,5 @@
+# Portions of this file come from the original RSC-Toolkit code base by Miika Toikkanen; that code is under the MIT license.
+# See THIRD_PARTY_NOTICES.md. The rest of the file is under the PolyForm Noncommercial License 1.0.0.
 """rsc_toolkit.datasets -- raw datasets (download, index, validation) and index datasets/datamodules for training.
 
 The registry is `DatasetFactory` (delegates to registries.DATASETS). The CLI (`rsctk datasets ...`) lives in

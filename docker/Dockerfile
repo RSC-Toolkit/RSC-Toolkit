@@ -1,3 +1,5 @@
+# Portions of this file come from the original RSC-Toolkit code base by Miika Toikkanen; that code is under the MIT license.
+# See THIRD_PARTY_NOTICES.md. The rest of the file is under the PolyForm Noncommercial License 1.0.0.
 # Use a PyTorch CUDA base image aligned with pyproject.toml torch pins
 FROM pytorch/pytorch:2.7.0-cuda12.1-cudnn9-runtime
 

@@ -382,7 +382,8 @@ wheel smoke test, the CPU unit tests and the tutorial on toy data.
 RSC-Toolkit is released under the [PolyForm Noncommercial License 1.0.0](LICENSE): you may use, modify and share it for
 research, education and other noncommercial purposes. Commercial use requires separate permission.
 
-Files that contain code ported from other projects keep their original licenses (MIT, BSD-3-Clause, Apache-2.0,
+Code from the original RSC-Toolkit code base stays under the MIT License. Files that contain code ported from other
+projects keep their original licenses (MIT, BSD-3-Clause, Apache-2.0,
 CC BY-NC 4.0, CC BY-NC-SA 4.0); each such file names its source in a header comment, and the list with full license
 texts is in [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) and [`LICENSES/`](LICENSES). Released weights inherit the
 license of the pre-trained backbone they were fine-tuned from.

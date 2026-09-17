@@ -1,5 +1,6 @@
 # Portions of this file are adapted from PANNs (https://github.com/qiuqiangkong/audioset_tagging_cnn); that code is under the MIT license.
 # Portions of this file are ported from SG-SCL (https://github.com/kaen2891/stethoscope-guided_supervised_contrastive_learning), which does not include a license file.
+# Portions of this file come from the original RSC-Toolkit code base by Miika Toikkanen; that code is under the MIT license.
 # See THIRD_PARTY_NOTICES.md. The rest of the file is under the PolyForm Noncommercial License 1.0.0.
 from __future__ import annotations
 
