@@ -122,7 +122,7 @@ def build_parser(subparsers):
     validate_parser.add_argument("dataset", choices=_dataset_choices())
     validate_parser.add_argument("--project_root", default=None, help="Base directory for relative paths (defaults to repo root)")
     validate_parser.add_argument("--data_dir", default=None, help="Dataset directory (defaults to OS user data dir)")
-    validate_parser.add_argument("--force", action="store_true", help="Dummy..")
+    validate_parser.add_argument("--force", action="store_true", help="No effect for validate (accepted for symmetry with the other subcommands)")
 
     return dataset_parser
 

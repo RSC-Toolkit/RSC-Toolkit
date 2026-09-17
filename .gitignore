@@ -254,3 +254,4 @@ tests/golden/sclmeta/audio.pt
 tests/golden/sclmeta/features.pt
 tests/golden/sclmeta/cnn6.pt
 tests/golden/sclmeta_sprs/audio.pt
+paper_weights/

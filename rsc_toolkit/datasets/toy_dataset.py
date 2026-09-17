@@ -37,8 +37,8 @@ class ToyDatasetProcessor(ICBHIDatasetProcessor):
             p = pathlib.Path(self.raw_data_directory).expanduser().resolve()
             if p.exists():
                 return p
-            logger.warning(
-                "Toy dataset raw_data_directory does not exist (%s); falling back to bundled sample_data.",
+            logger.info(
+                "Toy dataset raw_data_directory does not exist (%s); using the bundled sample_data.",
                 p,
             )
 

@@ -19,9 +19,12 @@ import csv
 import hashlib
 import pathlib
 import sys
+import time
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 MANIFEST = ROOT / "weights_manifest.csv"
+ATTEMPTS = 3          # Google Drive requests are retried this many times
+RETRY_WAIT_S = 20
 URL_PLACEHOLDER = "[Google Drive]"
 
 
@@ -70,10 +73,18 @@ def download_run(url: str, run: str, dst: pathlib.Path) -> str | None:
     import gdown
 
     listing_base = dst.parent.resolve()
-    try:
-        files = gdown.download_folder(id=_folder_id(url), output=str(listing_base) + os.sep, skip_download=True, quiet=True)
-    except Exception as exc:                        # permissions (link not shared) or network
-        return f"failed to read the folder listing: {type(exc).__name__}: {str(exc)[:200]}"
+    files, err = None, None
+    for attempt in range(1, ATTEMPTS + 1):          # Google Drive sometimes answers a large folder listing with HTTP 500
+        try:
+            files = gdown.download_folder(id=_folder_id(url), output=str(listing_base) + os.sep, skip_download=True, quiet=True)
+            break
+        except Exception as exc:                    # permissions (link not shared) or network
+            err = f"{type(exc).__name__}: {str(exc)[:200]}"
+            if attempt < ATTEMPTS:
+                print(f"{run}: reading the folder listing failed (attempt {attempt}/{ATTEMPTS}); retrying in {RETRY_WAIT_S} s")
+                time.sleep(RETRY_WAIT_S)
+    if files is None:
+        return f"failed to read the folder listing after {ATTEMPTS} attempts: {err}"
     if not files:
         return "folder is empty (not uploaded yet, or the link points to a different folder)"
     entries = []
@@ -99,7 +110,13 @@ def download_run(url: str, run: str, dst: pathlib.Path) -> str | None:
             continue
         local = dst.joinpath(*parts)
         local.parent.mkdir(parents=True, exist_ok=True)
-        got = gdown.download(id=fid, output=str(local), quiet=True)
+        got = None
+        for attempt in range(1, ATTEMPTS + 1):
+            got = gdown.download(id=fid, output=str(local), quiet=True)
+            if got:
+                break
+            if attempt < ATTEMPTS:
+                time.sleep(RETRY_WAIT_S)
         if not got:
             return f"{'/'.join(parts)} download failed"
     return None
