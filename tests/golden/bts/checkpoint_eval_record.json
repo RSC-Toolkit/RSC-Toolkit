@@ -18,5 +18,5 @@
   "S_e": 45.11,
   "icbhi_score": 63.85
  },
- "note": "scripts/reproduction/eval_bts_checkpoint.py --amp \ub85c \uc7ac\ud604. \uc6d0\ubcf8 validate \ub294 autocast \ud3c9\uac00."
+ "note": "Reproduced with scripts/reproduction/eval_bts_checkpoint.py --amp. The original validate runs under autocast."
 }
