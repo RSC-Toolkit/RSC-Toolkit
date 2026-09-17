@@ -1,3 +1,5 @@
+# Portions of this file are adapted from AMS-D (https://github.com/CcnNnn/AMS-D); that code is under the MIT license.
+# See THIRD_PARTY_NOTICES.md. The rest of the file is under the PolyForm Noncommercial License 1.0.0.
 """
 Best selection for AMS-D: same protocol as ICBHIBestScoreCheckpoint (val = official test, highest Score && Se > min_se), except that
 (1) the selection keys are configurable (default: the paper's binary metrics paper_score/paper_S_e/paper_S_p), and

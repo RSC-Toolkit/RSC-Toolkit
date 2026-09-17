@@ -1,3 +1,6 @@
+# Portions of this file are adapted from RespireNet (https://github.com/microsoft/RespireNet); that code is under the MIT license.
+# Portions of this file are adapted from nlpaug 0.0.14 (https://github.com/makcedward/nlpaug); that code is under the MIT license.
+# See THIRD_PARTY_NOTICES.md. The rest of the file is under the PolyForm Noncommercial License 1.0.0.
 """
 RespireNet training waveform augmentation: a faithful port of the five nlpaug 0.0.14 audio augmentations used by gen_augmented in the original utils.py.
 

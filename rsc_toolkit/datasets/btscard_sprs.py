@@ -1,3 +1,5 @@
+# Portions of this file are adapted from BTS-CARD (https://github.com/RSC-Toolkit/BTS-CARD); that code is under the Apache-2.0 license.
+# See THIRD_PARTY_NOTICES.md. The rest of the file is under the PolyForm Noncommercial License 1.0.0.
 """
 Data path for **training BTS-family models (BTS-CARD, BTS) directly on SPRSound** (SPR->SPR).
 

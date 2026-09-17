@@ -1,5 +1,5 @@
 [build-system]
-# `license = "MIT"` (PEP 639 SPDX string) and `license-files` are accepted from setuptools 77 on;
+# `license` as a PEP 639 SPDX expression and `license-files` are accepted from setuptools 77 on;
 # a --no-build-isolation build with an older version fails with "project.license must be valid exactly by one definition".
 requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
@@ -10,8 +10,10 @@ version = "0.1.0"
 description = "Respiratory Sound Classification Toolkit"
 readme = "README.md"
 requires-python = ">=3.9"
-license = "MIT"
-license-files = ["LICENSE"]
+# Own code: PolyForm Noncommercial 1.0.0. Files with ported third-party code keep their original licenses
+# (see THIRD_PARTY_NOTICES.md and LICENSES/).
+license = "PolyForm-Noncommercial-1.0.0 AND MIT AND BSD-3-Clause AND Apache-2.0 AND CC-BY-NC-4.0 AND CC-BY-NC-SA-4.0"
+license-files = ["LICENSE", "THIRD_PARTY_NOTICES.md", "LICENSES/*"]
 
 dependencies = [
     "pydantic",

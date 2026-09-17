@@ -1,3 +1,5 @@
+# Portions of this file are adapted from RespireNet (https://github.com/microsoft/RespireNet); that code is under the MIT license.
+# See THIRD_PARTY_NOTICES.md. The rest of the file is under the PolyForm Noncommercial License 1.0.0.
 """
 CNN model of RespireNet (EMBC 2021) — exact port of the official code.
 

@@ -1,3 +1,5 @@
+# Portions of this file are adapted from DASS (https://github.com/Saurabhbhati/DASS); that code is under the BSD-3-Clause license.
+# See THIRD_PARTY_NOTICES.md. The rest of the file is under the PolyForm Noncommercial License 1.0.0.
 """
 CrossScan / CrossMerge — VMamba 4-direction scan (verbatim pure-torch version of csms6s.py:4-45).
 

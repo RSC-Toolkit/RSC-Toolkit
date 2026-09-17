@@ -1,3 +1,5 @@
+# Portions of this file are adapted from PANNs (https://github.com/qiuqiangkong/audioset_tagging_cnn); that code is under the MIT license.
+# See THIRD_PARTY_NOTICES.md. The rest of the file is under the PolyForm Noncommercial License 1.0.0.
 """
 GaP-Aug (Chang et al., ICASSP 2024) classifier — original PANNs Cnn14 + the training procedure of paper Algorithm 1. **Re-implementation from the paper description** (no official or unofficial code).
 

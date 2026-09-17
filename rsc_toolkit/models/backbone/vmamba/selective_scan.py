@@ -1,3 +1,6 @@
+# Portions of this file are adapted from DASS (https://github.com/Saurabhbhati/DASS); that code is under the BSD-3-Clause license.
+# Portions of this file are adapted from Mamba (https://github.com/state-spaces/mamba); that code is under the Apache-2.0 license.
+# See THIRD_PARTY_NOTICES.md. The rest of the file is under the PolyForm Noncommercial License 1.0.0.
 """
 Selective scan (Mamba S6 recurrence) — same interface as SelectiveScanOflex in VMamba/DASS `csms6s.py`.
 

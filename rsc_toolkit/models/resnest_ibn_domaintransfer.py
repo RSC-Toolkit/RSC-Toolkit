@@ -1,3 +1,5 @@
+# Portions of this file are adapted from IBN-Net (https://github.com/XingangPan/IBN-Net); that code is under the MIT license.
+# See THIRD_PARTY_NOTICES.md. The rest of the file is under the PolyForm Noncommercial License 1.0.0.
 """
 Classifier of Domain Transfer (Wang & Wang, ICASSP 2022) — **re-implementation from the paper description** (no official or unofficial code, grade C).
 

@@ -1,3 +1,5 @@
+# Portions of this file are adapted from AMS-D (https://github.com/CcnNnn/AMS-D); that code is under the MIT license.
+# See THIRD_PARTY_NOTICES.md. The rest of the file is under the PolyForm Noncommercial License 1.0.0.
 """
 AMS-D — Attentive Masked Self-Distillation for Respiratory Sound Classification (Nuo Chen, Mingsheng Xu; ICASSP 2026).
 Faithful port of the official code CcnNnn/AMS-D 5f8aab9 (MIT) models/{ams_d,ast_model,token_weight_module}.py + main.py train()

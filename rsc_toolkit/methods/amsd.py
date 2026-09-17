@@ -1,3 +1,5 @@
+# Portions of this file are adapted from AMS-D (https://github.com/CcnNnn/AMS-D); that code is under the MIT license.
+# See THIRD_PARTY_NOTICES.md. The rest of the file is under the PolyForm Noncommercial License 1.0.0.
 """
 Training loss of AMS-D (ICASSP 2026, CcnNnn/AMS-D): a faithful port of Custom_Loss in the official custom_loss.py (official-code parity).
 

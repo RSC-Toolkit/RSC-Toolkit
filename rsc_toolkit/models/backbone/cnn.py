@@ -1,3 +1,5 @@
+# Portions of this file are adapted from PANNs (https://github.com/qiuqiangkong/audioset_tagging_cnn); that code is under the MIT license.
+# See THIRD_PARTY_NOTICES.md. The rest of the file is under the PolyForm Noncommercial License 1.0.0.
 from __future__ import annotations
 
 from typing import Optional

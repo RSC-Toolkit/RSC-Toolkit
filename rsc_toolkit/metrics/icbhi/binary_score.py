@@ -1,3 +1,5 @@
+# Portions of this file are adapted from AMS-D (https://github.com/CcnNnn/AMS-D); that code is under the MIT license.
+# See THIRD_PARTY_NOTICES.md. The rest of the file is under the PolyForm Noncommercial License 1.0.0.
 """
 **Binary (non-standard)** Se/Sp/Score of the AMS-D paper/official code — port of calculate_stats in utils/metric.py:18-34.
 

@@ -1,3 +1,5 @@
+# Portions of this file are adapted from PrototypeSound (https://github.com/L3S/PrototypeSound); that code is under the MIT license.
+# See THIRD_PARTY_NOTICES.md. The rest of the file is under the PolyForm Noncommercial License 1.0.0.
 """
 ICBHI data path of the Prototype paper (Ren et al., ICASSP 2022) -- exact port of the official code (verified against goldens).
 

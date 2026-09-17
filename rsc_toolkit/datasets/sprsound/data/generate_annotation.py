@@ -1,3 +1,5 @@
+# Portions of this file are adapted from SupCon-DAT (https://github.com/RSC-Toolkit/SupCon-DAT); that code is under the MIT license.
+# See THIRD_PARTY_NOTICES.md. The rest of the file is under the PolyForm Noncommercial License 1.0.0.
 import pandas as pd
 from glob import glob
 import os

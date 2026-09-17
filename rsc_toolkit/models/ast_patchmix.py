@@ -1,3 +1,6 @@
+# Portions of this file are adapted from patch-mix_contrastive_learning (https://github.com/raymin0223/patch-mix_contrastive_learning); that code is under the MIT license.
+# Portions of this file are adapted from AST (https://github.com/YuanGongND/ast); that code is under the BSD-3-Clause license.
+# See THIRD_PARTY_NOTICES.md. The rest of the file is under the PolyForm Noncommercial License 1.0.0.
 """
 AST model of the Patch-Mix paper (Interspeech 2023) — faithful port of the official code
 (exact port of the official code, verified against goldens).

@@ -1,3 +1,5 @@
+# Portions of this file are adapted from PrototypeSound (https://github.com/L3S/PrototypeSound); that code is under the MIT license.
+# See THIRD_PARTY_NOTICES.md. The rest of the file is under the PolyForm Noncommercial License 1.0.0.
 """
 For the Prototype paper reproduction: injects the balanced class weight computed by the datamodule into the model.
 

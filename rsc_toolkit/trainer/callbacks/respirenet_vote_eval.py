@@ -1,3 +1,5 @@
+# Portions of this file are adapted from RespireNet (https://github.com/microsoft/RespireNet); that code is under the MIT license.
+# See THIRD_PARTY_NOTICES.md. The rest of the file is under the PolyForm Noncommercial License 1.0.0.
 """
 RespireNet evaluation and model-selection protocol, reproducing evaluate() and the checkpoint rule of the original train.py.
 

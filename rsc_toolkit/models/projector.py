@@ -1,3 +1,5 @@
+# Portions of this file are adapted from patch-mix_contrastive_learning (https://github.com/raymin0223/patch-mix_contrastive_learning); that code is under the MIT license.
+# See THIRD_PARTY_NOTICES.md. The rest of the file is under the PolyForm Noncommercial License 1.0.0.
 """
 Projection head shared by the Patch-Mix / SG-SCL family of papers — exact port of the official code.
 

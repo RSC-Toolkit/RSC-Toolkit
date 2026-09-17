@@ -1,3 +1,5 @@
+# Portions of this file are adapted from AudioMAE (https://github.com/facebookresearch/AudioMAE), incl. timm window attention (Apache-2.0); that code is under the CC-BY-NC-4.0 license.
+# See THIRD_PARTY_NOTICES.md. The rest of the file is under the PolyForm Noncommercial License 1.0.0.
 """
 Audio-MAE backbone + DDE-MAE (Disentangling Dual-Encoder MAE) — Wei, Miao, Li, Interspeech 2025 (arXiv 2506.10698).
 

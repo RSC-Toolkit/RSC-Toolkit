@@ -1,3 +1,5 @@
+# Portions of this file are adapted from OPERA (https://github.com/evelyn0414/OPERA), HTS-AT and Swin Transformer; that code is under the MIT license.
+# See THIRD_PARTY_NOTICES.md. The rest of the file is under the PolyForm Noncommercial License 1.0.0.
 """
 Toolkit re-implementation of HTSAT-Swin (OPERA-CT encoder) — faithful reproduction of evelyn0414/OPERA src/model/htsat/htsat.py (Ke Chen's HTS-AT with the torchlibrosa front end commented out).
 

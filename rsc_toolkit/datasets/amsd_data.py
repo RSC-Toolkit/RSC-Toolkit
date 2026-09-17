@@ -1,3 +1,5 @@
+# Portions of this file are adapted from AMS-D (https://github.com/CcnNnn/AMS-D); that code is under the MIT license.
+# See THIRD_PARTY_NOTICES.md. The rest of the file is under the PolyForm Noncommercial License 1.0.0.
 """
 AMS-D data pipeline -- reproduces the post-fbank behaviour of the official loader/mydataset.py ICBHIDataset.__getitem__ (:94-132) on top of the toolkit IndexDataModule.
 
