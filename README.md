@@ -336,7 +336,47 @@ Keep your files in a directory outside the repository, for example next to the c
 mkdir -p ../my_plugin/configs/model
 ```
 
-**1. Model** — save as `../my_plugin/my_model.py`:
+**1. Model**
+
+The model file has three parts.
+
+**(a) Registration.** The decorator registers the class under a name:
+
+```python
+@ModelFactory.register_model_class("my_model")
+class MyModel(BaseRSCModel, nn.Module):
+```
+
+- The name is how configs refer to the model: the `name:` in the model config (step 2) must be the same string.
+- The registered name is independent of the file name: the file `my_model.py` is the module `my_model`, which
+  `RSC_TOOLKIT_PLUGINS` imports in step 3. Here both happen to be `my_model`.
+- Inherit `BaseRSCModel` (the toolkit's model interface) and `nn.Module`.
+
+**(b) Constructor.** Its keyword arguments are filled from `params:` in the model config:
+
+```python
+    def __init__(self, n_cls: int = 4, hidden: int = 16, **params):
+```
+
+- `n_cls` must equal the number of classes of the dataset (4 for ICBHI, 7 for SPRSound).
+- Keep `**params` so that extra keys in the config do not break the constructor.
+
+**(c) `training_forward`.** The toolkit calls only this method, for training and for validation:
+
+```python
+    def training_forward(self, audio_batch, labels, loss_func, **kwargs):
+```
+
+- `audio_batch`: the input batch without a channel axis; its shape is set by the data config (`[B, F, T]` for fbank
+  features).
+- `labels`: class indices of shape `[B]`.
+- `loss_func`: the loss built from the config (for example class-weighted cross-entropy); use it instead of creating
+  a loss inside the model.
+- Return `(logits, loss)` with logits of shape `[B, n_cls]`.
+- Keep `**kwargs`: some datamodules pass extra inputs such as `meta_labels`. Branch on `self.training` if training and
+  validation must differ.
+
+The complete file — save as `../my_plugin/my_model.py`:
 
 ```python
 from torch import nn
@@ -347,13 +387,13 @@ from rsc_toolkit.models.factory import ModelFactory
 @ModelFactory.register_model_class("my_model")
 class MyModel(BaseRSCModel, nn.Module):
     def __init__(self, n_cls: int = 4, hidden: int = 16, **params):
-        super().__init__()                               # n_cls and hidden come from the model config below
+        super().__init__()
         self.net = nn.Sequential(nn.Conv2d(1, hidden, 3, padding=1), nn.ReLU(), nn.AdaptiveAvgPool2d(1),
                                  nn.Flatten(), nn.Linear(hidden, n_cls))
 
     def training_forward(self, audio_batch, labels, loss_func, **kwargs):
-        logits = self.net(audio_batch.unsqueeze(1))      # fbank features arrive as [B, F, T]
-        return logits, loss_func(logits, labels)         # return (logits, loss)
+        logits = self.net(audio_batch.unsqueeze(1))      # [B, F, T] -> [B, 1, F, T] for Conv2d
+        return logits, loss_func(logits, labels)
 ```
 
 **2. Model config** — save as `../my_plugin/configs/model/my_model.yaml`:
@@ -378,9 +418,6 @@ rsc-toolkit-eval outputs/mine/my-model --sandbox /tmp/rsc_eval_sandbox
 
 Notes:
 
-- `audio_batch` has the shape produced by the data config (for example `[B, F, T]` for fbank features), and `loss_func`
-  is the loss from the config.
-- Training and validation call the same method; branch on `self.training` if they must differ.
 - A model that consumes the third batch element (metadata) declares `accepts_meta = ("dev", ...)`; the adapter checks it
   against the datamodule's `meta_kind` before training starts.
 - `--config-name default` only adds an EMA callback, so pass `callbacks=best_checkpoint` to save `best.pth`.
