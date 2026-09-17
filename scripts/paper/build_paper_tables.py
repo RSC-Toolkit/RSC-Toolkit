@@ -271,6 +271,24 @@ def _rep(x):
     return "" if x in ("", None) else num2(x)
 
 
+def _rep_m(x, kind=None, html=False):
+    """reported 셀에 best/second 표시 (2026-09-16 사용자: 표 1 reported 열에도 top·second). 값이 없으면 빈칸."""
+    core = _rep(x)
+    if not core:
+        return core
+    return {"best": f"<b>{core}</b>", "second": f"<u>{core}</u>"}.get(kind, core) if html else _mark(core, kind)
+
+
+def _rep_marks(rows, table):
+    """표 1 reported 열의 best/second. 비교 가능한 보고값(anchors.delta == 'score': 공식 스플릿·같은 지표·같은 선택 규칙)만 순위에 넣는다 —
+    비공식 스플릿(MVST·ADD-RSC, 각주 1)·이진 지표(AMS-D, 각주 2)는 제외. 표 2 등 다른 표는 reported 열이 없어 빈 dict."""
+    if table != "A":
+        return {k: {} for k in ("sp", "se", "score")}
+    def val(a, col):
+        return float(a[col]) if (a.get(col) not in ("", None) and a.get("delta") == "score") else None
+    return {k: _rank_marks([val(a, col) for a in rows]) for k, col in (("sp", "paper_sp"), ("se", "paper_se"), ("score", "paper_score"))}
+
+
 def build_patchmix(anchors, fam, table, meta, footnotes):
     """사용자 형식(2026-09-08): method · architecture · pretrain · venue | reported Sp/Se/Sc | ours Sp/Se/Sc (5-seed mean±std) | ΔSc(색).
     행 = anchors.pm_order 가 있는 행, 그 순서. 논문값이 없는 행은 reported·ΔSc 를 비운다. 같은 프로토콜이 아니면 ΔSc = --.
@@ -282,6 +300,7 @@ def build_patchmix(anchors, fam, table, meta, footnotes):
     def comp(a): return meta[a["family"]]["comparable"] == "1"
     marks = {k: _rank_marks([agg_of(a)[k][0] if (comp(a) and agg_of(a)["n"]) else None for a in rows])
              for k in ("sp", "se", "score")}
+    rep_marks = _rep_marks(rows, table)
     stem, dsdesc, label = PM_TABLES[table]
     colspec = "p{2pt}llcl" + "ccc" + "ccc" + "c"
     head = [r"& \multirow{2}{*}{method} & \multirow{2}{*}{architecture} & \multirow{2}{*}{pretrain} & \multirow{2}{*}{venue} & "
@@ -310,7 +329,12 @@ def build_patchmix(anchors, fam, table, meta, footnotes):
             fns = sorted(_local(fns, "A"), key=int)
         used_fn.update(fns)
         fn = (r"\textsuperscript{" + ",".join(fns) + "}") if fns else ""
-        name = tex_escape(m["method"]) + r"~\cite{" + m["cite"].replace(" ", "") + "}" + fn
+        # 2026-09-16 사용자: 표 1 각주(비공식 스플릿·AMS-D 이진 지표)는 논문 보고값에 대한 것이라 method 이름이 아니라 reported Sc 칸에 붙인다.
+        #   보고값이 없는 행(있다면)만 이름에 남긴다.
+        # 2026-09-16 사용자: 비교 불가 행(비공식 스플릿·이진 지표)은 Δ 도 계산해 싣고 각주를 Δ 옆에 단다; 그 외 각주는 reported Sc 칸에.
+        fn_on_delta = table == "A" and bool(a["paper_score"]) and a["delta"] != "score"
+        fn_on_reported = table == "A" and bool(a["paper_score"]) and not fn_on_delta
+        name = tex_escape(m["method"]) + r"~\cite{" + m["cite"].replace(" ", "") + "}" + ("" if (fn_on_reported or fn_on_delta) else fn)
         if a["band"] != cur_band:
             if cur_band is not None:
                 L.append(r"\midrule")
@@ -319,15 +343,16 @@ def build_patchmix(anchors, fam, table, meta, footnotes):
         else:
             first = ""
         cells = [first, name, m["arch"], tex_escape(m["pretrain"]).replace("+", r"\,+\,"), r"\textit{" + m["venue"] + "}",
-                 _rep(a["paper_sp"]), _rep(a["paper_se"]), _rep(a["paper_score"]),
+                 _rep_m(a["paper_sp"], rep_marks["sp"].get(i)), _rep_m(a["paper_se"], rep_marks["se"].get(i)),
+                 _rep_m(a["paper_score"], rep_marks["score"].get(i)) + (fn if fn_on_reported else ""),
                  _ours_pm(*agg["sp"], marks["sp"].get(i)), _ours_pm(*agg["se"], marks["se"].get(i)),
                  _ours_pm(*agg["score"], marks["score"].get(i))]
         if not a["paper_score"]:
             cells.append("")
-        elif a["delta"] != "score" or not agg["n"]:
+        elif not agg["n"] or (a["delta"] != "score" and table != "A"):
             cells.append("--")
         else:
-            cells.append(delta_color_tex(agg["score"][0] - float(a["paper_score"])))
+            cells.append(delta_color_tex(agg["score"][0] - float(a["paper_score"])) + (fn if fn_on_delta else ""))
         if m.get("backbone_cite"):   # 2026-09-15 사용자: backbone 논문은 표에서 인용하지 않고(본문에서) 행 위 주석으로만 남긴다
             L.append("% backbone: " + m["backbone_cite"].replace(" ", ""))
         L.append(" & ".join(cells) + r" \\")
@@ -355,19 +380,25 @@ CAPTION_FN = {"8"}                           # OOD 프로토콜(7→4 병합·α
 #   2026-09-14 저녁(사용자): 표 1 각주 1(코드 부재/재구성; 전역 1·2) 제거 → 본문. Prototype·LungMix 표에서 제거(전역 6·10·9 미사용).
 #   n/a 사유는 캡션 대신 각주로: 12(SG-SCL 단일 청진기) → t2.7, 17(RespireNet 장치별 설계·SPRSound 로더 없음) → t2.8.
 FN_MAP = {"A": {"3": "1", "5": "2"},
-          "M": {"7": "1", "13": "2", "14": "3", "11": "4", "12": "5", "17": "6"}}
+          "M": {"7": "1", "13": "2", "14": "3", "12": "4", "17": "5"}}
+# 2026-09-16 사용자: M2D 마지막 배치 나머지 탈락 각주(전역 11 = 표 2 로컬 4) 삭제 — SplitIterAdapter 가 나머지를 (K+1) 번째 서브배치로 평가하도록 고쳐
+#   30 run 을 1,429 건 전수로 재평가·갱신(best.json/ood.json; 옛 값 *_1428.json). 표 2 각주 1~5 로 당김(12→4, 17→5).
 # 2026-09-15 사용자: M2D-X SPRSound 미세조정 각주(전역 16 = 표 2 로컬 5)도 삭제 → 표 2 각주 1~6.
 # 2026-09-15 사용자: OPERA-CT 전체 미세조정 각주(전역 15 = 표 1 로컬 3 · 표 2 로컬 5)는 의미 없음 → 두 표에서 제거, 뒤 번호 당김(표 2 6·7·8 → 5·6·7).
 FN_KEY = {"A": "t1.", "M": "t2."}   # footnotes.csv 의 로컬 문안 id 접두사
-RANK_EXCLUDE = {"C": {"11"}}          # 각주 4(M2D 마지막 배치 나머지 1건 탈락, 1,428/1,429 — 2026-09-16 실측 정정) 인 OOD 행은 전체 테스트셋 순위(굵게/밑줄)에서 제외 (2026-09-14)
+RANK_EXCLUDE = {}                      # (2026-09-14~16) 각주 4(M2D 1,428/1,429) 행을 순위에서 빼던 규칙 — 전수 평가로 바뀌어 비었다
 # 2026-09-14 사용자 제공 캡션 문안(그대로 사용)
 CAPTION_A = (r"Reported and toolkit results on ICBHI 2017. Toolkit results use the official 60/40 split and four-class scoring (five seeds; "
-             r"mean\,$\pm$\,SD). $\Delta S_c$ = toolkit $-$ reported Score, shown only for comparable splits, metrics, and checkpoint selection. "
-             r"Bold and underlined values mark the highest and second-highest comparable toolkit means per column.")
-CAPTION_M = (r"Toolkit results on the SPRSound 2022 inter-patient test set (1,429 events unless noted; five seeds; mean\,$\pm$\,SD). "
-             r"SPRSound $\to$ SPRSound uses seven classes. ICBHI $\to$ SPRSound is zero-shot, using four merged classes and "
+             r"mean\,$\pm$\,SD). $\Delta S_c$ = toolkit $-$ reported Score. Bold and underlined values mark the highest and second-highest "
+             r"values per column, separately for the reported and toolkit columns; reported values under notes 1--2 are not ranked.")
+# 2026-09-16 사용자 캡션 첨삭: "in four classification tasks" → "and four-class scoring"(4-class 단일 과제), \red{…comparable…} 절 삭제(ΔSc 는 전 행 계산·각주로 표시),
+#   마지막 문장은 reported 열에도 굵게/밑줄이 있으므로 두 열 모두를 가리키도록.
+# 2026-09-16 사용자: reported 열에도 top·second 표시. 비교 불가 보고값(비공식 스플릿·이진 지표 = 각주 1·2)은 순위 제외 — 캡션 마지막 문장 갱신.
+# 2026-09-17 사용자 캡션 문안(그대로 사용): "1,429 events;" 삭제, "\red{uses seven classes.}" 강조(\red 는 원고 매크로 — 래퍼에 \providecommand), "(see notes); Abbreviations".
+CAPTION_M = (r"Toolkit results on the SPRSound 2022 inter-patient test set (five seeds; mean\,$\pm$\,SD). "
+             r"SPRSound $\to$ SPRSound \red{uses seven classes.} ICBHI $\to$ SPRSound is zero-shot, using four merged classes and "
              r"checkpoints selected only on ICBHI test data. Bold and underlined values mark the two highest means per column among results with "
-             r"matching label spaces and test samples. n/a: not available (see notes); \mbox{--}: not run. "
+             r"matching label spaces and test samples. n/a: not available (see notes); "
              r"Abbreviations as in Table~\ref{tab:icbhi_diff}.")
 # 2026-09-14 사용자 축약안. 표 1 아래 번호 없는 범례 한 줄(ABBREV_LINE); 자세한 정의는 본문(docs/paper/body_text_moved_from_footnotes.md).
 ABBREV_LINE = (r"\textit{Abbreviations:} IN, ImageNet; AS, AudioSet; LA, LAION-Audio-630K; Resp, respiratory audio; FM, foundation model; "
@@ -521,6 +552,9 @@ def build_merged(anchors, fam, meta, footnotes):
     notes = [r"\textsuperscript{" + k + "} " + footnotes[FN_KEY["M"] + k] for k in sorted((x for x in used_fn if x.isdigit()), key=int)]
     if notes:
         L += [r"\par\vspace{2pt}\begin{minipage}{\linewidth}\scriptsize", " ".join(notes), r"\end{minipage}"]
+    # 2026-09-16 사용자: 현재 두 표에 '--' 셀이 없어 캡션의 "\mbox{--}: not run." 을 뺐다. 미완주 run 이 생겨 '--' 셀이 다시 나오면 자동으로 붙인다.
+    if any(re.search(r"&\s*--\s*(&|\\\\)", l) for l in L if l.rstrip().endswith("\\\\")):
+        L[2] = L[2].replace("n/a: not available (see notes);", r"n/a: not available (see notes); \mbox{--}: not run;")
     L.append(r"\end{table*}")
     return "\n".join(L) + "\n", aggs["B"], aggs["C"]
 
@@ -607,6 +641,7 @@ def patchmix_html(anchors, fam, meta, footnotes):
         comp = lambda a: meta[a["family"]]["comparable"] == "1"
         marks = {k: _rank_marks([aggs[key(a)][k][0] if (comp(a) and aggs[key(a)]["n"]) else None for a in rows])
                  for k in ("sp", "se", "score")}
+        rep_marks = _rep_marks(rows, table)
         used = set()
         L = [f'<div class="pm pm-{table}">', f'<p class="pm-title"><b>{titles[table]}</b> · {len(rows)} 행</p>', '<div class="tbl"><table class="pmt"><thead>',
              '<tr class="grp"><th colspan="5"></th><th colspan="3">reported in paper</th><th colspan="3">ours (5 seeds)</th><th></th></tr>',
@@ -620,24 +655,27 @@ def patchmix_html(anchors, fam, meta, footnotes):
                 fns = sorted(_local(fns, "A"), key=int)
             used.update(fns)
             fn = f"<sup>{','.join(fns)}</sup>" if fns else ""
+            fn_on_delta = table == "A" and bool(a["paper_score"]) and a["delta"] != "score"   # 비교 불가 행: Δ 옆 (2026-09-16)
+            fn_on_reported = table == "A" and bool(a["paper_score"]) and not fn_on_delta        # 그 외: reported Sc 칸
             cite = f'<span class="run">\\cite{{{m["cite"].replace(" ", "")}}} · {a["family"]}{" · " + a["metric_source"] if table == "C" else ""}</span>'
             first = ""
             if a["band"] != cur_band:
                 cur_band = a["band"]
                 first = f'<td class="pm-band" rowspan="{sum(1 for b in rows if b["band"] == cur_band)}"><span>{BAND_SHORT[cur_band]}</span></td>'
-            cells = [first, f'<td class="name">{_html_esc(m["method"])}{fn}{cite}</td>', f"<td>{_html_esc(tex2html(m['arch']))}</td>",
+            cells = [first, f'<td class="name">{_html_esc(m["method"])}{"" if (fn_on_reported or fn_on_delta) else fn}{cite}</td>', f"<td>{_html_esc(tex2html(m['arch']))}</td>",
                      f"<td>{_html_esc(m['pretrain'])}</td>", f"<td><i>{_html_esc(m['venue'].replace(chr(96), chr(8217)))}</i></td>",
-                     f'<td class="m">{_rep(a["paper_sp"])}</td>', f'<td class="m">{_rep(a["paper_se"])}</td>', f'<td class="m">{_rep(a["paper_score"])}</td>',
+                     f'<td class="m">{_rep_m(a["paper_sp"], rep_marks["sp"].get(i), html=True)}</td>', f'<td class="m">{_rep_m(a["paper_se"], rep_marks["se"].get(i), html=True)}</td>',
+                     f'<td class="m">{_rep_m(a["paper_score"], rep_marks["score"].get(i), html=True)}{fn if fn_on_reported else ""}</td>',
                      f'<td class="m">{_ours_html(*agg["sp"], marks["sp"].get(i))}</td>', f'<td class="m">{_ours_html(*agg["se"], marks["se"].get(i))}</td>',
                      f'<td class="m">{_ours_html(*agg["score"], marks["score"].get(i))}</td>']
             if not a["paper_score"]:
                 cells.append('<td class="m"></td>')
-            elif a["delta"] != "score" or not agg["n"]:
+            elif not agg["n"] or (a["delta"] != "score" and table != "A"):
                 cells.append('<td class="m"><span class="d z">—</span></td>')
             else:
                 dd = agg["score"][0] - float(a["paper_score"])
                 cls = "p" if dd >= 0 else ("nn" if dd <= -2.5 else "n")
-                cells.append(f'<td class="m"><span class="d {cls}">{delta_str(dd, tex=False)}</span></td>')
+                cells.append(f'<td class="m"><span class="d {cls}">{delta_str(dd, tex=False)}</span>{fn if fn_on_delta else ""}</td>')
             L.append("<tr>" + "".join(cells) + "</tr>")
         L.append("</tbody></table></div>")
         key = (lambda k: FN_KEY["A"] + k) if table == "A" else (lambda k: k)
@@ -716,7 +754,7 @@ def main():
     else:
         meta = load_meta()
         hdr = (f"% generated by scripts/paper/build_paper_tables.py (git {sha}); do not edit\n"
-               "% requires: booktabs, multirow, graphicx (\\resizebox), xcolor (\\textcolor for ΔSc); cite keys = user's bib (docs/paper/model_meta.csv `cite`; backbone papers are cited in the text, listed in `backbone_cite` and as % comments)\n")
+               "% requires: booktabs, multirow, graphicx (\\resizebox), xcolor (\\textcolor for Delta Sc; \\red{...} = manuscript macro \\textcolor{red}); cite keys = user's bib (docs/paper/model_meta.csv `cite`; backbone papers are cited in the text, listed in `backbone_cite` and as % comments)\n")
         tex, aggs_by_table["A"] = build_patchmix(anchors, fam, "A", meta, footnotes)
         (out / "tables" / f"{PM_TABLES['A'][0]}.tex").write_text(hdr + tex)
         tex, aggs_by_table["B"], aggs_by_table["C"] = build_merged(anchors, fam, meta, footnotes)
