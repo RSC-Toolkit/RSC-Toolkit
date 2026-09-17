@@ -19,7 +19,7 @@ QLung(Interspeech 2026, arXiv 2606.11915) 방법 — 공식 코드(RSC-Toolkit/Q
     librosa 계산은 골든(tests/golden/qlung/aqs_golden.pt)에만 쓰고 런타임은 torch 로 재구현한다 (librosa ≥0.10 의
     center=True, pad_mode="constant", periodic hann 을 따른다; 골든 대조 tests/unit/models/test_ast_qlung.py).
 
-논문·코드 불일치와 저자 질문은 docs/AUTHOR_QUESTIONS_2026-08-26.md QLung 절 참고. 여기서는 코드 기본값 + 플래그.
+논문·코드가 어긋나는 곳은 코드 기본값 + 플래그로 둔다.
 """
 from __future__ import annotations
 

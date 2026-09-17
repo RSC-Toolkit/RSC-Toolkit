@@ -8,7 +8,7 @@ AMS-D(ICASSP 2026, CcnNnn/AMS-D) 의 학습 손실 — 공식 custom_loss.py Cus
                   ※ t_output 은 main.py:322/348 이 저장한 **이미 softmax 된 확률(epoch 0 은 one-hot)** 이라 teacher 에 softmax 가
                     두 번 걸린다(이중 softmax; epoch 0 실효 teacher = [0.475, 0.175, 0.175, 0.175]). 공식 동작이므로 기본값으로 유지하고,
                     논문 식 1(KL(q_t ∥ q_{t-1}), q 는 softmax 출력) 의 문자 그대로 해석은 teacher_is_prob=True 플래그 뒤에 둔다
-                    (가정 — 저자 확인 전, docs/AUTHOR_QUESTIONS #7 계열).
+                    (가정 — 저자 확인 전).
       L_recon   = 호출측이 계산한 MSE 스칼라 (epoch 0 은 0)
     'hard' 는 CE(s, argmax t) (custom_loss.py:42-43) — 공식 실행은 'soft'.
 """

@@ -21,7 +21,7 @@ Audio-MAE 백본 + DDE-MAE(Disentangling Dual-Encoder MAE) — Wei·Miao·Li, In
       총손실 식 7: L = L_recon + 0.5 L_siamese + 0.02 L_MI. variant='s2' 는 단일 인코더 + 원 디코더 재구성(L_recon)만.
   - AudioMAEClassifier(model 'audiomae_dde_cls', B2/2단계): 인코더(+ encoder_ckpt 로 1단계 E_R 만 로드) → global_pool+fc_norm [가정] → Linear → CE.
 
-가정 목록(전부 config 플래그, docs/AUTHOR_QUESTIONS_2026-08-26.md DDE-MAE 절): mask_ratio 0.8, norm_pix_loss False, decoder_mode 1(ckpt 와 키 일치),
+가정 목록(전부 config 플래그): mask_ratio 0.8, norm_pix_loss False, decoder_mode 1(ckpt 와 키 일치),
 decoder_embed 1536→512 신규 초기화, time-shuffle 단위 'patch', E_I 두 입력 마스크 = 물리적으로 같은 패치, Siamese/MI 풀링 벡터, margin 1.0,
 q_θ MLP(768-512-768) + 보조 Adam 1e-4, 분류 헤드 global_pool(fc_norm), E_I 폐기.
 

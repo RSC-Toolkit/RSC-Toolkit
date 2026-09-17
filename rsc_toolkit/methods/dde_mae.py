@@ -13,7 +13,7 @@ DDE-MAE(Wei·Miao·Li, Interspeech 2025, arXiv 2506.10698) 의 분리(disentangl
                           풀링 벡터인지 미기재 → 풀링 벡터(패치 토큰 평균) 가정). q_θ 는 log-likelihood 최대화로 따로 학습해야 하므로
                           모델 내부 보조 Adam(lr 미기재 → 1e-4 가정, 매 스텝 1회) — rsc_toolkit/models/audiomae_dde.py DDEMAE 참조.
 
-전부 '가정(저자 확인 전)' — docs/AUTHOR_QUESTIONS_2026-08-26.md DDE-MAE 절 4·5·7 번.
+전부 '가정(저자 확인 전)'.
 """
 from __future__ import annotations
 

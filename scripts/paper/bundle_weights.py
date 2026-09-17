@@ -231,7 +231,7 @@ def write_index(out: pathlib.Path, made: list[tuple[str, pathlib.Path, dict]]) -
     L = ["# RSC-Toolkit paper weights — release bundles", "",
          f"{len(rows)} run bundles · {len(fam)} families · {total/1e3:.1f} GB of best.pth. One folder per run: best.pth, best.json, .hydra/config.yaml, README.txt, sha256.txt.",
          "Layout: `<dataset>/<family>/<run>/`. Upload the whole tree (keep folder names; include the hidden `.hydra/` folders).",
-         "Index of every run: `INDEX.tsv`. Licensing notes per family: `docs/paper/weights_release_plan.md` in the repository.", "",
+         "Index of every run: `INDEX.tsv`.", "",
          "| dataset | family | runs | best.pth total |", "|---|---|---|---|"]
     for (ds, f) in sorted(fam):
         rs = fam[(ds, f)]

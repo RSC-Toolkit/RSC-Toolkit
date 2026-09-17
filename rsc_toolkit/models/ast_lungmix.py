@@ -8,7 +8,7 @@ Lungmix(ICASSP 2025, Ge et al.) 의 AST 분류기 — **논문 명세 재구현*
 입력 레이아웃은 **원 AST(input_fdim=128, input_tdim=1024)** 로 되돌린다 → AudioSet pos_embed(12×101) 를 보간 없이 그대로 쓴다
 (patch-mix 의 뒤집힌 (798,128) quirk 는 물려받지 않는다 — 논문에 patch-mix 코드베이스 사용 근거 없음).
 
-가정(저자 확인 전, 전부 플래그 — docs/AUTHOR_QUESTIONS_2026-08-26.md LungMix 절):
+가정(저자 확인 전, 전부 플래그):
 - #8 stride 미기재 → fstride=tstride=10 (AudioSet 10/10 ckpt). 전 토큰 평균에 cls/dist 포함 여부 미기재 → pool='mean_all'(포함);
      'mean_patches' 로 제외 가능. '전 hidden state' 는 최종 LayerNorm(v.norm) **뒤**의 토큰으로 가정(HF last_hidden_state 정의와 동일;
      norm 앞 평균은 미구현). BatchNorm = BatchNorm1d(768) 하나.

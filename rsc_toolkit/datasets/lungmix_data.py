@@ -8,7 +8,7 @@ SPRSound 는 이벤트 7-class 를 ICBHI 식 4-class 로 통일(Fine/Coarse Crac
 **Rhonchi·Stridor 는 4-class 뷰에서 제외**한다(2026-09-16 사용자 규칙) — 논문 §III-A 는 wheeze 병합이라 서술하지만 툴킷은 따르지 않는다.
 2022 inter-test 에는 두 클래스가 0 건이라 시험 수치는 같고, train 에서만 54 건(Rhonchi 39 + Stridor 15)이 빠진다.
 
-가정(저자 확인 전, 전부 config 플래그 — docs/AUTHOR_QUESTIONS_2026-08-26.md LungMix 절):
+가정(저자 확인 전, 전부 config 플래그):
 - #5 9 s 패딩 방식 미기재 → pad_type repeat(툴킷 AudioPreprocessor), 밴드패스는 **패딩 전** 원 구간에 적용(bandpass.before_pad).
 - #5 믹싱 위치: 논문 식 3 의 maxlen(x_i,x_j) 표기와 공식 함수의 길이 맞춤 구조는 '원 구간을 섞은 뒤 9 s' 를 시사 → 기본·주 런은
   model mix_stage='raw': 이 데이터셋이 lungmix.emit_valid_len=true(기본) 로 배치에 실어 주는 원 구간 길이(n_valid, 패딩 전 샘플 수;

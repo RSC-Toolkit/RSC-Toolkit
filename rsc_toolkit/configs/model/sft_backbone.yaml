@@ -3,8 +3,7 @@
 # method:
 #   SFT(CE) : method=ce (기본) + loss=cross_entropy_weighted_icbhi (스크립트 --weighted_loss)
 #   SG-SCL  : model.params.method=sgscl + loss=cross_entropy
-#             (비-AST SG-SCL 공식 스크립트 = 저장소 커밋 6a1bdbd 의 *_da2.sh —
-#              docs/reference_scripts/sgscl_6a1bdbd/ 에 보존; 툴킷 config 와 동일)
+#             (비-AST SG-SCL 공식 스크립트 = 저장소 커밋 6a1bdbd 의 *_da2.sh; 툴킷 config 와 동일)
 name: resnet18_sft
 params:
   n_cls: 4

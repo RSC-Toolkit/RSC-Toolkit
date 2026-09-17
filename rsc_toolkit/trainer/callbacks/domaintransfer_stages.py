@@ -5,7 +5,7 @@ Domain Transfer(Wang & Wang, ICASSP 2022) 의 **2단계 학습**과 warm-up·클
 - "Adam optimizer with learning rate 6e-4, batch size 64, weight decay 1e-3, and **warm-up**"
 - 증강 데이터로 학습한 뒤 **원본 데이터만으로 작은 learning rate 로 다시 미세조정**하는 단계가 따로 있다.
 
-가정(논문 미기재 — 전부 인자로 노출, `docs/REPRODUCTION_TARGETS.md` 신규 24 의 공백 (3)(4)(7)):
+가정(논문 미기재 — 전부 인자로 노출):
 - **epoch 수 미기재** → 1단계 50 epoch, 2단계 10 epoch.
 - **warm-up 스케줄 미기재** → 1단계 앞 5 epoch 을 0 → lr 로 선형 증가시킨 뒤 cosine 으로 감쇠.
 - **2단계 lr 미기재** → 1단계 lr 의 0.1배(6e-5) 고정.

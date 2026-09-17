@@ -5,7 +5,7 @@
 #   공식 60/40 (툴킷 표준, 목표 55.2~55.7)      : ... data.params.split_mode=official run.name=icbhi-respirenet-official-s1
 #   CNN+CBA+BRC 공식 60/40 (가정 런, 2026-09-08 사용자 결정; 목표 README 55.7):
 #       ... data.params.split_mode=official data.params.aug_scale=1 data.params.cba_seed=1 run.name=icbhi-respirenet-cba-s1
-# 장치별 FT 는 재현 범위 밖 (docs/REPRODUCTION_TARGETS.md).
+# 장치별 FT 는 재현 범위 밖.
 defaults:
   - model: respirenet
   - data: icbhi_respirenet

@@ -2,7 +2,7 @@
 LungAdapter(Interspeech 2024, Xiao et al.) — 동결 AST + Attention-Adapter/Res-Adapter, **논문 명세 재구현** (공식·비공식 코드 없음).
 
 논문: LungAdapter: Efficient Adapting Audio Spectrogram Transformer for Lung Sound Classification
-      (DOI 10.21437/Interspeech.2024-106; docs/paper_recon_2026-08-26.json['lungadapter'] 정찰·verdict 기준)
+      (DOI 10.21437/Interspeech.2024-106)
 
 골격: 논문 'experimental setup mostly follows [13]'(Bae Patch-Mix) + 'AST pre-trained from Bae et al. on ImageNet and Audioset'
       → 툴킷 ast_patchmix.PatchMixAST(IN+AS ckpt audioset_0.4593.pth, 뒤집힌 798×128 quirk 포함)를 그대로 부모로 쓴다.

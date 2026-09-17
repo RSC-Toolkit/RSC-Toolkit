@@ -1,7 +1,7 @@
 # BTS-CARD (ICASSP 2026, RSC-Toolkit/BTS-CARD a9982a0) — BTS 위 반사실(RUBI)·적대(GRL) 편향 제거, 공식 코드 충실 이식.
 # 기본값 = 공식 코드 quirk 그대로 (KL 무효, c=1 고정, 마스킹 = None 생략). 논문형 전환은 플래그.
 #   ablation w/o (a)/(b)/(c): model.params.use_counterfactual=false / use_adversarial=false / use_meta_aug=false
-#   (정의는 저자 확인 전 잠정 — docs/AUTHOR_QUESTIONS_2026-08-26.md BTS-CARD 8번)
+#   (정의는 저자 확인 전 잠정)
 name: bts_card
 params:
   n_cls: 4

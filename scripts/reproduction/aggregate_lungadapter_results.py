@@ -4,9 +4,9 @@ LungAdapter P1 집계: outputs/lungadapter/<run>/best.json (+ logs/<run>.done EX
   .venv/bin/python scripts/reproduction/aggregate_lungadapter_results.py
 
 앵커(Interspeech 2024, 5 random runs): Table 1 4-class 80.43±3.11 / 44.37±2.46 / 62.40±1.11 (2.48M/90.01M).
-논문 내부 불일치: Figure 2 막대(PDF 벡터 복원, docs/paper_recon_2026-08-26.json verdict) AST+LungAdapter = 75.53±2.83 / 45.21±2.48 / 60.37
+논문 내부 불일치: Figure 2 막대(PDF 벡터 복원) AST+LungAdapter = 75.53±2.83 / 45.21±2.48 / 60.37
 → 두 값을 병기한다. Table 2 ablation: Attn만 77.72/45.05/61.39±1.75, Res만 77.55/44.55/61.05±0.51.
-툴킷 내 공정 비교 기준: AST SFT(weighted CE 전체 FT) P1 59.80±0.55 / 논문 59.55 (docs/REPRODUCTION_TARGETS.md).
+툴킷 내 공정 비교 기준: AST SFT(weighted CE 전체 FT) P1 59.80±0.55 / 논문 59.55.
 """
 import json
 import pathlib

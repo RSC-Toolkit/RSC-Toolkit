@@ -5,8 +5,7 @@ LoRA-RSC(ICASSP 2025) 파형 잡음의 **대안 해석**(1D 파형 → 샘플별
 이고, 이는 kaldi fbank 의 remove_dc_offset 으로 제거되어 특징이 바뀌지 않는다(골든 features.pt, max|diff| 6.4e-5). 그러나 같은 골든의
 orig_2d_call 이 보여주듯 공개 코드는 이 (1,N) 호출에서 4.28.1 ASTFeatureExtractor → kaldi AssertionError 로 **실행 자체가 불가**하므로
 저자의 실제 실행은 이 지점에서 공개 코드와 달랐다. 가장 자연스러운 수정(audio.numpy()[0] 등 1D 화)이었다면 len=128000 → 샘플별
-N(0,0.3²) 잡음이 train/test 캐시에 1회(고정) 들어가는 전혀 다른 파이프라인이 된다. 어느 쪽인지 코드로 확정 불가(저자 질문 #6,
-docs/AUTHOR_QUESTIONS_2026-08-26.md) → 기본 config(icbhi_lorarsc) 는 잡음 없음(스칼라 해석 = 무효), 이 클래스 + data=icbhi_lorarsc_noise
+N(0,0.3²) 잡음이 train/test 캐시에 1회(고정) 들어가는 전혀 다른 파이프라인이 된다. 어느 쪽인지 코드로 확정 불가 → 기본 config(icbhi_lorarsc) 는 잡음 없음(스칼라 해석 = 무효), 이 클래스 + data=icbhi_lorarsc_noise
 가 1D 해석이다.
 
 재현 방식: 원본은 np.random.seed(10) 상태에서 데이터셋 순서대로 1회 뽑아 캐시했으므로(전역 RNG 순서 의존, 정확 재현 불가) 여기서는
