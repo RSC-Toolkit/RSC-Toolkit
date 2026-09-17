@@ -223,3 +223,34 @@ scripts/verify_paper_weights.py
 scripts/verify_paper_weights.sh
 tests/unit/test_paper_params.py
 tests/unit/test_build_results_master.py
+
+# Dataset audio is not published: real ICBHI patient-107 recordings (the tracked toy data is synthetic) and golden
+# reference files that contain waveforms, spectrograms or images from real recordings (tests skip when they are missing)
+sample_data/icbhi_patient107/
+tests/golden/btscard/forward_golden.pt
+tests/golden/btscard/ckpt_forward_golden.pt
+tests/golden/gapaug/backbone.pt
+tests/golden/lorarsc/features.pt
+tests/golden/lorarsc/model.pt
+tests/golden/lungmix/lungmix_golden.pt
+tests/golden/m2d/features.pt
+tests/golden/m2d/encoder.pt
+tests/golden/m2d/head.pt
+tests/golden/opera/features.pt
+tests/golden/opera/htsat.pt
+tests/golden/opera/head.pt
+tests/golden/pafa/pipeline_golden.pt
+tests/golden/patchmix_pipeline/fbank_golden.pt
+tests/golden/patchmix_pipeline/specaug_input.pt
+tests/golden/patchmix_pipeline/specaug_golden.pt
+tests/golden/pcmcl/dataset.pt
+tests/golden/pcmcl/fbank_input.pt
+tests/golden/pcmcl/specaug.pt
+tests/golden/pcmcl/beats.pt
+tests/golden/pcmcl/ast.pt
+tests/golden/qlung/aqs_golden.pt
+tests/golden/respirenet/images.pt
+tests/golden/sclmeta/audio.pt
+tests/golden/sclmeta/features.pt
+tests/golden/sclmeta/cnn6.pt
+tests/golden/sclmeta_sprs/audio.pt

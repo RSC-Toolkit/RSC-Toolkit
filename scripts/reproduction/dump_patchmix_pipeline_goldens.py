@@ -7,7 +7,7 @@ torchaudio version (a reproduction risk), so the reference here is the authors' 
 version — comparing the authors' code and ours on the same torchaudio isolates code differences only.
 
   .venv/bin/python scripts/reproduction/dump_patchmix_pipeline_goldens.py \
-      --repo <patch-mix clone> --data sample_data/toy_dataset/files
+      --repo <patch-mix clone> --data sample_data/icbhi_patient107/files
 
 cv2/cmapy/nlpaug, imported at the top level of the authors' util module, are not used on the golden path,
 so they are replaced with stubs (get_individual_cycles_torchaudio / generate_fbank /
@@ -44,7 +44,7 @@ def install_stubs():
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--repo", required=True)
-    ap.add_argument("--data", default="sample_data/toy_dataset/files")
+    ap.add_argument("--data", default="sample_data/icbhi_patient107/files")  # real ICBHI patient-107 recordings (local only)
     ap.add_argument("--out", default="tests/golden/patchmix_pipeline")
     ap.add_argument("--n_files", type=int, default=2)
     ap.add_argument("--n_cycles", type=int, default=2)
@@ -97,7 +97,7 @@ def main():
         entries.append({"filename": fn, "cycles": rows[: args.n_cycles]})
 
     torch.save(torch.stack(fbanks), out / "fbank_golden.pt")
-    json.dump({"data_folder_note": "sample_data/toy_dataset/files", "entries": entries,
+    json.dump({"data_folder_note": "sample_data/icbhi_patient107/files", "entries": entries,
                "torch": torch.__version__}, open(out / "cycles_meta.json", "w"), indent=1)
 
     # ---- SpecAugment goldens (same policy, same seed) ----

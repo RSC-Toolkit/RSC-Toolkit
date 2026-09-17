@@ -54,7 +54,7 @@ def _load(name):
 
 
 # ------------------------------------------------------------------ AQS
-@needs_golden
+@pytest.mark.skipif(not (GOLDEN / "aqs_golden.pt").exists(), reason="golden missing (contains dataset audio, kept locally)")
 def test_aqs_three_variants_match_librosa_reference():
     g = _load("aqs_golden.pt")
     for row in g["rows"]:

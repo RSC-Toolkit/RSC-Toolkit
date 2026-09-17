@@ -1,5 +1,8 @@
 # Toy Dataset
 
-This is a minimal dataset for running sanity checks and tests on the code.
+A minimal dataset for sanity checks, the tutorial and CI.
 
-The dataset consists of the ICBHI dataset patient 107 only.
+It keeps the ICBHI 2017 file layout (file names, cycle annotation `.txt` files and a split file) so the full pipeline runs
+without downloading data, but the audio is **synthetic**: band-limited noise shaped by the annotated breathing cycles, with
+clicks on crackle cycles and a gliding tone on wheeze cycles. It contains no real recordings and scores on it are
+meaningless. Regenerate the audio with `python scripts/tutorial/make_toy_audio.py`.

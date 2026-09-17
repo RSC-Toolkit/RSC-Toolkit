@@ -78,7 +78,7 @@ The console scripts are `rsc-toolkit-train` (training), `rsc-toolkit-eval` (re-e
 
 ## Quick start (CPU, a few minutes)
 
-The repository ships a small toy subset of ICBHI (`sample_data/`). This trains a CNN6 for one epoch on the CPU and
+The repository ships a small synthetic toy dataset in the ICBHI file format (`sample_data/`). This trains a CNN6 for one epoch on the CPU and
 re-evaluates the saved checkpoint:
 
 ```bash
@@ -357,7 +357,7 @@ rsc_toolkit/
   trainer/        Lightning adapters and callbacks
 scripts/          train/eval wrappers, weight download, tutorial, reproduction utilities
 tests/            unit and integration tests, golden references
-sample_data/      toy ICBHI subset used by the tutorial and CI
+sample_data/      synthetic toy dataset (ICBHI file format) used by the tutorial and CI
 ```
 
 ## Testing

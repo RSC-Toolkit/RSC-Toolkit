@@ -40,10 +40,10 @@ def _repo_root() -> pathlib.Path:
 
 REPO = _repo_root()
 GOLDEN = REPO / "tests" / "golden" / "patchmix_pipeline"
-DATA = REPO / "sample_data" / "toy_dataset" / "files"
+DATA = REPO / "sample_data" / "icbhi_patient107" / "files"   # local copy of the real ICBHI recordings (not in the repository)
 
 needs_golden = pytest.mark.skipif(
-    not (GOLDEN / "fbank_golden.pt").exists(),
+    not ((GOLDEN / "fbank_golden.pt").exists() and DATA.exists()),
     reason="golden missing — generate with scripts/reproduction/dump_patchmix_pipeline_goldens.py",
 )
 

@@ -25,7 +25,7 @@ def _repo_root() -> pathlib.Path:
 REPO = _repo_root()
 GOLDEN = REPO / "tests" / "golden" / "lorarsc"
 HF = REPO / "pretrained_models/upstream/hf/ast-finetuned-audioset-10-10-0.4593"
-DATA = REPO / "sample_data/toy_dataset/files"
+DATA = REPO / "sample_data/icbhi_patient107/files"   # local copy of the real ICBHI recordings (not in the repository)
 needs_golden = pytest.mark.skipif(not (GOLDEN / "model.pt").exists(), reason="golden missing")
 needs_hf = pytest.mark.skipif(not (HF / "config.json").exists(), reason="HF AST snapshot missing")
 
@@ -45,7 +45,7 @@ def _inject_golden(m: ASTLoRARSC, g: dict):
     m.classification_head.load_state_dict(g["head_state"])
 
 
-@needs_golden
+@pytest.mark.skipif(not ((GOLDEN / "features.pt").exists() and DATA.exists()), reason="golden or local ICBHI patient-107 recordings missing")
 def test_features_match_hf_extractor_and_sclmeta_chain():
     """Toolkit sclmeta padding + fbank(128, target_frames 500) == original waveform chain + 4.28.1 ASTFeatureExtractor(max_length 500)."""
     g = torch.load(GOLDEN / "features.pt", weights_only=False)

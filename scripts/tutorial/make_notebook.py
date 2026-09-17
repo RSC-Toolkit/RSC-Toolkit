@@ -90,7 +90,7 @@ print("ROOT:", ROOT, "\nWORK:", WORK, "\nQUICK:", QUICK)
 cells.append(md(r"""
 ## Part A — toy data (CPU)
 
-`sample_data/toy_dataset/` is bundled data containing only the recordings of ICBHI patient 107. It uses the same file format as the real ICBHI,
+`sample_data/toy_dataset/` is bundled synthetic data (no real recordings) in the same file format as the real ICBHI,
 so index building → training → evaluation runs exactly as on the real data.
 
 ### A-1. Build the index

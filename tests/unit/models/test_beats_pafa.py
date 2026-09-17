@@ -108,7 +108,7 @@ def test_beats_classifier_ce_and_pafa_paths():
 
 
 # ------------------------------------------------------------ data
-@needs_golden
+@pytest.mark.skipif(not (GOLDEN / "pipeline_golden.pt").exists(), reason="golden missing (contains dataset audio, kept locally)")
 @needs_icbhi
 def test_waveform_pipeline_matches_reference():
     """IndexDataset(16 kHz, fade) + repeat_fade 5 s == original slice + cut_pad_sample_torchaudio."""

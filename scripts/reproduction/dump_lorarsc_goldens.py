@@ -66,7 +66,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--repo", required=True)
     ap.add_argument("--hf", required=True)
-    ap.add_argument("--data", default="sample_data/toy_dataset/files")
+    ap.add_argument("--data", default="sample_data/icbhi_patient107/files")  # real ICBHI patient-107 recordings (local only)
     ap.add_argument("--out", default="tests/golden/lorarsc")
     args = ap.parse_args()
     out = pathlib.Path(args.out)
