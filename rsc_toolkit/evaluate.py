@@ -2,8 +2,7 @@
 
 학습 run 디렉터리(`outputs/<group>/<run>/best.pth`)를 그 run 의 설정 스냅샷(`outputs/YYYY-MM-DD/HH-MM-SS/.hydra/config.yaml`,
 없으면 run 로그에 찍힌 resolved config)으로 **학습 때와 같은 팩토리**로 다시 세우고, state_dict 를 strict 로 로드한 뒤
-검증 스플릿을 `trainer.validate` 로 평가해 지표를 돌려준다. `scripts/verify_paper_weights.py`(논문 weight 전수 검증)와
-`scripts/eval_ood_sprsound.py` 가 이 모듈을 쓴다.
+검증 스플릿을 `trainer.validate` 로 평가해 지표를 돌려준다.
 
 원칙
 - 학습 산출물은 **읽기만 한다**: 프로세스 CWD 를 샌드박스로 옮기고(입력 디렉터리만 심링크), 체크포인트·json 을 쓰는
@@ -109,8 +108,7 @@ def find_snapshot_dirs(run_name: str, project_root: pathlib.Path) -> List[pathli
 
 
 def pick_snapshot(snapshot_dirs: Sequence[pathlib.Path], best_pth: pathlib.Path) -> Optional[pathlib.Path]:
-    """같은 run.name 의 스냅샷이 여럿이면 **best.pth 가 저장되기 직전** 것(디렉터리명 = 시작 시각). 없으면 마지막 것.
-    (scripts/reproduction/build_results_master.py 의 pick_snapshot 과 같은 규칙.)"""
+    """같은 run.name 의 스냅샷이 여럿이면 **best.pth 가 저장되기 직전** 것(디렉터리명 = 시작 시각). 없으면 마지막 것."""
     if not snapshot_dirs:
         return None
     try:

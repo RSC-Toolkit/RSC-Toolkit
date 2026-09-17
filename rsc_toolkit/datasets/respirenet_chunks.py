@@ -340,7 +340,7 @@ class RespireNetDataModule(L.LightningDataModule):
                  aug_scale: Optional[float] = None, cba_seed: Optional[int] = None,
                  ood_index_csv: Optional[str] = None, ood_data_dir: Optional[str] = None, ood_split: str = "test"):
         super().__init__()
-        # 제로샷(OOD) 평가: test 셋만 다른 데이터셋의 인덱스에서 만든다(학습·정규화 통계는 ICBHI 그대로) — scripts/eval_ood_sprsound.py 가 넘긴다
+        # 제로샷(OOD) 평가: test 셋만 다른 데이터셋의 인덱스에서 만든다(학습·정규화 통계는 ICBHI 그대로)
         self.ood = dict(index_csv=ood_index_csv, data_dir=ood_data_dir, split=ood_split) if ood_index_csv else None
         self.kw = dict(data_dir=data_dir, split_mode=split_mode, folds_file=folds_file, test_fold=test_fold,
                        official_split_file=official_split_file, sample_rate=sample_rate, desired_length=desired_length,

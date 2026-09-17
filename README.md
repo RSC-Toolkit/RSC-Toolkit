@@ -64,7 +64,7 @@ scripts/eval.sh outputs/bts/icbhi-bts-s1                               # 셸 래
 ```
 
 run 디렉터리의 hydra 스냅샷으로 학습 때와 같은 팩토리에서 모델·데이터를 다시 세운다. 학습 산출물은 읽기만 하고
-(쓰기는 샌드박스), `best.json` 이 있으면 PASS/MISMATCH 를 판정한다. 여러 run 전수 검증은 `scripts/verify_paper_weights.sh`.
+(쓰기는 샌드박스), `best.json` 이 있으면 PASS/MISMATCH 를 판정한다.
 
 ## 논문 재현 레시피 — 모델·데이터별 실행법
 
@@ -228,7 +228,7 @@ pytest                    # 골든 텐서 포함 전체
   `pretrained_models/…`)는 **실행한 작업 디렉터리** 기준이다. 사전학습 가중치는 `RSCTK_PRETRAINED_ROOT=/path/to/weights` 로
   한 디렉터리에 모아 둘 수 있고(후보 경로의 `pretrained_models/` 접두사를 뗀 상대 경로 또는 파일명으로 찾는다), 피처 캐시는
   `RSCTK_FEATURE_CACHE_ROOT`, 저장소 루트 추정은 `RSCTK_PROJECT_ROOT` 로 바꾼다.
-- 논문별 **집계**(seed 평균·표) 는 아직 `scripts/reproduction/aggregate_*.py` 와 `scripts/paper/` 가 담당한다
+- 논문별 **집계**(seed 평균) 는 아직 `scripts/reproduction/aggregate_*.py` 가 담당한다
   (재평가 자체는 `rsc-toolkit-eval`).
 - CI 는 `.github/workflows/ci.yml`(휠 스모크 + CPU 단위 테스트) — GPU 가 필요한 골든 테스트는 로컬에서 돈다.
 

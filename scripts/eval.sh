@@ -9,7 +9,6 @@
 #
 # 설정은 그 run 의 hydra 스냅샷(run.name 이 같은 outputs/<날짜>/<시각>/.hydra)을 자동으로 찾아 학습 때와 같은 팩토리로
 # 모델·데이터를 다시 세우고 strict 로드 → validate. 학습 산출물은 읽기만 하고(쓰기는 샌드박스), best.json 이 있으면 대조한다.
-# 여러 run 전수 검증은 scripts/verify_paper_weights.sh (GPU 병렬·요약표).
 #
 # 환경변수: GPU(기본: 환경의 CUDA_VISIBLE_DEVICES, 없으면 0) · PY(기본 .venv/bin/python) · SANDBOX(기본 /tmp/rsc_eval_sandbox_<uid>) · THREAD_CAP(기본 1)
 set -euo pipefail

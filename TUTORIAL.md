@@ -119,7 +119,6 @@ rsc-toolkit-eval "$WORK/paper_weights/icbhi-cnn6-ce-s1" --project-root "$ROOT" -
   --override data.params.data_dir="$WORK/icbhi" --override data.params.features.cache_dir="$WORK/cache_icbhi"
 ```
 묶음이 설정 스냅샷을 품고 있으므로 `outputs/` 없이 재평가된다. 경로 override 가 붙은 평가는 `status: OK` 와 함께 `best.json`(논문 표의 값)과의 |Δ| 를 보여주며, 같은 공식 test 이므로 |Δ| 는 0 이다(override 없이 돌리면 PASS/MISMATCH 판정).
-논문 weight 전체를 다시 검증하려면 `scripts/verify_paper_weights.sh`(README "평가" 절).
 
 ## 패키지 설치만으로 쓰기
 자기 모델만 붙이는 사용자는 clone 없이도 된다: `pip install "rsc-toolkit[trainer,models] @ git+<repo-url>"`.
@@ -130,5 +129,4 @@ rsc-toolkit-eval "$WORK/paper_weights/icbhi-cnn6-ce-s1" --project-root "$ROOT" -
 |---|---|
 | 논문 레시피 학습 | `scripts/train.sh <config> [override…]` (README 표) |
 | run 하나 재평가 | `rsc-toolkit-eval outputs/<group>/<run>` |
-| 논문 weight 전수 재검증 | `scripts/verify_paper_weights.sh` / `scripts/verify_paper_ood.py` |
 | 튜토리얼 자동 실행 | `scripts/tutorial/run_tutorial.sh [--full]` (CI 는 Part A) |

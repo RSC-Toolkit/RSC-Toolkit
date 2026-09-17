@@ -1,7 +1,6 @@
 """rsc_toolkit.evaluate — 체크포인트 재평가 엔트리포인트의 순수 함수들 (P2-3).
 
-실데이터 재평가 자체는 scripts/verify_paper_weights.py 의 전수 검증이 게이트이고, 여기서는 설정 복구·정제·
-스냅샷 선택·override·버퍼 적응·대조 판정을 고정한다.
+설정 복구·정제·스냅샷 선택·override·버퍼 적응·대조 판정을 고정한다.
 """
 from __future__ import annotations
 

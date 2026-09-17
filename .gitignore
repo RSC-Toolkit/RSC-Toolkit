@@ -210,3 +210,16 @@ pretrained_models
 
 # 내부 작업 문서(논문 표 원장·리뷰·검증 기록 등)는 로컬에만 둔다 — 공개 문서는 README.md·TUTORIAL.md (2026-09-17 결정)
 docs/
+
+# Internal paper tooling that reads docs/ (paper tables, results_master.csv) — kept local only
+scripts/paper/
+scripts/reproduction/build_results_master.py
+scripts/reproduction/generate_repro_ledger.py
+scripts/reproduction/generate_team_paper_evidence.py
+scripts/eval_ood_sprsound.py
+scripts/eval_ood_mvst_fusion.py
+scripts/verify_paper_ood.py
+scripts/verify_paper_weights.py
+scripts/verify_paper_weights.sh
+tests/unit/test_paper_params.py
+tests/unit/test_build_results_master.py
