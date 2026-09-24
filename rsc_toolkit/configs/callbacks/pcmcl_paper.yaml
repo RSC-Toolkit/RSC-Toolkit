@@ -1,0 +1,17 @@
+# @package _global_
+# PC-MCL training-protocol callbacks — no training script released → **assumed** from the PAFA lineage: MA 0.5 (--ma_update, argparse default beta 0), per-epoch cosine (lr 5e-5, 100 ep,
+# eta_min=lr·1e-3; misc.py adjust_learning_rate), best-on-test with best Score && Se > 0.1 (main.py:960 — Se is in %, hence min_se 0.1), resumable.
+# warmup (--warm, 10 ep) is assumed unused.
+trainer:
+  params:
+    callbacks:
+      - _target_: rsc_toolkit.trainer.callbacks.ma_update.LiveWeightAveraging
+        beta: 0.5
+      - _target_: rsc_toolkit.trainer.callbacks.paper_cosine_lr.PaperCosineLR
+        learning_rate: ${optimizer.params.lr}        # single source: the optimizer group (a hard-coded copy would silently ignore CLI sweeps)
+        epochs: ${trainer.params.max_epochs}
+      - _target_: rsc_toolkit.trainer.callbacks.icbhi_best_checkpoint.ICBHIBestScoreCheckpoint
+        dirpath: outputs/pcmcl/${run.name}
+        min_se: 0.1
+      - _target_: rsc_toolkit.trainer.callbacks.resume_checkpoint.EpochResumeCheckpoint
+        dirpath: outputs/pcmcl/${run.name}

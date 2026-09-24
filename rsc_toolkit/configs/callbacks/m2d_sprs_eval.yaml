@@ -1,0 +1,10 @@
+# @package _global_
+# M2D fine-tuning evaluation protocol: best test Score every epoch (strict >, no Se gate), resumable
+trainer:
+  params:
+    callbacks:
+      - _target_: rsc_toolkit.trainer.callbacks.icbhi_best_checkpoint.ICBHIBestScoreCheckpoint
+        dirpath: outputs/m2d_sprs/${run.name}
+        min_se: -1.0
+      - _target_: rsc_toolkit.trainer.callbacks.resume_checkpoint.EpochResumeCheckpoint
+        dirpath: outputs/m2d_sprs/${run.name}

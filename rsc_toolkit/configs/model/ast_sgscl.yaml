@@ -1,0 +1,24 @@
+# AST of the SG-SCL paper (ICASSP 2024) — faithful port of the official code (verified against goldens).
+# Select method with an override (all three use loss=cross_entropy — the official code uses unweighted CE for DAT/SG-SCL):
+#   SG-SCL : model.params.method=sgscl (default)
+#   DAT    : model.params.method=dat
+#   CE     : model.params.method=ce   (for AST SFT, the patchmix_icbhi config matches the official script)
+name: ast_sgscl
+params:
+  n_cls: 4
+  method: sgscl
+  m_cls: 4                       # meta=dev (4 stethoscope types)
+  proj_dim: 768
+  temperature: 0.06
+  alpha: 1.0
+  target_type: project1_project2block
+  grl_alpha: 1.0                 # the official GRL schedule saturates at 1.0 under the official recipe (methods/sgscl.py)
+  cls_feat: feat0                # feat1 = GRL(x) as the classifier input (experimental)
+  con_feat: feat0                # feat1 = GRL(x) as the contrastive feature (GitHub HEAD 2ed1bac); feat0 = clone 6656460 (default)
+  specaug_policy: icbhi_ast_sup  # per-batch SpecAugment of the official train loop (cumulative masking of the two views)
+  specaug_mask: mean
+  # the toolkit datamodule provides (B, n_mels=128, frames=798)
+  input_layout: freq_time
+  # the two below are intentionally swapped, replicating an official-code quirk (see the models/ast_patchmix.py docstring)
+  input_fdim: 798
+  input_tdim: 128

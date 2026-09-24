@@ -1,0 +1,43 @@
+# PC-MCL (BEATs) SPRSound extension — **not a reproduction target**.
+#
+# The paper (arXiv 2601.17080) evaluates ICBHI only and has no SPRSound target. Its 3-sigmoid multi-label head is tied to
+# the ICBHI 4-class = 2×2 attribute structure and cannot express 7 classes as is,
+# so **the label space is decomposed into 6 attributes** to extend the method while keeping it intact.
+#
+# What comes from the authors and what the toolkit adds:
+#   authors — additive (union) concatenation rule · bucket inclusion rule · PM (patient matching) · loss combination · the whole ICBHI recipe
+#   toolkit — the 6-attribute decomposition table for SPRSound 7-class, decoding priority for non-existent attribute combinations,
+#             enumeration order when widening the concatenation combinations to 28 pairs (no 3-source combinations)
+#   Details: rsc_toolkit/methods/pcmcl_labelspace.py
+#
+# MCL remains intact — the discont attribute is shared by Fine/Coarse/Wheeze+Crackle, and cont by Wheeze/W+C/Rhonchi/Stridor.
+# PC remains intact too — the multi-label path is kept, so the PM head stays on (switching to label_mode=single would turn it off).
+#
+#   Run: rsc-toolkit-train --config-name pcmcl_sprs run.name=sprs-pcmcl-beats-s1 seed=1
+defaults:
+  - model: beats_pcmcl
+  - data_defaults@data: base
+  - data: sprsound_pcmcl_beats
+  - loss: bce_with_logits
+  - metrics: pcmcl_metrics_sprs
+  - optimizer: adam_pcmcl
+  - trainer: default
+  - callbacks: pcmcl_paper
+  - _self_
+
+seed: 1
+
+model:
+  params:
+    n_cls: 6                     # number of attributes (there are 7 classes)
+    label_space: sprsound7
+
+trainer:
+  params:
+    max_epochs: 100
+    precision: 32                # no autocast in the official code — same as the ICBHI run
+
+run:
+  name: sprs-pcmcl-beats
+  group: pcmcl
+  tags: [pcmcl, beats, sprsound, extension]

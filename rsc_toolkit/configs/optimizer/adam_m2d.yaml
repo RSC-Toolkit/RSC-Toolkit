@@ -1,0 +1,10 @@
+# m2d app/icbhi_sprs eval_icbhi.sh: Adam lr 5e-5, wd 1e-4 (scl main.py), CosineAnnealingLR(T_max 40, eta_min 1e-6) epoch step
+name: adam
+params:
+  lr: 5e-5
+  weight_decay: 1e-4
+lr_scheduler:
+  name: cosine_annealing
+  params:
+    T_max: 40
+    eta_min: 1e-6

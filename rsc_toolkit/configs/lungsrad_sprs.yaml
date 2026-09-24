@@ -1,0 +1,31 @@
+# Lung-SRAD extended to the standard SPRSound task (7-class). **No paper-reported value** — ICBHI recipe unchanged.
+#   Ladder: model.params.method=ce (FT) | ce_blur (SAR) | patchmix_cl (Lung-SRAD, cl_mode dual)
+#   Axis definition: model.params.mix_layout=as_code (default, official behavior) | as_paper (Eq.6-7)
+#   rsctk-train --config-name lungsrad_sprs model.params.method=patchmix_cl seed=N run.name=sprs-lungsrad-dual-sN
+# Metrics are the standard 7-class ones (sprsound_metrics) — the ICBHI-only 2-class derived metrics are not used.
+defaults:
+  - model: dass_lungsrad
+  - data_defaults@data: base
+  - data: sprsound_lungsrad
+  - loss: cross_entropy         # the official code does not use --weighted_loss → SPRS is also unweighted
+  - metrics: sprsound_metrics
+  - optimizer: adamw_addrsc
+  - trainer: default
+  - callbacks: lungsrad_paper
+  - _self_
+
+seed: 1
+
+trainer:
+  params:
+    max_epochs: 50
+    precision: 32
+
+run:
+  name: sprs-lungsrad
+  group: lungsrad
+  tags: [lungsrad, sprsound, extension, dass]
+
+model:
+  params:
+    n_cls: 7

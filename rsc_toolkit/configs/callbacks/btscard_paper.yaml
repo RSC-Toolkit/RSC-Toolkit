@@ -1,0 +1,17 @@
+# @package _global_
+# BTS-CARD training-protocol callbacks (official scripts scripts/icbhi_*.sh: 15 ep, MA 0.5 every step (excluding discriminators and constants), cosine 5e-5,
+# best on the official ICBHI test set (best Score & Se>5) — the official code saves 11 bests, one per α; the toolkit fixes α=0 with a single best).
+trainer:
+  params:
+    callbacks:
+      - _target_: rsc_toolkit.trainer.callbacks.btscard.BTSCARDWeightAveraging
+        beta: 0.5
+      - _target_: rsc_toolkit.trainer.callbacks.btscard.BTSCARDLossLogger
+      - _target_: rsc_toolkit.trainer.callbacks.paper_cosine_lr.PaperCosineLR
+        learning_rate: ${optimizer.params.lr}
+        epochs: ${trainer.params.max_epochs}
+      - _target_: rsc_toolkit.trainer.callbacks.icbhi_best_checkpoint.ICBHIBestScoreCheckpoint
+        dirpath: outputs/btscard/${run.name}
+        min_se: 5.0
+      - _target_: rsc_toolkit.trainer.callbacks.resume_checkpoint.EpochResumeCheckpoint
+        dirpath: outputs/btscard/${run.name}

@@ -1,0 +1,42 @@
+# Portions of this file come from the original RSC-Toolkit code base by Miika Toikkanen; that code is under the MIT license.
+# See THIRD_PARTY_NOTICES.md. The rest of the file is under the PolyForm Noncommercial License 1.0.0.
+name: index
+params:
+  datamodule_name: index
+
+  dataset_name: icbhi
+  index_dataset_cls: rsc_toolkit.datasets.index_dataset.IndexDataset
+  project_root: ${hydra:runtime.cwd}
+  split_file: rsc_toolkit/datasets/icbhi/data/official_split.txt
+
+  sampling_rate: 16000
+  sample_level: cycle
+
+  train_splits: [train]
+  val_splits: [test]
+  test_splits: [test]
+
+  batch_size: 8
+  num_workers: 4
+  shuffle_train: true
+
+  features:
+    enabled: true
+    kind: fbank
+    cache_dir: downloaded_datasets/features_cache_icbhi_fbank   # dedicated — the processor config (128×1024) equals icbhi_ddemae_16k, so the cache keys
+                                                              # collide, but the audio chains differ (8 s repeat vs 10.24 s zero), so in a shared dir the chain ledger rejects it
+    n_mels: 128
+    target_frames: 1024
+    frame_shift: 10
+    window_type: hanning
+    dither: 0.0
+    normalize: true
+
+  feature_precompute: true
+  feature_precompute_batch_size: 8
+  feature_precompute_num_workers: 0
+
+  specaugment:
+    enabled: true
+    policy: icbhi_ast_sup
+    mask: mean

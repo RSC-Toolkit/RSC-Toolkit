@@ -1,0 +1,2697 @@
+{
+"128": {
+"mlp_head.0.bias": [
+768
+],
+"mlp_head.0.weight": [
+768
+],
+"mlp_head.1.bias": [
+4
+],
+"mlp_head.1.weight": [
+4,
+768
+],
+"v.blocks.0.attn.proj.bias": [
+768
+],
+"v.blocks.0.attn.proj.weight": [
+768,
+768
+],
+"v.blocks.0.attn.qkv.bias": [
+2304
+],
+"v.blocks.0.attn.qkv.weight": [
+2304,
+768
+],
+"v.blocks.0.mlp.fc1.bias": [
+3072
+],
+"v.blocks.0.mlp.fc1.weight": [
+3072,
+768
+],
+"v.blocks.0.mlp.fc2.bias": [
+768
+],
+"v.blocks.0.mlp.fc2.weight": [
+768,
+3072
+],
+"v.blocks.0.norm1.bias": [
+768
+],
+"v.blocks.0.norm1.weight": [
+768
+],
+"v.blocks.0.norm2.bias": [
+768
+],
+"v.blocks.0.norm2.weight": [
+768
+],
+"v.blocks.1.attn.proj.bias": [
+768
+],
+"v.blocks.1.attn.proj.weight": [
+768,
+768
+],
+"v.blocks.1.attn.qkv.bias": [
+2304
+],
+"v.blocks.1.attn.qkv.weight": [
+2304,
+768
+],
+"v.blocks.1.mlp.fc1.bias": [
+3072
+],
+"v.blocks.1.mlp.fc1.weight": [
+3072,
+768
+],
+"v.blocks.1.mlp.fc2.bias": [
+768
+],
+"v.blocks.1.mlp.fc2.weight": [
+768,
+3072
+],
+"v.blocks.1.norm1.bias": [
+768
+],
+"v.blocks.1.norm1.weight": [
+768
+],
+"v.blocks.1.norm2.bias": [
+768
+],
+"v.blocks.1.norm2.weight": [
+768
+],
+"v.blocks.10.attn.proj.bias": [
+768
+],
+"v.blocks.10.attn.proj.weight": [
+768,
+768
+],
+"v.blocks.10.attn.qkv.bias": [
+2304
+],
+"v.blocks.10.attn.qkv.weight": [
+2304,
+768
+],
+"v.blocks.10.mlp.fc1.bias": [
+3072
+],
+"v.blocks.10.mlp.fc1.weight": [
+3072,
+768
+],
+"v.blocks.10.mlp.fc2.bias": [
+768
+],
+"v.blocks.10.mlp.fc2.weight": [
+768,
+3072
+],
+"v.blocks.10.norm1.bias": [
+768
+],
+"v.blocks.10.norm1.weight": [
+768
+],
+"v.blocks.10.norm2.bias": [
+768
+],
+"v.blocks.10.norm2.weight": [
+768
+],
+"v.blocks.11.attn.proj.bias": [
+768
+],
+"v.blocks.11.attn.proj.weight": [
+768,
+768
+],
+"v.blocks.11.attn.qkv.bias": [
+2304
+],
+"v.blocks.11.attn.qkv.weight": [
+2304,
+768
+],
+"v.blocks.11.mlp.fc1.bias": [
+3072
+],
+"v.blocks.11.mlp.fc1.weight": [
+3072,
+768
+],
+"v.blocks.11.mlp.fc2.bias": [
+768
+],
+"v.blocks.11.mlp.fc2.weight": [
+768,
+3072
+],
+"v.blocks.11.norm1.bias": [
+768
+],
+"v.blocks.11.norm1.weight": [
+768
+],
+"v.blocks.11.norm2.bias": [
+768
+],
+"v.blocks.11.norm2.weight": [
+768
+],
+"v.blocks.2.attn.proj.bias": [
+768
+],
+"v.blocks.2.attn.proj.weight": [
+768,
+768
+],
+"v.blocks.2.attn.qkv.bias": [
+2304
+],
+"v.blocks.2.attn.qkv.weight": [
+2304,
+768
+],
+"v.blocks.2.mlp.fc1.bias": [
+3072
+],
+"v.blocks.2.mlp.fc1.weight": [
+3072,
+768
+],
+"v.blocks.2.mlp.fc2.bias": [
+768
+],
+"v.blocks.2.mlp.fc2.weight": [
+768,
+3072
+],
+"v.blocks.2.norm1.bias": [
+768
+],
+"v.blocks.2.norm1.weight": [
+768
+],
+"v.blocks.2.norm2.bias": [
+768
+],
+"v.blocks.2.norm2.weight": [
+768
+],
+"v.blocks.3.attn.proj.bias": [
+768
+],
+"v.blocks.3.attn.proj.weight": [
+768,
+768
+],
+"v.blocks.3.attn.qkv.bias": [
+2304
+],
+"v.blocks.3.attn.qkv.weight": [
+2304,
+768
+],
+"v.blocks.3.mlp.fc1.bias": [
+3072
+],
+"v.blocks.3.mlp.fc1.weight": [
+3072,
+768
+],
+"v.blocks.3.mlp.fc2.bias": [
+768
+],
+"v.blocks.3.mlp.fc2.weight": [
+768,
+3072
+],
+"v.blocks.3.norm1.bias": [
+768
+],
+"v.blocks.3.norm1.weight": [
+768
+],
+"v.blocks.3.norm2.bias": [
+768
+],
+"v.blocks.3.norm2.weight": [
+768
+],
+"v.blocks.4.attn.proj.bias": [
+768
+],
+"v.blocks.4.attn.proj.weight": [
+768,
+768
+],
+"v.blocks.4.attn.qkv.bias": [
+2304
+],
+"v.blocks.4.attn.qkv.weight": [
+2304,
+768
+],
+"v.blocks.4.mlp.fc1.bias": [
+3072
+],
+"v.blocks.4.mlp.fc1.weight": [
+3072,
+768
+],
+"v.blocks.4.mlp.fc2.bias": [
+768
+],
+"v.blocks.4.mlp.fc2.weight": [
+768,
+3072
+],
+"v.blocks.4.norm1.bias": [
+768
+],
+"v.blocks.4.norm1.weight": [
+768
+],
+"v.blocks.4.norm2.bias": [
+768
+],
+"v.blocks.4.norm2.weight": [
+768
+],
+"v.blocks.5.attn.proj.bias": [
+768
+],
+"v.blocks.5.attn.proj.weight": [
+768,
+768
+],
+"v.blocks.5.attn.qkv.bias": [
+2304
+],
+"v.blocks.5.attn.qkv.weight": [
+2304,
+768
+],
+"v.blocks.5.mlp.fc1.bias": [
+3072
+],
+"v.blocks.5.mlp.fc1.weight": [
+3072,
+768
+],
+"v.blocks.5.mlp.fc2.bias": [
+768
+],
+"v.blocks.5.mlp.fc2.weight": [
+768,
+3072
+],
+"v.blocks.5.norm1.bias": [
+768
+],
+"v.blocks.5.norm1.weight": [
+768
+],
+"v.blocks.5.norm2.bias": [
+768
+],
+"v.blocks.5.norm2.weight": [
+768
+],
+"v.blocks.6.attn.proj.bias": [
+768
+],
+"v.blocks.6.attn.proj.weight": [
+768,
+768
+],
+"v.blocks.6.attn.qkv.bias": [
+2304
+],
+"v.blocks.6.attn.qkv.weight": [
+2304,
+768
+],
+"v.blocks.6.mlp.fc1.bias": [
+3072
+],
+"v.blocks.6.mlp.fc1.weight": [
+3072,
+768
+],
+"v.blocks.6.mlp.fc2.bias": [
+768
+],
+"v.blocks.6.mlp.fc2.weight": [
+768,
+3072
+],
+"v.blocks.6.norm1.bias": [
+768
+],
+"v.blocks.6.norm1.weight": [
+768
+],
+"v.blocks.6.norm2.bias": [
+768
+],
+"v.blocks.6.norm2.weight": [
+768
+],
+"v.blocks.7.attn.proj.bias": [
+768
+],
+"v.blocks.7.attn.proj.weight": [
+768,
+768
+],
+"v.blocks.7.attn.qkv.bias": [
+2304
+],
+"v.blocks.7.attn.qkv.weight": [
+2304,
+768
+],
+"v.blocks.7.mlp.fc1.bias": [
+3072
+],
+"v.blocks.7.mlp.fc1.weight": [
+3072,
+768
+],
+"v.blocks.7.mlp.fc2.bias": [
+768
+],
+"v.blocks.7.mlp.fc2.weight": [
+768,
+3072
+],
+"v.blocks.7.norm1.bias": [
+768
+],
+"v.blocks.7.norm1.weight": [
+768
+],
+"v.blocks.7.norm2.bias": [
+768
+],
+"v.blocks.7.norm2.weight": [
+768
+],
+"v.blocks.8.attn.proj.bias": [
+768
+],
+"v.blocks.8.attn.proj.weight": [
+768,
+768
+],
+"v.blocks.8.attn.qkv.bias": [
+2304
+],
+"v.blocks.8.attn.qkv.weight": [
+2304,
+768
+],
+"v.blocks.8.mlp.fc1.bias": [
+3072
+],
+"v.blocks.8.mlp.fc1.weight": [
+3072,
+768
+],
+"v.blocks.8.mlp.fc2.bias": [
+768
+],
+"v.blocks.8.mlp.fc2.weight": [
+768,
+3072
+],
+"v.blocks.8.norm1.bias": [
+768
+],
+"v.blocks.8.norm1.weight": [
+768
+],
+"v.blocks.8.norm2.bias": [
+768
+],
+"v.blocks.8.norm2.weight": [
+768
+],
+"v.blocks.9.attn.proj.bias": [
+768
+],
+"v.blocks.9.attn.proj.weight": [
+768,
+768
+],
+"v.blocks.9.attn.qkv.bias": [
+2304
+],
+"v.blocks.9.attn.qkv.weight": [
+2304,
+768
+],
+"v.blocks.9.mlp.fc1.bias": [
+3072
+],
+"v.blocks.9.mlp.fc1.weight": [
+3072,
+768
+],
+"v.blocks.9.mlp.fc2.bias": [
+768
+],
+"v.blocks.9.mlp.fc2.weight": [
+768,
+3072
+],
+"v.blocks.9.norm1.bias": [
+768
+],
+"v.blocks.9.norm1.weight": [
+768
+],
+"v.blocks.9.norm2.bias": [
+768
+],
+"v.blocks.9.norm2.weight": [
+768
+],
+"v.cls_token": [
+1,
+1,
+768
+],
+"v.dist_token": [
+1,
+1,
+768
+],
+"v.head.bias": [
+1000
+],
+"v.head.weight": [
+1000,
+768
+],
+"v.head_dist.bias": [
+1000
+],
+"v.head_dist.weight": [
+1000,
+768
+],
+"v.norm.bias": [
+768
+],
+"v.norm.weight": [
+768
+],
+"v.patch_embed.proj.bias": [
+768
+],
+"v.patch_embed.proj.weight": [
+768,
+1,
+128,
+2
+],
+"v.pos_embed": [
+1,
+1026,
+768
+]
+},
+"16": {
+"mlp_head.0.bias": [
+768
+],
+"mlp_head.0.weight": [
+768
+],
+"mlp_head.1.bias": [
+4
+],
+"mlp_head.1.weight": [
+4,
+768
+],
+"v.blocks.0.attn.proj.bias": [
+768
+],
+"v.blocks.0.attn.proj.weight": [
+768,
+768
+],
+"v.blocks.0.attn.qkv.bias": [
+2304
+],
+"v.blocks.0.attn.qkv.weight": [
+2304,
+768
+],
+"v.blocks.0.mlp.fc1.bias": [
+3072
+],
+"v.blocks.0.mlp.fc1.weight": [
+3072,
+768
+],
+"v.blocks.0.mlp.fc2.bias": [
+768
+],
+"v.blocks.0.mlp.fc2.weight": [
+768,
+3072
+],
+"v.blocks.0.norm1.bias": [
+768
+],
+"v.blocks.0.norm1.weight": [
+768
+],
+"v.blocks.0.norm2.bias": [
+768
+],
+"v.blocks.0.norm2.weight": [
+768
+],
+"v.blocks.1.attn.proj.bias": [
+768
+],
+"v.blocks.1.attn.proj.weight": [
+768,
+768
+],
+"v.blocks.1.attn.qkv.bias": [
+2304
+],
+"v.blocks.1.attn.qkv.weight": [
+2304,
+768
+],
+"v.blocks.1.mlp.fc1.bias": [
+3072
+],
+"v.blocks.1.mlp.fc1.weight": [
+3072,
+768
+],
+"v.blocks.1.mlp.fc2.bias": [
+768
+],
+"v.blocks.1.mlp.fc2.weight": [
+768,
+3072
+],
+"v.blocks.1.norm1.bias": [
+768
+],
+"v.blocks.1.norm1.weight": [
+768
+],
+"v.blocks.1.norm2.bias": [
+768
+],
+"v.blocks.1.norm2.weight": [
+768
+],
+"v.blocks.10.attn.proj.bias": [
+768
+],
+"v.blocks.10.attn.proj.weight": [
+768,
+768
+],
+"v.blocks.10.attn.qkv.bias": [
+2304
+],
+"v.blocks.10.attn.qkv.weight": [
+2304,
+768
+],
+"v.blocks.10.mlp.fc1.bias": [
+3072
+],
+"v.blocks.10.mlp.fc1.weight": [
+3072,
+768
+],
+"v.blocks.10.mlp.fc2.bias": [
+768
+],
+"v.blocks.10.mlp.fc2.weight": [
+768,
+3072
+],
+"v.blocks.10.norm1.bias": [
+768
+],
+"v.blocks.10.norm1.weight": [
+768
+],
+"v.blocks.10.norm2.bias": [
+768
+],
+"v.blocks.10.norm2.weight": [
+768
+],
+"v.blocks.11.attn.proj.bias": [
+768
+],
+"v.blocks.11.attn.proj.weight": [
+768,
+768
+],
+"v.blocks.11.attn.qkv.bias": [
+2304
+],
+"v.blocks.11.attn.qkv.weight": [
+2304,
+768
+],
+"v.blocks.11.mlp.fc1.bias": [
+3072
+],
+"v.blocks.11.mlp.fc1.weight": [
+3072,
+768
+],
+"v.blocks.11.mlp.fc2.bias": [
+768
+],
+"v.blocks.11.mlp.fc2.weight": [
+768,
+3072
+],
+"v.blocks.11.norm1.bias": [
+768
+],
+"v.blocks.11.norm1.weight": [
+768
+],
+"v.blocks.11.norm2.bias": [
+768
+],
+"v.blocks.11.norm2.weight": [
+768
+],
+"v.blocks.2.attn.proj.bias": [
+768
+],
+"v.blocks.2.attn.proj.weight": [
+768,
+768
+],
+"v.blocks.2.attn.qkv.bias": [
+2304
+],
+"v.blocks.2.attn.qkv.weight": [
+2304,
+768
+],
+"v.blocks.2.mlp.fc1.bias": [
+3072
+],
+"v.blocks.2.mlp.fc1.weight": [
+3072,
+768
+],
+"v.blocks.2.mlp.fc2.bias": [
+768
+],
+"v.blocks.2.mlp.fc2.weight": [
+768,
+3072
+],
+"v.blocks.2.norm1.bias": [
+768
+],
+"v.blocks.2.norm1.weight": [
+768
+],
+"v.blocks.2.norm2.bias": [
+768
+],
+"v.blocks.2.norm2.weight": [
+768
+],
+"v.blocks.3.attn.proj.bias": [
+768
+],
+"v.blocks.3.attn.proj.weight": [
+768,
+768
+],
+"v.blocks.3.attn.qkv.bias": [
+2304
+],
+"v.blocks.3.attn.qkv.weight": [
+2304,
+768
+],
+"v.blocks.3.mlp.fc1.bias": [
+3072
+],
+"v.blocks.3.mlp.fc1.weight": [
+3072,
+768
+],
+"v.blocks.3.mlp.fc2.bias": [
+768
+],
+"v.blocks.3.mlp.fc2.weight": [
+768,
+3072
+],
+"v.blocks.3.norm1.bias": [
+768
+],
+"v.blocks.3.norm1.weight": [
+768
+],
+"v.blocks.3.norm2.bias": [
+768
+],
+"v.blocks.3.norm2.weight": [
+768
+],
+"v.blocks.4.attn.proj.bias": [
+768
+],
+"v.blocks.4.attn.proj.weight": [
+768,
+768
+],
+"v.blocks.4.attn.qkv.bias": [
+2304
+],
+"v.blocks.4.attn.qkv.weight": [
+2304,
+768
+],
+"v.blocks.4.mlp.fc1.bias": [
+3072
+],
+"v.blocks.4.mlp.fc1.weight": [
+3072,
+768
+],
+"v.blocks.4.mlp.fc2.bias": [
+768
+],
+"v.blocks.4.mlp.fc2.weight": [
+768,
+3072
+],
+"v.blocks.4.norm1.bias": [
+768
+],
+"v.blocks.4.norm1.weight": [
+768
+],
+"v.blocks.4.norm2.bias": [
+768
+],
+"v.blocks.4.norm2.weight": [
+768
+],
+"v.blocks.5.attn.proj.bias": [
+768
+],
+"v.blocks.5.attn.proj.weight": [
+768,
+768
+],
+"v.blocks.5.attn.qkv.bias": [
+2304
+],
+"v.blocks.5.attn.qkv.weight": [
+2304,
+768
+],
+"v.blocks.5.mlp.fc1.bias": [
+3072
+],
+"v.blocks.5.mlp.fc1.weight": [
+3072,
+768
+],
+"v.blocks.5.mlp.fc2.bias": [
+768
+],
+"v.blocks.5.mlp.fc2.weight": [
+768,
+3072
+],
+"v.blocks.5.norm1.bias": [
+768
+],
+"v.blocks.5.norm1.weight": [
+768
+],
+"v.blocks.5.norm2.bias": [
+768
+],
+"v.blocks.5.norm2.weight": [
+768
+],
+"v.blocks.6.attn.proj.bias": [
+768
+],
+"v.blocks.6.attn.proj.weight": [
+768,
+768
+],
+"v.blocks.6.attn.qkv.bias": [
+2304
+],
+"v.blocks.6.attn.qkv.weight": [
+2304,
+768
+],
+"v.blocks.6.mlp.fc1.bias": [
+3072
+],
+"v.blocks.6.mlp.fc1.weight": [
+3072,
+768
+],
+"v.blocks.6.mlp.fc2.bias": [
+768
+],
+"v.blocks.6.mlp.fc2.weight": [
+768,
+3072
+],
+"v.blocks.6.norm1.bias": [
+768
+],
+"v.blocks.6.norm1.weight": [
+768
+],
+"v.blocks.6.norm2.bias": [
+768
+],
+"v.blocks.6.norm2.weight": [
+768
+],
+"v.blocks.7.attn.proj.bias": [
+768
+],
+"v.blocks.7.attn.proj.weight": [
+768,
+768
+],
+"v.blocks.7.attn.qkv.bias": [
+2304
+],
+"v.blocks.7.attn.qkv.weight": [
+2304,
+768
+],
+"v.blocks.7.mlp.fc1.bias": [
+3072
+],
+"v.blocks.7.mlp.fc1.weight": [
+3072,
+768
+],
+"v.blocks.7.mlp.fc2.bias": [
+768
+],
+"v.blocks.7.mlp.fc2.weight": [
+768,
+3072
+],
+"v.blocks.7.norm1.bias": [
+768
+],
+"v.blocks.7.norm1.weight": [
+768
+],
+"v.blocks.7.norm2.bias": [
+768
+],
+"v.blocks.7.norm2.weight": [
+768
+],
+"v.blocks.8.attn.proj.bias": [
+768
+],
+"v.blocks.8.attn.proj.weight": [
+768,
+768
+],
+"v.blocks.8.attn.qkv.bias": [
+2304
+],
+"v.blocks.8.attn.qkv.weight": [
+2304,
+768
+],
+"v.blocks.8.mlp.fc1.bias": [
+3072
+],
+"v.blocks.8.mlp.fc1.weight": [
+3072,
+768
+],
+"v.blocks.8.mlp.fc2.bias": [
+768
+],
+"v.blocks.8.mlp.fc2.weight": [
+768,
+3072
+],
+"v.blocks.8.norm1.bias": [
+768
+],
+"v.blocks.8.norm1.weight": [
+768
+],
+"v.blocks.8.norm2.bias": [
+768
+],
+"v.blocks.8.norm2.weight": [
+768
+],
+"v.blocks.9.attn.proj.bias": [
+768
+],
+"v.blocks.9.attn.proj.weight": [
+768,
+768
+],
+"v.blocks.9.attn.qkv.bias": [
+2304
+],
+"v.blocks.9.attn.qkv.weight": [
+2304,
+768
+],
+"v.blocks.9.mlp.fc1.bias": [
+3072
+],
+"v.blocks.9.mlp.fc1.weight": [
+3072,
+768
+],
+"v.blocks.9.mlp.fc2.bias": [
+768
+],
+"v.blocks.9.mlp.fc2.weight": [
+768,
+3072
+],
+"v.blocks.9.norm1.bias": [
+768
+],
+"v.blocks.9.norm1.weight": [
+768
+],
+"v.blocks.9.norm2.bias": [
+768
+],
+"v.blocks.9.norm2.weight": [
+768
+],
+"v.cls_token": [
+1,
+1,
+768
+],
+"v.dist_token": [
+1,
+1,
+768
+],
+"v.head.bias": [
+1000
+],
+"v.head.weight": [
+1000,
+768
+],
+"v.head_dist.bias": [
+1000
+],
+"v.head_dist.weight": [
+1000,
+768
+],
+"v.norm.bias": [
+768
+],
+"v.norm.weight": [
+768
+],
+"v.patch_embed.proj.bias": [
+768
+],
+"v.patch_embed.proj.weight": [
+768,
+1,
+16,
+16
+],
+"v.pos_embed": [
+1,
+1026,
+768
+]
+},
+"256": {
+"mlp_head.0.bias": [
+768
+],
+"mlp_head.0.weight": [
+768
+],
+"mlp_head.1.bias": [
+4
+],
+"mlp_head.1.weight": [
+4,
+768
+],
+"v.blocks.0.attn.proj.bias": [
+768
+],
+"v.blocks.0.attn.proj.weight": [
+768,
+768
+],
+"v.blocks.0.attn.qkv.bias": [
+2304
+],
+"v.blocks.0.attn.qkv.weight": [
+2304,
+768
+],
+"v.blocks.0.mlp.fc1.bias": [
+3072
+],
+"v.blocks.0.mlp.fc1.weight": [
+3072,
+768
+],
+"v.blocks.0.mlp.fc2.bias": [
+768
+],
+"v.blocks.0.mlp.fc2.weight": [
+768,
+3072
+],
+"v.blocks.0.norm1.bias": [
+768
+],
+"v.blocks.0.norm1.weight": [
+768
+],
+"v.blocks.0.norm2.bias": [
+768
+],
+"v.blocks.0.norm2.weight": [
+768
+],
+"v.blocks.1.attn.proj.bias": [
+768
+],
+"v.blocks.1.attn.proj.weight": [
+768,
+768
+],
+"v.blocks.1.attn.qkv.bias": [
+2304
+],
+"v.blocks.1.attn.qkv.weight": [
+2304,
+768
+],
+"v.blocks.1.mlp.fc1.bias": [
+3072
+],
+"v.blocks.1.mlp.fc1.weight": [
+3072,
+768
+],
+"v.blocks.1.mlp.fc2.bias": [
+768
+],
+"v.blocks.1.mlp.fc2.weight": [
+768,
+3072
+],
+"v.blocks.1.norm1.bias": [
+768
+],
+"v.blocks.1.norm1.weight": [
+768
+],
+"v.blocks.1.norm2.bias": [
+768
+],
+"v.blocks.1.norm2.weight": [
+768
+],
+"v.blocks.10.attn.proj.bias": [
+768
+],
+"v.blocks.10.attn.proj.weight": [
+768,
+768
+],
+"v.blocks.10.attn.qkv.bias": [
+2304
+],
+"v.blocks.10.attn.qkv.weight": [
+2304,
+768
+],
+"v.blocks.10.mlp.fc1.bias": [
+3072
+],
+"v.blocks.10.mlp.fc1.weight": [
+3072,
+768
+],
+"v.blocks.10.mlp.fc2.bias": [
+768
+],
+"v.blocks.10.mlp.fc2.weight": [
+768,
+3072
+],
+"v.blocks.10.norm1.bias": [
+768
+],
+"v.blocks.10.norm1.weight": [
+768
+],
+"v.blocks.10.norm2.bias": [
+768
+],
+"v.blocks.10.norm2.weight": [
+768
+],
+"v.blocks.11.attn.proj.bias": [
+768
+],
+"v.blocks.11.attn.proj.weight": [
+768,
+768
+],
+"v.blocks.11.attn.qkv.bias": [
+2304
+],
+"v.blocks.11.attn.qkv.weight": [
+2304,
+768
+],
+"v.blocks.11.mlp.fc1.bias": [
+3072
+],
+"v.blocks.11.mlp.fc1.weight": [
+3072,
+768
+],
+"v.blocks.11.mlp.fc2.bias": [
+768
+],
+"v.blocks.11.mlp.fc2.weight": [
+768,
+3072
+],
+"v.blocks.11.norm1.bias": [
+768
+],
+"v.blocks.11.norm1.weight": [
+768
+],
+"v.blocks.11.norm2.bias": [
+768
+],
+"v.blocks.11.norm2.weight": [
+768
+],
+"v.blocks.2.attn.proj.bias": [
+768
+],
+"v.blocks.2.attn.proj.weight": [
+768,
+768
+],
+"v.blocks.2.attn.qkv.bias": [
+2304
+],
+"v.blocks.2.attn.qkv.weight": [
+2304,
+768
+],
+"v.blocks.2.mlp.fc1.bias": [
+3072
+],
+"v.blocks.2.mlp.fc1.weight": [
+3072,
+768
+],
+"v.blocks.2.mlp.fc2.bias": [
+768
+],
+"v.blocks.2.mlp.fc2.weight": [
+768,
+3072
+],
+"v.blocks.2.norm1.bias": [
+768
+],
+"v.blocks.2.norm1.weight": [
+768
+],
+"v.blocks.2.norm2.bias": [
+768
+],
+"v.blocks.2.norm2.weight": [
+768
+],
+"v.blocks.3.attn.proj.bias": [
+768
+],
+"v.blocks.3.attn.proj.weight": [
+768,
+768
+],
+"v.blocks.3.attn.qkv.bias": [
+2304
+],
+"v.blocks.3.attn.qkv.weight": [
+2304,
+768
+],
+"v.blocks.3.mlp.fc1.bias": [
+3072
+],
+"v.blocks.3.mlp.fc1.weight": [
+3072,
+768
+],
+"v.blocks.3.mlp.fc2.bias": [
+768
+],
+"v.blocks.3.mlp.fc2.weight": [
+768,
+3072
+],
+"v.blocks.3.norm1.bias": [
+768
+],
+"v.blocks.3.norm1.weight": [
+768
+],
+"v.blocks.3.norm2.bias": [
+768
+],
+"v.blocks.3.norm2.weight": [
+768
+],
+"v.blocks.4.attn.proj.bias": [
+768
+],
+"v.blocks.4.attn.proj.weight": [
+768,
+768
+],
+"v.blocks.4.attn.qkv.bias": [
+2304
+],
+"v.blocks.4.attn.qkv.weight": [
+2304,
+768
+],
+"v.blocks.4.mlp.fc1.bias": [
+3072
+],
+"v.blocks.4.mlp.fc1.weight": [
+3072,
+768
+],
+"v.blocks.4.mlp.fc2.bias": [
+768
+],
+"v.blocks.4.mlp.fc2.weight": [
+768,
+3072
+],
+"v.blocks.4.norm1.bias": [
+768
+],
+"v.blocks.4.norm1.weight": [
+768
+],
+"v.blocks.4.norm2.bias": [
+768
+],
+"v.blocks.4.norm2.weight": [
+768
+],
+"v.blocks.5.attn.proj.bias": [
+768
+],
+"v.blocks.5.attn.proj.weight": [
+768,
+768
+],
+"v.blocks.5.attn.qkv.bias": [
+2304
+],
+"v.blocks.5.attn.qkv.weight": [
+2304,
+768
+],
+"v.blocks.5.mlp.fc1.bias": [
+3072
+],
+"v.blocks.5.mlp.fc1.weight": [
+3072,
+768
+],
+"v.blocks.5.mlp.fc2.bias": [
+768
+],
+"v.blocks.5.mlp.fc2.weight": [
+768,
+3072
+],
+"v.blocks.5.norm1.bias": [
+768
+],
+"v.blocks.5.norm1.weight": [
+768
+],
+"v.blocks.5.norm2.bias": [
+768
+],
+"v.blocks.5.norm2.weight": [
+768
+],
+"v.blocks.6.attn.proj.bias": [
+768
+],
+"v.blocks.6.attn.proj.weight": [
+768,
+768
+],
+"v.blocks.6.attn.qkv.bias": [
+2304
+],
+"v.blocks.6.attn.qkv.weight": [
+2304,
+768
+],
+"v.blocks.6.mlp.fc1.bias": [
+3072
+],
+"v.blocks.6.mlp.fc1.weight": [
+3072,
+768
+],
+"v.blocks.6.mlp.fc2.bias": [
+768
+],
+"v.blocks.6.mlp.fc2.weight": [
+768,
+3072
+],
+"v.blocks.6.norm1.bias": [
+768
+],
+"v.blocks.6.norm1.weight": [
+768
+],
+"v.blocks.6.norm2.bias": [
+768
+],
+"v.blocks.6.norm2.weight": [
+768
+],
+"v.blocks.7.attn.proj.bias": [
+768
+],
+"v.blocks.7.attn.proj.weight": [
+768,
+768
+],
+"v.blocks.7.attn.qkv.bias": [
+2304
+],
+"v.blocks.7.attn.qkv.weight": [
+2304,
+768
+],
+"v.blocks.7.mlp.fc1.bias": [
+3072
+],
+"v.blocks.7.mlp.fc1.weight": [
+3072,
+768
+],
+"v.blocks.7.mlp.fc2.bias": [
+768
+],
+"v.blocks.7.mlp.fc2.weight": [
+768,
+3072
+],
+"v.blocks.7.norm1.bias": [
+768
+],
+"v.blocks.7.norm1.weight": [
+768
+],
+"v.blocks.7.norm2.bias": [
+768
+],
+"v.blocks.7.norm2.weight": [
+768
+],
+"v.blocks.8.attn.proj.bias": [
+768
+],
+"v.blocks.8.attn.proj.weight": [
+768,
+768
+],
+"v.blocks.8.attn.qkv.bias": [
+2304
+],
+"v.blocks.8.attn.qkv.weight": [
+2304,
+768
+],
+"v.blocks.8.mlp.fc1.bias": [
+3072
+],
+"v.blocks.8.mlp.fc1.weight": [
+3072,
+768
+],
+"v.blocks.8.mlp.fc2.bias": [
+768
+],
+"v.blocks.8.mlp.fc2.weight": [
+768,
+3072
+],
+"v.blocks.8.norm1.bias": [
+768
+],
+"v.blocks.8.norm1.weight": [
+768
+],
+"v.blocks.8.norm2.bias": [
+768
+],
+"v.blocks.8.norm2.weight": [
+768
+],
+"v.blocks.9.attn.proj.bias": [
+768
+],
+"v.blocks.9.attn.proj.weight": [
+768,
+768
+],
+"v.blocks.9.attn.qkv.bias": [
+2304
+],
+"v.blocks.9.attn.qkv.weight": [
+2304,
+768
+],
+"v.blocks.9.mlp.fc1.bias": [
+3072
+],
+"v.blocks.9.mlp.fc1.weight": [
+3072,
+768
+],
+"v.blocks.9.mlp.fc2.bias": [
+768
+],
+"v.blocks.9.mlp.fc2.weight": [
+768,
+3072
+],
+"v.blocks.9.norm1.bias": [
+768
+],
+"v.blocks.9.norm1.weight": [
+768
+],
+"v.blocks.9.norm2.bias": [
+768
+],
+"v.blocks.9.norm2.weight": [
+768
+],
+"v.cls_token": [
+1,
+1,
+768
+],
+"v.dist_token": [
+1,
+1,
+768
+],
+"v.head.bias": [
+1000
+],
+"v.head.weight": [
+1000,
+768
+],
+"v.head_dist.bias": [
+1000
+],
+"v.head_dist.weight": [
+1000,
+768
+],
+"v.norm.bias": [
+768
+],
+"v.norm.weight": [
+768
+],
+"v.patch_embed.proj.bias": [
+768
+],
+"v.patch_embed.proj.weight": [
+768,
+1,
+256,
+1
+],
+"v.pos_embed": [
+1,
+1026,
+768
+]
+},
+"32": {
+"mlp_head.0.bias": [
+768
+],
+"mlp_head.0.weight": [
+768
+],
+"mlp_head.1.bias": [
+4
+],
+"mlp_head.1.weight": [
+4,
+768
+],
+"v.blocks.0.attn.proj.bias": [
+768
+],
+"v.blocks.0.attn.proj.weight": [
+768,
+768
+],
+"v.blocks.0.attn.qkv.bias": [
+2304
+],
+"v.blocks.0.attn.qkv.weight": [
+2304,
+768
+],
+"v.blocks.0.mlp.fc1.bias": [
+3072
+],
+"v.blocks.0.mlp.fc1.weight": [
+3072,
+768
+],
+"v.blocks.0.mlp.fc2.bias": [
+768
+],
+"v.blocks.0.mlp.fc2.weight": [
+768,
+3072
+],
+"v.blocks.0.norm1.bias": [
+768
+],
+"v.blocks.0.norm1.weight": [
+768
+],
+"v.blocks.0.norm2.bias": [
+768
+],
+"v.blocks.0.norm2.weight": [
+768
+],
+"v.blocks.1.attn.proj.bias": [
+768
+],
+"v.blocks.1.attn.proj.weight": [
+768,
+768
+],
+"v.blocks.1.attn.qkv.bias": [
+2304
+],
+"v.blocks.1.attn.qkv.weight": [
+2304,
+768
+],
+"v.blocks.1.mlp.fc1.bias": [
+3072
+],
+"v.blocks.1.mlp.fc1.weight": [
+3072,
+768
+],
+"v.blocks.1.mlp.fc2.bias": [
+768
+],
+"v.blocks.1.mlp.fc2.weight": [
+768,
+3072
+],
+"v.blocks.1.norm1.bias": [
+768
+],
+"v.blocks.1.norm1.weight": [
+768
+],
+"v.blocks.1.norm2.bias": [
+768
+],
+"v.blocks.1.norm2.weight": [
+768
+],
+"v.blocks.10.attn.proj.bias": [
+768
+],
+"v.blocks.10.attn.proj.weight": [
+768,
+768
+],
+"v.blocks.10.attn.qkv.bias": [
+2304
+],
+"v.blocks.10.attn.qkv.weight": [
+2304,
+768
+],
+"v.blocks.10.mlp.fc1.bias": [
+3072
+],
+"v.blocks.10.mlp.fc1.weight": [
+3072,
+768
+],
+"v.blocks.10.mlp.fc2.bias": [
+768
+],
+"v.blocks.10.mlp.fc2.weight": [
+768,
+3072
+],
+"v.blocks.10.norm1.bias": [
+768
+],
+"v.blocks.10.norm1.weight": [
+768
+],
+"v.blocks.10.norm2.bias": [
+768
+],
+"v.blocks.10.norm2.weight": [
+768
+],
+"v.blocks.11.attn.proj.bias": [
+768
+],
+"v.blocks.11.attn.proj.weight": [
+768,
+768
+],
+"v.blocks.11.attn.qkv.bias": [
+2304
+],
+"v.blocks.11.attn.qkv.weight": [
+2304,
+768
+],
+"v.blocks.11.mlp.fc1.bias": [
+3072
+],
+"v.blocks.11.mlp.fc1.weight": [
+3072,
+768
+],
+"v.blocks.11.mlp.fc2.bias": [
+768
+],
+"v.blocks.11.mlp.fc2.weight": [
+768,
+3072
+],
+"v.blocks.11.norm1.bias": [
+768
+],
+"v.blocks.11.norm1.weight": [
+768
+],
+"v.blocks.11.norm2.bias": [
+768
+],
+"v.blocks.11.norm2.weight": [
+768
+],
+"v.blocks.2.attn.proj.bias": [
+768
+],
+"v.blocks.2.attn.proj.weight": [
+768,
+768
+],
+"v.blocks.2.attn.qkv.bias": [
+2304
+],
+"v.blocks.2.attn.qkv.weight": [
+2304,
+768
+],
+"v.blocks.2.mlp.fc1.bias": [
+3072
+],
+"v.blocks.2.mlp.fc1.weight": [
+3072,
+768
+],
+"v.blocks.2.mlp.fc2.bias": [
+768
+],
+"v.blocks.2.mlp.fc2.weight": [
+768,
+3072
+],
+"v.blocks.2.norm1.bias": [
+768
+],
+"v.blocks.2.norm1.weight": [
+768
+],
+"v.blocks.2.norm2.bias": [
+768
+],
+"v.blocks.2.norm2.weight": [
+768
+],
+"v.blocks.3.attn.proj.bias": [
+768
+],
+"v.blocks.3.attn.proj.weight": [
+768,
+768
+],
+"v.blocks.3.attn.qkv.bias": [
+2304
+],
+"v.blocks.3.attn.qkv.weight": [
+2304,
+768
+],
+"v.blocks.3.mlp.fc1.bias": [
+3072
+],
+"v.blocks.3.mlp.fc1.weight": [
+3072,
+768
+],
+"v.blocks.3.mlp.fc2.bias": [
+768
+],
+"v.blocks.3.mlp.fc2.weight": [
+768,
+3072
+],
+"v.blocks.3.norm1.bias": [
+768
+],
+"v.blocks.3.norm1.weight": [
+768
+],
+"v.blocks.3.norm2.bias": [
+768
+],
+"v.blocks.3.norm2.weight": [
+768
+],
+"v.blocks.4.attn.proj.bias": [
+768
+],
+"v.blocks.4.attn.proj.weight": [
+768,
+768
+],
+"v.blocks.4.attn.qkv.bias": [
+2304
+],
+"v.blocks.4.attn.qkv.weight": [
+2304,
+768
+],
+"v.blocks.4.mlp.fc1.bias": [
+3072
+],
+"v.blocks.4.mlp.fc1.weight": [
+3072,
+768
+],
+"v.blocks.4.mlp.fc2.bias": [
+768
+],
+"v.blocks.4.mlp.fc2.weight": [
+768,
+3072
+],
+"v.blocks.4.norm1.bias": [
+768
+],
+"v.blocks.4.norm1.weight": [
+768
+],
+"v.blocks.4.norm2.bias": [
+768
+],
+"v.blocks.4.norm2.weight": [
+768
+],
+"v.blocks.5.attn.proj.bias": [
+768
+],
+"v.blocks.5.attn.proj.weight": [
+768,
+768
+],
+"v.blocks.5.attn.qkv.bias": [
+2304
+],
+"v.blocks.5.attn.qkv.weight": [
+2304,
+768
+],
+"v.blocks.5.mlp.fc1.bias": [
+3072
+],
+"v.blocks.5.mlp.fc1.weight": [
+3072,
+768
+],
+"v.blocks.5.mlp.fc2.bias": [
+768
+],
+"v.blocks.5.mlp.fc2.weight": [
+768,
+3072
+],
+"v.blocks.5.norm1.bias": [
+768
+],
+"v.blocks.5.norm1.weight": [
+768
+],
+"v.blocks.5.norm2.bias": [
+768
+],
+"v.blocks.5.norm2.weight": [
+768
+],
+"v.blocks.6.attn.proj.bias": [
+768
+],
+"v.blocks.6.attn.proj.weight": [
+768,
+768
+],
+"v.blocks.6.attn.qkv.bias": [
+2304
+],
+"v.blocks.6.attn.qkv.weight": [
+2304,
+768
+],
+"v.blocks.6.mlp.fc1.bias": [
+3072
+],
+"v.blocks.6.mlp.fc1.weight": [
+3072,
+768
+],
+"v.blocks.6.mlp.fc2.bias": [
+768
+],
+"v.blocks.6.mlp.fc2.weight": [
+768,
+3072
+],
+"v.blocks.6.norm1.bias": [
+768
+],
+"v.blocks.6.norm1.weight": [
+768
+],
+"v.blocks.6.norm2.bias": [
+768
+],
+"v.blocks.6.norm2.weight": [
+768
+],
+"v.blocks.7.attn.proj.bias": [
+768
+],
+"v.blocks.7.attn.proj.weight": [
+768,
+768
+],
+"v.blocks.7.attn.qkv.bias": [
+2304
+],
+"v.blocks.7.attn.qkv.weight": [
+2304,
+768
+],
+"v.blocks.7.mlp.fc1.bias": [
+3072
+],
+"v.blocks.7.mlp.fc1.weight": [
+3072,
+768
+],
+"v.blocks.7.mlp.fc2.bias": [
+768
+],
+"v.blocks.7.mlp.fc2.weight": [
+768,
+3072
+],
+"v.blocks.7.norm1.bias": [
+768
+],
+"v.blocks.7.norm1.weight": [
+768
+],
+"v.blocks.7.norm2.bias": [
+768
+],
+"v.blocks.7.norm2.weight": [
+768
+],
+"v.blocks.8.attn.proj.bias": [
+768
+],
+"v.blocks.8.attn.proj.weight": [
+768,
+768
+],
+"v.blocks.8.attn.qkv.bias": [
+2304
+],
+"v.blocks.8.attn.qkv.weight": [
+2304,
+768
+],
+"v.blocks.8.mlp.fc1.bias": [
+3072
+],
+"v.blocks.8.mlp.fc1.weight": [
+3072,
+768
+],
+"v.blocks.8.mlp.fc2.bias": [
+768
+],
+"v.blocks.8.mlp.fc2.weight": [
+768,
+3072
+],
+"v.blocks.8.norm1.bias": [
+768
+],
+"v.blocks.8.norm1.weight": [
+768
+],
+"v.blocks.8.norm2.bias": [
+768
+],
+"v.blocks.8.norm2.weight": [
+768
+],
+"v.blocks.9.attn.proj.bias": [
+768
+],
+"v.blocks.9.attn.proj.weight": [
+768,
+768
+],
+"v.blocks.9.attn.qkv.bias": [
+2304
+],
+"v.blocks.9.attn.qkv.weight": [
+2304,
+768
+],
+"v.blocks.9.mlp.fc1.bias": [
+3072
+],
+"v.blocks.9.mlp.fc1.weight": [
+3072,
+768
+],
+"v.blocks.9.mlp.fc2.bias": [
+768
+],
+"v.blocks.9.mlp.fc2.weight": [
+768,
+3072
+],
+"v.blocks.9.norm1.bias": [
+768
+],
+"v.blocks.9.norm1.weight": [
+768
+],
+"v.blocks.9.norm2.bias": [
+768
+],
+"v.blocks.9.norm2.weight": [
+768
+],
+"v.cls_token": [
+1,
+1,
+768
+],
+"v.dist_token": [
+1,
+1,
+768
+],
+"v.head.bias": [
+1000
+],
+"v.head.weight": [
+1000,
+768
+],
+"v.head_dist.bias": [
+1000
+],
+"v.head_dist.weight": [
+1000,
+768
+],
+"v.norm.bias": [
+768
+],
+"v.norm.weight": [
+768
+],
+"v.patch_embed.proj.bias": [
+768
+],
+"v.patch_embed.proj.weight": [
+768,
+1,
+32,
+8
+],
+"v.pos_embed": [
+1,
+1026,
+768
+]
+},
+"64": {
+"mlp_head.0.bias": [
+768
+],
+"mlp_head.0.weight": [
+768
+],
+"mlp_head.1.bias": [
+4
+],
+"mlp_head.1.weight": [
+4,
+768
+],
+"v.blocks.0.attn.proj.bias": [
+768
+],
+"v.blocks.0.attn.proj.weight": [
+768,
+768
+],
+"v.blocks.0.attn.qkv.bias": [
+2304
+],
+"v.blocks.0.attn.qkv.weight": [
+2304,
+768
+],
+"v.blocks.0.mlp.fc1.bias": [
+3072
+],
+"v.blocks.0.mlp.fc1.weight": [
+3072,
+768
+],
+"v.blocks.0.mlp.fc2.bias": [
+768
+],
+"v.blocks.0.mlp.fc2.weight": [
+768,
+3072
+],
+"v.blocks.0.norm1.bias": [
+768
+],
+"v.blocks.0.norm1.weight": [
+768
+],
+"v.blocks.0.norm2.bias": [
+768
+],
+"v.blocks.0.norm2.weight": [
+768
+],
+"v.blocks.1.attn.proj.bias": [
+768
+],
+"v.blocks.1.attn.proj.weight": [
+768,
+768
+],
+"v.blocks.1.attn.qkv.bias": [
+2304
+],
+"v.blocks.1.attn.qkv.weight": [
+2304,
+768
+],
+"v.blocks.1.mlp.fc1.bias": [
+3072
+],
+"v.blocks.1.mlp.fc1.weight": [
+3072,
+768
+],
+"v.blocks.1.mlp.fc2.bias": [
+768
+],
+"v.blocks.1.mlp.fc2.weight": [
+768,
+3072
+],
+"v.blocks.1.norm1.bias": [
+768
+],
+"v.blocks.1.norm1.weight": [
+768
+],
+"v.blocks.1.norm2.bias": [
+768
+],
+"v.blocks.1.norm2.weight": [
+768
+],
+"v.blocks.10.attn.proj.bias": [
+768
+],
+"v.blocks.10.attn.proj.weight": [
+768,
+768
+],
+"v.blocks.10.attn.qkv.bias": [
+2304
+],
+"v.blocks.10.attn.qkv.weight": [
+2304,
+768
+],
+"v.blocks.10.mlp.fc1.bias": [
+3072
+],
+"v.blocks.10.mlp.fc1.weight": [
+3072,
+768
+],
+"v.blocks.10.mlp.fc2.bias": [
+768
+],
+"v.blocks.10.mlp.fc2.weight": [
+768,
+3072
+],
+"v.blocks.10.norm1.bias": [
+768
+],
+"v.blocks.10.norm1.weight": [
+768
+],
+"v.blocks.10.norm2.bias": [
+768
+],
+"v.blocks.10.norm2.weight": [
+768
+],
+"v.blocks.11.attn.proj.bias": [
+768
+],
+"v.blocks.11.attn.proj.weight": [
+768,
+768
+],
+"v.blocks.11.attn.qkv.bias": [
+2304
+],
+"v.blocks.11.attn.qkv.weight": [
+2304,
+768
+],
+"v.blocks.11.mlp.fc1.bias": [
+3072
+],
+"v.blocks.11.mlp.fc1.weight": [
+3072,
+768
+],
+"v.blocks.11.mlp.fc2.bias": [
+768
+],
+"v.blocks.11.mlp.fc2.weight": [
+768,
+3072
+],
+"v.blocks.11.norm1.bias": [
+768
+],
+"v.blocks.11.norm1.weight": [
+768
+],
+"v.blocks.11.norm2.bias": [
+768
+],
+"v.blocks.11.norm2.weight": [
+768
+],
+"v.blocks.2.attn.proj.bias": [
+768
+],
+"v.blocks.2.attn.proj.weight": [
+768,
+768
+],
+"v.blocks.2.attn.qkv.bias": [
+2304
+],
+"v.blocks.2.attn.qkv.weight": [
+2304,
+768
+],
+"v.blocks.2.mlp.fc1.bias": [
+3072
+],
+"v.blocks.2.mlp.fc1.weight": [
+3072,
+768
+],
+"v.blocks.2.mlp.fc2.bias": [
+768
+],
+"v.blocks.2.mlp.fc2.weight": [
+768,
+3072
+],
+"v.blocks.2.norm1.bias": [
+768
+],
+"v.blocks.2.norm1.weight": [
+768
+],
+"v.blocks.2.norm2.bias": [
+768
+],
+"v.blocks.2.norm2.weight": [
+768
+],
+"v.blocks.3.attn.proj.bias": [
+768
+],
+"v.blocks.3.attn.proj.weight": [
+768,
+768
+],
+"v.blocks.3.attn.qkv.bias": [
+2304
+],
+"v.blocks.3.attn.qkv.weight": [
+2304,
+768
+],
+"v.blocks.3.mlp.fc1.bias": [
+3072
+],
+"v.blocks.3.mlp.fc1.weight": [
+3072,
+768
+],
+"v.blocks.3.mlp.fc2.bias": [
+768
+],
+"v.blocks.3.mlp.fc2.weight": [
+768,
+3072
+],
+"v.blocks.3.norm1.bias": [
+768
+],
+"v.blocks.3.norm1.weight": [
+768
+],
+"v.blocks.3.norm2.bias": [
+768
+],
+"v.blocks.3.norm2.weight": [
+768
+],
+"v.blocks.4.attn.proj.bias": [
+768
+],
+"v.blocks.4.attn.proj.weight": [
+768,
+768
+],
+"v.blocks.4.attn.qkv.bias": [
+2304
+],
+"v.blocks.4.attn.qkv.weight": [
+2304,
+768
+],
+"v.blocks.4.mlp.fc1.bias": [
+3072
+],
+"v.blocks.4.mlp.fc1.weight": [
+3072,
+768
+],
+"v.blocks.4.mlp.fc2.bias": [
+768
+],
+"v.blocks.4.mlp.fc2.weight": [
+768,
+3072
+],
+"v.blocks.4.norm1.bias": [
+768
+],
+"v.blocks.4.norm1.weight": [
+768
+],
+"v.blocks.4.norm2.bias": [
+768
+],
+"v.blocks.4.norm2.weight": [
+768
+],
+"v.blocks.5.attn.proj.bias": [
+768
+],
+"v.blocks.5.attn.proj.weight": [
+768,
+768
+],
+"v.blocks.5.attn.qkv.bias": [
+2304
+],
+"v.blocks.5.attn.qkv.weight": [
+2304,
+768
+],
+"v.blocks.5.mlp.fc1.bias": [
+3072
+],
+"v.blocks.5.mlp.fc1.weight": [
+3072,
+768
+],
+"v.blocks.5.mlp.fc2.bias": [
+768
+],
+"v.blocks.5.mlp.fc2.weight": [
+768,
+3072
+],
+"v.blocks.5.norm1.bias": [
+768
+],
+"v.blocks.5.norm1.weight": [
+768
+],
+"v.blocks.5.norm2.bias": [
+768
+],
+"v.blocks.5.norm2.weight": [
+768
+],
+"v.blocks.6.attn.proj.bias": [
+768
+],
+"v.blocks.6.attn.proj.weight": [
+768,
+768
+],
+"v.blocks.6.attn.qkv.bias": [
+2304
+],
+"v.blocks.6.attn.qkv.weight": [
+2304,
+768
+],
+"v.blocks.6.mlp.fc1.bias": [
+3072
+],
+"v.blocks.6.mlp.fc1.weight": [
+3072,
+768
+],
+"v.blocks.6.mlp.fc2.bias": [
+768
+],
+"v.blocks.6.mlp.fc2.weight": [
+768,
+3072
+],
+"v.blocks.6.norm1.bias": [
+768
+],
+"v.blocks.6.norm1.weight": [
+768
+],
+"v.blocks.6.norm2.bias": [
+768
+],
+"v.blocks.6.norm2.weight": [
+768
+],
+"v.blocks.7.attn.proj.bias": [
+768
+],
+"v.blocks.7.attn.proj.weight": [
+768,
+768
+],
+"v.blocks.7.attn.qkv.bias": [
+2304
+],
+"v.blocks.7.attn.qkv.weight": [
+2304,
+768
+],
+"v.blocks.7.mlp.fc1.bias": [
+3072
+],
+"v.blocks.7.mlp.fc1.weight": [
+3072,
+768
+],
+"v.blocks.7.mlp.fc2.bias": [
+768
+],
+"v.blocks.7.mlp.fc2.weight": [
+768,
+3072
+],
+"v.blocks.7.norm1.bias": [
+768
+],
+"v.blocks.7.norm1.weight": [
+768
+],
+"v.blocks.7.norm2.bias": [
+768
+],
+"v.blocks.7.norm2.weight": [
+768
+],
+"v.blocks.8.attn.proj.bias": [
+768
+],
+"v.blocks.8.attn.proj.weight": [
+768,
+768
+],
+"v.blocks.8.attn.qkv.bias": [
+2304
+],
+"v.blocks.8.attn.qkv.weight": [
+2304,
+768
+],
+"v.blocks.8.mlp.fc1.bias": [
+3072
+],
+"v.blocks.8.mlp.fc1.weight": [
+3072,
+768
+],
+"v.blocks.8.mlp.fc2.bias": [
+768
+],
+"v.blocks.8.mlp.fc2.weight": [
+768,
+3072
+],
+"v.blocks.8.norm1.bias": [
+768
+],
+"v.blocks.8.norm1.weight": [
+768
+],
+"v.blocks.8.norm2.bias": [
+768
+],
+"v.blocks.8.norm2.weight": [
+768
+],
+"v.blocks.9.attn.proj.bias": [
+768
+],
+"v.blocks.9.attn.proj.weight": [
+768,
+768
+],
+"v.blocks.9.attn.qkv.bias": [
+2304
+],
+"v.blocks.9.attn.qkv.weight": [
+2304,
+768
+],
+"v.blocks.9.mlp.fc1.bias": [
+3072
+],
+"v.blocks.9.mlp.fc1.weight": [
+3072,
+768
+],
+"v.blocks.9.mlp.fc2.bias": [
+768
+],
+"v.blocks.9.mlp.fc2.weight": [
+768,
+3072
+],
+"v.blocks.9.norm1.bias": [
+768
+],
+"v.blocks.9.norm1.weight": [
+768
+],
+"v.blocks.9.norm2.bias": [
+768
+],
+"v.blocks.9.norm2.weight": [
+768
+],
+"v.cls_token": [
+1,
+1,
+768
+],
+"v.dist_token": [
+1,
+1,
+768
+],
+"v.head.bias": [
+1000
+],
+"v.head.weight": [
+1000,
+768
+],
+"v.head_dist.bias": [
+1000
+],
+"v.head_dist.weight": [
+1000,
+768
+],
+"v.norm.bias": [
+768
+],
+"v.norm.weight": [
+768
+],
+"v.patch_embed.proj.bias": [
+768
+],
+"v.patch_embed.proj.weight": [
+768,
+1,
+64,
+4
+],
+"v.pos_embed": [
+1,
+1026,
+768
+]
+}
+}

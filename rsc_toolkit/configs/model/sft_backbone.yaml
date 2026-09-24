@@ -1,0 +1,19 @@
+# Non-AST backbones of the sgscl repository (selected by registered name):
+#   model.name=resnet18_sft | resnet34_sft | efficientnet_b0_sft | cnn6_sft
+# method:
+#   SFT(CE) : method=ce (default) + loss=cross_entropy_weighted_icbhi (script --weighted_loss)
+#   SG-SCL  : model.params.method=sgscl + loss=cross_entropy
+#             (official non-AST SG-SCL scripts = *_da2.sh at repository commit 6a1bdbd; same as the toolkit config)
+name: resnet18_sft
+params:
+  n_cls: 4
+  from_sl_official: true
+  input_layout: freq_time
+  method: ce
+  m_cls: 4
+  proj_dim: 768
+  temperature: 0.06
+  alpha: 1.0
+  target_type: project1_project2block
+  specaug_policy: icbhi_ast_sup   # per-batch SpecAugment of the official train loop
+  specaug_mask: mean

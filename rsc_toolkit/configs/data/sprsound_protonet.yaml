@@ -1,0 +1,33 @@
+# Prototype extended to the standard SPRSound task (7-class). ICBHI recipe unchanged:
+# resample to 4 kHz → Butterworth band-pass 100–1800 Hz (whole recording) → event segmentation → 4 s random (train) / center (eval) crop · wrap padding.
+# The model computes log-mel directly with torchlibrosa, so the waveform is passed as is.
+name: sprsound_protonet
+params:
+  datamodule_name: protonet
+  dataset_name: sprsound
+  index_dataset_cls: rsc_toolkit.datasets.index_dataset.IndexDataset
+  project_root: ${hydra:runtime.cwd}
+  data_dir: .datasets/sprsound
+  raw_data_subdir: Classification
+  index_filename: index_cycle.csv
+  sampling_rate: 4000
+  sample_level: cycle
+  desired_length_sec: null
+  fade: false
+  bandpass: true
+  cycle_len: 16000
+  time_unit: ms_int
+  train_splits: [train]
+  val_splits: [test]
+  test_splits: [test]
+  batch_size: 16
+  num_workers: 8
+  shuffle_train: true
+  drop_last_train: false
+  pin_memory: true
+  features:
+    enabled: true
+    kind: waveform
+  feature_precompute: false
+  specaugment:
+    enabled: false

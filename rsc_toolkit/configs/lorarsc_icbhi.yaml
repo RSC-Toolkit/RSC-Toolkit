@@ -1,0 +1,26 @@
+# LoRA-RSC (ICASSP 2025) ICBHI 4-class — official code defaults: LoRA K,V r=8 α=8 (scaling 8/96), 100 ep, bs 16, AdamW 0.01/wd 0.1 (β .9/.98, eps 1e-6),
+#   per-step cosine, unweighted CE, fp32, no augmentation, best-on-test (no Se gate). Paper-reported (README table, number of runs unknown, code seed 10): Sp 85.31 / Se 36.11 / Score 60.71.
+#   full-FT baseline (README 82.84/36.70/59.77): model.params.method=full_ft optimizer.params.lr=5e-5
+#   Run: rsctk-train --config-name lorarsc_icbhi run.name=icbhi-lorarsc-s1 seed=1
+defaults:
+  - model: ast_lora_rsc
+  - data_defaults@data: base
+  - data: icbhi_lorarsc
+  - loss: cross_entropy         # main_icbhi.py:195 unweighted CE (the weights are commented out)
+  - metrics: icbhi_metrics
+  - optimizer: adamw_lorarsc
+  - trainer: default
+  - callbacks: lorarsc_paper
+  - _self_
+
+seed: 1
+
+trainer:
+  params:
+    max_epochs: 100
+    precision: 32
+
+run:
+  name: icbhi-lorarsc
+  group: lorarsc
+  tags: [lorarsc, icbhi]

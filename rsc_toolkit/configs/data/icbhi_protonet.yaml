@@ -1,0 +1,30 @@
+# Prototype (ICASSP 2022) ICBHI data — resample to 4 kHz → band-pass 100–1800 Hz (whole recording) → split into cycles → 4 s crop/wrap padding.
+# The model computes log-mel internally, so the waveform is passed as is (kind: waveform, no cache).
+name: icbhi_protonet
+params:
+  datamodule_name: protonet
+  dataset_name: icbhi
+  index_dataset_cls: rsc_toolkit.datasets.index_dataset.IndexDataset
+  project_root: ${hydra:runtime.cwd}
+  split_file: rsc_toolkit/datasets/icbhi/data/official_split.txt
+  data_dir: .datasets/icbhi
+  sampling_rate: 4000            # official preprocessing/config.py
+  sample_level: cycle
+  desired_length_sec: null       # ProtoIndexDataset fixes the length (random vs. center crop)
+  fade: false                    # not in the official code (disables the toolkit default sr/16 fade)
+  bandpass: true                 # butter(5) 100–1800 Hz, applied to the whole recording before splitting
+  cycle_len: 16000
+  train_splits: [train]
+  val_splits: [test]             # same target as the 'Test' column of paper Table 3
+  test_splits: [test]
+  batch_size: 16                 # official main_pytorch_prototype.py:23
+  num_workers: 8
+  shuffle_train: true
+  drop_last_train: false
+  pin_memory: true
+  features:
+    enabled: true
+    kind: waveform               # no cache — the model computes log-mel with torchlibrosa
+  feature_precompute: false
+  specaugment:
+    enabled: false               # no augmentation in the official code

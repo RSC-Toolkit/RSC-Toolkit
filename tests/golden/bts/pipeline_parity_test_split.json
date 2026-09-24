@@ -1,0 +1,7 @@
+{
+ "n": 2756,
+ "max_abs_diff": 7.62939453125e-06,
+ "n_diff_gt_1e-5": 0,
+ "label_mismatch": 0,
+ "first_bad": []
+}

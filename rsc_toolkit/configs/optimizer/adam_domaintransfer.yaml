@@ -1,0 +1,7 @@
+# Paper §3.2 — Adam lr 6e-4, weight decay 1e-3, with warm-up.
+# The lr schedule (warm-up → cosine → low lr in stage 2) is overwritten directly by the DomainTransferStages callback,
+# so no scheduler is set here (same approach as the PaperCosineLR family).
+name: adam
+params:
+  lr: 6.0e-4
+  weight_decay: 1.0e-3

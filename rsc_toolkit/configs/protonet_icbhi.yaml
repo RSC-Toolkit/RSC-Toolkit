@@ -1,0 +1,29 @@
+# Prototype Learning for Interpretable Respiratory Sound Analysis (Ren·Nguyen·Nejdl, ICASSP 2022) reproduction.
+#   ProtoNet "Ours" : rsctk-train --config-name protonet_icbhi run.name=icbhi-protonet-s1 seed=1
+#   CNN-8 baseline  : ... model.params.method=cnn8 run.name=icbhi-protonet-cnn8-s1
+# Official: Adam 1e-3, StepLR(200, 0.9) per iteration, batch 16, 10,000 iterations, weighted NLL (+0.1·diverse).
+defaults:
+  - model: protonet
+  - data_defaults@data: base
+  - data: icbhi_protonet
+  - loss: cross_entropy          # unused — the model computes the weighted NLL itself (training_forward)
+  - metrics: icbhi_metrics
+  - optimizer: adam_protonet
+  - trainer: default
+  - callbacks: protonet_paper
+  - _self_
+
+seed: 1
+
+trainer:
+  params:
+    max_epochs: -1
+    max_steps: 10000             # official ITERATION_MAX
+    precision: 32                # the official code does not use AMP
+    val_check_interval: 500      # the official code logs every 100 iterations — 500 here due to evaluation cost (the final result comes from final_*)
+    check_val_every_n_epoch: null
+
+run:
+  name: icbhi-protonet
+  group: protonet
+  tags: [protonet, icbhi]

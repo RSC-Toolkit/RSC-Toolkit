@@ -1,0 +1,27 @@
+# LungAdapter (Interspeech 2024) — re-implementation from the paper specification (no official code). Frozen PatchMixAST (IN+AS, swapped 798×128 quirk) + per-block
+# Attention-Adapter (hidden 16, in series after the MHSA output) + Res-Adapter (ratio 0.15 → 115, parallel to the MLP). Only the adapters + classifier (LN+Linear) are trained.
+# Default flags = paper equations and Fig.1 as written (res_input x, res_scale none): parameters Attn only 0.34M ✓ / Res only 2.13M (2.14, within ±0.01M) /
+# both 2.468M (0.0116M off from the paper's 2.48 — unresolved). Matching all three at once needs res_scale: vector (an invented parameter, see the models/ast_lungadapter.py docstring).
+# Table 2 ablation: model.params.use_res_adapter=false (Attn only) / model.params.use_attn_adapter=false (Res only)
+name: ast_lungadapter
+params:
+  n_cls: 4
+  use_attn_adapter: true
+  use_res_adapter: true
+  attn_hidden: 16
+  res_ratio: 0.15
+  # ---- items not specified in the paper (flags; values are guesses) ----
+  conv_dim: 2d            # 2d (12×79 patch grid, cls/dist bypass the DWConv) | 1d (token axis)
+  scale_form: vector      # learned s1∈R^768, s2∈R^16 | scalar
+  s1_init: 1.0
+  s2_init: 1.0
+  attn_insert: pre_residual   # x = x + Adapter(attn(norm1 x)) | post_residual (as in the Mona code)
+  res_input: x            # Fig.1: branch from the residual stream x after ⊕ and before LN2 | norm2 (shared with the MLP, alternative)
+  res_scale: none         # no scale in paper Eq. (8) | vector (learned 768-d; guessed to match 2.48M) | scalar
+  res_scale_init: 1.0
+  zero_init_up: true      # W_up zero-initialized → output identical to the frozen AST at the start
+  freeze_backbone: true
+  # ---- arguments inherited from PatchMixAST ----
+  input_layout: freq_time
+  input_fdim: 798         # intentionally swapped Bae code quirk (models/ast_patchmix.py docstring)
+  input_tdim: 128

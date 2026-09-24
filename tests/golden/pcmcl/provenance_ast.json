@@ -1,0 +1,6 @@
+{
+  "repo": "/raid/doyoung/projects/RSC-Toolkit/outputs/reference/pcmcl",
+  "torch": "2.13.0+cu130",
+  "timm": "0.4.5",
+  "ckpt": "/raid/doyoung/projects/RSC-Toolkit/pretrained_models/upstream/audioset_0.4593.pth"
+}

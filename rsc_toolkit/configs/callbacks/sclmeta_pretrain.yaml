@@ -1,0 +1,9 @@
+# @package _global_
+# SCL/M-SCL pretraining: no evaluation, saves the last-epoch state (scl.py:51 final_state), resumable
+trainer:
+  params:
+    callbacks:
+      - _target_: rsc_toolkit.trainer.callbacks.final_state.FinalStateCheckpoint
+        dirpath: outputs/sclmeta/${run.name}
+      - _target_: rsc_toolkit.trainer.callbacks.resume_checkpoint.EpochResumeCheckpoint
+        dirpath: outputs/sclmeta/${run.name}

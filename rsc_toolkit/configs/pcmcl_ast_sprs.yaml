@@ -1,0 +1,34 @@
+# PC-MCL (AST) SPRSound extension — **not a reproduction target** (the AST counterpart of pcmcl_sprs).
+#
+# The paper (arXiv 2601.17080) evaluates ICBHI only. The label space is decomposed into 6 attributes (methods/pcmcl_labelspace.py, sprsound7)
+# to extend it while keeping the method (MCL attribute sharing + PM patient matching) — see the header of pcmcl_sprs.yaml for what comes from the authors and what the toolkit adds.
+#
+# Recipe: pcmcl_ast_icbhi unchanged (100 ep / bs 32 / Adam 5e-5 / cosine / MA 0.5 assumed, SpecAugment on, AST fp16 autocast → trainer precision 32).
+#   Run: rsc-toolkit-train --config-name pcmcl_ast_sprs run.name=sprs-pcmcl-ast-s1 seed=1
+defaults:
+  - model: ast_pcmcl
+  - data_defaults@data: base
+  - data: sprsound_pcmcl_ast
+  - loss: bce_with_logits
+  - metrics: pcmcl_metrics_sprs
+  - optimizer: adam_pcmcl
+  - trainer: default
+  - callbacks: pcmcl_paper
+  - _self_
+
+seed: 1
+
+model:
+  params:
+    n_cls: 6                     # number of attributes (there are 7 classes)
+    label_space: sprsound7
+
+trainer:
+  params:
+    max_epochs: 100
+    precision: 32                # no GradScaler in the official code — same as the ICBHI run
+
+run:
+  name: sprs-pcmcl-ast
+  group: pcmcl
+  tags: [pcmcl, ast, sprsound, extension]

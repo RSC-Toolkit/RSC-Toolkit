@@ -1,0 +1,37 @@
+# Data config for extending BTS / Audio-CLAP to the standard SPRSound task (7-class).
+# ICBHI reads the authors' released tensors (bts_precomputed), but there is no SPRSound release, so **the toolkit pipeline builds the same features**
+# (48 kHz → recording fade → segment slicing → 8 s repeat+fade_out → ClapProcessor log-mel 1001×64).
+# This chain was verified on ICBHI to match the authors' tensors bit for bit (see the comments in data/bts_precomputed.yaml).
+# The cache is **kept separate** — the BTS-CARD OOD path slices segments with its own ms rounding in sprsound_ood.py (time_unit unset),
+# while this config uses the datamodule's time_unit=ms_int. The processor settings are identical, so the cache keys collide and the dirs must differ.
+name: sprsound_bts
+params:
+  datamodule_name: index
+  dataset_name: sprsound
+  index_dataset_cls: rsc_toolkit.datasets.index_dataset.IndexDataset
+  project_root: ${hydra:runtime.cwd}
+  data_dir: .datasets/sprsound
+  raw_data_subdir: Classification
+  index_filename: index_cycle.csv
+  sampling_rate: 48000
+  sample_level: cycle
+  desired_length_sec: 8.0
+  pad_type: repeat_fade
+  fade: true
+  time_unit: ms_int
+  train_splits: [train]
+  val_splits: [test]
+  test_splits: [test]
+  batch_size: 8
+  num_workers: 8
+  shuffle_train: true
+  drop_last_train: true          # official ICBHI train loader uses drop_last=True
+  pin_memory: true
+  features:
+    enabled: true
+    kind: clap
+    cache_dir: downloaded_datasets/features_cache_bts_sprs   # time_unit differs from the btscard OOD path, so the cache is separate (a shared cache would silently mix them)
+    clap_model_name: laion/clap-htsat-unfused
+  feature_precompute: true
+  feature_precompute_batch_size: 8
+  feature_precompute_num_workers: 0

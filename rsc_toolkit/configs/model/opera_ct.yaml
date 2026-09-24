@@ -1,0 +1,17 @@
+# OPERA-CT (HTSAT-Swin, evelyn0414/OPERA) classifier — reproduction of the EMBC'25 frozen-evaluation path (eval-audio-repr app/icbhi_sprs solve.py).
+#   freeze_body true = EMBC --freeze_body (frozen backbone, only the Tfm head is trained; paper-reported ICBHI 4-class 48.97±1.21 / SPRS 7-class 71.62±0.84)
+#   freeze_body false = full fine-tuning on the toolkit standard task (no paper-reported value)
+name: opera_ct
+params:
+  n_cls: 4
+  pretrained_path: pretrained_models/upstream/opera/encoder-operaCT.ckpt
+  freeze_body: true
+  head: tfm                      # tfm(depth 4, heads 1, mlp_ratio 1) | mlp(768-128-n_cls)
+  head_depth: 4
+  head_heads: 1
+  head_mlp_ratio: 1
+  freq_mask: 20                  # scl args default (evar SpecAugment, mask shared across the batch)
+  time_mask: 40
+  input_sec: 8.0
+  sample_rate: 16000
+  drop_path_rate: 0.1

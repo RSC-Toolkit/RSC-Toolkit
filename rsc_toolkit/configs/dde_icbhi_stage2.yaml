@@ -1,0 +1,29 @@
+# DDE-MAE stage 2 (classification FT, paper §2.3 (ii)): loads only E_R from the stage-1 final_state → CE, 50 ep, AdamW 1e-3/wd 5e-4, bs 8 (assumed), best-on-test.
+#   S3: rsctk ... --config-name dde_icbhi_stage2 model.params.encoder_ckpt=outputs/ddemae/icbhi-ddemae-s3-pre-s1/final_state.pth seed=1 run.name=icbhi-ddemae-s3-s1
+#   S2: same form with icbhi-ddemae-s2-pre-s1/final_state.pth → run.name=icbhi-ddemae-s2-s1
+defaults:
+  - model: audiomae_dde_cls
+  - data_defaults@data: base
+  - data: icbhi_ddemae
+  - loss: cross_entropy
+  - metrics: icbhi_metrics
+  - optimizer: adamw_ddemae_stage2
+  - trainer: default
+  - callbacks: ddemae_eval
+  - _self_
+
+seed: 1
+
+model:
+  params:
+    encoder_ckpt: ???              # required: outputs/ddemae/<stage1 run>/final_state.pth
+
+trainer:
+  params:
+    max_epochs: 50
+    precision: 32
+
+run:
+  name: icbhi-ddemae-s3
+  group: ddemae
+  tags: [ddemae, icbhi, stage2, paper-spec-reimpl]

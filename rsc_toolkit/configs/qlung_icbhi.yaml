@@ -1,0 +1,32 @@
+# QLung (Interspeech 2026) reproduction run config (AST recipe: 50 ep, bs 8, adam 5e-5/wd 1e-6, cosine, MA 0.6, AMP).
+#
+#   QLung (code as is, AQS rms bug)          : rsctk-train --config-name qlung_icbhi seed=N run.name=icbhi-qlung-sN
+#   QLung (code formula + entropy, Figure 1) : ... data.params.qlung.entropy_source=entropy_nanmean run.name=icbhi-qlung-entropy-sN
+#        (entropy_source=entropy is literal — 71 digitally silent cycles give nan AQS → nan loss; risk of AMP step skipping and scale collapse)
+#   QLung (paper Eq. 5 taken literally)      : ... data.params.qlung.entropy_source=entropy data.params.qlung.formula=paper
+#   CE path (code quirk)                     : ... model.params.method=ce run.name=icbhi-qlung-ce-sN
+#   OOD : .venv/bin/python scripts/reproduction/eval_qlung_ood.py --run icbhi-qlung-sN
+#
+# Loss = unweighted CE (criterion[0]; --weighted_loss not used). DFAM CE is computed inside the model.
+# Prerequisite: .datasets/icbhi index built (feature cache shared with patchmix); the AQS cache is created automatically on the first run.
+defaults:
+  - model: ast_qlung
+  - data_defaults@data: base
+  - data: icbhi_qlung
+  - loss: cross_entropy
+  - metrics: icbhi_metrics
+  - optimizer: adam            # lr 5e-5, wd 1e-6 (model + AngularClassifier + DFAM, train_qlung.py:345)
+  - trainer: default           # max_epochs 50
+  - callbacks: qlung_paper
+  - _self_
+
+seed: 1
+
+trainer:
+  params:
+    precision: 16-mixed        # official AMP (GradScaler + autocast)
+
+run:
+  name: icbhi-qlung
+  group: qlung
+  tags: [qlung, icbhi]

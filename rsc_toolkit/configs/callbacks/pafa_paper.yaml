@@ -1,0 +1,15 @@
+# @package _global_
+# PAFA paper training-protocol callbacks: MA 0.5, cosine (lr 5e-5, 100 ep), best-on-test — but with an Se gate of 0.1 (main.py:518)
+trainer:
+  params:
+    callbacks:
+      - _target_: rsc_toolkit.trainer.callbacks.ma_update.LiveWeightAveraging
+        beta: 0.5
+      - _target_: rsc_toolkit.trainer.callbacks.paper_cosine_lr.PaperCosineLR
+        learning_rate: ${optimizer.params.lr}        # single source: the optimizer group (a hard-coded copy would silently ignore CLI sweeps)
+        epochs: ${trainer.params.max_epochs}
+      - _target_: rsc_toolkit.trainer.callbacks.icbhi_best_checkpoint.ICBHIBestScoreCheckpoint
+        dirpath: outputs/pafa/${run.name}
+        min_se: 0.1
+      - _target_: rsc_toolkit.trainer.callbacks.resume_checkpoint.EpochResumeCheckpoint
+        dirpath: outputs/pafa/${run.name}

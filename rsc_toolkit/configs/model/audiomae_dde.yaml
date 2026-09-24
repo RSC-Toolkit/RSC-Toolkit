@@ -1,0 +1,24 @@
+# DDE-MAE stage 1 (disentangled FT) model — re-implementation from the paper specification (rsc_toolkit/models/audiomae_dde.py DDEMAE). The Audio-MAE backbone is verified against goldens.
+#   variant s3 = DDE-MAE (E_R + E_I + concat decoder + Siamese + vCLUB), s2 = single-encoder reconstruction FT (Table 1 S2)
+#   Table 2 ablation: use_mi=false (−MI), use_siamese=false (−Siamese), both false (inferred row-4 configuration)
+name: audiomae_dde
+params:
+  variant: s3
+  n_cls: 4
+  pretrained_path: pretrained_models/upstream/audiomae/pretrained.pth   # Audio-MAE ViT-B AS-2M (encoder+decoder, CC-BY-NC-4.0)
+  mask_ratio: 0.8            # Assumption: not specified → Audio-MAE pretraining default
+  norm_pix_loss: false       # Assumption: not specified (Eq. 5 is MSE on the raw spectrogram; the public ckpt was pretrained with True)
+  decoder_mode: 1            # Assumption: the option whose keys match the public ckpt decoder (Swin x16); 0 = global Block x8 (newly initialized)
+  alpha_siamese: 0.5         # paper α1
+  alpha_mi: 0.02             # paper α2
+  use_siamese: true
+  use_mi: true
+  siamese_margin: 1.0        # Assumption: margin not specified
+  siamese_level: pooled      # Assumption: pooled vector (mean of patch tokens) | token
+  mi_level: pooled           # Assumption: pooled vector as the vCLUB input
+  shuffle_unit: patch        # Assumption: time shuffle per patch column (16 frames) | frame
+  shuffle_mask: same_physical  # Assumption: mask physically identical patches in the two E_I inputs | same_index
+  club_hidden: 512           # Assumption: q_θ MLP 768-512-768 (form of the official CLUB implementation)
+  club_lr: 1.0e-4            # Assumption: lr of the auxiliary Adam for q_θ
+  club_steps: 1              # Assumption: one q_θ update per step
+  recon_scope: masked        # Assumption: Eq. 5 is written as MSE over the whole spectrogram, but following the official MAE convention only masked patches are averaged | all (all patches)

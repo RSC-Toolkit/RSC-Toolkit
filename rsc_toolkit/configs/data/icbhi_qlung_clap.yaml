@@ -1,0 +1,62 @@
+# QLung (Audio-CLAP) ICBHI data config.
+#
+# Two differences from the AST version (icbhi_qlung.yaml):
+#   ① the features are **CLAP log-mel (1, 1001, 64)**, not fbank 128×798 → 48 kHz path.
+#   ② hence **AQS is also computed from the 48 kHz waveform** (16 kHz in the AST version). The paper does not state the sampling rate
+#      used for AQS, so the natural reading "computed from the waveform fed to the backbone" is followed (assumption ③ in models/clap_qlung.py).
+#      This is also why the cache is separate from the AST version.
+#
+# The audio chain matches the Audio-CLAP·BTS baselines (48 kHz → 8 s repeat_fade → ClapProcessor log-mel).
+# The toolkit pipeline is used instead of the authors' released .pt (bts_precomputed) because **AQS needs the waveform**.
+# This chain was verified on ICBHI to match the authors' tensors bit for bit
+# (see the comments in configs/data/bts_precomputed.yaml).
+name: icbhi_qlung_clap
+params:
+  datamodule_name: qlung
+
+  dataset_name: icbhi
+  index_dataset_cls: rsc_toolkit.datasets.qlung_data.QLungAQSIndexDataset
+  project_root: ${hydra:runtime.cwd}
+  split_file: rsc_toolkit/datasets/icbhi/data/official_split.txt
+  data_dir: .datasets/icbhi
+
+  sampling_rate: 48000           # CLAP path (16000 in the AST version)
+  sample_level: cycle
+  desired_length_sec: 8.0
+  pad_type: repeat_fade          # same as the official BTS/Audio-CLAP preprocessing
+  fade: true
+
+  train_splits: [train]
+  val_splits: [test]             # best-on-test — same protocol as the other rows
+  test_splits: [test]
+
+  batch_size: 8
+  num_workers: 8
+  shuffle_train: true
+  drop_last_train: true          # official train loader uses drop_last=True
+  pin_memory: true
+
+  features:
+    enabled: true
+    kind: clap
+    # separate cache from the AST version (features_cache) and the BTS family — the audio chain is not part of the cache key,
+    # so without a separate name it would silently read another config's features.
+    cache_dir: downloaded_datasets/features_cache_qlung_clap
+    clap_model_name: laion/clap-htsat-unfused
+
+  feature_precompute: true
+  feature_precompute_batch_size: 8
+  feature_precompute_num_workers: 0
+
+  specaugment:
+    enabled: false               # the CLAP path has no per-batch SpecAugment of the official AST path
+
+  qlung:
+    alpha: 0.7                   # --quality_alpha
+    beta: 0.3                    # --quality_beta
+    entropy_source: rms          # same interpretation as the AST version's main result (code as is, including the bug that passes rms twice)
+    formula: code
+    cache_dir: downloaded_datasets/aqs_cache_clap48k   # based on the 48 kHz waveform, so separate from the AST version
+    precompute: true
+    precompute_num_workers: 8
+    attach_val: true

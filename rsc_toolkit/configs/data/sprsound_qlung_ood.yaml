@@ -1,0 +1,59 @@
+# QLung SPRSound OOD evaluation view (not used for training): 7→4 merged derived labels (**Rhonchi·Stridor excluded**), 16 kHz fbank 128×798,
+#   same preprocessing chain as ICBHI (assumption — not stated in the paper).
+#   Evaluation scope: eval_qlung_ood.py switches test_splits to [test] (inter, 1,429; unaffected since both excluded classes have 0 events there) and [train, test] (8,031) and aggregates twice.
+name: sprsound_qlung_ood
+params:
+  datamodule_name: qlung
+  dataset_name: sprsound
+  index_dataset_cls: rsc_toolkit.datasets.qlung_data.QLungAQSIndexDataset
+  project_root: ${hydra:runtime.cwd}
+  data_dir: .datasets/sprsound
+  raw_data_subdir: Classification
+  index_filename: index_cycle.csv
+  label_map: sprsound_7to4
+
+  sampling_rate: 16000
+  sample_level: cycle
+  desired_length_sec: 8.0
+  pad_type: repeat_fade          # Assumption: same as ICBHI (recording fade in/out + 8 s repeat + fade_out)
+  fade: true
+  resample_after_slice: false    # Assumption: resample the whole recording to 16 kHz, then slice in seconds (ICBHI chain)
+  time_unit: s
+
+  train_splits: [train]
+  val_splits: [test]
+  test_splits: [test]
+
+  batch_size: 8
+  num_workers: 8
+  shuffle_train: false
+  drop_last_train: false
+  pin_memory: true
+
+  features:
+    enabled: true
+    kind: fbank
+    cache_dir: downloaded_datasets/features_cache_qlung_ood   # separate cache (the preprocessing chain is not part of the cache key)
+    n_mels: 128
+    target_frames: 798
+    frame_shift: 10
+    window_type: hanning
+    dither: 0.0
+    normalize: true
+
+  feature_precompute: true
+  feature_precompute_batch_size: 8
+  feature_precompute_num_workers: 0
+
+  specaugment:
+    enabled: false
+
+  qlung:
+    alpha: 0.7
+    beta: 0.3
+    entropy_source: rms
+    formula: code
+    cache_dir: downloaded_datasets/aqs_cache
+    precompute: true
+    precompute_num_workers: 8
+    attach_val: true

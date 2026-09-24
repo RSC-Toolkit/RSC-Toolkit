@@ -1,0 +1,16 @@
+# @package _global_
+# AMS-D training protocol: epoch-aware buffer callback, best-on-test (default selection key = the paper's binary paper_score, no Se gate; best.json also records the standard 4-class metrics),
+# epoch resume (last.ckpt includes the per-sample buffers). MultiStepLR is the lr_scheduler in optimizer/adam_amsd.yaml.
+# To select best by the standard formula: trainer.params.callbacks.1.score_key=icbhi_score ...se_key=S_e ...sp_key=S_p
+trainer:
+  params:
+    callbacks:
+      - _target_: rsc_toolkit.trainer.callbacks.amsd_epoch.AMSDEpochCallback
+      - _target_: rsc_toolkit.trainer.callbacks.amsd_best_checkpoint.AMSDBestScoreCheckpoint
+        dirpath: outputs/amsd/${run.name}
+        score_key: paper_score
+        se_key: paper_S_e
+        sp_key: paper_S_p
+        min_se: -1.0
+      - _target_: rsc_toolkit.trainer.callbacks.resume_checkpoint.EpochResumeCheckpoint
+        dirpath: outputs/amsd/${run.name}

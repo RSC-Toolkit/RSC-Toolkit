@@ -1,0 +1,6 @@
+# PC-MCL: no training script released → **assumption (not confirmed by the authors)**: PAFA-lineage script values Adam lr 5e-5, wd 1e-6 (misc.py set_optimizer 'adam' = torch Adam).
+# The official argparse defaults are lr 1e-3, wd 1e-4 (main.py:71,74) — not adopted since they do not match the paper description.
+name: adam
+params:
+  lr: 5e-5
+  weight_decay: 1e-6

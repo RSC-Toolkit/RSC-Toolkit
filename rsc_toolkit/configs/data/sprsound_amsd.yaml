@@ -1,0 +1,47 @@
+# AMS-D extended to the standard SPRSound task (7-class). ICBHI recipe unchanged:
+# 16 kHz · 8 s repeat padding (no fade) → raw kaldi fbank 128 × 798 → AMSDFeatureDataset normalizes after masking. bs 24, drop_last True.
+# As on ICBHI, `dataset_aug` (paper §3.1, generation script not released) is not used — known gap.
+# Metrics are the same standard 7-class Se/Sp/Score as the other SPRSound extensions (the paper's binary Se/Sp is only for comparison with the ICBHI paper-reported values).
+name: sprsound_amsd
+params:
+  datamodule_name: amsd
+  dataset_name: sprsound
+  index_dataset_cls: rsc_toolkit.datasets.index_dataset.IndexDataset
+  project_root: ${hydra:runtime.cwd}
+  data_dir: .datasets/sprsound
+  raw_data_subdir: Classification
+  index_filename: index_cycle.csv
+  sampling_rate: 16000
+  sample_level: cycle
+  desired_length_sec: 8.0
+  pad_type: repeat
+  fade: false
+  time_unit: ms_int
+  train_splits: [train]
+  val_splits: [test]
+  test_splits: [test]
+  batch_size: 24
+  num_workers: 8
+  shuffle_train: true
+  drop_last_train: true
+  pin_memory: true
+  features:
+    enabled: true
+    kind: fbank
+    cache_dir: downloaded_datasets/features_cache_amsd
+    n_mels: 128
+    target_frames: 798
+    frame_shift: 10
+    window_type: hanning
+    dither: 0.0
+    normalize: false
+  feature_precompute: true
+  feature_precompute_batch_size: 8
+  feature_precompute_num_workers: 8
+  specaugment:
+    enabled: false
+  amsd_freqm: 48
+  amsd_timem: 192
+  amsd_mean: -4.2677393
+  amsd_std: 4.5689974
+  amsd_return_index: true

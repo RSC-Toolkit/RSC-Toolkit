@@ -1,0 +1,26 @@
+# MVST per-view AST fine-tuning (official {view}/main.py: unweighted CE, AdamW 5e-5/1e-6, cosine, 50 ep, bs 8, MA .5, per-sample SpecAug, AMP, best Score&Se>5).
+# Data use the same fbank cache as patch-mix (icbhi_patchmix) — only the split differs:
+#   official 60/40 split (toolkit main result): default
+#   paper seed-1 split (for paper-reported values/comparison; has patient leakage): data.params.split_file=rsc_toolkit/datasets/icbhi/data/mvst_seed1_split.txt
+#   view: model.params.view=16|32|64|128|256
+defaults:
+  - model: ast_mvst
+  - data_defaults@data: base
+  - data: icbhi_patchmix
+  - loss: cross_entropy
+  - metrics: icbhi_metrics
+  - optimizer: adamw_mvst
+  - trainer: default
+  - callbacks: mvst_paper
+  - _self_
+
+seed: 1
+
+trainer:
+  params:
+    precision: 16-mixed
+
+run:
+  name: icbhi-mvst-v16
+  group: mvst
+  tags: [mvst, icbhi]

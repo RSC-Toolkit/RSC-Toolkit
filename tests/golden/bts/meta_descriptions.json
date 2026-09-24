@@ -1,0 +1,5462 @@
+[
+{
+"meta7": [
+3.0,
+1.0,
+-1.0,
+19.0,
+99.0,
+4.0,
+0.0
+],
+"mode": "age",
+"text": "This patient is a pediatric patient."
+},
+{
+"meta7": [
+3.0,
+1.0,
+-1.0,
+19.0,
+99.0,
+4.0,
+0.0
+],
+"mode": "sex",
+"text": "This patient is a female patient."
+},
+{
+"meta7": [
+3.0,
+1.0,
+-1.0,
+19.0,
+99.0,
+4.0,
+0.0
+],
+"mode": "loc",
+"text": "This sound was recorded from the right posterior chest."
+},
+{
+"meta7": [
+3.0,
+1.0,
+-1.0,
+19.0,
+99.0,
+4.0,
+0.0
+],
+"mode": "dev",
+"text": "This sound was recorded with a Meditron stethoscope."
+},
+{
+"meta7": [
+3.0,
+1.0,
+-1.0,
+19.0,
+99.0,
+4.0,
+0.0
+],
+"mode": "age_sex",
+"text": "This patient is a female pediatric patient."
+},
+{
+"meta7": [
+3.0,
+1.0,
+-1.0,
+19.0,
+99.0,
+4.0,
+0.0
+],
+"mode": "age_loc",
+"text": "This sound was recorded from the right posterior chest of a pediatric patient."
+},
+{
+"meta7": [
+3.0,
+1.0,
+-1.0,
+19.0,
+99.0,
+4.0,
+0.0
+],
+"mode": "age_dev",
+"text": "This sound was recorded from a pediatric patient, using a Meditron stethoscope."
+},
+{
+"meta7": [
+3.0,
+1.0,
+-1.0,
+19.0,
+99.0,
+4.0,
+0.0
+],
+"mode": "sex_loc",
+"text": "This sound was recorded from the right posterior chest of a female patient."
+},
+{
+"meta7": [
+3.0,
+1.0,
+-1.0,
+19.0,
+99.0,
+4.0,
+0.0
+],
+"mode": "sex_dev",
+"text": "This sound was recorded from a female patient, using a Meditron stethoscope."
+},
+{
+"meta7": [
+3.0,
+1.0,
+-1.0,
+19.0,
+99.0,
+4.0,
+0.0
+],
+"mode": "loc_dev",
+"text": "This sound was recorded from the right posterior chest with a Meditron stethoscope."
+},
+{
+"meta7": [
+3.0,
+1.0,
+-1.0,
+19.0,
+99.0,
+4.0,
+0.0
+],
+"mode": "age_sex_loc",
+"text": "This sound was recorded from the right posterior chest of a female pediatric patient."
+},
+{
+"meta7": [
+3.0,
+1.0,
+-1.0,
+19.0,
+99.0,
+4.0,
+0.0
+],
+"mode": "age_sex_dev",
+"text": "This sound was recorded from a female pediatric patient, using a Meditron stethoscope."
+},
+{
+"meta7": [
+3.0,
+1.0,
+-1.0,
+19.0,
+99.0,
+4.0,
+0.0
+],
+"mode": "age_loc_dev",
+"text": "This sound was recorded from the right posterior chest of a pediatric patient, using a Meditron stethoscope."
+},
+{
+"meta7": [
+3.0,
+1.0,
+-1.0,
+19.0,
+99.0,
+4.0,
+0.0
+],
+"mode": "sex_loc_dev",
+"text": "This sound was recorded from the right posterior chest of a female patient, using a Meditron stethoscope."
+},
+{
+"meta7": [
+3.0,
+1.0,
+-1.0,
+19.0,
+99.0,
+4.0,
+0.0
+],
+"mode": "all",
+"text": "This sound was recorded from the right posterior chest of a female pediatric patient, using a Meditron stethoscope."
+},
+{
+"meta7": [
+0.75,
+1.0,
+-1.0,
+9.8,
+73.0,
+2.0,
+0.0
+],
+"mode": "age",
+"text": "This patient is a pediatric patient."
+},
+{
+"meta7": [
+0.75,
+1.0,
+-1.0,
+9.8,
+73.0,
+2.0,
+0.0
+],
+"mode": "sex",
+"text": "This patient is a female patient."
+},
+{
+"meta7": [
+0.75,
+1.0,
+-1.0,
+9.8,
+73.0,
+2.0,
+0.0
+],
+"mode": "loc",
+"text": "This sound was recorded from the right anterior chest."
+},
+{
+"meta7": [
+0.75,
+1.0,
+-1.0,
+9.8,
+73.0,
+2.0,
+0.0
+],
+"mode": "dev",
+"text": "This sound was recorded with a Meditron stethoscope."
+},
+{
+"meta7": [
+0.75,
+1.0,
+-1.0,
+9.8,
+73.0,
+2.0,
+0.0
+],
+"mode": "age_sex",
+"text": "This patient is a female pediatric patient."
+},
+{
+"meta7": [
+0.75,
+1.0,
+-1.0,
+9.8,
+73.0,
+2.0,
+0.0
+],
+"mode": "age_loc",
+"text": "This sound was recorded from the right anterior chest of a pediatric patient."
+},
+{
+"meta7": [
+0.75,
+1.0,
+-1.0,
+9.8,
+73.0,
+2.0,
+0.0
+],
+"mode": "age_dev",
+"text": "This sound was recorded from a pediatric patient, using a Meditron stethoscope."
+},
+{
+"meta7": [
+0.75,
+1.0,
+-1.0,
+9.8,
+73.0,
+2.0,
+0.0
+],
+"mode": "sex_loc",
+"text": "This sound was recorded from the right anterior chest of a female patient."
+},
+{
+"meta7": [
+0.75,
+1.0,
+-1.0,
+9.8,
+73.0,
+2.0,
+0.0
+],
+"mode": "sex_dev",
+"text": "This sound was recorded from a female patient, using a Meditron stethoscope."
+},
+{
+"meta7": [
+0.75,
+1.0,
+-1.0,
+9.8,
+73.0,
+2.0,
+0.0
+],
+"mode": "loc_dev",
+"text": "This sound was recorded from the right anterior chest with a Meditron stethoscope."
+},
+{
+"meta7": [
+0.75,
+1.0,
+-1.0,
+9.8,
+73.0,
+2.0,
+0.0
+],
+"mode": "age_sex_loc",
+"text": "This sound was recorded from the right anterior chest of a female pediatric patient."
+},
+{
+"meta7": [
+0.75,
+1.0,
+-1.0,
+9.8,
+73.0,
+2.0,
+0.0
+],
+"mode": "age_sex_dev",
+"text": "This sound was recorded from a female pediatric patient, using a Meditron stethoscope."
+},
+{
+"meta7": [
+0.75,
+1.0,
+-1.0,
+9.8,
+73.0,
+2.0,
+0.0
+],
+"mode": "age_loc_dev",
+"text": "This sound was recorded from the right anterior chest of a pediatric patient, using a Meditron stethoscope."
+},
+{
+"meta7": [
+0.75,
+1.0,
+-1.0,
+9.8,
+73.0,
+2.0,
+0.0
+],
+"mode": "sex_loc_dev",
+"text": "This sound was recorded from the right anterior chest of a female patient, using a Meditron stethoscope."
+},
+{
+"meta7": [
+0.75,
+1.0,
+-1.0,
+9.8,
+73.0,
+2.0,
+0.0
+],
+"mode": "all",
+"text": "This sound was recorded from the right anterior chest of a female pediatric patient, using a Meditron stethoscope."
+},
+{
+"meta7": [
+70.0,
+1.0,
+28.47,
+-1.0,
+-1.0,
+1.0,
+2.0
+],
+"mode": "age",
+"text": "This patient is an adult patient."
+},
+{
+"meta7": [
+70.0,
+1.0,
+28.47,
+-1.0,
+-1.0,
+1.0,
+2.0
+],
+"mode": "sex",
+"text": "This patient is a female patient."
+},
+{
+"meta7": [
+70.0,
+1.0,
+28.47,
+-1.0,
+-1.0,
+1.0,
+2.0
+],
+"mode": "loc",
+"text": "This sound was recorded from the left anterior chest."
+},
+{
+"meta7": [
+70.0,
+1.0,
+28.47,
+-1.0,
+-1.0,
+1.0,
+2.0
+],
+"mode": "dev",
+"text": "This sound was recorded with a Litt3200 stethoscope."
+},
+{
+"meta7": [
+70.0,
+1.0,
+28.47,
+-1.0,
+-1.0,
+1.0,
+2.0
+],
+"mode": "age_sex",
+"text": "This patient is an adult female patient."
+},
+{
+"meta7": [
+70.0,
+1.0,
+28.47,
+-1.0,
+-1.0,
+1.0,
+2.0
+],
+"mode": "age_loc",
+"text": "This sound was recorded from the left anterior chest of an adult patient."
+},
+{
+"meta7": [
+70.0,
+1.0,
+28.47,
+-1.0,
+-1.0,
+1.0,
+2.0
+],
+"mode": "age_dev",
+"text": "This sound was recorded from an adult patient, using a Litt3200 stethoscope."
+},
+{
+"meta7": [
+70.0,
+1.0,
+28.47,
+-1.0,
+-1.0,
+1.0,
+2.0
+],
+"mode": "sex_loc",
+"text": "This sound was recorded from the left anterior chest of a female patient."
+},
+{
+"meta7": [
+70.0,
+1.0,
+28.47,
+-1.0,
+-1.0,
+1.0,
+2.0
+],
+"mode": "sex_dev",
+"text": "This sound was recorded from a female patient, using a Litt3200 stethoscope."
+},
+{
+"meta7": [
+70.0,
+1.0,
+28.47,
+-1.0,
+-1.0,
+1.0,
+2.0
+],
+"mode": "loc_dev",
+"text": "This sound was recorded from the left anterior chest with a Litt3200 stethoscope."
+},
+{
+"meta7": [
+70.0,
+1.0,
+28.47,
+-1.0,
+-1.0,
+1.0,
+2.0
+],
+"mode": "age_sex_loc",
+"text": "This sound was recorded from the left anterior chest of an adult female patient."
+},
+{
+"meta7": [
+70.0,
+1.0,
+28.47,
+-1.0,
+-1.0,
+1.0,
+2.0
+],
+"mode": "age_sex_dev",
+"text": "This sound was recorded from an adult female patient, using a Litt3200 stethoscope."
+},
+{
+"meta7": [
+70.0,
+1.0,
+28.47,
+-1.0,
+-1.0,
+1.0,
+2.0
+],
+"mode": "age_loc_dev",
+"text": "This sound was recorded from the left anterior chest of an adult patient, using a Litt3200 stethoscope."
+},
+{
+"meta7": [
+70.0,
+1.0,
+28.47,
+-1.0,
+-1.0,
+1.0,
+2.0
+],
+"mode": "sex_loc_dev",
+"text": "This sound was recorded from the left anterior chest of a female patient, using a Litt3200 stethoscope."
+},
+{
+"meta7": [
+70.0,
+1.0,
+28.47,
+-1.0,
+-1.0,
+1.0,
+2.0
+],
+"mode": "all",
+"text": "This sound was recorded from the left anterior chest of an adult female patient, using a Litt3200 stethoscope."
+},
+{
+"meta7": [
+84.0,
+1.0,
+33.53,
+-1.0,
+-1.0,
+6.0,
+2.0
+],
+"mode": "age",
+"text": "This patient is an adult patient."
+},
+{
+"meta7": [
+84.0,
+1.0,
+33.53,
+-1.0,
+-1.0,
+6.0,
+2.0
+],
+"mode": "sex",
+"text": "This patient is a female patient."
+},
+{
+"meta7": [
+84.0,
+1.0,
+33.53,
+-1.0,
+-1.0,
+6.0,
+2.0
+],
+"mode": "loc",
+"text": "This sound was recorded from the right lateral chest."
+},
+{
+"meta7": [
+84.0,
+1.0,
+33.53,
+-1.0,
+-1.0,
+6.0,
+2.0
+],
+"mode": "dev",
+"text": "This sound was recorded with a Litt3200 stethoscope."
+},
+{
+"meta7": [
+84.0,
+1.0,
+33.53,
+-1.0,
+-1.0,
+6.0,
+2.0
+],
+"mode": "age_sex",
+"text": "This patient is an adult female patient."
+},
+{
+"meta7": [
+84.0,
+1.0,
+33.53,
+-1.0,
+-1.0,
+6.0,
+2.0
+],
+"mode": "age_loc",
+"text": "This sound was recorded from the right lateral chest of an adult patient."
+},
+{
+"meta7": [
+84.0,
+1.0,
+33.53,
+-1.0,
+-1.0,
+6.0,
+2.0
+],
+"mode": "age_dev",
+"text": "This sound was recorded from an adult patient, using a Litt3200 stethoscope."
+},
+{
+"meta7": [
+84.0,
+1.0,
+33.53,
+-1.0,
+-1.0,
+6.0,
+2.0
+],
+"mode": "sex_loc",
+"text": "This sound was recorded from the right lateral chest of a female patient."
+},
+{
+"meta7": [
+84.0,
+1.0,
+33.53,
+-1.0,
+-1.0,
+6.0,
+2.0
+],
+"mode": "sex_dev",
+"text": "This sound was recorded from a female patient, using a Litt3200 stethoscope."
+},
+{
+"meta7": [
+84.0,
+1.0,
+33.53,
+-1.0,
+-1.0,
+6.0,
+2.0
+],
+"mode": "loc_dev",
+"text": "This sound was recorded from the right lateral chest with a Litt3200 stethoscope."
+},
+{
+"meta7": [
+84.0,
+1.0,
+33.53,
+-1.0,
+-1.0,
+6.0,
+2.0
+],
+"mode": "age_sex_loc",
+"text": "This sound was recorded from the right lateral chest of an adult female patient."
+},
+{
+"meta7": [
+84.0,
+1.0,
+33.53,
+-1.0,
+-1.0,
+6.0,
+2.0
+],
+"mode": "age_sex_dev",
+"text": "This sound was recorded from an adult female patient, using a Litt3200 stethoscope."
+},
+{
+"meta7": [
+84.0,
+1.0,
+33.53,
+-1.0,
+-1.0,
+6.0,
+2.0
+],
+"mode": "age_loc_dev",
+"text": "This sound was recorded from the right lateral chest of an adult patient, using a Litt3200 stethoscope."
+},
+{
+"meta7": [
+84.0,
+1.0,
+33.53,
+-1.0,
+-1.0,
+6.0,
+2.0
+],
+"mode": "sex_loc_dev",
+"text": "This sound was recorded from the right lateral chest of a female patient, using a Litt3200 stethoscope."
+},
+{
+"meta7": [
+84.0,
+1.0,
+33.53,
+-1.0,
+-1.0,
+6.0,
+2.0
+],
+"mode": "all",
+"text": "This sound was recorded from the right lateral chest of an adult female patient, using a Litt3200 stethoscope."
+},
+{
+"meta7": [
+58.0,
+0.0,
+28.41,
+-1.0,
+-1.0,
+6.0,
+2.0
+],
+"mode": "age",
+"text": "This patient is an adult patient."
+},
+{
+"meta7": [
+58.0,
+0.0,
+28.41,
+-1.0,
+-1.0,
+6.0,
+2.0
+],
+"mode": "sex",
+"text": "This patient is a male patient."
+},
+{
+"meta7": [
+58.0,
+0.0,
+28.41,
+-1.0,
+-1.0,
+6.0,
+2.0
+],
+"mode": "loc",
+"text": "This sound was recorded from the right lateral chest."
+},
+{
+"meta7": [
+58.0,
+0.0,
+28.41,
+-1.0,
+-1.0,
+6.0,
+2.0
+],
+"mode": "dev",
+"text": "This sound was recorded with a Litt3200 stethoscope."
+},
+{
+"meta7": [
+58.0,
+0.0,
+28.41,
+-1.0,
+-1.0,
+6.0,
+2.0
+],
+"mode": "age_sex",
+"text": "This patient is an adult male patient."
+},
+{
+"meta7": [
+58.0,
+0.0,
+28.41,
+-1.0,
+-1.0,
+6.0,
+2.0
+],
+"mode": "age_loc",
+"text": "This sound was recorded from the right lateral chest of an adult patient."
+},
+{
+"meta7": [
+58.0,
+0.0,
+28.41,
+-1.0,
+-1.0,
+6.0,
+2.0
+],
+"mode": "age_dev",
+"text": "This sound was recorded from an adult patient, using a Litt3200 stethoscope."
+},
+{
+"meta7": [
+58.0,
+0.0,
+28.41,
+-1.0,
+-1.0,
+6.0,
+2.0
+],
+"mode": "sex_loc",
+"text": "This sound was recorded from the right lateral chest of a male patient."
+},
+{
+"meta7": [
+58.0,
+0.0,
+28.41,
+-1.0,
+-1.0,
+6.0,
+2.0
+],
+"mode": "sex_dev",
+"text": "This sound was recorded from a male patient, using a Litt3200 stethoscope."
+},
+{
+"meta7": [
+58.0,
+0.0,
+28.41,
+-1.0,
+-1.0,
+6.0,
+2.0
+],
+"mode": "loc_dev",
+"text": "This sound was recorded from the right lateral chest with a Litt3200 stethoscope."
+},
+{
+"meta7": [
+58.0,
+0.0,
+28.41,
+-1.0,
+-1.0,
+6.0,
+2.0
+],
+"mode": "age_sex_loc",
+"text": "This sound was recorded from the right lateral chest of an adult male patient."
+},
+{
+"meta7": [
+58.0,
+0.0,
+28.41,
+-1.0,
+-1.0,
+6.0,
+2.0
+],
+"mode": "age_sex_dev",
+"text": "This sound was recorded from an adult male patient, using a Litt3200 stethoscope."
+},
+{
+"meta7": [
+58.0,
+0.0,
+28.41,
+-1.0,
+-1.0,
+6.0,
+2.0
+],
+"mode": "age_loc_dev",
+"text": "This sound was recorded from the right lateral chest of an adult patient, using a Litt3200 stethoscope."
+},
+{
+"meta7": [
+58.0,
+0.0,
+28.41,
+-1.0,
+-1.0,
+6.0,
+2.0
+],
+"mode": "sex_loc_dev",
+"text": "This sound was recorded from the right lateral chest of a male patient, using a Litt3200 stethoscope."
+},
+{
+"meta7": [
+58.0,
+0.0,
+28.41,
+-1.0,
+-1.0,
+6.0,
+2.0
+],
+"mode": "all",
+"text": "This sound was recorded from the right lateral chest of an adult male patient, using a Litt3200 stethoscope."
+},
+{
+"meta7": [
+81.0,
+0.0,
+36.76,
+-1.0,
+-1.0,
+4.0,
+2.0
+],
+"mode": "age",
+"text": "This patient is an adult patient."
+},
+{
+"meta7": [
+81.0,
+0.0,
+36.76,
+-1.0,
+-1.0,
+4.0,
+2.0
+],
+"mode": "sex",
+"text": "This patient is a male patient."
+},
+{
+"meta7": [
+81.0,
+0.0,
+36.76,
+-1.0,
+-1.0,
+4.0,
+2.0
+],
+"mode": "loc",
+"text": "This sound was recorded from the right posterior chest."
+},
+{
+"meta7": [
+81.0,
+0.0,
+36.76,
+-1.0,
+-1.0,
+4.0,
+2.0
+],
+"mode": "dev",
+"text": "This sound was recorded with a Litt3200 stethoscope."
+},
+{
+"meta7": [
+81.0,
+0.0,
+36.76,
+-1.0,
+-1.0,
+4.0,
+2.0
+],
+"mode": "age_sex",
+"text": "This patient is an adult male patient."
+},
+{
+"meta7": [
+81.0,
+0.0,
+36.76,
+-1.0,
+-1.0,
+4.0,
+2.0
+],
+"mode": "age_loc",
+"text": "This sound was recorded from the right posterior chest of an adult patient."
+},
+{
+"meta7": [
+81.0,
+0.0,
+36.76,
+-1.0,
+-1.0,
+4.0,
+2.0
+],
+"mode": "age_dev",
+"text": "This sound was recorded from an adult patient, using a Litt3200 stethoscope."
+},
+{
+"meta7": [
+81.0,
+0.0,
+36.76,
+-1.0,
+-1.0,
+4.0,
+2.0
+],
+"mode": "sex_loc",
+"text": "This sound was recorded from the right posterior chest of a male patient."
+},
+{
+"meta7": [
+81.0,
+0.0,
+36.76,
+-1.0,
+-1.0,
+4.0,
+2.0
+],
+"mode": "sex_dev",
+"text": "This sound was recorded from a male patient, using a Litt3200 stethoscope."
+},
+{
+"meta7": [
+81.0,
+0.0,
+36.76,
+-1.0,
+-1.0,
+4.0,
+2.0
+],
+"mode": "loc_dev",
+"text": "This sound was recorded from the right posterior chest with a Litt3200 stethoscope."
+},
+{
+"meta7": [
+81.0,
+0.0,
+36.76,
+-1.0,
+-1.0,
+4.0,
+2.0
+],
+"mode": "age_sex_loc",
+"text": "This sound was recorded from the right posterior chest of an adult male patient."
+},
+{
+"meta7": [
+81.0,
+0.0,
+36.76,
+-1.0,
+-1.0,
+4.0,
+2.0
+],
+"mode": "age_sex_dev",
+"text": "This sound was recorded from an adult male patient, using a Litt3200 stethoscope."
+},
+{
+"meta7": [
+81.0,
+0.0,
+36.76,
+-1.0,
+-1.0,
+4.0,
+2.0
+],
+"mode": "age_loc_dev",
+"text": "This sound was recorded from the right posterior chest of an adult patient, using a Litt3200 stethoscope."
+},
+{
+"meta7": [
+81.0,
+0.0,
+36.76,
+-1.0,
+-1.0,
+4.0,
+2.0
+],
+"mode": "sex_loc_dev",
+"text": "This sound was recorded from the right posterior chest of a male patient, using a Litt3200 stethoscope."
+},
+{
+"meta7": [
+81.0,
+0.0,
+36.76,
+-1.0,
+-1.0,
+4.0,
+2.0
+],
+"mode": "all",
+"text": "This sound was recorded from the right posterior chest of an adult male patient, using a Litt3200 stethoscope."
+},
+{
+"meta7": [
+5.0,
+0.0,
+-1.0,
+25.0,
+125.0,
+1.0,
+0.0
+],
+"mode": "age",
+"text": "This patient is a pediatric patient."
+},
+{
+"meta7": [
+5.0,
+0.0,
+-1.0,
+25.0,
+125.0,
+1.0,
+0.0
+],
+"mode": "sex",
+"text": "This patient is a male patient."
+},
+{
+"meta7": [
+5.0,
+0.0,
+-1.0,
+25.0,
+125.0,
+1.0,
+0.0
+],
+"mode": "loc",
+"text": "This sound was recorded from the left anterior chest."
+},
+{
+"meta7": [
+5.0,
+0.0,
+-1.0,
+25.0,
+125.0,
+1.0,
+0.0
+],
+"mode": "dev",
+"text": "This sound was recorded with a Meditron stethoscope."
+},
+{
+"meta7": [
+5.0,
+0.0,
+-1.0,
+25.0,
+125.0,
+1.0,
+0.0
+],
+"mode": "age_sex",
+"text": "This patient is a male pediatric patient."
+},
+{
+"meta7": [
+5.0,
+0.0,
+-1.0,
+25.0,
+125.0,
+1.0,
+0.0
+],
+"mode": "age_loc",
+"text": "This sound was recorded from the left anterior chest of a pediatric patient."
+},
+{
+"meta7": [
+5.0,
+0.0,
+-1.0,
+25.0,
+125.0,
+1.0,
+0.0
+],
+"mode": "age_dev",
+"text": "This sound was recorded from a pediatric patient, using a Meditron stethoscope."
+},
+{
+"meta7": [
+5.0,
+0.0,
+-1.0,
+25.0,
+125.0,
+1.0,
+0.0
+],
+"mode": "sex_loc",
+"text": "This sound was recorded from the left anterior chest of a male patient."
+},
+{
+"meta7": [
+5.0,
+0.0,
+-1.0,
+25.0,
+125.0,
+1.0,
+0.0
+],
+"mode": "sex_dev",
+"text": "This sound was recorded from a male patient, using a Meditron stethoscope."
+},
+{
+"meta7": [
+5.0,
+0.0,
+-1.0,
+25.0,
+125.0,
+1.0,
+0.0
+],
+"mode": "loc_dev",
+"text": "This sound was recorded from the left anterior chest with a Meditron stethoscope."
+},
+{
+"meta7": [
+5.0,
+0.0,
+-1.0,
+25.0,
+125.0,
+1.0,
+0.0
+],
+"mode": "age_sex_loc",
+"text": "This sound was recorded from the left anterior chest of a male pediatric patient."
+},
+{
+"meta7": [
+5.0,
+0.0,
+-1.0,
+25.0,
+125.0,
+1.0,
+0.0
+],
+"mode": "age_sex_dev",
+"text": "This sound was recorded from a male pediatric patient, using a Meditron stethoscope."
+},
+{
+"meta7": [
+5.0,
+0.0,
+-1.0,
+25.0,
+125.0,
+1.0,
+0.0
+],
+"mode": "age_loc_dev",
+"text": "This sound was recorded from the left anterior chest of a pediatric patient, using a Meditron stethoscope."
+},
+{
+"meta7": [
+5.0,
+0.0,
+-1.0,
+25.0,
+125.0,
+1.0,
+0.0
+],
+"mode": "sex_loc_dev",
+"text": "This sound was recorded from the left anterior chest of a male patient, using a Meditron stethoscope."
+},
+{
+"meta7": [
+5.0,
+0.0,
+-1.0,
+25.0,
+125.0,
+1.0,
+0.0
+],
+"mode": "all",
+"text": "This sound was recorded from the left anterior chest of a male pediatric patient, using a Meditron stethoscope."
+},
+{
+"meta7": [
+65.0,
+0.0,
+29.07,
+-1.0,
+-1.0,
+1.0,
+2.0
+],
+"mode": "age",
+"text": "This patient is an adult patient."
+},
+{
+"meta7": [
+65.0,
+0.0,
+29.07,
+-1.0,
+-1.0,
+1.0,
+2.0
+],
+"mode": "sex",
+"text": "This patient is a male patient."
+},
+{
+"meta7": [
+65.0,
+0.0,
+29.07,
+-1.0,
+-1.0,
+1.0,
+2.0
+],
+"mode": "loc",
+"text": "This sound was recorded from the left anterior chest."
+},
+{
+"meta7": [
+65.0,
+0.0,
+29.07,
+-1.0,
+-1.0,
+1.0,
+2.0
+],
+"mode": "dev",
+"text": "This sound was recorded with a Litt3200 stethoscope."
+},
+{
+"meta7": [
+65.0,
+0.0,
+29.07,
+-1.0,
+-1.0,
+1.0,
+2.0
+],
+"mode": "age_sex",
+"text": "This patient is an adult male patient."
+},
+{
+"meta7": [
+65.0,
+0.0,
+29.07,
+-1.0,
+-1.0,
+1.0,
+2.0
+],
+"mode": "age_loc",
+"text": "This sound was recorded from the left anterior chest of an adult patient."
+},
+{
+"meta7": [
+65.0,
+0.0,
+29.07,
+-1.0,
+-1.0,
+1.0,
+2.0
+],
+"mode": "age_dev",
+"text": "This sound was recorded from an adult patient, using a Litt3200 stethoscope."
+},
+{
+"meta7": [
+65.0,
+0.0,
+29.07,
+-1.0,
+-1.0,
+1.0,
+2.0
+],
+"mode": "sex_loc",
+"text": "This sound was recorded from the left anterior chest of a male patient."
+},
+{
+"meta7": [
+65.0,
+0.0,
+29.07,
+-1.0,
+-1.0,
+1.0,
+2.0
+],
+"mode": "sex_dev",
+"text": "This sound was recorded from a male patient, using a Litt3200 stethoscope."
+},
+{
+"meta7": [
+65.0,
+0.0,
+29.07,
+-1.0,
+-1.0,
+1.0,
+2.0
+],
+"mode": "loc_dev",
+"text": "This sound was recorded from the left anterior chest with a Litt3200 stethoscope."
+},
+{
+"meta7": [
+65.0,
+0.0,
+29.07,
+-1.0,
+-1.0,
+1.0,
+2.0
+],
+"mode": "age_sex_loc",
+"text": "This sound was recorded from the left anterior chest of an adult male patient."
+},
+{
+"meta7": [
+65.0,
+0.0,
+29.07,
+-1.0,
+-1.0,
+1.0,
+2.0
+],
+"mode": "age_sex_dev",
+"text": "This sound was recorded from an adult male patient, using a Litt3200 stethoscope."
+},
+{
+"meta7": [
+65.0,
+0.0,
+29.07,
+-1.0,
+-1.0,
+1.0,
+2.0
+],
+"mode": "age_loc_dev",
+"text": "This sound was recorded from the left anterior chest of an adult patient, using a Litt3200 stethoscope."
+},
+{
+"meta7": [
+65.0,
+0.0,
+29.07,
+-1.0,
+-1.0,
+1.0,
+2.0
+],
+"mode": "sex_loc_dev",
+"text": "This sound was recorded from the left anterior chest of a male patient, using a Litt3200 stethoscope."
+},
+{
+"meta7": [
+65.0,
+0.0,
+29.07,
+-1.0,
+-1.0,
+1.0,
+2.0
+],
+"mode": "all",
+"text": "This sound was recorded from the left anterior chest of an adult male patient, using a Litt3200 stethoscope."
+},
+{
+"meta7": [
+1.0,
+1.0,
+-1.0,
+10.18,
+80.0,
+1.0,
+0.0
+],
+"mode": "age",
+"text": "This patient is a pediatric patient."
+},
+{
+"meta7": [
+1.0,
+1.0,
+-1.0,
+10.18,
+80.0,
+1.0,
+0.0
+],
+"mode": "sex",
+"text": "This patient is a female patient."
+},
+{
+"meta7": [
+1.0,
+1.0,
+-1.0,
+10.18,
+80.0,
+1.0,
+0.0
+],
+"mode": "loc",
+"text": "This sound was recorded from the left anterior chest."
+},
+{
+"meta7": [
+1.0,
+1.0,
+-1.0,
+10.18,
+80.0,
+1.0,
+0.0
+],
+"mode": "dev",
+"text": "This sound was recorded with a Meditron stethoscope."
+},
+{
+"meta7": [
+1.0,
+1.0,
+-1.0,
+10.18,
+80.0,
+1.0,
+0.0
+],
+"mode": "age_sex",
+"text": "This patient is a female pediatric patient."
+},
+{
+"meta7": [
+1.0,
+1.0,
+-1.0,
+10.18,
+80.0,
+1.0,
+0.0
+],
+"mode": "age_loc",
+"text": "This sound was recorded from the left anterior chest of a pediatric patient."
+},
+{
+"meta7": [
+1.0,
+1.0,
+-1.0,
+10.18,
+80.0,
+1.0,
+0.0
+],
+"mode": "age_dev",
+"text": "This sound was recorded from a pediatric patient, using a Meditron stethoscope."
+},
+{
+"meta7": [
+1.0,
+1.0,
+-1.0,
+10.18,
+80.0,
+1.0,
+0.0
+],
+"mode": "sex_loc",
+"text": "This sound was recorded from the left anterior chest of a female patient."
+},
+{
+"meta7": [
+1.0,
+1.0,
+-1.0,
+10.18,
+80.0,
+1.0,
+0.0
+],
+"mode": "sex_dev",
+"text": "This sound was recorded from a female patient, using a Meditron stethoscope."
+},
+{
+"meta7": [
+1.0,
+1.0,
+-1.0,
+10.18,
+80.0,
+1.0,
+0.0
+],
+"mode": "loc_dev",
+"text": "This sound was recorded from the left anterior chest with a Meditron stethoscope."
+},
+{
+"meta7": [
+1.0,
+1.0,
+-1.0,
+10.18,
+80.0,
+1.0,
+0.0
+],
+"mode": "age_sex_loc",
+"text": "This sound was recorded from the left anterior chest of a female pediatric patient."
+},
+{
+"meta7": [
+1.0,
+1.0,
+-1.0,
+10.18,
+80.0,
+1.0,
+0.0
+],
+"mode": "age_sex_dev",
+"text": "This sound was recorded from a female pediatric patient, using a Meditron stethoscope."
+},
+{
+"meta7": [
+1.0,
+1.0,
+-1.0,
+10.18,
+80.0,
+1.0,
+0.0
+],
+"mode": "age_loc_dev",
+"text": "This sound was recorded from the left anterior chest of a pediatric patient, using a Meditron stethoscope."
+},
+{
+"meta7": [
+1.0,
+1.0,
+-1.0,
+10.18,
+80.0,
+1.0,
+0.0
+],
+"mode": "sex_loc_dev",
+"text": "This sound was recorded from the left anterior chest of a female patient, using a Meditron stethoscope."
+},
+{
+"meta7": [
+1.0,
+1.0,
+-1.0,
+10.18,
+80.0,
+1.0,
+0.0
+],
+"mode": "all",
+"text": "This sound was recorded from the left anterior chest of a female pediatric patient, using a Meditron stethoscope."
+},
+{
+"meta7": [
+68.0,
+0.0,
+27.4,
+-1.0,
+-1.0,
+3.0,
+3.0
+],
+"mode": "age",
+"text": "This patient is an adult patient."
+},
+{
+"meta7": [
+68.0,
+0.0,
+27.4,
+-1.0,
+-1.0,
+3.0,
+3.0
+],
+"mode": "sex",
+"text": "This patient is a male patient."
+},
+{
+"meta7": [
+68.0,
+0.0,
+27.4,
+-1.0,
+-1.0,
+3.0,
+3.0
+],
+"mode": "loc",
+"text": "This sound was recorded from the left posterior chest."
+},
+{
+"meta7": [
+68.0,
+0.0,
+27.4,
+-1.0,
+-1.0,
+3.0,
+3.0
+],
+"mode": "dev",
+"text": "This sound was recorded with an AKGC417L microphone."
+},
+{
+"meta7": [
+68.0,
+0.0,
+27.4,
+-1.0,
+-1.0,
+3.0,
+3.0
+],
+"mode": "age_sex",
+"text": "This patient is an adult male patient."
+},
+{
+"meta7": [
+68.0,
+0.0,
+27.4,
+-1.0,
+-1.0,
+3.0,
+3.0
+],
+"mode": "age_loc",
+"text": "This sound was recorded from the left posterior chest of an adult patient."
+},
+{
+"meta7": [
+68.0,
+0.0,
+27.4,
+-1.0,
+-1.0,
+3.0,
+3.0
+],
+"mode": "age_dev",
+"text": "This sound was recorded from an adult patient, using an AKGC417L microphone."
+},
+{
+"meta7": [
+68.0,
+0.0,
+27.4,
+-1.0,
+-1.0,
+3.0,
+3.0
+],
+"mode": "sex_loc",
+"text": "This sound was recorded from the left posterior chest of a male patient."
+},
+{
+"meta7": [
+68.0,
+0.0,
+27.4,
+-1.0,
+-1.0,
+3.0,
+3.0
+],
+"mode": "sex_dev",
+"text": "This sound was recorded from a male patient, using an AKGC417L microphone."
+},
+{
+"meta7": [
+68.0,
+0.0,
+27.4,
+-1.0,
+-1.0,
+3.0,
+3.0
+],
+"mode": "loc_dev",
+"text": "This sound was recorded from the left posterior chest with an AKGC417L microphone."
+},
+{
+"meta7": [
+68.0,
+0.0,
+27.4,
+-1.0,
+-1.0,
+3.0,
+3.0
+],
+"mode": "age_sex_loc",
+"text": "This sound was recorded from the left posterior chest of an adult male patient."
+},
+{
+"meta7": [
+68.0,
+0.0,
+27.4,
+-1.0,
+-1.0,
+3.0,
+3.0
+],
+"mode": "age_sex_dev",
+"text": "This sound was recorded from an adult male patient, using an AKGC417L microphone."
+},
+{
+"meta7": [
+68.0,
+0.0,
+27.4,
+-1.0,
+-1.0,
+3.0,
+3.0
+],
+"mode": "age_loc_dev",
+"text": "This sound was recorded from the left posterior chest of an adult patient, using an AKGC417L microphone."
+},
+{
+"meta7": [
+68.0,
+0.0,
+27.4,
+-1.0,
+-1.0,
+3.0,
+3.0
+],
+"mode": "sex_loc_dev",
+"text": "This sound was recorded from the left posterior chest of a male patient, using an AKGC417L microphone."
+},
+{
+"meta7": [
+68.0,
+0.0,
+27.4,
+-1.0,
+-1.0,
+3.0,
+3.0
+],
+"mode": "all",
+"text": "This sound was recorded from the left posterior chest of an adult male patient, using an AKGC417L microphone."
+},
+{
+"meta7": [
+5.0,
+0.0,
+-1.0,
+16.2,
+110.0,
+2.0,
+0.0
+],
+"mode": "age",
+"text": "This patient is a pediatric patient."
+},
+{
+"meta7": [
+5.0,
+0.0,
+-1.0,
+16.2,
+110.0,
+2.0,
+0.0
+],
+"mode": "sex",
+"text": "This patient is a male patient."
+},
+{
+"meta7": [
+5.0,
+0.0,
+-1.0,
+16.2,
+110.0,
+2.0,
+0.0
+],
+"mode": "loc",
+"text": "This sound was recorded from the right anterior chest."
+},
+{
+"meta7": [
+5.0,
+0.0,
+-1.0,
+16.2,
+110.0,
+2.0,
+0.0
+],
+"mode": "dev",
+"text": "This sound was recorded with a Meditron stethoscope."
+},
+{
+"meta7": [
+5.0,
+0.0,
+-1.0,
+16.2,
+110.0,
+2.0,
+0.0
+],
+"mode": "age_sex",
+"text": "This patient is a male pediatric patient."
+},
+{
+"meta7": [
+5.0,
+0.0,
+-1.0,
+16.2,
+110.0,
+2.0,
+0.0
+],
+"mode": "age_loc",
+"text": "This sound was recorded from the right anterior chest of a pediatric patient."
+},
+{
+"meta7": [
+5.0,
+0.0,
+-1.0,
+16.2,
+110.0,
+2.0,
+0.0
+],
+"mode": "age_dev",
+"text": "This sound was recorded from a pediatric patient, using a Meditron stethoscope."
+},
+{
+"meta7": [
+5.0,
+0.0,
+-1.0,
+16.2,
+110.0,
+2.0,
+0.0
+],
+"mode": "sex_loc",
+"text": "This sound was recorded from the right anterior chest of a male patient."
+},
+{
+"meta7": [
+5.0,
+0.0,
+-1.0,
+16.2,
+110.0,
+2.0,
+0.0
+],
+"mode": "sex_dev",
+"text": "This sound was recorded from a male patient, using a Meditron stethoscope."
+},
+{
+"meta7": [
+5.0,
+0.0,
+-1.0,
+16.2,
+110.0,
+2.0,
+0.0
+],
+"mode": "loc_dev",
+"text": "This sound was recorded from the right anterior chest with a Meditron stethoscope."
+},
+{
+"meta7": [
+5.0,
+0.0,
+-1.0,
+16.2,
+110.0,
+2.0,
+0.0
+],
+"mode": "age_sex_loc",
+"text": "This sound was recorded from the right anterior chest of a male pediatric patient."
+},
+{
+"meta7": [
+5.0,
+0.0,
+-1.0,
+16.2,
+110.0,
+2.0,
+0.0
+],
+"mode": "age_sex_dev",
+"text": "This sound was recorded from a male pediatric patient, using a Meditron stethoscope."
+},
+{
+"meta7": [
+5.0,
+0.0,
+-1.0,
+16.2,
+110.0,
+2.0,
+0.0
+],
+"mode": "age_loc_dev",
+"text": "This sound was recorded from the right anterior chest of a pediatric patient, using a Meditron stethoscope."
+},
+{
+"meta7": [
+5.0,
+0.0,
+-1.0,
+16.2,
+110.0,
+2.0,
+0.0
+],
+"mode": "sex_loc_dev",
+"text": "This sound was recorded from the right anterior chest of a male patient, using a Meditron stethoscope."
+},
+{
+"meta7": [
+5.0,
+0.0,
+-1.0,
+16.2,
+110.0,
+2.0,
+0.0
+],
+"mode": "all",
+"text": "This sound was recorded from the right anterior chest of a male pediatric patient, using a Meditron stethoscope."
+},
+{
+"meta7": [
+69.0,
+0.0,
+23.4,
+-1.0,
+-1.0,
+6.0,
+3.0
+],
+"mode": "age",
+"text": "This patient is an adult patient."
+},
+{
+"meta7": [
+69.0,
+0.0,
+23.4,
+-1.0,
+-1.0,
+6.0,
+3.0
+],
+"mode": "sex",
+"text": "This patient is a male patient."
+},
+{
+"meta7": [
+69.0,
+0.0,
+23.4,
+-1.0,
+-1.0,
+6.0,
+3.0
+],
+"mode": "loc",
+"text": "This sound was recorded from the right lateral chest."
+},
+{
+"meta7": [
+69.0,
+0.0,
+23.4,
+-1.0,
+-1.0,
+6.0,
+3.0
+],
+"mode": "dev",
+"text": "This sound was recorded with an AKGC417L microphone."
+},
+{
+"meta7": [
+69.0,
+0.0,
+23.4,
+-1.0,
+-1.0,
+6.0,
+3.0
+],
+"mode": "age_sex",
+"text": "This patient is an adult male patient."
+},
+{
+"meta7": [
+69.0,
+0.0,
+23.4,
+-1.0,
+-1.0,
+6.0,
+3.0
+],
+"mode": "age_loc",
+"text": "This sound was recorded from the right lateral chest of an adult patient."
+},
+{
+"meta7": [
+69.0,
+0.0,
+23.4,
+-1.0,
+-1.0,
+6.0,
+3.0
+],
+"mode": "age_dev",
+"text": "This sound was recorded from an adult patient, using an AKGC417L microphone."
+},
+{
+"meta7": [
+69.0,
+0.0,
+23.4,
+-1.0,
+-1.0,
+6.0,
+3.0
+],
+"mode": "sex_loc",
+"text": "This sound was recorded from the right lateral chest of a male patient."
+},
+{
+"meta7": [
+69.0,
+0.0,
+23.4,
+-1.0,
+-1.0,
+6.0,
+3.0
+],
+"mode": "sex_dev",
+"text": "This sound was recorded from a male patient, using an AKGC417L microphone."
+},
+{
+"meta7": [
+69.0,
+0.0,
+23.4,
+-1.0,
+-1.0,
+6.0,
+3.0
+],
+"mode": "loc_dev",
+"text": "This sound was recorded from the right lateral chest with an AKGC417L microphone."
+},
+{
+"meta7": [
+69.0,
+0.0,
+23.4,
+-1.0,
+-1.0,
+6.0,
+3.0
+],
+"mode": "age_sex_loc",
+"text": "This sound was recorded from the right lateral chest of an adult male patient."
+},
+{
+"meta7": [
+69.0,
+0.0,
+23.4,
+-1.0,
+-1.0,
+6.0,
+3.0
+],
+"mode": "age_sex_dev",
+"text": "This sound was recorded from an adult male patient, using an AKGC417L microphone."
+},
+{
+"meta7": [
+69.0,
+0.0,
+23.4,
+-1.0,
+-1.0,
+6.0,
+3.0
+],
+"mode": "age_loc_dev",
+"text": "This sound was recorded from the right lateral chest of an adult patient, using an AKGC417L microphone."
+},
+{
+"meta7": [
+69.0,
+0.0,
+23.4,
+-1.0,
+-1.0,
+6.0,
+3.0
+],
+"mode": "sex_loc_dev",
+"text": "This sound was recorded from the right lateral chest of a male patient, using an AKGC417L microphone."
+},
+{
+"meta7": [
+69.0,
+0.0,
+23.4,
+-1.0,
+-1.0,
+6.0,
+3.0
+],
+"mode": "all",
+"text": "This sound was recorded from the right lateral chest of an adult male patient, using an AKGC417L microphone."
+},
+{
+"meta7": [
+77.0,
+0.0,
+25.7,
+-1.0,
+-1.0,
+2.0,
+3.0
+],
+"mode": "age",
+"text": "This patient is an adult patient."
+},
+{
+"meta7": [
+77.0,
+0.0,
+25.7,
+-1.0,
+-1.0,
+2.0,
+3.0
+],
+"mode": "sex",
+"text": "This patient is a male patient."
+},
+{
+"meta7": [
+77.0,
+0.0,
+25.7,
+-1.0,
+-1.0,
+2.0,
+3.0
+],
+"mode": "loc",
+"text": "This sound was recorded from the right anterior chest."
+},
+{
+"meta7": [
+77.0,
+0.0,
+25.7,
+-1.0,
+-1.0,
+2.0,
+3.0
+],
+"mode": "dev",
+"text": "This sound was recorded with an AKGC417L microphone."
+},
+{
+"meta7": [
+77.0,
+0.0,
+25.7,
+-1.0,
+-1.0,
+2.0,
+3.0
+],
+"mode": "age_sex",
+"text": "This patient is an adult male patient."
+},
+{
+"meta7": [
+77.0,
+0.0,
+25.7,
+-1.0,
+-1.0,
+2.0,
+3.0
+],
+"mode": "age_loc",
+"text": "This sound was recorded from the right anterior chest of an adult patient."
+},
+{
+"meta7": [
+77.0,
+0.0,
+25.7,
+-1.0,
+-1.0,
+2.0,
+3.0
+],
+"mode": "age_dev",
+"text": "This sound was recorded from an adult patient, using an AKGC417L microphone."
+},
+{
+"meta7": [
+77.0,
+0.0,
+25.7,
+-1.0,
+-1.0,
+2.0,
+3.0
+],
+"mode": "sex_loc",
+"text": "This sound was recorded from the right anterior chest of a male patient."
+},
+{
+"meta7": [
+77.0,
+0.0,
+25.7,
+-1.0,
+-1.0,
+2.0,
+3.0
+],
+"mode": "sex_dev",
+"text": "This sound was recorded from a male patient, using an AKGC417L microphone."
+},
+{
+"meta7": [
+77.0,
+0.0,
+25.7,
+-1.0,
+-1.0,
+2.0,
+3.0
+],
+"mode": "loc_dev",
+"text": "This sound was recorded from the right anterior chest with an AKGC417L microphone."
+},
+{
+"meta7": [
+77.0,
+0.0,
+25.7,
+-1.0,
+-1.0,
+2.0,
+3.0
+],
+"mode": "age_sex_loc",
+"text": "This sound was recorded from the right anterior chest of an adult male patient."
+},
+{
+"meta7": [
+77.0,
+0.0,
+25.7,
+-1.0,
+-1.0,
+2.0,
+3.0
+],
+"mode": "age_sex_dev",
+"text": "This sound was recorded from an adult male patient, using an AKGC417L microphone."
+},
+{
+"meta7": [
+77.0,
+0.0,
+25.7,
+-1.0,
+-1.0,
+2.0,
+3.0
+],
+"mode": "age_loc_dev",
+"text": "This sound was recorded from the right anterior chest of an adult patient, using an AKGC417L microphone."
+},
+{
+"meta7": [
+77.0,
+0.0,
+25.7,
+-1.0,
+-1.0,
+2.0,
+3.0
+],
+"mode": "sex_loc_dev",
+"text": "This sound was recorded from the right anterior chest of a male patient, using an AKGC417L microphone."
+},
+{
+"meta7": [
+77.0,
+0.0,
+25.7,
+-1.0,
+-1.0,
+2.0,
+3.0
+],
+"mode": "all",
+"text": "This sound was recorded from the right anterior chest of an adult male patient, using an AKGC417L microphone."
+},
+{
+"meta7": [
+0.67,
+0.0,
+-1.0,
+9.5,
+70.0,
+6.0,
+0.0
+],
+"mode": "age",
+"text": "This patient is a pediatric patient."
+},
+{
+"meta7": [
+0.67,
+0.0,
+-1.0,
+9.5,
+70.0,
+6.0,
+0.0
+],
+"mode": "sex",
+"text": "This patient is a male patient."
+},
+{
+"meta7": [
+0.67,
+0.0,
+-1.0,
+9.5,
+70.0,
+6.0,
+0.0
+],
+"mode": "loc",
+"text": "This sound was recorded from the right lateral chest."
+},
+{
+"meta7": [
+0.67,
+0.0,
+-1.0,
+9.5,
+70.0,
+6.0,
+0.0
+],
+"mode": "dev",
+"text": "This sound was recorded with a Meditron stethoscope."
+},
+{
+"meta7": [
+0.67,
+0.0,
+-1.0,
+9.5,
+70.0,
+6.0,
+0.0
+],
+"mode": "age_sex",
+"text": "This patient is a male pediatric patient."
+},
+{
+"meta7": [
+0.67,
+0.0,
+-1.0,
+9.5,
+70.0,
+6.0,
+0.0
+],
+"mode": "age_loc",
+"text": "This sound was recorded from the right lateral chest of a pediatric patient."
+},
+{
+"meta7": [
+0.67,
+0.0,
+-1.0,
+9.5,
+70.0,
+6.0,
+0.0
+],
+"mode": "age_dev",
+"text": "This sound was recorded from a pediatric patient, using a Meditron stethoscope."
+},
+{
+"meta7": [
+0.67,
+0.0,
+-1.0,
+9.5,
+70.0,
+6.0,
+0.0
+],
+"mode": "sex_loc",
+"text": "This sound was recorded from the right lateral chest of a male patient."
+},
+{
+"meta7": [
+0.67,
+0.0,
+-1.0,
+9.5,
+70.0,
+6.0,
+0.0
+],
+"mode": "sex_dev",
+"text": "This sound was recorded from a male patient, using a Meditron stethoscope."
+},
+{
+"meta7": [
+0.67,
+0.0,
+-1.0,
+9.5,
+70.0,
+6.0,
+0.0
+],
+"mode": "loc_dev",
+"text": "This sound was recorded from the right lateral chest with a Meditron stethoscope."
+},
+{
+"meta7": [
+0.67,
+0.0,
+-1.0,
+9.5,
+70.0,
+6.0,
+0.0
+],
+"mode": "age_sex_loc",
+"text": "This sound was recorded from the right lateral chest of a male pediatric patient."
+},
+{
+"meta7": [
+0.67,
+0.0,
+-1.0,
+9.5,
+70.0,
+6.0,
+0.0
+],
+"mode": "age_sex_dev",
+"text": "This sound was recorded from a male pediatric patient, using a Meditron stethoscope."
+},
+{
+"meta7": [
+0.67,
+0.0,
+-1.0,
+9.5,
+70.0,
+6.0,
+0.0
+],
+"mode": "age_loc_dev",
+"text": "This sound was recorded from the right lateral chest of a pediatric patient, using a Meditron stethoscope."
+},
+{
+"meta7": [
+0.67,
+0.0,
+-1.0,
+9.5,
+70.0,
+6.0,
+0.0
+],
+"mode": "sex_loc_dev",
+"text": "This sound was recorded from the right lateral chest of a male patient, using a Meditron stethoscope."
+},
+{
+"meta7": [
+0.67,
+0.0,
+-1.0,
+9.5,
+70.0,
+6.0,
+0.0
+],
+"mode": "all",
+"text": "This sound was recorded from the right lateral chest of a male pediatric patient, using a Meditron stethoscope."
+},
+{
+"meta7": [
+75.0,
+0.0,
+28.4,
+-1.0,
+-1.0,
+5.0,
+3.0
+],
+"mode": "age",
+"text": "This patient is an adult patient."
+},
+{
+"meta7": [
+75.0,
+0.0,
+28.4,
+-1.0,
+-1.0,
+5.0,
+3.0
+],
+"mode": "sex",
+"text": "This patient is a male patient."
+},
+{
+"meta7": [
+75.0,
+0.0,
+28.4,
+-1.0,
+-1.0,
+5.0,
+3.0
+],
+"mode": "loc",
+"text": "This sound was recorded from the left lateral chest."
+},
+{
+"meta7": [
+75.0,
+0.0,
+28.4,
+-1.0,
+-1.0,
+5.0,
+3.0
+],
+"mode": "dev",
+"text": "This sound was recorded with an AKGC417L microphone."
+},
+{
+"meta7": [
+75.0,
+0.0,
+28.4,
+-1.0,
+-1.0,
+5.0,
+3.0
+],
+"mode": "age_sex",
+"text": "This patient is an adult male patient."
+},
+{
+"meta7": [
+75.0,
+0.0,
+28.4,
+-1.0,
+-1.0,
+5.0,
+3.0
+],
+"mode": "age_loc",
+"text": "This sound was recorded from the left lateral chest of an adult patient."
+},
+{
+"meta7": [
+75.0,
+0.0,
+28.4,
+-1.0,
+-1.0,
+5.0,
+3.0
+],
+"mode": "age_dev",
+"text": "This sound was recorded from an adult patient, using an AKGC417L microphone."
+},
+{
+"meta7": [
+75.0,
+0.0,
+28.4,
+-1.0,
+-1.0,
+5.0,
+3.0
+],
+"mode": "sex_loc",
+"text": "This sound was recorded from the left lateral chest of a male patient."
+},
+{
+"meta7": [
+75.0,
+0.0,
+28.4,
+-1.0,
+-1.0,
+5.0,
+3.0
+],
+"mode": "sex_dev",
+"text": "This sound was recorded from a male patient, using an AKGC417L microphone."
+},
+{
+"meta7": [
+75.0,
+0.0,
+28.4,
+-1.0,
+-1.0,
+5.0,
+3.0
+],
+"mode": "loc_dev",
+"text": "This sound was recorded from the left lateral chest with an AKGC417L microphone."
+},
+{
+"meta7": [
+75.0,
+0.0,
+28.4,
+-1.0,
+-1.0,
+5.0,
+3.0
+],
+"mode": "age_sex_loc",
+"text": "This sound was recorded from the left lateral chest of an adult male patient."
+},
+{
+"meta7": [
+75.0,
+0.0,
+28.4,
+-1.0,
+-1.0,
+5.0,
+3.0
+],
+"mode": "age_sex_dev",
+"text": "This sound was recorded from an adult male patient, using an AKGC417L microphone."
+},
+{
+"meta7": [
+75.0,
+0.0,
+28.4,
+-1.0,
+-1.0,
+5.0,
+3.0
+],
+"mode": "age_loc_dev",
+"text": "This sound was recorded from the left lateral chest of an adult patient, using an AKGC417L microphone."
+},
+{
+"meta7": [
+75.0,
+0.0,
+28.4,
+-1.0,
+-1.0,
+5.0,
+3.0
+],
+"mode": "sex_loc_dev",
+"text": "This sound was recorded from the left lateral chest of a male patient, using an AKGC417L microphone."
+},
+{
+"meta7": [
+75.0,
+0.0,
+28.4,
+-1.0,
+-1.0,
+5.0,
+3.0
+],
+"mode": "all",
+"text": "This sound was recorded from the left lateral chest of an adult male patient, using an AKGC417L microphone."
+},
+{
+"meta7": [
+80.0,
+0.0,
+22.9,
+-1.0,
+-1.0,
+1.0,
+3.0
+],
+"mode": "age",
+"text": "This patient is an adult patient."
+},
+{
+"meta7": [
+80.0,
+0.0,
+22.9,
+-1.0,
+-1.0,
+1.0,
+3.0
+],
+"mode": "sex",
+"text": "This patient is a male patient."
+},
+{
+"meta7": [
+80.0,
+0.0,
+22.9,
+-1.0,
+-1.0,
+1.0,
+3.0
+],
+"mode": "loc",
+"text": "This sound was recorded from the left anterior chest."
+},
+{
+"meta7": [
+80.0,
+0.0,
+22.9,
+-1.0,
+-1.0,
+1.0,
+3.0
+],
+"mode": "dev",
+"text": "This sound was recorded with an AKGC417L microphone."
+},
+{
+"meta7": [
+80.0,
+0.0,
+22.9,
+-1.0,
+-1.0,
+1.0,
+3.0
+],
+"mode": "age_sex",
+"text": "This patient is an adult male patient."
+},
+{
+"meta7": [
+80.0,
+0.0,
+22.9,
+-1.0,
+-1.0,
+1.0,
+3.0
+],
+"mode": "age_loc",
+"text": "This sound was recorded from the left anterior chest of an adult patient."
+},
+{
+"meta7": [
+80.0,
+0.0,
+22.9,
+-1.0,
+-1.0,
+1.0,
+3.0
+],
+"mode": "age_dev",
+"text": "This sound was recorded from an adult patient, using an AKGC417L microphone."
+},
+{
+"meta7": [
+80.0,
+0.0,
+22.9,
+-1.0,
+-1.0,
+1.0,
+3.0
+],
+"mode": "sex_loc",
+"text": "This sound was recorded from the left anterior chest of a male patient."
+},
+{
+"meta7": [
+80.0,
+0.0,
+22.9,
+-1.0,
+-1.0,
+1.0,
+3.0
+],
+"mode": "sex_dev",
+"text": "This sound was recorded from a male patient, using an AKGC417L microphone."
+},
+{
+"meta7": [
+80.0,
+0.0,
+22.9,
+-1.0,
+-1.0,
+1.0,
+3.0
+],
+"mode": "loc_dev",
+"text": "This sound was recorded from the left anterior chest with an AKGC417L microphone."
+},
+{
+"meta7": [
+80.0,
+0.0,
+22.9,
+-1.0,
+-1.0,
+1.0,
+3.0
+],
+"mode": "age_sex_loc",
+"text": "This sound was recorded from the left anterior chest of an adult male patient."
+},
+{
+"meta7": [
+80.0,
+0.0,
+22.9,
+-1.0,
+-1.0,
+1.0,
+3.0
+],
+"mode": "age_sex_dev",
+"text": "This sound was recorded from an adult male patient, using an AKGC417L microphone."
+},
+{
+"meta7": [
+80.0,
+0.0,
+22.9,
+-1.0,
+-1.0,
+1.0,
+3.0
+],
+"mode": "age_loc_dev",
+"text": "This sound was recorded from the left anterior chest of an adult patient, using an AKGC417L microphone."
+},
+{
+"meta7": [
+80.0,
+0.0,
+22.9,
+-1.0,
+-1.0,
+1.0,
+3.0
+],
+"mode": "sex_loc_dev",
+"text": "This sound was recorded from the left anterior chest of a male patient, using an AKGC417L microphone."
+},
+{
+"meta7": [
+80.0,
+0.0,
+22.9,
+-1.0,
+-1.0,
+1.0,
+3.0
+],
+"mode": "all",
+"text": "This sound was recorded from the left anterior chest of an adult male patient, using an AKGC417L microphone."
+},
+{
+"meta7": [
+74.0,
+0.0,
+27.4,
+-1.0,
+-1.0,
+0.0,
+3.0
+],
+"mode": "age",
+"text": "This patient is an adult patient."
+},
+{
+"meta7": [
+74.0,
+0.0,
+27.4,
+-1.0,
+-1.0,
+0.0,
+3.0
+],
+"mode": "sex",
+"text": "This patient is a male patient."
+},
+{
+"meta7": [
+74.0,
+0.0,
+27.4,
+-1.0,
+-1.0,
+0.0,
+3.0
+],
+"mode": "loc",
+"text": "This sound was recorded from the trachea."
+},
+{
+"meta7": [
+74.0,
+0.0,
+27.4,
+-1.0,
+-1.0,
+0.0,
+3.0
+],
+"mode": "dev",
+"text": "This sound was recorded with an AKGC417L microphone."
+},
+{
+"meta7": [
+74.0,
+0.0,
+27.4,
+-1.0,
+-1.0,
+0.0,
+3.0
+],
+"mode": "age_sex",
+"text": "This patient is an adult male patient."
+},
+{
+"meta7": [
+74.0,
+0.0,
+27.4,
+-1.0,
+-1.0,
+0.0,
+3.0
+],
+"mode": "age_loc",
+"text": "This sound was recorded from the trachea of an adult patient."
+},
+{
+"meta7": [
+74.0,
+0.0,
+27.4,
+-1.0,
+-1.0,
+0.0,
+3.0
+],
+"mode": "age_dev",
+"text": "This sound was recorded from an adult patient, using an AKGC417L microphone."
+},
+{
+"meta7": [
+74.0,
+0.0,
+27.4,
+-1.0,
+-1.0,
+0.0,
+3.0
+],
+"mode": "sex_loc",
+"text": "This sound was recorded from the trachea of a male patient."
+},
+{
+"meta7": [
+74.0,
+0.0,
+27.4,
+-1.0,
+-1.0,
+0.0,
+3.0
+],
+"mode": "sex_dev",
+"text": "This sound was recorded from a male patient, using an AKGC417L microphone."
+},
+{
+"meta7": [
+74.0,
+0.0,
+27.4,
+-1.0,
+-1.0,
+0.0,
+3.0
+],
+"mode": "loc_dev",
+"text": "This sound was recorded from the trachea with an AKGC417L microphone."
+},
+{
+"meta7": [
+74.0,
+0.0,
+27.4,
+-1.0,
+-1.0,
+0.0,
+3.0
+],
+"mode": "age_sex_loc",
+"text": "This sound was recorded from the trachea of an adult male patient."
+},
+{
+"meta7": [
+74.0,
+0.0,
+27.4,
+-1.0,
+-1.0,
+0.0,
+3.0
+],
+"mode": "age_sex_dev",
+"text": "This sound was recorded from an adult male patient, using an AKGC417L microphone."
+},
+{
+"meta7": [
+74.0,
+0.0,
+27.4,
+-1.0,
+-1.0,
+0.0,
+3.0
+],
+"mode": "age_loc_dev",
+"text": "This sound was recorded from the trachea of an adult patient, using an AKGC417L microphone."
+},
+{
+"meta7": [
+74.0,
+0.0,
+27.4,
+-1.0,
+-1.0,
+0.0,
+3.0
+],
+"mode": "sex_loc_dev",
+"text": "This sound was recorded from the trachea of a male patient, using an AKGC417L microphone."
+},
+{
+"meta7": [
+74.0,
+0.0,
+27.4,
+-1.0,
+-1.0,
+0.0,
+3.0
+],
+"mode": "all",
+"text": "This sound was recorded from the trachea of an adult male patient, using an AKGC417L microphone."
+},
+{
+"meta7": [
+50.0,
+1.0,
+28.81,
+-1.0,
+-1.0,
+5.0,
+0.0
+],
+"mode": "age",
+"text": "This patient is an adult patient."
+},
+{
+"meta7": [
+50.0,
+1.0,
+28.81,
+-1.0,
+-1.0,
+5.0,
+0.0
+],
+"mode": "sex",
+"text": "This patient is a female patient."
+},
+{
+"meta7": [
+50.0,
+1.0,
+28.81,
+-1.0,
+-1.0,
+5.0,
+0.0
+],
+"mode": "loc",
+"text": "This sound was recorded from the left lateral chest."
+},
+{
+"meta7": [
+50.0,
+1.0,
+28.81,
+-1.0,
+-1.0,
+5.0,
+0.0
+],
+"mode": "dev",
+"text": "This sound was recorded with a Meditron stethoscope."
+},
+{
+"meta7": [
+50.0,
+1.0,
+28.81,
+-1.0,
+-1.0,
+5.0,
+0.0
+],
+"mode": "age_sex",
+"text": "This patient is an adult female patient."
+},
+{
+"meta7": [
+50.0,
+1.0,
+28.81,
+-1.0,
+-1.0,
+5.0,
+0.0
+],
+"mode": "age_loc",
+"text": "This sound was recorded from the left lateral chest of an adult patient."
+},
+{
+"meta7": [
+50.0,
+1.0,
+28.81,
+-1.0,
+-1.0,
+5.0,
+0.0
+],
+"mode": "age_dev",
+"text": "This sound was recorded from an adult patient, using a Meditron stethoscope."
+},
+{
+"meta7": [
+50.0,
+1.0,
+28.81,
+-1.0,
+-1.0,
+5.0,
+0.0
+],
+"mode": "sex_loc",
+"text": "This sound was recorded from the left lateral chest of a female patient."
+},
+{
+"meta7": [
+50.0,
+1.0,
+28.81,
+-1.0,
+-1.0,
+5.0,
+0.0
+],
+"mode": "sex_dev",
+"text": "This sound was recorded from a female patient, using a Meditron stethoscope."
+},
+{
+"meta7": [
+50.0,
+1.0,
+28.81,
+-1.0,
+-1.0,
+5.0,
+0.0
+],
+"mode": "loc_dev",
+"text": "This sound was recorded from the left lateral chest with a Meditron stethoscope."
+},
+{
+"meta7": [
+50.0,
+1.0,
+28.81,
+-1.0,
+-1.0,
+5.0,
+0.0
+],
+"mode": "age_sex_loc",
+"text": "This sound was recorded from the left lateral chest of an adult female patient."
+},
+{
+"meta7": [
+50.0,
+1.0,
+28.81,
+-1.0,
+-1.0,
+5.0,
+0.0
+],
+"mode": "age_sex_dev",
+"text": "This sound was recorded from an adult female patient, using a Meditron stethoscope."
+},
+{
+"meta7": [
+50.0,
+1.0,
+28.81,
+-1.0,
+-1.0,
+5.0,
+0.0
+],
+"mode": "age_loc_dev",
+"text": "This sound was recorded from the left lateral chest of an adult patient, using a Meditron stethoscope."
+},
+{
+"meta7": [
+50.0,
+1.0,
+28.81,
+-1.0,
+-1.0,
+5.0,
+0.0
+],
+"mode": "sex_loc_dev",
+"text": "This sound was recorded from the left lateral chest of a female patient, using a Meditron stethoscope."
+},
+{
+"meta7": [
+50.0,
+1.0,
+28.81,
+-1.0,
+-1.0,
+5.0,
+0.0
+],
+"mode": "all",
+"text": "This sound was recorded from the left lateral chest of an adult female patient, using a Meditron stethoscope."
+},
+{
+"meta7": [
+79.0,
+0.0,
+22.6,
+-1.0,
+-1.0,
+4.0,
+3.0
+],
+"mode": "age",
+"text": "This patient is an adult patient."
+},
+{
+"meta7": [
+79.0,
+0.0,
+22.6,
+-1.0,
+-1.0,
+4.0,
+3.0
+],
+"mode": "sex",
+"text": "This patient is a male patient."
+},
+{
+"meta7": [
+79.0,
+0.0,
+22.6,
+-1.0,
+-1.0,
+4.0,
+3.0
+],
+"mode": "loc",
+"text": "This sound was recorded from the right posterior chest."
+},
+{
+"meta7": [
+79.0,
+0.0,
+22.6,
+-1.0,
+-1.0,
+4.0,
+3.0
+],
+"mode": "dev",
+"text": "This sound was recorded with an AKGC417L microphone."
+},
+{
+"meta7": [
+79.0,
+0.0,
+22.6,
+-1.0,
+-1.0,
+4.0,
+3.0
+],
+"mode": "age_sex",
+"text": "This patient is an adult male patient."
+},
+{
+"meta7": [
+79.0,
+0.0,
+22.6,
+-1.0,
+-1.0,
+4.0,
+3.0
+],
+"mode": "age_loc",
+"text": "This sound was recorded from the right posterior chest of an adult patient."
+},
+{
+"meta7": [
+79.0,
+0.0,
+22.6,
+-1.0,
+-1.0,
+4.0,
+3.0
+],
+"mode": "age_dev",
+"text": "This sound was recorded from an adult patient, using an AKGC417L microphone."
+},
+{
+"meta7": [
+79.0,
+0.0,
+22.6,
+-1.0,
+-1.0,
+4.0,
+3.0
+],
+"mode": "sex_loc",
+"text": "This sound was recorded from the right posterior chest of a male patient."
+},
+{
+"meta7": [
+79.0,
+0.0,
+22.6,
+-1.0,
+-1.0,
+4.0,
+3.0
+],
+"mode": "sex_dev",
+"text": "This sound was recorded from a male patient, using an AKGC417L microphone."
+},
+{
+"meta7": [
+79.0,
+0.0,
+22.6,
+-1.0,
+-1.0,
+4.0,
+3.0
+],
+"mode": "loc_dev",
+"text": "This sound was recorded from the right posterior chest with an AKGC417L microphone."
+},
+{
+"meta7": [
+79.0,
+0.0,
+22.6,
+-1.0,
+-1.0,
+4.0,
+3.0
+],
+"mode": "age_sex_loc",
+"text": "This sound was recorded from the right posterior chest of an adult male patient."
+},
+{
+"meta7": [
+79.0,
+0.0,
+22.6,
+-1.0,
+-1.0,
+4.0,
+3.0
+],
+"mode": "age_sex_dev",
+"text": "This sound was recorded from an adult male patient, using an AKGC417L microphone."
+},
+{
+"meta7": [
+79.0,
+0.0,
+22.6,
+-1.0,
+-1.0,
+4.0,
+3.0
+],
+"mode": "age_loc_dev",
+"text": "This sound was recorded from the right posterior chest of an adult patient, using an AKGC417L microphone."
+},
+{
+"meta7": [
+79.0,
+0.0,
+22.6,
+-1.0,
+-1.0,
+4.0,
+3.0
+],
+"mode": "sex_loc_dev",
+"text": "This sound was recorded from the right posterior chest of a male patient, using an AKGC417L microphone."
+},
+{
+"meta7": [
+79.0,
+0.0,
+22.6,
+-1.0,
+-1.0,
+4.0,
+3.0
+],
+"mode": "all",
+"text": "This sound was recorded from the right posterior chest of an adult male patient, using an AKGC417L microphone."
+},
+{
+"meta7": [
+63.0,
+0.0,
+28.34,
+-1.0,
+-1.0,
+3.0,
+2.0
+],
+"mode": "age",
+"text": "This patient is an adult patient."
+},
+{
+"meta7": [
+63.0,
+0.0,
+28.34,
+-1.0,
+-1.0,
+3.0,
+2.0
+],
+"mode": "sex",
+"text": "This patient is a male patient."
+},
+{
+"meta7": [
+63.0,
+0.0,
+28.34,
+-1.0,
+-1.0,
+3.0,
+2.0
+],
+"mode": "loc",
+"text": "This sound was recorded from the left posterior chest."
+},
+{
+"meta7": [
+63.0,
+0.0,
+28.34,
+-1.0,
+-1.0,
+3.0,
+2.0
+],
+"mode": "dev",
+"text": "This sound was recorded with a Litt3200 stethoscope."
+},
+{
+"meta7": [
+63.0,
+0.0,
+28.34,
+-1.0,
+-1.0,
+3.0,
+2.0
+],
+"mode": "age_sex",
+"text": "This patient is an adult male patient."
+},
+{
+"meta7": [
+63.0,
+0.0,
+28.34,
+-1.0,
+-1.0,
+3.0,
+2.0
+],
+"mode": "age_loc",
+"text": "This sound was recorded from the left posterior chest of an adult patient."
+},
+{
+"meta7": [
+63.0,
+0.0,
+28.34,
+-1.0,
+-1.0,
+3.0,
+2.0
+],
+"mode": "age_dev",
+"text": "This sound was recorded from an adult patient, using a Litt3200 stethoscope."
+},
+{
+"meta7": [
+63.0,
+0.0,
+28.34,
+-1.0,
+-1.0,
+3.0,
+2.0
+],
+"mode": "sex_loc",
+"text": "This sound was recorded from the left posterior chest of a male patient."
+},
+{
+"meta7": [
+63.0,
+0.0,
+28.34,
+-1.0,
+-1.0,
+3.0,
+2.0
+],
+"mode": "sex_dev",
+"text": "This sound was recorded from a male patient, using a Litt3200 stethoscope."
+},
+{
+"meta7": [
+63.0,
+0.0,
+28.34,
+-1.0,
+-1.0,
+3.0,
+2.0
+],
+"mode": "loc_dev",
+"text": "This sound was recorded from the left posterior chest with a Litt3200 stethoscope."
+},
+{
+"meta7": [
+63.0,
+0.0,
+28.34,
+-1.0,
+-1.0,
+3.0,
+2.0
+],
+"mode": "age_sex_loc",
+"text": "This sound was recorded from the left posterior chest of an adult male patient."
+},
+{
+"meta7": [
+63.0,
+0.0,
+28.34,
+-1.0,
+-1.0,
+3.0,
+2.0
+],
+"mode": "age_sex_dev",
+"text": "This sound was recorded from an adult male patient, using a Litt3200 stethoscope."
+},
+{
+"meta7": [
+63.0,
+0.0,
+28.34,
+-1.0,
+-1.0,
+3.0,
+2.0
+],
+"mode": "age_loc_dev",
+"text": "This sound was recorded from the left posterior chest of an adult patient, using a Litt3200 stethoscope."
+},
+{
+"meta7": [
+63.0,
+0.0,
+28.34,
+-1.0,
+-1.0,
+3.0,
+2.0
+],
+"mode": "sex_loc_dev",
+"text": "This sound was recorded from the left posterior chest of a male patient, using a Litt3200 stethoscope."
+},
+{
+"meta7": [
+63.0,
+0.0,
+28.34,
+-1.0,
+-1.0,
+3.0,
+2.0
+],
+"mode": "all",
+"text": "This sound was recorded from the left posterior chest of an adult male patient, using a Litt3200 stethoscope."
+},
+{
+"meta7": [
+11.0,
+0.0,
+-1.0,
+33.0,
+136.0,
+0.0,
+0.0
+],
+"mode": "age",
+"text": "This patient is a pediatric patient."
+},
+{
+"meta7": [
+11.0,
+0.0,
+-1.0,
+33.0,
+136.0,
+0.0,
+0.0
+],
+"mode": "sex",
+"text": "This patient is a male patient."
+},
+{
+"meta7": [
+11.0,
+0.0,
+-1.0,
+33.0,
+136.0,
+0.0,
+0.0
+],
+"mode": "loc",
+"text": "This sound was recorded from the trachea."
+},
+{
+"meta7": [
+11.0,
+0.0,
+-1.0,
+33.0,
+136.0,
+0.0,
+0.0
+],
+"mode": "dev",
+"text": "This sound was recorded with a Meditron stethoscope."
+},
+{
+"meta7": [
+11.0,
+0.0,
+-1.0,
+33.0,
+136.0,
+0.0,
+0.0
+],
+"mode": "age_sex",
+"text": "This patient is a male pediatric patient."
+},
+{
+"meta7": [
+11.0,
+0.0,
+-1.0,
+33.0,
+136.0,
+0.0,
+0.0
+],
+"mode": "age_loc",
+"text": "This sound was recorded from the trachea of a pediatric patient."
+},
+{
+"meta7": [
+11.0,
+0.0,
+-1.0,
+33.0,
+136.0,
+0.0,
+0.0
+],
+"mode": "age_dev",
+"text": "This sound was recorded from a pediatric patient, using a Meditron stethoscope."
+},
+{
+"meta7": [
+11.0,
+0.0,
+-1.0,
+33.0,
+136.0,
+0.0,
+0.0
+],
+"mode": "sex_loc",
+"text": "This sound was recorded from the trachea of a male patient."
+},
+{
+"meta7": [
+11.0,
+0.0,
+-1.0,
+33.0,
+136.0,
+0.0,
+0.0
+],
+"mode": "sex_dev",
+"text": "This sound was recorded from a male patient, using a Meditron stethoscope."
+},
+{
+"meta7": [
+11.0,
+0.0,
+-1.0,
+33.0,
+136.0,
+0.0,
+0.0
+],
+"mode": "loc_dev",
+"text": "This sound was recorded from the trachea with a Meditron stethoscope."
+},
+{
+"meta7": [
+11.0,
+0.0,
+-1.0,
+33.0,
+136.0,
+0.0,
+0.0
+],
+"mode": "age_sex_loc",
+"text": "This sound was recorded from the trachea of a male pediatric patient."
+},
+{
+"meta7": [
+11.0,
+0.0,
+-1.0,
+33.0,
+136.0,
+0.0,
+0.0
+],
+"mode": "age_sex_dev",
+"text": "This sound was recorded from a male pediatric patient, using a Meditron stethoscope."
+},
+{
+"meta7": [
+11.0,
+0.0,
+-1.0,
+33.0,
+136.0,
+0.0,
+0.0
+],
+"mode": "age_loc_dev",
+"text": "This sound was recorded from the trachea of a pediatric patient, using a Meditron stethoscope."
+},
+{
+"meta7": [
+11.0,
+0.0,
+-1.0,
+33.0,
+136.0,
+0.0,
+0.0
+],
+"mode": "sex_loc_dev",
+"text": "This sound was recorded from the trachea of a male patient, using a Meditron stethoscope."
+},
+{
+"meta7": [
+11.0,
+0.0,
+-1.0,
+33.0,
+136.0,
+0.0,
+0.0
+],
+"mode": "all",
+"text": "This sound was recorded from the trachea of a male pediatric patient, using a Meditron stethoscope."
+},
+{
+"meta7": [
+0.5,
+1.0,
+-1.0,
+8.26,
+71.0,
+5.0,
+0.0
+],
+"mode": "age",
+"text": "This patient is a pediatric patient."
+},
+{
+"meta7": [
+0.5,
+1.0,
+-1.0,
+8.26,
+71.0,
+5.0,
+0.0
+],
+"mode": "sex",
+"text": "This patient is a female patient."
+},
+{
+"meta7": [
+0.5,
+1.0,
+-1.0,
+8.26,
+71.0,
+5.0,
+0.0
+],
+"mode": "loc",
+"text": "This sound was recorded from the left lateral chest."
+},
+{
+"meta7": [
+0.5,
+1.0,
+-1.0,
+8.26,
+71.0,
+5.0,
+0.0
+],
+"mode": "dev",
+"text": "This sound was recorded with a Meditron stethoscope."
+},
+{
+"meta7": [
+0.5,
+1.0,
+-1.0,
+8.26,
+71.0,
+5.0,
+0.0
+],
+"mode": "age_sex",
+"text": "This patient is a female pediatric patient."
+},
+{
+"meta7": [
+0.5,
+1.0,
+-1.0,
+8.26,
+71.0,
+5.0,
+0.0
+],
+"mode": "age_loc",
+"text": "This sound was recorded from the left lateral chest of a pediatric patient."
+},
+{
+"meta7": [
+0.5,
+1.0,
+-1.0,
+8.26,
+71.0,
+5.0,
+0.0
+],
+"mode": "age_dev",
+"text": "This sound was recorded from a pediatric patient, using a Meditron stethoscope."
+},
+{
+"meta7": [
+0.5,
+1.0,
+-1.0,
+8.26,
+71.0,
+5.0,
+0.0
+],
+"mode": "sex_loc",
+"text": "This sound was recorded from the left lateral chest of a female patient."
+},
+{
+"meta7": [
+0.5,
+1.0,
+-1.0,
+8.26,
+71.0,
+5.0,
+0.0
+],
+"mode": "sex_dev",
+"text": "This sound was recorded from a female patient, using a Meditron stethoscope."
+},
+{
+"meta7": [
+0.5,
+1.0,
+-1.0,
+8.26,
+71.0,
+5.0,
+0.0
+],
+"mode": "loc_dev",
+"text": "This sound was recorded from the left lateral chest with a Meditron stethoscope."
+},
+{
+"meta7": [
+0.5,
+1.0,
+-1.0,
+8.26,
+71.0,
+5.0,
+0.0
+],
+"mode": "age_sex_loc",
+"text": "This sound was recorded from the left lateral chest of a female pediatric patient."
+},
+{
+"meta7": [
+0.5,
+1.0,
+-1.0,
+8.26,
+71.0,
+5.0,
+0.0
+],
+"mode": "age_sex_dev",
+"text": "This sound was recorded from a female pediatric patient, using a Meditron stethoscope."
+},
+{
+"meta7": [
+0.5,
+1.0,
+-1.0,
+8.26,
+71.0,
+5.0,
+0.0
+],
+"mode": "age_loc_dev",
+"text": "This sound was recorded from the left lateral chest of a pediatric patient, using a Meditron stethoscope."
+},
+{
+"meta7": [
+0.5,
+1.0,
+-1.0,
+8.26,
+71.0,
+5.0,
+0.0
+],
+"mode": "sex_loc_dev",
+"text": "This sound was recorded from the left lateral chest of a female patient, using a Meditron stethoscope."
+},
+{
+"meta7": [
+0.5,
+1.0,
+-1.0,
+8.26,
+71.0,
+5.0,
+0.0
+],
+"mode": "all",
+"text": "This sound was recorded from the left lateral chest of a female pediatric patient, using a Meditron stethoscope."
+},
+{
+"meta7": [
+2.0,
+0.0,
+-1.0,
+12.8,
+86.0,
+4.0,
+0.0
+],
+"mode": "age",
+"text": "This patient is a pediatric patient."
+},
+{
+"meta7": [
+2.0,
+0.0,
+-1.0,
+12.8,
+86.0,
+4.0,
+0.0
+],
+"mode": "sex",
+"text": "This patient is a male patient."
+},
+{
+"meta7": [
+2.0,
+0.0,
+-1.0,
+12.8,
+86.0,
+4.0,
+0.0
+],
+"mode": "loc",
+"text": "This sound was recorded from the right posterior chest."
+},
+{
+"meta7": [
+2.0,
+0.0,
+-1.0,
+12.8,
+86.0,
+4.0,
+0.0
+],
+"mode": "dev",
+"text": "This sound was recorded with a Meditron stethoscope."
+},
+{
+"meta7": [
+2.0,
+0.0,
+-1.0,
+12.8,
+86.0,
+4.0,
+0.0
+],
+"mode": "age_sex",
+"text": "This patient is a male pediatric patient."
+},
+{
+"meta7": [
+2.0,
+0.0,
+-1.0,
+12.8,
+86.0,
+4.0,
+0.0
+],
+"mode": "age_loc",
+"text": "This sound was recorded from the right posterior chest of a pediatric patient."
+},
+{
+"meta7": [
+2.0,
+0.0,
+-1.0,
+12.8,
+86.0,
+4.0,
+0.0
+],
+"mode": "age_dev",
+"text": "This sound was recorded from a pediatric patient, using a Meditron stethoscope."
+},
+{
+"meta7": [
+2.0,
+0.0,
+-1.0,
+12.8,
+86.0,
+4.0,
+0.0
+],
+"mode": "sex_loc",
+"text": "This sound was recorded from the right posterior chest of a male patient."
+},
+{
+"meta7": [
+2.0,
+0.0,
+-1.0,
+12.8,
+86.0,
+4.0,
+0.0
+],
+"mode": "sex_dev",
+"text": "This sound was recorded from a male patient, using a Meditron stethoscope."
+},
+{
+"meta7": [
+2.0,
+0.0,
+-1.0,
+12.8,
+86.0,
+4.0,
+0.0
+],
+"mode": "loc_dev",
+"text": "This sound was recorded from the right posterior chest with a Meditron stethoscope."
+},
+{
+"meta7": [
+2.0,
+0.0,
+-1.0,
+12.8,
+86.0,
+4.0,
+0.0
+],
+"mode": "age_sex_loc",
+"text": "This sound was recorded from the right posterior chest of a male pediatric patient."
+},
+{
+"meta7": [
+2.0,
+0.0,
+-1.0,
+12.8,
+86.0,
+4.0,
+0.0
+],
+"mode": "age_sex_dev",
+"text": "This sound was recorded from a male pediatric patient, using a Meditron stethoscope."
+},
+{
+"meta7": [
+2.0,
+0.0,
+-1.0,
+12.8,
+86.0,
+4.0,
+0.0
+],
+"mode": "age_loc_dev",
+"text": "This sound was recorded from the right posterior chest of a pediatric patient, using a Meditron stethoscope."
+},
+{
+"meta7": [
+2.0,
+0.0,
+-1.0,
+12.8,
+86.0,
+4.0,
+0.0
+],
+"mode": "sex_loc_dev",
+"text": "This sound was recorded from the right posterior chest of a male patient, using a Meditron stethoscope."
+},
+{
+"meta7": [
+2.0,
+0.0,
+-1.0,
+12.8,
+86.0,
+4.0,
+0.0
+],
+"mode": "all",
+"text": "This sound was recorded from the right posterior chest of a male pediatric patient, using a Meditron stethoscope."
+},
+{
+"meta7": [
+63.0,
+1.0,
+29.6,
+-1.0,
+-1.0,
+3.0,
+3.0
+],
+"mode": "age",
+"text": "This patient is an adult patient."
+},
+{
+"meta7": [
+63.0,
+1.0,
+29.6,
+-1.0,
+-1.0,
+3.0,
+3.0
+],
+"mode": "sex",
+"text": "This patient is a female patient."
+},
+{
+"meta7": [
+63.0,
+1.0,
+29.6,
+-1.0,
+-1.0,
+3.0,
+3.0
+],
+"mode": "loc",
+"text": "This sound was recorded from the left posterior chest."
+},
+{
+"meta7": [
+63.0,
+1.0,
+29.6,
+-1.0,
+-1.0,
+3.0,
+3.0
+],
+"mode": "dev",
+"text": "This sound was recorded with an AKGC417L microphone."
+},
+{
+"meta7": [
+63.0,
+1.0,
+29.6,
+-1.0,
+-1.0,
+3.0,
+3.0
+],
+"mode": "age_sex",
+"text": "This patient is an adult female patient."
+},
+{
+"meta7": [
+63.0,
+1.0,
+29.6,
+-1.0,
+-1.0,
+3.0,
+3.0
+],
+"mode": "age_loc",
+"text": "This sound was recorded from the left posterior chest of an adult patient."
+},
+{
+"meta7": [
+63.0,
+1.0,
+29.6,
+-1.0,
+-1.0,
+3.0,
+3.0
+],
+"mode": "age_dev",
+"text": "This sound was recorded from an adult patient, using an AKGC417L microphone."
+},
+{
+"meta7": [
+63.0,
+1.0,
+29.6,
+-1.0,
+-1.0,
+3.0,
+3.0
+],
+"mode": "sex_loc",
+"text": "This sound was recorded from the left posterior chest of a female patient."
+},
+{
+"meta7": [
+63.0,
+1.0,
+29.6,
+-1.0,
+-1.0,
+3.0,
+3.0
+],
+"mode": "sex_dev",
+"text": "This sound was recorded from a female patient, using an AKGC417L microphone."
+},
+{
+"meta7": [
+63.0,
+1.0,
+29.6,
+-1.0,
+-1.0,
+3.0,
+3.0
+],
+"mode": "loc_dev",
+"text": "This sound was recorded from the left posterior chest with an AKGC417L microphone."
+},
+{
+"meta7": [
+63.0,
+1.0,
+29.6,
+-1.0,
+-1.0,
+3.0,
+3.0
+],
+"mode": "age_sex_loc",
+"text": "This sound was recorded from the left posterior chest of an adult female patient."
+},
+{
+"meta7": [
+63.0,
+1.0,
+29.6,
+-1.0,
+-1.0,
+3.0,
+3.0
+],
+"mode": "age_sex_dev",
+"text": "This sound was recorded from an adult female patient, using an AKGC417L microphone."
+},
+{
+"meta7": [
+63.0,
+1.0,
+29.6,
+-1.0,
+-1.0,
+3.0,
+3.0
+],
+"mode": "age_loc_dev",
+"text": "This sound was recorded from the left posterior chest of an adult patient, using an AKGC417L microphone."
+},
+{
+"meta7": [
+63.0,
+1.0,
+29.6,
+-1.0,
+-1.0,
+3.0,
+3.0
+],
+"mode": "sex_loc_dev",
+"text": "This sound was recorded from the left posterior chest of a female patient, using an AKGC417L microphone."
+},
+{
+"meta7": [
+63.0,
+1.0,
+29.6,
+-1.0,
+-1.0,
+3.0,
+3.0
+],
+"mode": "all",
+"text": "This sound was recorded from the left posterior chest of an adult female patient, using an AKGC417L microphone."
+},
+{
+"meta7": [
+70.0,
+1.0,
+31.1,
+-1.0,
+-1.0,
+2.0,
+3.0
+],
+"mode": "age",
+"text": "This patient is an adult patient."
+},
+{
+"meta7": [
+70.0,
+1.0,
+31.1,
+-1.0,
+-1.0,
+2.0,
+3.0
+],
+"mode": "sex",
+"text": "This patient is a female patient."
+},
+{
+"meta7": [
+70.0,
+1.0,
+31.1,
+-1.0,
+-1.0,
+2.0,
+3.0
+],
+"mode": "loc",
+"text": "This sound was recorded from the right anterior chest."
+},
+{
+"meta7": [
+70.0,
+1.0,
+31.1,
+-1.0,
+-1.0,
+2.0,
+3.0
+],
+"mode": "dev",
+"text": "This sound was recorded with an AKGC417L microphone."
+},
+{
+"meta7": [
+70.0,
+1.0,
+31.1,
+-1.0,
+-1.0,
+2.0,
+3.0
+],
+"mode": "age_sex",
+"text": "This patient is an adult female patient."
+},
+{
+"meta7": [
+70.0,
+1.0,
+31.1,
+-1.0,
+-1.0,
+2.0,
+3.0
+],
+"mode": "age_loc",
+"text": "This sound was recorded from the right anterior chest of an adult patient."
+},
+{
+"meta7": [
+70.0,
+1.0,
+31.1,
+-1.0,
+-1.0,
+2.0,
+3.0
+],
+"mode": "age_dev",
+"text": "This sound was recorded from an adult patient, using an AKGC417L microphone."
+},
+{
+"meta7": [
+70.0,
+1.0,
+31.1,
+-1.0,
+-1.0,
+2.0,
+3.0
+],
+"mode": "sex_loc",
+"text": "This sound was recorded from the right anterior chest of a female patient."
+},
+{
+"meta7": [
+70.0,
+1.0,
+31.1,
+-1.0,
+-1.0,
+2.0,
+3.0
+],
+"mode": "sex_dev",
+"text": "This sound was recorded from a female patient, using an AKGC417L microphone."
+},
+{
+"meta7": [
+70.0,
+1.0,
+31.1,
+-1.0,
+-1.0,
+2.0,
+3.0
+],
+"mode": "loc_dev",
+"text": "This sound was recorded from the right anterior chest with an AKGC417L microphone."
+},
+{
+"meta7": [
+70.0,
+1.0,
+31.1,
+-1.0,
+-1.0,
+2.0,
+3.0
+],
+"mode": "age_sex_loc",
+"text": "This sound was recorded from the right anterior chest of an adult female patient."
+},
+{
+"meta7": [
+70.0,
+1.0,
+31.1,
+-1.0,
+-1.0,
+2.0,
+3.0
+],
+"mode": "age_sex_dev",
+"text": "This sound was recorded from an adult female patient, using an AKGC417L microphone."
+},
+{
+"meta7": [
+70.0,
+1.0,
+31.1,
+-1.0,
+-1.0,
+2.0,
+3.0
+],
+"mode": "age_loc_dev",
+"text": "This sound was recorded from the right anterior chest of an adult patient, using an AKGC417L microphone."
+},
+{
+"meta7": [
+70.0,
+1.0,
+31.1,
+-1.0,
+-1.0,
+2.0,
+3.0
+],
+"mode": "sex_loc_dev",
+"text": "This sound was recorded from the right anterior chest of a female patient, using an AKGC417L microphone."
+},
+{
+"meta7": [
+70.0,
+1.0,
+31.1,
+-1.0,
+-1.0,
+2.0,
+3.0
+],
+"mode": "all",
+"text": "This sound was recorded from the right anterior chest of an adult female patient, using an AKGC417L microphone."
+},
+{
+"meta7": [
+1.0,
+0.0,
+-1.0,
+10.25,
+78.0,
+3.0,
+0.0
+],
+"mode": "age",
+"text": "This patient is a pediatric patient."
+},
+{
+"meta7": [
+1.0,
+0.0,
+-1.0,
+10.25,
+78.0,
+3.0,
+0.0
+],
+"mode": "sex",
+"text": "This patient is a male patient."
+},
+{
+"meta7": [
+1.0,
+0.0,
+-1.0,
+10.25,
+78.0,
+3.0,
+0.0
+],
+"mode": "loc",
+"text": "This sound was recorded from the left posterior chest."
+},
+{
+"meta7": [
+1.0,
+0.0,
+-1.0,
+10.25,
+78.0,
+3.0,
+0.0
+],
+"mode": "dev",
+"text": "This sound was recorded with a Meditron stethoscope."
+},
+{
+"meta7": [
+1.0,
+0.0,
+-1.0,
+10.25,
+78.0,
+3.0,
+0.0
+],
+"mode": "age_sex",
+"text": "This patient is a male pediatric patient."
+},
+{
+"meta7": [
+1.0,
+0.0,
+-1.0,
+10.25,
+78.0,
+3.0,
+0.0
+],
+"mode": "age_loc",
+"text": "This sound was recorded from the left posterior chest of a pediatric patient."
+},
+{
+"meta7": [
+1.0,
+0.0,
+-1.0,
+10.25,
+78.0,
+3.0,
+0.0
+],
+"mode": "age_dev",
+"text": "This sound was recorded from a pediatric patient, using a Meditron stethoscope."
+},
+{
+"meta7": [
+1.0,
+0.0,
+-1.0,
+10.25,
+78.0,
+3.0,
+0.0
+],
+"mode": "sex_loc",
+"text": "This sound was recorded from the left posterior chest of a male patient."
+},
+{
+"meta7": [
+1.0,
+0.0,
+-1.0,
+10.25,
+78.0,
+3.0,
+0.0
+],
+"mode": "sex_dev",
+"text": "This sound was recorded from a male patient, using a Meditron stethoscope."
+},
+{
+"meta7": [
+1.0,
+0.0,
+-1.0,
+10.25,
+78.0,
+3.0,
+0.0
+],
+"mode": "loc_dev",
+"text": "This sound was recorded from the left posterior chest with a Meditron stethoscope."
+},
+{
+"meta7": [
+1.0,
+0.0,
+-1.0,
+10.25,
+78.0,
+3.0,
+0.0
+],
+"mode": "age_sex_loc",
+"text": "This sound was recorded from the left posterior chest of a male pediatric patient."
+},
+{
+"meta7": [
+1.0,
+0.0,
+-1.0,
+10.25,
+78.0,
+3.0,
+0.0
+],
+"mode": "age_sex_dev",
+"text": "This sound was recorded from a male pediatric patient, using a Meditron stethoscope."
+},
+{
+"meta7": [
+1.0,
+0.0,
+-1.0,
+10.25,
+78.0,
+3.0,
+0.0
+],
+"mode": "age_loc_dev",
+"text": "This sound was recorded from the left posterior chest of a pediatric patient, using a Meditron stethoscope."
+},
+{
+"meta7": [
+1.0,
+0.0,
+-1.0,
+10.25,
+78.0,
+3.0,
+0.0
+],
+"mode": "sex_loc_dev",
+"text": "This sound was recorded from the left posterior chest of a male patient, using a Meditron stethoscope."
+},
+{
+"meta7": [
+1.0,
+0.0,
+-1.0,
+10.25,
+78.0,
+3.0,
+0.0
+],
+"mode": "all",
+"text": "This sound was recorded from the left posterior chest of a male pediatric patient, using a Meditron stethoscope."
+},
+{
+"meta7": [
+75.0,
+0.0,
+26.29,
+-1.0,
+-1.0,
+1.0,
+0.0
+],
+"mode": "age",
+"text": "This patient is an adult patient."
+},
+{
+"meta7": [
+75.0,
+0.0,
+26.29,
+-1.0,
+-1.0,
+1.0,
+0.0
+],
+"mode": "sex",
+"text": "This patient is a male patient."
+},
+{
+"meta7": [
+75.0,
+0.0,
+26.29,
+-1.0,
+-1.0,
+1.0,
+0.0
+],
+"mode": "loc",
+"text": "This sound was recorded from the left anterior chest."
+},
+{
+"meta7": [
+75.0,
+0.0,
+26.29,
+-1.0,
+-1.0,
+1.0,
+0.0
+],
+"mode": "dev",
+"text": "This sound was recorded with a Meditron stethoscope."
+},
+{
+"meta7": [
+75.0,
+0.0,
+26.29,
+-1.0,
+-1.0,
+1.0,
+0.0
+],
+"mode": "age_sex",
+"text": "This patient is an adult male patient."
+},
+{
+"meta7": [
+75.0,
+0.0,
+26.29,
+-1.0,
+-1.0,
+1.0,
+0.0
+],
+"mode": "age_loc",
+"text": "This sound was recorded from the left anterior chest of an adult patient."
+},
+{
+"meta7": [
+75.0,
+0.0,
+26.29,
+-1.0,
+-1.0,
+1.0,
+0.0
+],
+"mode": "age_dev",
+"text": "This sound was recorded from an adult patient, using a Meditron stethoscope."
+},
+{
+"meta7": [
+75.0,
+0.0,
+26.29,
+-1.0,
+-1.0,
+1.0,
+0.0
+],
+"mode": "sex_loc",
+"text": "This sound was recorded from the left anterior chest of a male patient."
+},
+{
+"meta7": [
+75.0,
+0.0,
+26.29,
+-1.0,
+-1.0,
+1.0,
+0.0
+],
+"mode": "sex_dev",
+"text": "This sound was recorded from a male patient, using a Meditron stethoscope."
+},
+{
+"meta7": [
+75.0,
+0.0,
+26.29,
+-1.0,
+-1.0,
+1.0,
+0.0
+],
+"mode": "loc_dev",
+"text": "This sound was recorded from the left anterior chest with a Meditron stethoscope."
+},
+{
+"meta7": [
+75.0,
+0.0,
+26.29,
+-1.0,
+-1.0,
+1.0,
+0.0
+],
+"mode": "age_sex_loc",
+"text": "This sound was recorded from the left anterior chest of an adult male patient."
+},
+{
+"meta7": [
+75.0,
+0.0,
+26.29,
+-1.0,
+-1.0,
+1.0,
+0.0
+],
+"mode": "age_sex_dev",
+"text": "This sound was recorded from an adult male patient, using a Meditron stethoscope."
+},
+{
+"meta7": [
+75.0,
+0.0,
+26.29,
+-1.0,
+-1.0,
+1.0,
+0.0
+],
+"mode": "age_loc_dev",
+"text": "This sound was recorded from the left anterior chest of an adult patient, using a Meditron stethoscope."
+},
+{
+"meta7": [
+75.0,
+0.0,
+26.29,
+-1.0,
+-1.0,
+1.0,
+0.0
+],
+"mode": "sex_loc_dev",
+"text": "This sound was recorded from the left anterior chest of a male patient, using a Meditron stethoscope."
+},
+{
+"meta7": [
+75.0,
+0.0,
+26.29,
+-1.0,
+-1.0,
+1.0,
+0.0
+],
+"mode": "all",
+"text": "This sound was recorded from the left anterior chest of an adult male patient, using a Meditron stethoscope."
+},
+{
+"meta7": [
+10.0,
+1.0,
+-1.0,
+32.3,
+143.0,
+0.0,
+0.0
+],
+"mode": "age",
+"text": "This patient is a pediatric patient."
+},
+{
+"meta7": [
+10.0,
+1.0,
+-1.0,
+32.3,
+143.0,
+0.0,
+0.0
+],
+"mode": "sex",
+"text": "This patient is a female patient."
+},
+{
+"meta7": [
+10.0,
+1.0,
+-1.0,
+32.3,
+143.0,
+0.0,
+0.0
+],
+"mode": "loc",
+"text": "This sound was recorded from the trachea."
+},
+{
+"meta7": [
+10.0,
+1.0,
+-1.0,
+32.3,
+143.0,
+0.0,
+0.0
+],
+"mode": "dev",
+"text": "This sound was recorded with a Meditron stethoscope."
+},
+{
+"meta7": [
+10.0,
+1.0,
+-1.0,
+32.3,
+143.0,
+0.0,
+0.0
+],
+"mode": "age_sex",
+"text": "This patient is a female pediatric patient."
+},
+{
+"meta7": [
+10.0,
+1.0,
+-1.0,
+32.3,
+143.0,
+0.0,
+0.0
+],
+"mode": "age_loc",
+"text": "This sound was recorded from the trachea of a pediatric patient."
+},
+{
+"meta7": [
+10.0,
+1.0,
+-1.0,
+32.3,
+143.0,
+0.0,
+0.0
+],
+"mode": "age_dev",
+"text": "This sound was recorded from a pediatric patient, using a Meditron stethoscope."
+},
+{
+"meta7": [
+10.0,
+1.0,
+-1.0,
+32.3,
+143.0,
+0.0,
+0.0
+],
+"mode": "sex_loc",
+"text": "This sound was recorded from the trachea of a female patient."
+},
+{
+"meta7": [
+10.0,
+1.0,
+-1.0,
+32.3,
+143.0,
+0.0,
+0.0
+],
+"mode": "sex_dev",
+"text": "This sound was recorded from a female patient, using a Meditron stethoscope."
+},
+{
+"meta7": [
+10.0,
+1.0,
+-1.0,
+32.3,
+143.0,
+0.0,
+0.0
+],
+"mode": "loc_dev",
+"text": "This sound was recorded from the trachea with a Meditron stethoscope."
+},
+{
+"meta7": [
+10.0,
+1.0,
+-1.0,
+32.3,
+143.0,
+0.0,
+0.0
+],
+"mode": "age_sex_loc",
+"text": "This sound was recorded from the trachea of a female pediatric patient."
+},
+{
+"meta7": [
+10.0,
+1.0,
+-1.0,
+32.3,
+143.0,
+0.0,
+0.0
+],
+"mode": "age_sex_dev",
+"text": "This sound was recorded from a female pediatric patient, using a Meditron stethoscope."
+},
+{
+"meta7": [
+10.0,
+1.0,
+-1.0,
+32.3,
+143.0,
+0.0,
+0.0
+],
+"mode": "age_loc_dev",
+"text": "This sound was recorded from the trachea of a pediatric patient, using a Meditron stethoscope."
+},
+{
+"meta7": [
+10.0,
+1.0,
+-1.0,
+32.3,
+143.0,
+0.0,
+0.0
+],
+"mode": "sex_loc_dev",
+"text": "This sound was recorded from the trachea of a female patient, using a Meditron stethoscope."
+},
+{
+"meta7": [
+10.0,
+1.0,
+-1.0,
+32.3,
+143.0,
+0.0,
+0.0
+],
+"mode": "all",
+"text": "This sound was recorded from the trachea of a female pediatric patient, using a Meditron stethoscope."
+}
+]

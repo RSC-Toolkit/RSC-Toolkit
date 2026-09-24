@@ -1,0 +1,29 @@
+# LoRA-RSC SPRSound extension
+# **No paper-reported value** — the paper evaluates ICBHI only. This extends it to the standard SPRSound task (2022 inter-patient, 7-class)
+# as a toolkit extension (no paper counterpart), not a reproduction target. The recipe is the paper's ICBHI recipe, unchanged.
+defaults:
+  - model: ast_lora_rsc
+  - data_defaults@data: base
+  - data: sprsound_lorarsc
+  - loss: cross_entropy
+  - metrics: sprsound_metrics
+  - optimizer: adamw_lorarsc
+  - trainer: default
+  - callbacks: lorarsc_paper
+  - _self_
+
+seed: 1
+
+run:
+  name: sprs-lorarsc
+  group: lorarsc
+  tags: [lorarsc, sprsound, extension]
+
+model:
+  params:
+    n_cls: 7
+
+trainer:
+  params:
+    max_epochs: 100
+    precision: 32

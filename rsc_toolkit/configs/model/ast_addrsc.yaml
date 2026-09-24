@@ -1,0 +1,16 @@
+# ADD-RSC (Interspeech 2025) AST variant: DiffTransformerLayer(256, 8, depth 6 → λ_init 0.7008) + AST (16/16, 1024×256) — official code defaults.
+name: ast_addrsc
+params:
+  n_cls: 4
+  fstride: 16
+  tstride: 16
+  input_fdim: 1024               # official ASTModel argument (the actual grid is 16×64 via transpose — quirk kept)
+  input_tdim: 256
+  audioset_pretrain: true        # only keys matching in name and shape from YuanGong audioset_10_10_0.4593 (pos_embed not loaded)
+  pretrained_path: null
+  denoise_d_model: 256
+  denoise_num_heads: 8
+  denoise_depth: 6
+  loss_beta: 0.5
+  label_smoothing: 0.20
+  amp: true                      # official autocast fp16, no GradScaler (trainer precision 32)

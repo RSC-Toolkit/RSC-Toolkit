@@ -1,0 +1,36 @@
+# PAFA (BEATs) ICBHI data config: raw 16 kHz waveform (fbank inside BEATs), 5 s cycles repeat+fade, bs 32,
+# patient ID passed as meta, no SpecAugment (--nospec).
+name: icbhi_pafa_beats
+params:
+  datamodule_name: index
+
+  dataset_name: icbhi
+  index_dataset_cls: rsc_toolkit.datasets.index_dataset.IndexDataset
+  project_root: ${hydra:runtime.cwd}
+  split_file: rsc_toolkit/datasets/icbhi/data/official_split.txt
+  data_dir: .datasets/icbhi
+
+  sampling_rate: 16000
+  sample_level: cycle
+  desired_length_sec: 5.0        # --desired_length 5
+  pad_type: repeat_fade
+
+  train_splits: [train]
+  val_splits: [test]             # best-on-test protocol
+  test_splits: [test]
+
+  batch_size: 32
+  num_workers: 8
+  shuffle_train: true
+  drop_last_train: true
+  pin_memory: true
+
+  features:
+    enabled: true
+    kind: waveform               # no cache
+  feature_precompute: false
+
+  specaugment:
+    enabled: false
+
+  meta_label_mode: patient

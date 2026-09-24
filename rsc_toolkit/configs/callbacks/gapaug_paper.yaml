@@ -1,0 +1,13 @@
+# @package _global_
+# GaP-Aug protocol: best test Score every epoch (=500 steps) (no Se gate) + final-iterate metrics final_* alongside + resume
+trainer:
+  params:
+    callbacks:
+      - _target_: rsc_toolkit.trainer.callbacks.icbhi_best_checkpoint.ICBHIBestScoreCheckpoint
+        dirpath: outputs/gapaug/${run.name}
+        min_se: -1.0
+      - _target_: rsc_toolkit.trainer.callbacks.gapaug_final_metrics.FinalMetricsToBestJson
+        dirpath: outputs/gapaug/${run.name}
+      - _target_: rsc_toolkit.trainer.callbacks.gapaug_sampler_epoch.GaPAugSamplerEpoch   # keeps the sampler epoch sequence in sync after resume (Lightning does not call set_epoch)
+      - _target_: rsc_toolkit.trainer.callbacks.resume_checkpoint.EpochResumeCheckpoint
+        dirpath: outputs/gapaug/${run.name}

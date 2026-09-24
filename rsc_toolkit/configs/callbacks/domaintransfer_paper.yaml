@@ -1,0 +1,20 @@
+# @package _global_
+# Domain Transfer training protocol:
+#   - injects balanced class weights (paper §2.1: higher weight for minority classes)
+#   - warm-up (5 ep) → cosine; after 50 ep, **stage 2**: original (non-augmented) data only, mixup off, lr ×0.1 for 10 ep
+#   - the paper reports a single run and does not specify model selection → best-on-test is primary, final_* reported alongside
+trainer:
+  params:
+    callbacks:
+      - _target_: rsc_toolkit.trainer.callbacks.domaintransfer_stages.DomainTransferStages
+        learning_rate: ${optimizer.params.lr}   # single source: the optimizer group (adam_domaintransfer, 6e-4)
+        stage1_epochs: 50
+        warmup_epochs: 5
+        stage2_lr_scale: 0.1
+      - _target_: rsc_toolkit.trainer.callbacks.icbhi_best_checkpoint.ICBHIBestScoreCheckpoint
+        dirpath: outputs/domaintransfer/${run.name}
+        min_se: 0.0
+      - _target_: rsc_toolkit.trainer.callbacks.gapaug_final_metrics.FinalMetricsToBestJson
+        dirpath: outputs/domaintransfer/${run.name}
+      - _target_: rsc_toolkit.trainer.callbacks.resume_checkpoint.EpochResumeCheckpoint
+        dirpath: outputs/domaintransfer/${run.name}

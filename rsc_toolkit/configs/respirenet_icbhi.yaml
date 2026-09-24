@@ -1,0 +1,29 @@
+# RespireNet reproduction run config (README/scripts: 200 ep, bs 64, SGD 1e-3/momentum .9/wd 5e-4, weighted CE [.1,.3,.3,.3],
+# WeightedRandomSampler, nlpaug augmentation, BRC, fp32, best = test cycle accuracy).
+#
+#   80/20 fold-4 (official code and ckpt, target 66.2~67.1): rsctk-train --config-name respirenet_icbhi run.name=icbhi-respirenet-fold4-s1 seed=1
+#   official 60/40 split (toolkit standard, target 55.2~55.7): ... data.params.split_mode=official run.name=icbhi-respirenet-official-s1
+#   CNN+CBA+BRC, official 60/40 split (assumption run; target README 55.7):
+#       ... data.params.split_mode=official data.params.aug_scale=1 data.params.cba_seed=1 run.name=icbhi-respirenet-cba-s1
+# Device-specific FT is outside the reproduction scope.
+defaults:
+  - model: respirenet
+  - data: icbhi_respirenet
+  - loss: cross_entropy_respirenet
+  - metrics: icbhi_metrics
+  - optimizer: sgd
+  - trainer: default
+  - callbacks: respirenet_paper
+  - _self_
+
+seed: 1
+
+trainer:
+  params:
+    max_epochs: 200
+    precision: 32              # the official code has no AMP
+
+run:
+  name: icbhi-respirenet-fold4
+  group: respirenet
+  tags: [respirenet, icbhi]

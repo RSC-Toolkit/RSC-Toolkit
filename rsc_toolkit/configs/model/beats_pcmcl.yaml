@@ -1,0 +1,19 @@
+# PC-MCL BEATs (main result): BEATs iter3+ AS2M → token mean → Linear(768,3) + PM Linear(768,2). Loss (1-w)·BCE + w·CE (code default).
+#   Table 3 'Concat+Multi' (no PM): model.params.enable_ssl=false
+#   Table 3 'Multi only'          : model.params.enable_ssl=false + data.params.pcmcl.mode=noconcat_multi
+#   Table 3 'Concat only'         : model.params.label_mode=single model.params.n_cls=4 loss=cross_entropy metrics=icbhi_metrics data.params.pcmcl.mode=concat_single
+name: beats_pcmcl
+params:
+  n_cls: 3                       # = **number of attributes** of the label space (not the number of classes). icbhi4 → 3, sprsound7 → 6
+  label_mode: multilabel
+  label_space: icbhi4            # icbhi4 (authors' definition) | sprsound7 (toolkit extension — methods/pcmcl_labelspace.py)
+  pretrained_path: null          # pretrained_models/upstream/BEATs_iter3_plus_AS2M.pt
+  enable_ssl: true
+  ssl_weight: 0.1                # paper α=0.1 ↔ --ssl_weight — assumption (not confirmed by the authors; argparse default 0.5)
+  ssl_separate_training: false   # --ssl_separate_training (projector 768→256→LN→ReLU→768) assumed unused
+  ssl_projection_dim: 256
+  loss_combine: code             # code: (1-w)·main + w·ssl (main.py:586) | paper: main + α·ssl (paper formula, flag)
+  threshold: 0.5                 # stated in the paper
+  specaug: false                 # Assumption: PAFA lineage --nospec (the official default is SpecAugment on)
+  specaug_policy: icbhi_ast_sup
+  specaug_mask: mean

@@ -1,0 +1,15 @@
+# SPRSound 7-class: Sp = Normal accuracy, Se = pooled accuracy over the 6 abnormal classes, Score = their mean (same formula as sclmeta ce.py)
+train:
+  - name: topk_accuracy
+    params:
+      topk: [1]
+
+val:
+  - name: topk_accuracy
+    params:
+      topk: [1]
+  - name: icbhi_score
+    params:
+      num_classes: 7
+      normal_index: 0
+      topk: 1

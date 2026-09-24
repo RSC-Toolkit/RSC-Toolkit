@@ -1,0 +1,31 @@
+# M2D ICBHI fine-tuning (TASLP Table XIII path: m2d app/icbhi_sprs eval_icbhi.sh):
+#   150 ep, bs 64 + split_iter 4, Adam 5e-5/wd 1e-4 + cosine (T_max 40), weighted CE, freeze_embed, SpecAug (scl), fp32, best-on-test Score.
+#   Base 230529   : rsctk-train --config-name m2d_icbhi run.name=icbhi-m2d-base-s1 seed=1
+#   M2D-X s5      : ... model.params.pretrained_path=pretrained_models/upstream/m2d/m2d_x_vit_base-80x200p16x4-230814-Ddffsd50ks5blr0003bs128a2nr.3-e600/checkpoint-600.pth run.name=icbhi-m2dx-s5-s1
+defaults:
+  - model: m2d
+  - data_defaults@data: base
+  - data: icbhi_m2d
+  - loss: cross_entropy_weighted_icbhi
+  - metrics: icbhi_metrics
+  - optimizer: adam_m2d
+  - trainer: default
+  - callbacks: m2d_eval
+  - _self_
+
+seed: 1
+
+adapter:
+  name: split_iter
+  params:
+    split_iter: 4
+
+trainer:
+  params:
+    max_epochs: 150
+    precision: 32
+
+run:
+  name: icbhi-m2d-base
+  group: m2d
+  tags: [m2d, icbhi]

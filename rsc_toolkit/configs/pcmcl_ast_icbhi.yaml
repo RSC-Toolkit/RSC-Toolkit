@@ -1,0 +1,26 @@
+# PC-MCL (arXiv 2601.17080) AST — official ICBHI 60/40 split, 4-class. Paper-reported (5 seeds): 78.54/46.05/62.30±0.50.
+# Hyperparameters follow the same assumptions as pcmcl_icbhi.yaml (PAFA lineage 100 ep/bs 32/Adam 5e-5/cosine/MA 0.5). SpecAugment keeps the code default (on);
+# only the AST forward uses fp16 autocast (no GradScaler) → trainer precision 32.
+#   Run: rsctk-train --config-name pcmcl_ast_icbhi run.name=icbhi-pcmcl-ast-s1 seed=1
+defaults:
+  - model: ast_pcmcl
+  - data_defaults@data: base
+  - data: icbhi_pcmcl_ast
+  - loss: bce_with_logits
+  - metrics: pcmcl_metrics
+  - optimizer: adam_pcmcl
+  - trainer: default
+  - callbacks: pcmcl_paper
+  - _self_
+
+seed: 1
+
+trainer:
+  params:
+    max_epochs: 100
+    precision: 32
+
+run:
+  name: icbhi-pcmcl-ast
+  group: pcmcl
+  tags: [pcmcl, ast, icbhi]

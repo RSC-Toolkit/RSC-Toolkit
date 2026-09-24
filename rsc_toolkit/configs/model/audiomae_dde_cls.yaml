@@ -1,0 +1,12 @@
+# Audio-MAE encoder + Linear classifier (B2 direct FT / DDE-MAE stage 2). With encoder_ckpt, only E_R from the stage-1 final_state is loaded (pretrained ckpt ignored).
+name: audiomae_dde_cls
+params:
+  n_cls: 4
+  pretrained_path: pretrained_models/upstream/audiomae/pretrained.pth
+  encoder_ckpt: null         # stage 2: outputs/ddemae/<stage1 run>/final_state.pth
+  encoder_key: encoder_r.    # E_R prefix inside final_state (E_I · decoder · q_θ discarded — assumption)
+  global_pool: true          # Assumption: Audio-MAE fine-tuning convention (patch mean + fc_norm); false = cls token
+  head_init_std: 0.02        # Assumption: head initialization (2e-5 in AS fine-tuning is AudioSet-specific)
+# [Assumption: official Audio-MAE fine-tuning conventions not applied] The paper does not mention them, so none of the official main_finetune_as.py defaults (drop_path 0.1, layer_decay 0.75,
+#   label smoothing 0.1, mixup 0.5, warmup 4 ep + cosine, fine-tuning 2D masking mask_t/f 0.2, roll_mag_aug, head std 2e-5) are used
+#   (drop_path 0 · no layer decay · no masking · no schedule · plain CE). Only the values stated in paper §3.3 (AdamW 1e-3/wd 5e-4, 50 ep) are applied.

@@ -1,0 +1,8 @@
+{
+  "opera": "/raid/doyoung/projects/RSC-Toolkit/outputs/reference/opera",
+  "evar": "/raid/doyoung/projects/RSC-Toolkit/outputs/reference/m2d_evar",
+  "ckpt": "pretrained_models/upstream/opera/encoder-operaCT.ckpt",
+  "torch": "2.7.0+cu126",
+  "librosa": "0.11.0",
+  "n_htsat_keys": 197
+}

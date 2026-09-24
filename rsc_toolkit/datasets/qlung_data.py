@@ -1,0 +1,269 @@
+# Portions of this file are ported from QLung (https://github.com/RSC-Toolkit/QLung), which does not include a license file.
+# See THIRD_PARTY_NOTICES.md. The rest of the file is under the PolyForm Noncommercial License 1.0.0.
+"""
+QLung data path -- caches AQS (acoustic quality score) per sample_id and sends it as the 3rd batch element (meta_labels slot, **float**).
+
+Official util/icbhi_dataset.py:170-177: when the dataset is built, for every cycle (on the 16 kHz waveform after 8 s repeat padding + fade_out)
+  rms_energy = compute_rms_energy(wave), spectral_entropy = compute_spectral_entropy(wave),
+  quality_score = compute_quality_score_entropy_rms(rms_energy, rms_energy, α, β)   <- rms in the entropy slot (bug, kept as default)
+is computed, and __getitem__ returns (image, label, rms, entropy, quality). The train loop uses only quality_score.
+
+Toolkit implementation:
+  QLungAQSIndexDataset(IndexDataset): adds out["aqs"] to each item. rms/entropy are computed from the waveform in torch (methods/qlung.py) and
+    cached in downloaded_datasets/aqs_cache/<dataset>_acoustic_<preprocessing key>.pt (sample_id -> {rms, entropy}) (variant-independent, once).
+    Per-variant AQS is also written to <dataset>_<variant>.pt (for aggregation/inspection; at runtime it is computed as a pure function of rms/entropy).
+  QLungDataModule(IndexDataModule, data_registry 'qlung'): passes the qlung block {aqs_alpha, aqs_beta, entropy_source, formula, cache_dir,
+    precompute, attach_val} to the dataset, and in setup computes rms/entropy for missing sample_ids in bulk with DataLoader(num_workers).
+    Instead of IndexFeatureDataset, _QLungFeatureDataset yields (feats, label, sample_id, aqs float) and collate builds a float64 tensor (same as the official default_collate).
+    AQS is attached to val batches too (attach_val default true; the original val loader also returns quality but does not use it -- the model eval path ignores it).
+  preprocessing key = (sampling_rate, desired_length_sec, pad_type, fade, resample_after_slice, time_unit) -- different waveforms get separate caches.
+SPRSound works with the same class (OOD evaluation does not need AQS, but the format is kept; label_map gives 7->4 derived labels -- Rhonchi and Stridor rows are excluded).
+"""
+from __future__ import annotations
+
+import logging
+import os
+import pathlib
+import time
+from typing import Any, Dict, List, Optional, Tuple
+
+import torch
+from torch.utils.data import DataLoader, Dataset
+
+from rsc_toolkit.datasets.index_dataset import IndexDataset, IndexFeatureDataset
+from rsc_toolkit.methods.qlung import AQS_ENTROPY_SOURCES, aqs_from_features, aqs_variant_name, compute_acoustic_features
+from rsc_toolkit.trainer.data.index_datamodule import IndexDataModule
+
+logger = logging.getLogger(__name__)
+
+DEFAULT_AQS_CACHE_DIR = "downloaded_datasets/aqs_cache"
+
+
+class AQSConfig:
+    def __init__(self, alpha: float = 0.7, beta: float = 0.3, entropy_source: str = "rms", formula: str = "code",
+                 cache_dir: str = DEFAULT_AQS_CACHE_DIR, precompute: bool = True, attach_val: bool = True,
+                 precompute_num_workers: int = 8, precompute_batch_size: int = 16):
+        if entropy_source not in AQS_ENTROPY_SOURCES:
+            raise ValueError(f"entropy_source must be one of {AQS_ENTROPY_SOURCES}, got {entropy_source!r}")
+        if formula not in ("code", "paper"):
+            raise ValueError(f"formula must be code|paper, got {formula!r}")
+        self.alpha, self.beta = float(alpha), float(beta)
+        self.entropy_source, self.formula = entropy_source, formula
+        self.cache_dir = cache_dir
+        self.precompute = bool(precompute)
+        self.attach_val = bool(attach_val)
+        self.precompute_num_workers = int(precompute_num_workers)
+        self.precompute_batch_size = int(precompute_batch_size)
+
+    @property
+    def variant(self) -> str:
+        return aqs_variant_name(self.alpha, self.beta, self.entropy_source, self.formula)
+
+    def aqs(self, rms: float, entropy: float, entropy_nanmean: Optional[float] = None) -> float:
+        return aqs_from_features(rms, entropy, alpha=self.alpha, beta=self.beta, entropy_source=self.entropy_source,
+                                 formula=self.formula, entropy_nanmean=entropy_nanmean)
+
+    def aqs_of(self, feats: Dict[str, float]) -> float:
+        return self.aqs(feats["rms"], feats["entropy"], feats.get("entropy_nanmean"))
+
+
+class AcousticFeatureCache:
+    """Single .pt file cache of sample_id -> {'rms','entropy'} (atomic save)."""
+
+    def __init__(self, path: pathlib.Path):
+        self.path = pathlib.Path(path)
+        self.data: Dict[str, Dict[str, float]] = {}
+        if self.path.exists():
+            self.data = torch.load(self.path, map_location="cpu", weights_only=False)
+            logger.info("Loaded AQS acoustic feature cache: %s (%d)", self.path, len(self.data))
+
+    def missing(self, sample_ids: List[str]) -> List[str]:
+        return [s for s in sample_ids if s not in self.data]
+
+    def update(self, items: Dict[str, Dict[str, float]]) -> None:
+        self.data.update(items)
+
+    def save(self) -> None:
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = self.path.with_suffix(f".pt.tmp.{os.getpid()}")
+        torch.save(self.data, tmp)
+        os.replace(tmp, self.path)
+
+
+class QLungAQSIndexDataset(IndexDataset):
+    """IndexDataset + out['aqs'] (float). If missing from the cache, it is computed on the spot and put into the in-memory cache (the datamodule saves the file)."""
+
+    N_CLS = 4
+
+    def __init__(self, *args, aqs: Optional[AQSConfig] = None, acoustic_cache: Optional[AcousticFeatureCache] = None,
+                 label_map: Optional[Dict[int, int]] = None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.aqs_cfg = aqs or AQSConfig()
+        self.acoustic_cache = acoustic_cache or AcousticFeatureCache(pathlib.Path("/nonexistent/aqs.pt"))
+        self.label_map = label_map
+        if label_map is not None:
+            from rsc_toolkit.datasets.lungmix_data import apply_label_map
+
+            self.df, dropped = apply_label_map(self.df, label_map, where=f"QLungAQSIndexDataset split={self.split}")
+            counts = self.df["label"].value_counts().sort_index().to_dict()
+            logger.info("QLungAQSIndexDataset(split=%s): applied label map -> %s (dropped %d rows)", self.split, counts, dropped)
+
+    def sample_ids(self) -> List[str]:
+        return self.df["sample_id"].astype(str).tolist()
+
+    def acoustic_features(self, idx: int) -> Tuple[str, Dict[str, float]]:
+        """Load waveform (with preprocessing) -> {rms, entropy}. Does not use the cache (computation only)."""
+        item = IndexDataset.__getitem__(self, idx)
+        return str(item["sample_id"]), compute_acoustic_features(item["audio"])
+
+    def __getitem__(self, idx: int) -> Dict[str, Any]:
+        out = super().__getitem__(idx)
+        sid = str(out["sample_id"])
+        feats = self.acoustic_cache.data.get(sid)
+        if feats is None:
+            feats = compute_acoustic_features(out["audio"])
+            self.acoustic_cache.data[sid] = feats
+        out["rms"], out["entropy"] = feats["rms"], feats["entropy"]
+        out["aqs"] = self.aqs_cfg.aqs_of(feats)
+        return out
+
+
+class _QLungFeatureDataset(IndexFeatureDataset):
+    """(feats, label, sample_id, aqs float) -- float instead of IndexFeatureDataset's int meta."""
+
+    def __init__(self, index_ds, feature_processor, feature_transform=None, attach_aqs: bool = True):
+        super().__init__(index_ds, feature_processor, feature_transform=feature_transform, meta_label_fn=None)
+        self.attach_aqs = attach_aqs
+
+    def __getitem__(self, i):
+        item = self.index_ds[i]
+        audio = item["audio"].squeeze()
+        feats = self.fp.make_features_cached(audio, sample_id=item["sample_id"])
+        if self.feature_transform is not None:
+            feats = self.feature_transform(feats)
+        if self.attach_aqs:
+            return feats, item["label"], item["sample_id"], float(item["aqs"])
+        return feats, item["label"], item["sample_id"]
+
+
+from rsc_toolkit.datasets import collate as _collate  # single collate implementation
+
+# (x, y, aqs float64) -- official: python float -> default_collate float64 (float64 from loss.py:60 on)
+qlung_collate = _collate.qlung_collate
+
+
+class _AcousticJob(Dataset):
+    def __init__(self, ds: QLungAQSIndexDataset, indices: List[int]):
+        self.ds, self.indices = ds, list(indices)
+
+    def __len__(self):
+        return len(self.indices)
+
+    def __getitem__(self, i):
+        return self.ds.acoustic_features(self.indices[i])
+
+
+def precompute_acoustic_features(ds: QLungAQSIndexDataset, cache: AcousticFeatureCache, *, num_workers: int = 8,
+                                 batch_size: int = 16, split_name: str = "") -> int:
+    sids = ds.sample_ids()
+    missing = set(cache.missing(sids))
+    if not missing:
+        logger.info("AQS acoustic feature cache complete split=%s (%d)", split_name, len(sids))
+        return 0
+    idx = [i for i, s in enumerate(sids) if s in missing]
+    logger.info("Computing AQS acoustic features split=%s: %d/%d missing (workers=%d)", split_name, len(idx), len(sids), num_workers)
+    t0 = time.time()
+    loader = DataLoader(_AcousticJob(ds, idx), batch_size=batch_size, shuffle=False, num_workers=num_workers,
+                        collate_fn=lambda b: b)
+    done = 0
+    with torch.inference_mode():
+        for batch in loader:
+            cache.update({sid: f for sid, f in batch})
+            done += len(batch)
+            if done % 800 < len(batch):
+                logger.info("  AQS features %d/%d (%.1fs)", done, len(idx), time.time() - t0)
+    cache.save()
+    logger.info("AQS acoustic features computed split=%s: %d items, %.1fs -> %s", split_name, done, time.time() - t0, cache.path)
+    return done
+
+
+class QLungDataModule(IndexDataModule):
+    """IndexDataModule + qlung block (AQS settings) -- batch (x, y, aqs float64)."""
+
+    meta_kind = "qlung_aqs"  # batch[2] = AQS float (B,) -- checked against accepts_meta of ast_qlung/clap_qlung
+
+    def __init__(self, *args, qlung: Optional[dict] = None, label_map: Optional[str] = None, **kwargs):
+        kwargs.setdefault("collate_fn", qlung_collate)  # AQS float64 as batch[2]
+        super().__init__(*args, **kwargs)
+        cfg = dict(qlung or {})
+        self.aqs_cfg = AQSConfig(**cfg)
+        cache_dir = self._resolve_path(self.aqs_cfg.cache_dir)
+        self.acoustic_cache = AcousticFeatureCache(cache_dir / f"{self.dataset_name}_acoustic_{self.preprocess_key()}.pt")
+        self.aqs_variant_path = cache_dir / f"{self.dataset_name}_{self.aqs_cfg.variant}_{self.preprocess_key()}.pt"
+        self.label_map_name = label_map
+        self.label_map = None
+        if label_map == "sprsound_7to4":
+            from rsc_toolkit.datasets.lungmix_data import SPRSOUND_7_TO_4
+            self.label_map = dict(SPRSOUND_7_TO_4)
+        elif label_map not in (None, "none"):
+            raise ValueError(f"label_map must be none|sprsound_7to4: {label_map!r}")
+
+    def preprocess_key(self) -> str:
+        # Existing cache file names (AQS/acoustic .pt) must be preserved, so the format for non-None values stays unchanged; None maps to "none".
+        length = "none" if self.desired_length_sec is None else f"{self.desired_length_sec:g}"
+        return (f"sr{self.sampling_rate}_len{length}_{self.pad_type}_fade{int(self.fade)}"
+                f"_ras{int(self.resample_after_slice)}_{self.time_unit}")
+
+    def _index_dataset_kwargs(self, *, split: str, role: Optional[str] = None) -> Dict[str, Any]:
+        # Add only the QLung-specific arguments to the parent's assembly (including the fade/resample_after_slice/time_unit/split_file rules)
+        kwargs = super()._index_dataset_kwargs(split=split, role=role)
+        kwargs.update(aqs=self.aqs_cfg, acoustic_cache=self.acoustic_cache, label_map=self.label_map)
+        return kwargs
+
+    def _wrap_with_features(self, base_ds, *, feature_transform=None, meta_label_fn=None, split_role=None):
+        fp = self._make_feature_processor_with_cache()  # cache directory, key and chain ledger are the same as the parent's
+        if split_role is None:  # direct call (outside setup), backward compatible -- identity comparison
+            split_role = "train" if base_ds is getattr(self, "train_ds", None) else "val"
+        attach = True if split_role == "train" else self.aqs_cfg.attach_val
+        return _QLungFeatureDataset(base_ds, fp, feature_transform=feature_transform, attach_aqs=attach)
+
+    def _each_index_ds(self, ds) -> List[QLungAQSIndexDataset]:
+        from torch.utils.data import ConcatDataset
+        if isinstance(ds, ConcatDataset):
+            return [d for sub in ds.datasets for d in self._each_index_ds(sub)]
+        return [ds]
+
+    def _precompute_aqs(self, ds, split_name: str) -> None:
+        if not self.aqs_cfg.precompute or not self._is_global_zero():
+            return
+        for sub in self._each_index_ds(ds):
+            precompute_acoustic_features(sub, self.acoustic_cache, num_workers=self.aqs_cfg.precompute_num_workers,
+                                         batch_size=self.aqs_cfg.precompute_batch_size, split_name=split_name)
+        self._write_variant_file()
+
+    def _write_variant_file(self) -> None:
+        d = {sid: self.aqs_cfg.aqs_of(f) for sid, f in self.acoustic_cache.data.items()}
+        self.aqs_variant_path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = self.aqs_variant_path.with_suffix(f".pt.tmp.{os.getpid()}")
+        torch.save({"variant": self.aqs_cfg.variant, "alpha": self.aqs_cfg.alpha, "beta": self.aqs_cfg.beta,
+                    "entropy_source": self.aqs_cfg.entropy_source, "formula": self.aqs_cfg.formula, "aqs": d}, tmp)
+        os.replace(tmp, self.aqs_variant_path)
+        vals = torch.tensor(list(d.values()), dtype=torch.float64)
+        finite = vals[torch.isfinite(vals)]
+        logger.info("AQS variant %s: n=%d mean %.4f std %.4f min %.4f max %.4f nan=%d -> %s", self.aqs_cfg.variant, len(vals),
+                    float(finite.mean()) if len(finite) else float("nan"), float(finite.std()) if len(finite) > 1 else 0.0,
+                    float(finite.min()) if len(finite) else float("nan"), float(finite.max()) if len(finite) else float("nan"),
+                    int((~torch.isfinite(vals)).sum()), self.aqs_variant_path)
+
+    def setup(self, stage: Optional[str] = None) -> None:
+        # The original computes AQS before the fbank conversion -- fill the AQS cache before feature warm-up (parent setup).
+        if self.index_csv is None:
+            self.outputs_directory.mkdir(parents=True, exist_ok=True)
+            self.index_csv = self._default_index_path()
+        if stage in (None, "fit"):
+            self._precompute_aqs(self._build_index_dataset(splits=self.train_splits), "train")
+            self._precompute_aqs(self._build_index_dataset(splits=self.val_splits), "val")
+        if stage in (None, "test"):
+            self._precompute_aqs(self._build_index_dataset(splits=self.test_splits), "test")
+        super().setup(stage)
+    # the 3 dataloaders are inherited unchanged (collate_fn=qlung_collate is injected in __init__)

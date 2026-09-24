@@ -1,0 +1,26 @@
+# bts-family reproduction run config (official script: 50 ep, bs 8, adam 5e-5/wd 1e-6, cosine, MA 0.5, unweighted CE, AMP).
+#
+#   BTS (meta all): rsctk-train --config-name bts_icbhi run.name=icbhi-bts-s1 seed=1
+#   Audio-CLAP    : ... model=audioclap run.name=icbhi-audioclap-s1 seed=1
+#
+# Data are the authors' released training.pt/test.pt (the audio preprocessing arguments of data_defaults do not apply here).
+defaults:
+  - model: bts
+  - data: bts_precomputed
+  - loss: cross_entropy
+  - metrics: icbhi_metrics
+  - optimizer: adam            # lr 5e-5, wd 1e-6
+  - trainer: default           # max_epochs 50
+  - callbacks: bts_paper
+  - _self_
+
+seed: 1
+
+trainer:
+  params:
+    precision: 16-mixed        # official AMP (GradScaler + autocast)
+
+run:
+  name: icbhi-bts
+  group: bts
+  tags: [bts, icbhi]

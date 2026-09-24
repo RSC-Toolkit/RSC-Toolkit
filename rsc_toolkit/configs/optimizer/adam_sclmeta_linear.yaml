@@ -1,0 +1,5 @@
+# SCL-metadata linear evaluation: Adam (lr 0.1, wd 1e-4), no schedule (main.py:87)
+name: adam
+params:
+  lr: 0.1
+  weight_decay: 1e-4

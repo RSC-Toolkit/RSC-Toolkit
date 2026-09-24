@@ -1,0 +1,34 @@
+# GaP-Aug's ICBHI recipe applied unchanged to SPRSound 2022 inter-patient (7-class) — toolkit extension (no paper counterpart).
+# Same chain as icbhi_gapaug.yaml (16 kHz, 10 s cycles repeat / cut to the first 10 s, waveform input, no cache, class-balanced batches per_class×n_cls).
+# Only the dataset keys change to SPRSound: the split column of index_cycle.csv (train / test=inter-patient) is used, with no split_file.
+name: sprsound_gapaug
+params:
+  datamodule_name: gapaug
+  dataset_name: sprsound
+  index_dataset_cls: rsc_toolkit.datasets.index_dataset.IndexDataset
+  project_root: ${hydra:runtime.cwd}
+  data_dir: .datasets/sprsound
+  raw_data_subdir: Classification
+  index_filename: index_cycle.csv
+  sampling_rate: 16000
+  sample_level: cycle
+  desired_length_sec: 10.0
+  pad_type: repeat
+  fade: false
+  train_splits: [train]
+  val_splits: [test]               # 2022 inter-patient test, evaluated every epoch (500 steps) → best-on-test (same protocol as ICBHI)
+  test_splits: [test]
+  batch_size: 16                   # evaluation batch / reference value (the training batch is gapaug.per_class × 7 = 28)
+  num_workers: 8
+  shuffle_train: true
+  drop_last_train: false
+  pin_memory: true
+  features:
+    enabled: true
+    kind: waveform
+  feature_precompute: false
+  specaugment:
+    enabled: false
+  gapaug:
+    per_class: 4
+    steps_per_epoch: 500

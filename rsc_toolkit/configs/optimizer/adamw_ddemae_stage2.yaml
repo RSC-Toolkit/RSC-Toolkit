@@ -1,0 +1,5 @@
+# DDE-MAE stage 2/B2: AdamW lr 1e-3, wd 5e-4 (stated in paper §3.3), schedule not specified → none (assumption)
+name: adamw
+params:
+  lr: 1.0e-3
+  weight_decay: 5.0e-4

@@ -1,0 +1,31 @@
+# AMS-D SPRSound extension — metrics are the standard 7-class ones (the paper's binary formula is used only for the ICBHI paper-reported values)
+# **No paper-reported value** — the paper evaluates ICBHI only. This extends it to the standard SPRSound task (2022 inter-patient, 7-class)
+# as a toolkit extension (no paper counterpart), not a reproduction target. The recipe is the paper's ICBHI recipe, unchanged.
+defaults:
+  - model: ast_amsd
+  - data_defaults@data: base
+  - data: sprsound_amsd
+  - loss: cross_entropy
+  - metrics: sprsound_metrics
+  - optimizer: adam_amsd
+  - trainer: default
+  - callbacks: amsd_paper_sprs
+  - _self_
+
+seed: 1
+
+run:
+  name: sprs-amsd
+  group: amsd
+  tags: [amsd, sprsound, extension]
+
+model:
+  params:
+    n_cls: 7
+    num_train_samples: 6656      # SPRSound 2022 train event count — with the default (ICBHI 4,142) the callback reassigns it, but
+                                 # setting it in the constructor lets last.ckpt resume and best.pth load without shape adjustment
+
+trainer:
+  params:
+    max_epochs: 50
+    precision: 32

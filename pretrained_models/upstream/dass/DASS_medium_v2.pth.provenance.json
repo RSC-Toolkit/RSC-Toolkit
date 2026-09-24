@@ -1,0 +1,9 @@
+{
+  "source": "https://github.com/Saurabhbhati/DASS/releases/download/v0.2/DASS_medium_v2.pth",
+  "license": "BSD-3-Clause (Saurabhbhati/DASS LICENSE, Copyright (c) 2024 Saurabhchand Bhati)",
+  "sha256": "b8a547db36f67580a19b78c80f50c0c0e4522075eab2100e0b951f066936c664",
+  "size": 194788746,
+  "downloaded": "2026-08-26",
+  "downloaded_by": "copied from the official release file",
+  "notes": "DASS-medium (VMamba-S v2, distilled from AudioSet) 492 keys, 'module.v.' prefix, patch_embed.0 (48,1,3,3) single-channel, classifier.head (527,768). Loading as in Lung-SRAD ast_models.py:350-359: strip 'module.v.', exclude head, strict=False (only the 2 head keys are missing)."
+}

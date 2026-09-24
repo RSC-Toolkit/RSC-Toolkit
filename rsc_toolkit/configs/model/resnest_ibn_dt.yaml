@@ -1,0 +1,20 @@
+# Domain Transfer (Wang & Wang, ICASSP 2022) §2.2 — re-implementation from the paper specification (no official code, grade C).
+#   Paper setup: rsctk-train --config-name domaintransfer_icbhi run.name=icbhi-domaintransfer-s1 seed=1
+#   Baseline  : ... model.params.baseline=true model.params.mixup_alpha=0 (Table 2 first row, paper-reported 49.6)
+name: resnest_ibn_dt
+params:
+  n_cls: 4
+  backbone: resnest50d      # Assumption: the paper does not state the ResNeSt depth (output 2048 is common to 50d/101e/200e/269e)
+  pretrained: true          # ImageNet pretraining
+  ibn: true                 # Assumption: IBN-a in bn1 of stages 1–3 (IBN-Net default configuration)
+  ibn_stages: [1, 2, 3]
+  baseline: false
+  dropout: 0.5              # paper §3.2 "All dropout rates are set to 0.5"
+  gem_p: 3.0
+  sample_rate: 8000         # paper §3.2
+  n_fft: 512
+  hop: 256
+  use_mel: false            # Assumption: the Fig.1 caption says log-spectrogram → log of a linear STFT
+  n_mels: 128
+  mixup_alpha: 0.2          # paper Eq. (1)
+  label_smoothing: 0.01     # paper §3.2

@@ -1,0 +1,32 @@
+# AMS-D (ICASSP 2026) ICBHI 4-class.
+#   Official code: AST 16/16 + attentive masked self-distillation, 50 ep, bs 24 drop_last, Adam 5e-5/wd 5e-7/betas(.95,.999),
+#     MultiStep ×0.2 @[15,25,30,35,40,45] (main.py:52; the paper's "every 5 epochs after epoch 15" would include 20 — the code default is kept.
+#     To follow the paper text: optimizer.lr_scheduler.params.milestones=[15,20,25,30,35,40,45]); no AMP, no MA.
+#   Toolkit protocol (differs from the official code): 100% of the official train set + official test evaluation every epoch, best-on-test (paper_score). The official code
+#     trains on an 80% subset of (train+dataset_aug) and selects best_acc/best_score on the 20% valid split; test.py defaults to epoch 45. dataset_aug is unavailable (known gap).
+#   Assumptions (not confirmed by the authors): 8 s loop-pad clips, freqm/timem and mean/std, noise amplitude, roll RNG derivation — see data/icbhi_amsd.yaml, model/ast_amsd.yaml.
+#   Paper-reported values (§3.1 binary formula, non-standard): AMS-D Se 60.92 / Sp 74.16 / Score 67.54; baseline 64.47/67.15/65.81 (number of runs and ± not reported).
+#   Run: rsctk-train --config-name amsd_icbhi run.name=icbhi-amsd-s1 seed=1
+#   Variants: model.params.method=baseline|sd_only|sd_mask, model.params.mask_mode=random|time_inter|freq_inter
+defaults:
+  - model: ast_amsd
+  - data_defaults@data: base
+  - data: icbhi_amsd
+  - loss: cross_entropy         # validation CE (main.py criterion_CE) / L_task of baseline; the AMS-D training loss is AMSDLoss inside the model
+  - metrics: amsd_metrics
+  - optimizer: adam_amsd
+  - trainer: default
+  - callbacks: amsd_paper
+  - _self_
+
+seed: 1
+
+trainer:
+  params:
+    max_epochs: 50
+    precision: 32               # no AMP in the official code
+
+run:
+  name: icbhi-amsd
+  group: amsd
+  tags: [amsd, icbhi]

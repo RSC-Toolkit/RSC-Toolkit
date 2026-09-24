@@ -1,0 +1,10 @@
+# @package _global_
+# RespireNet training protocol: every epoch the test set is evaluated by chunk→cycle majority vote; best is saved at the **best cycle accuracy**
+# (train.py:266 — not Score-based). No MA/cosine. Epoch resume supported.
+trainer:
+  params:
+    callbacks:
+      - _target_: rsc_toolkit.trainer.callbacks.respirenet_vote_eval.RespireNetVoteEval
+        dirpath: outputs/respirenet/${run.name}
+      - _target_: rsc_toolkit.trainer.callbacks.resume_checkpoint.EpochResumeCheckpoint
+        dirpath: outputs/respirenet/${run.name}

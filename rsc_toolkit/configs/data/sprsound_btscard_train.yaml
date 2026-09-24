@@ -1,0 +1,49 @@
+# Data config for **training BTS-CARD directly on SPRSound** (SPR→SPR, 7-class).
+#
+# This is a different file from sprsound_btscard.yaml — that one is the **zero-shot OOD evaluation view** that applies an ICBHI-trained ckpt to SPRSound
+# (7→4 merge, with its own slicing in sprsound_ood.py); this config trains on SPRSound.
+#   · datamodule_name: btscard_sprs  → attaches meta7-shaped vectors to the batches of **both train and val**
+#     (the default index path does not attach meta to val, so BTS-family models crash in validation_step)
+#   · no label_map → original 7-class labels
+#   · shuffle_train/drop_last_train on (same as the official ICBHI train loader)
+#
+# The audio/feature chain matches sprsound_bts.yaml (48 kHz → recording fade → segment slicing → 8 s repeat+fade_out → CLAP log-mel 1001×64).
+# This chain was verified on ICBHI to match the authors' released tensors (see the comments in data/bts_precomputed.yaml).
+# The cache is also shared with sprsound_bts — time_unit, padding and sampling rate are all identical, giving the same waveforms.
+name: sprsound_btscard_train
+params:
+  datamodule_name: btscard_sprs
+
+  dataset_name: sprsound
+  index_dataset_cls: rsc_toolkit.datasets.index_dataset.IndexDataset
+  project_root: ${hydra:runtime.cwd}
+  data_dir: .datasets/sprsound
+  raw_data_subdir: Classification
+  index_filename: index_cycle.csv
+
+  sampling_rate: 48000
+  sample_level: cycle
+  desired_length_sec: 8.0
+  pad_type: repeat_fade
+  fade: true
+  time_unit: ms_int
+
+  train_splits: [train]
+  val_splits: [test]             # best-on-test — same protocol as the other rows
+  test_splits: [test]
+
+  batch_size: 8
+  num_workers: 8
+  shuffle_train: true
+  drop_last_train: true          # official ICBHI train loader uses drop_last=True
+  pin_memory: true
+
+  features:
+    enabled: true
+    kind: clap
+    cache_dir: downloaded_datasets/features_cache_bts_sprs   # same chain as sprsound_bts → shared cache
+    clap_model_name: laion/clap-htsat-unfused
+
+  feature_precompute: true
+  feature_precompute_batch_size: 8
+  feature_precompute_num_workers: 0

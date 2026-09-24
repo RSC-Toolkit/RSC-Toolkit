@@ -1,0 +1,37 @@
+# The 4 non-AST SFT baselines of the SG-SCL repository, extended to the standard SPRSound task (7-class).
+#   rsctk-train --config-name sgscl_nonast_sprs model.name=resnet18_sft   seed=N run.name=sprs-resnet18-ce-sN
+#   ... model.name=resnet34_sft | efficientnet_b0_sft | cnn6_sft
+# **No paper-reported value** — the paper evaluates ICBHI only. Each paper's ICBHI recipe is used unchanged.
+# ICBHI uses weighted CE, so SPRS uses the same weighted-CE formula computed on the SPRSound distribution.
+defaults:
+  - model: sft_backbone
+  - data_defaults@data: base
+  - data: sprsound_sgscl_nonast
+  - loss: cross_entropy_weighted_sprsound
+  - metrics: sprsound_metrics
+  - optimizer: adam
+  - trainer: default
+  - callbacks: sgscl_nonast_paper
+  - _self_
+
+seed: 1
+
+trainer:
+  params:
+    max_epochs: 400
+    precision: 16-mixed
+
+optimizer:
+  params:
+    lr: 1e-3                   # script --learning_rate 1e-3 — same as the icbhi variant.
+                               # Required: the PaperCosineLR callback reads its lr from the optimizer group,
+                               # so without this override training would run at the adam default of 5e-5.
+
+run:
+  name: sprs-nonast-sft
+  group: sgscl
+  tags: [sgscl, sprsound, extension]
+
+model:
+  params:
+    n_cls: 7

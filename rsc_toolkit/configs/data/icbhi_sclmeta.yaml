@@ -1,0 +1,41 @@
+# SCL-metadata ICBHI data: slice the cycle at the native sr, resample to 16 kHz → fade in/out → 8 s circular padding + fade_out
+# → cached torchaudio dB-mel (64, 1024/512, 50–2000 Hz). Per-batch min-max · SpecAug · Standardize happen inside the model.
+name: icbhi_sclmeta
+params:
+  datamodule_name: index
+  dataset_name: icbhi
+  index_dataset_cls: rsc_toolkit.datasets.index_dataset.IndexDataset
+  project_root: ${hydra:runtime.cwd}
+  split_file: rsc_toolkit/datasets/icbhi/data/official_split.txt
+  data_dir: .datasets/icbhi
+
+  sampling_rate: 16000
+  sample_level: cycle
+  desired_length_sec: 8.0
+  pad_type: sclmeta
+  fade: false                      # the fade is applied directly to the segment by pad_type=sclmeta
+  resample_after_slice: true       # official dataset.py: load the segment, then resample
+
+  train_splits: [train]
+  val_splits: [test]               # official test evaluation every epoch, best Sc (no Se gate)
+  test_splits: [test]
+
+  batch_size: 128
+  num_workers: 8
+  shuffle_train: true
+  drop_last_train: false           # the official DataLoader has no drop_last (last batch of 46)
+  pin_memory: true
+
+  features:
+    enabled: true
+    kind: sclmeta_mel
+    cache_dir: downloaded_datasets/features_cache
+    n_mels: 64
+  feature_precompute: true
+  feature_precompute_batch_size: 8
+  feature_precompute_num_workers: 0
+
+  specaugment:
+    enabled: false                 # applied inside the model (torchaudio iid)
+
+  meta_label_mode: sa              # sex x age group, 4 classes (M-SCL)

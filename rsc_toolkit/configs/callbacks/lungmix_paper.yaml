@@ -1,0 +1,11 @@
+# @package _global_
+# Lungmix training-protocol callbacks: best = toolkit best-on-test (best Score, no Se gate — the paper's COMB-based selection (including HF) is out of scope and not possible).
+# Cosine annealing is handled by the lr_scheduler (per epoch) in optimizer/adamw_lungmix.yaml.
+trainer:
+  params:
+    callbacks:
+      - _target_: rsc_toolkit.trainer.callbacks.icbhi_best_checkpoint.ICBHIBestScoreCheckpoint
+        dirpath: outputs/lungmix/${run.name}
+        min_se: -1.0
+      - _target_: rsc_toolkit.trainer.callbacks.resume_checkpoint.EpochResumeCheckpoint
+        dirpath: outputs/lungmix/${run.name}

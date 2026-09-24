@@ -1,0 +1,53 @@
+# SPRSound OOD evaluation view of the QLung **Audio-CLAP version** (not used for training): 7→4 merged derived labels (Rhonchi·Stridor excluded), same
+# audio chain as the ICBHI CLAP version (icbhi_qlung_clap.yaml) (48 kHz → recording fade → segment slicing → 8 s repeat_fade → ClapProcessor log-mel). Evaluation scope
+# and label merging are the same as the AST version's OOD view (sprsound_qlung_ood.yaml).
+name: sprsound_qlung_clap_ood
+params:
+  datamodule_name: qlung
+  dataset_name: sprsound
+  index_dataset_cls: rsc_toolkit.datasets.qlung_data.QLungAQSIndexDataset
+  project_root: ${hydra:runtime.cwd}
+  data_dir: .datasets/sprsound
+  raw_data_subdir: Classification
+  index_filename: index_cycle.csv
+  label_map: sprsound_7to4
+
+  sampling_rate: 48000           # CLAP path (16000 in the AST OOD view)
+  sample_level: cycle
+  desired_length_sec: 8.0
+  pad_type: repeat_fade          # Assumption: same as ICBHI (recording fade in/out + 8 s repeat + fade_out)
+  fade: true
+  resample_after_slice: false    # Assumption: resample the whole recording to 48 kHz, then slice in seconds (same chain as the ICBHI CLAP version)
+  time_unit: s
+
+  train_splits: [train]
+  val_splits: [test]
+  test_splits: [test]
+
+  batch_size: 8
+  num_workers: 8
+  shuffle_train: false
+  drop_last_train: false
+  pin_memory: true
+
+  features:
+    enabled: true
+    kind: clap
+    cache_dir: downloaded_datasets/features_cache_qlung_clap_ood   # separate cache (the chain is not part of the cache key, so kept apart from the AST version and ICBHI CLAP)
+    clap_model_name: laion/clap-htsat-unfused
+  feature_precompute: true
+  feature_precompute_batch_size: 8
+  feature_precompute_num_workers: 0
+
+  specaugment:
+    enabled: false
+
+  qlung:
+    alpha: 0.7
+    beta: 0.3
+    entropy_source: rms
+    formula: code
+    cache_dir: downloaded_datasets/aqs_cache_clap48k   # based on the 48 kHz waveform (same directory as the ICBHI CLAP version; file names include the dataset)
+    precompute: true
+    precompute_num_workers: 8
+    attach_val: true

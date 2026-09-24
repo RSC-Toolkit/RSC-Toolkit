@@ -1,0 +1,30 @@
+# Lung-SRAD (Interspeech 2026) DASS-medium (VMamba-S v2) variant — official code defaults. Select the ladder step with method:
+#   ce = DASS FT (no blur) · ce_blur = SAR (blur K5 σ3, stage2 blocks {2,3}) · patchmix_cl = Lung-SRAD (cl_mode dual; time|freq|2d are the Table 2 variants)
+# mix_layout: as_code (official behavior: 'time' = 32 frequency bins, 'freq' = 96 channels) | as_paper (Eq.6-7: time 256 / frequency 32)
+name: dass_lungsrad
+params:
+  n_cls: 4
+  method: ce
+  cl_mode: dual
+  mix_layout: as_code
+  train_projector: true          # false = main.py behavior (projector not trained). Difference measured by the authors: +1.61 (63.00 vs 61.39)
+  gaussian_blur: null            # null → method != ce
+  blur_blocks: [2, 3]
+  blur_stage: [2]
+  kernel_size: 5
+  sigma: 3.0
+  blur_strength: 1.0
+  mix_beta: 1.0
+  temperature: 0.2
+  negative_pair: all
+  target_type: project_flow
+  proj_dim: 768
+  alpha_time: 1.0
+  alpha_freq: 1.0
+  alpha: 1.0
+  detach_mix_2d: false           # no detach in the official 2d branch (quirk)
+  drop_path_rate: 0.3
+  audioset_pretrain: true        # DASS_medium_v2.pth ('module.v.' stripped, head excluded)
+  pretrained_path: null
+  amp: true                      # official autocast fp16, no GradScaler (trainer precision 32)
+  ssm_backend: auto              # auto | torch | cuda_oflex

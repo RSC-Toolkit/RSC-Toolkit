@@ -1,0 +1,21 @@
+# AST of the Patch-Mix paper (Interspeech 2023) — faithful port of the official code (verified against goldens).
+# select method with an override:
+#   AST SFT      : model.params.method=ce          + loss=cross_entropy_weighted_icbhi
+#   Patch-Mix CE : model.params.method=patchmix    + loss=cross_entropy
+#   Patch-Mix CL : model.params.method=patchmix_cl + loss=cross_entropy
+name: ast_patchmix
+params:
+  n_cls: 4
+  method: ce
+  mix_beta: 1.0
+  proj_dim: 768
+  temperature: 0.06
+  alpha: 1.0
+  negative_pair: all
+  target_type: grad_block
+  time_domain: false
+  # the toolkit datamodule provides (B, n_mels=128, frames=798)
+  input_layout: freq_time
+  # the two below are intentionally swapped, replicating an official-code quirk (see the models/ast_patchmix.py docstring)
+  input_fdim: 798
+  input_tdim: 128

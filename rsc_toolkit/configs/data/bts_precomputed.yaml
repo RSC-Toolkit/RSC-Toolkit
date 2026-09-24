@@ -1,0 +1,13 @@
+# BTS authors' released preprocessed tensors (48 kHz → 8 s repeat/fade → HF ClapProcessor log-mel 1001x64).
+# The toolkit's own pipeline (IndexDataset 48k + repeat_fade + CLAPProcessor) was verified to match these tensors bit for bit,
+# but the released files are read as is to guarantee the same input as the paper results.
+name: bts_precomputed
+params:
+  datamodule_name: bts_precomputed
+  train_path: pretrained_models/upstream/bts/training.pt
+  test_path: pretrained_models/upstream/bts/test.pt
+  batch_size: 8
+  num_workers: 8
+  shuffle_train: true
+  drop_last_train: true          # official train loader uses drop_last=True
+  pin_memory: true

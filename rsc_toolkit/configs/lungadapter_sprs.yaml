@@ -1,0 +1,37 @@
+# lungadapter extended to the **standard SPRSound task (2022 inter-patient, 7-class)** — **no paper-reported value** (toolkit extension, no paper counterpart).
+# The paper evaluates ICBHI only. Not a reproduction target; used to observe cross-dataset generalization.
+# LungAdapter (Interspeech 2024) ICBHI 4-class, official 60/40 split — re-implementation from the paper specification (no code).
+#   Stated in the paper: Adam lr 5e-4, cosine, bs 8, 50 ep, weighted CE, frozen IN+AS AST, adapter hidden 16 / ratio 0.15, 5 random runs.
+#   **Assumed** to be inherited from Bae [13]: data pipeline (icbhi_patchmix: 16 kHz, 8 s repeat+fade, fbank 128/798, SpecAugment icbhi_ast_sup always on),
+#   weighted CE formula (class_nums), AMP (16-mixed), MA 0.5, best-on-test (Se>5), wd 1e-6 (also applied to the adapter scales s1/s2).
+#   Window function: the paper says '25 ms Hamming', but the Bae code is inherited (kaldi fbank hanning, processors/mel.py) → hanning is used (notation mismatch).
+#   Paper-reported: Table 1 80.43/44.37/62.40±1.11 (the vector recovered from Fig.2 gives 75.53/45.21/60.37 — inconsistent within the paper).
+#   Run: .venv/bin/python -m rsc_toolkit.train --config-name lungadapter_icbhi run.name=icbhi-lungadapter-s1 seed=1
+#   Smoke test: ... run.name=smoke-lungadapter seed=1 trainer.params.max_epochs=1 +trainer.params.limit_train_batches=3 +trainer.params.limit_val_batches=3
+#   ablation: ... model.params.use_res_adapter=false run.name=icbhi-lungadapter-attnonly-s1
+#             ... model.params.use_attn_adapter=false run.name=icbhi-lungadapter-resonly-s1
+defaults:
+  - model: ast_lungadapter
+  - data_defaults@data: base
+  - data: sprsound_patchmix
+  - loss: cross_entropy_weighted_sprsound   # weighted CE of the ICBHI recipe, mapped to the SPRS distribution (same formula)
+  - metrics: sprsound_metrics
+  - optimizer: adam_lungadapter   # Adam lr 5e-4 (paper), wd 1e-6 (assumed from Bae)
+  - trainer: default              # max_epochs 50
+  - callbacks: lungadapter_paper
+  - _self_
+
+seed: 1
+
+trainer:
+  params:
+    precision: 16-mixed           # Bae AMP (autocast+GradScaler), assumed inherited; to disable: trainer.params.precision=32
+
+run:
+  name: sprs-lungadapter
+  group: lungadapter
+  tags: [lungadapter, icbhi]
+
+model:
+  params:
+    n_cls: 7

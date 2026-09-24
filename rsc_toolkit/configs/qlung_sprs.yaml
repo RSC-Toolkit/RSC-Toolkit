@@ -1,0 +1,42 @@
+# QLung **trained and evaluated directly on the standard SPRSound task (2022 inter-patient, 7-class)** (SPR→SPR).
+#
+# Why a separate config — the ICBHI-trained model is evaluated on SPRSound only as **zero-shot OOD** (7→4 merge), which gives no value
+# for the data principle "train on SPRSound → evaluate on SPRSound". This config provides it.
+# The OOD value (sprsound_qlung_ood.yaml + eval_qlung_ood.py) has a paper-reported value, so it is **kept as is** and reported alongside.
+#
+# Paper-reported value: none. The QLung paper uses SPRSound only for OOD and reports no in-domain training results.
+#            → not a reproduction target but a **toolkit extension (no paper counterpart)**.
+#
+# Recipe: QLung's ICBHI recipe unchanged (50 ep, bs 8, adam 5e-5/wd 1e-6, cosine, MA 0.6, AMP, unweighted CE).
+#         Only the number of classes (4→7) and the corresponding class_nums for π_y change.
+#
+#   rsctk-train --config-name qlung_sprs seed=N run.name=sprs-qlung-sN
+defaults:
+  - model: ast_qlung
+  - data_defaults@data: base
+  - data: sprsound_qlung
+  - loss: cross_entropy        # ICBHI QLung uses unweighted CE (criterion[0], no --weighted_loss) → SPRS stays unweighted
+  - metrics: sprsound_metrics  # 7-class Se/Sp/Score (keeps the icbhi_score key → compatible with best selection in the qlung_paper callback)
+  - optimizer: adam            # lr 5e-5, wd 1e-6
+  - trainer: default           # max_epochs 50
+  - callbacks: qlung_paper     # MA 0.6 (excluding dfam) · PaperCosineLR · best-on-test (Se>5) · last.ckpt for resuming
+  - _self_
+
+seed: 1
+
+trainer:
+  params:
+    precision: 16-mixed        # official AMP (GradScaler + autocast)
+
+run:
+  name: sprs-qlung
+  group: qlung
+  tags: [qlung, sprsound, extension]
+
+model:
+  params:
+    n_cls: 7
+    # π_y (class priors of the AngularClassifier) — SPRSound 2022 inter-patient **train** distribution, 7-class, sum 6,656.
+    # Normal 5159 / Fine Crackle 912 / Wheeze 452 / Coarse Crackle 49 / Wheeze+Crackle 30 / Rhonchi 39 / Stridor 15
+    # (counted on the actual data; same source as the values in loss/cross_entropy_weighted_sprsound.yaml)
+    class_nums: [5159, 912, 452, 49, 30, 39, 15]

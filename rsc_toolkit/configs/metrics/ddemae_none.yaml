@@ -1,0 +1,3 @@
+# DDE-MAE stage 1: training_forward outputs dummy zero logits, so classification metrics are meaningless → no metrics (the loss breakdown is logged by DDEMAELossLogger in callbacks/ddemae_stage1)
+train: []
+val: []

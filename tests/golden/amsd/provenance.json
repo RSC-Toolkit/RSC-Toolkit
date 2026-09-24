@@ -1,0 +1,7 @@
+{
+  "repo": "/raid/doyoung/projects/RSC-Toolkit/outputs/reference/amsd",
+  "ckpt": "/raid/doyoung/projects/RSC-Toolkit/pretrained_models/upstream/audioset_16_16_0.4422.pth",
+  "torch": "2.13.0+cu130",
+  "timm": "0.4.5",
+  "note": "CPU forced (cuda.is_available=False, nn.Module.cuda no-op, DataParallel replaced, wget stub); random parameters made deterministic with det_fill for mlp_head/gpredlayer/mask_embed and sin_fill for token_weight (linspace makes all token scores tie). augment.pt holds values from actually running the official loader/mydataset.py ICBHIDataset in .venv (synthetic wav; short=fbank zero-padding fallback, loop=8 s repeat padding)"
+}

@@ -1,0 +1,26 @@
+# ADD-RSC (AST) ICBHI 4-class — official code defaults: 50 ep, bs 8 drop_last, AdamW 5e-5/wd 1e-6 + per-epoch cosine, unweighted CE + LabelSmoothing(0.2) 0.5/0.5,
+#   MA 0.5, SpecAug(icbhi_ast_sup, mean) → Resize(1024,256), fp16 autocast (no GradScaler), best-on-test (Se>5). Paper (single seed 0): 85.13/45.94/65.53.
+#   Main result = official 60/40 split (data: icbhi_patchmix). Code split (random.Random(1), file-level) for comparison: data.params.split_file=rsc_toolkit/datasets/icbhi/data/addrsc_random1_split.txt
+#   Run: rsctk-train --config-name addrsc_icbhi run.name=icbhi-addrsc-s1 seed=1
+defaults:
+  - model: ast_addrsc
+  - data_defaults@data: base
+  - data: icbhi_patchmix
+  - loss: cross_entropy         # official default is --weighted_loss off (enabling it raises NameError)
+  - metrics: icbhi_metrics
+  - optimizer: adamw_addrsc     # AdamW lr 5e-5, wd 1e-6 (official misc.py: adam → AdamW)
+  - trainer: default
+  - callbacks: addrsc_paper
+  - _self_
+
+seed: 1
+
+trainer:
+  params:
+    max_epochs: 50
+    precision: 32               # AMP via autocast inside the model (no GradScaler, as in the official code)
+
+run:
+  name: icbhi-addrsc
+  group: addrsc
+  tags: [addrsc, icbhi]

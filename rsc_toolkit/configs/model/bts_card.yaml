@@ -1,0 +1,27 @@
+# BTS-CARD (ICASSP 2026, RSC-Toolkit/BTS-CARD a9982a0) — counterfactual (RUBI) and adversarial (GRL) debiasing on top of BTS, faithful port of the official code.
+# Defaults = official code quirks as is (KL has no effect, c=1 fixed, masking = omit None). Switching to the paper form is done via flags.
+#   ablation w/o (a)/(b)/(c): model.params.use_counterfactual=false / use_adversarial=false / use_meta_aug=false
+#   (definitions are provisional, not confirmed by the authors)
+name: bts_card
+params:
+  n_cls: 4
+  pretrained_name: laion/clap-htsat-unfused
+  final_feat_dim: 512
+  clap_final: concat
+  te_alpha: 0.5
+  meta_mode: all
+  text_max_length: 64
+  nde_pretrained_name: pretrained_models/upstream/hf/tiny-clinicalbert   # local copy of nlpie/tiny-clinicalbert (provenance.json)
+  alpha: 0.0            # inference TIE o1 − α·o2; α=0 fixed in the toolkit main-result protocol, sweep via the eval script
+  lambda_loc: 0.01
+  lambda_dev: 0.1
+  grl_lambda: 1.0
+  p_mask: 0.25
+  kl_dead: true         # true = official code (KL without gradient), false = paper Eq.8
+  const_trainable: false
+  mask_mode: omit       # omit = official code (omit None) | unknown = paper §2.3 placeholder
+  n_loc: 7
+  n_dev: 4
+  use_counterfactual: true
+  use_adversarial: true
+  use_meta_aug: true

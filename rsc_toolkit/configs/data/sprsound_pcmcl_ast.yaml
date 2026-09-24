@@ -1,0 +1,54 @@
+# PC-MCL (AST) extended to the standard SPRSound task (7-class) — the AST counterpart of sprsound_pcmcl_beats.
+# ICBHI recipe (icbhi_pcmcl_ast) unchanged: kaldi fbank 128 mel (mean -4.2677393 / std 4.5689974), 10 s → 998 frames,
+# training = dynamic concatenation · PM pairs, evaluation = single cycles. Dataset arguments, label space and patient unit match sprsound_pcmcl_beats
+# (16 kHz · 10 s repeat+fade · resample_after_slice · ms_int · label_space=sprsound7 · patient_id_mode=recording).
+# Dedicated feature cache directory — even on SPRSound, if the chain ledger mixes with another config's chain (5 s, slicing in seconds, etc.), the chain guard rejects it.
+name: sprsound_pcmcl_ast
+params:
+  datamodule_name: pcmcl
+  dataset_name: sprsound
+  index_dataset_cls: rsc_toolkit.datasets.index_dataset.IndexDataset
+  project_root: ${hydra:runtime.cwd}
+  data_dir: .datasets/sprsound
+  raw_data_subdir: Classification
+  index_filename: index_cycle.csv
+  sampling_rate: 16000
+  sample_level: cycle
+  desired_length_sec: 10.0
+  pad_type: repeat_fade
+  resample_after_slice: true
+  time_unit: ms_int
+  train_splits: [train]
+  val_splits: [test]
+  test_splits: [test]
+  batch_size: 32
+  num_workers: 8
+  shuffle_train: true
+  drop_last_train: true
+  pin_memory: true
+  features:
+    enabled: true
+    kind: fbank
+    cache_dir: downloaded_datasets/features_cache_pcmcl_ast_sprs   # dedicated (chain: 16 kHz · 10 s · repeat_fade · ras1 · ms_int)
+    n_mels: 128
+    target_frames: 998           # 10 s → h = 998 (main.py:257)
+    frame_shift: 10
+    window_type: hanning
+    dither: 0.0
+    normalize: true
+  feature_precompute: true       # fbank cache for the evaluation set (test)
+  feature_precompute_batch_size: 8
+  feature_precompute_num_workers: 0
+  specaugment:
+    enabled: false               # SpecAugment is applied per batch by the model (ast_pcmcl.specaug) (official main.py:531)
+  pcmcl:
+    label_space: sprsound7       # 6-attribute decomposition — without it the 4-class converter silently drops labels 4·5·6
+    mode: default
+    mixing_prob: 1.0
+    conditional_mixing: false
+    mixing_label_strategy: additive
+    enable_ssl: true
+    ssl_prob: 0.3
+    patient_id_mode: recording
+    hard_negative_mode: dict_order
+    cache_dir: outputs/pcmcl/cache_sprs   # the cycle cache can be shared with the BEATs version (the key is determined by sr and fade)

@@ -1,0 +1,42 @@
+# GaP-Aug ICBHI data: official 60/40 split, 16 kHz, 10 s cycles (short ones repeat-concatenated / long ones cut to the first 10 s), raw waveform (log-mel inside the model),
+# class-balanced batches (4/class × 4 = 16, sampling with replacement assumed), epoch = 500 steps (20,000 iter = 40 epochs), best-on-test protocol.
+# Assumptions: cycles longer than 10 s keep only the first 10 s (the paper's 'divided into 10-second segments' may mean multiple segments);
+#       no per-recording fade (fade: false; not mentioned in the paper — stated explicitly, as in the opera config).
+name: icbhi_gapaug
+params:
+  datamodule_name: gapaug
+  dataset_name: icbhi
+  index_dataset_cls: rsc_toolkit.datasets.index_dataset.IndexDataset
+  project_root: ${hydra:runtime.cwd}
+  split_file: rsc_toolkit/datasets/icbhi/data/official_split.txt
+  data_dir: .datasets/icbhi
+
+  sampling_rate: 16000
+  sample_level: cycle
+  desired_length_sec: 10.0
+  pad_type: repeat
+  fade: false                      # Assumption: not mentioned in the paper (disables the IndexDataModule default true)
+
+  train_splits: [train]
+  val_splits: [test]               # official test evaluation every epoch (500 steps) → best-on-test (model selection not specified in the paper)
+  test_splits: [test]
+
+  batch_size: 16                   # evaluation batch / reference value (the training batch is gapaug.per_class × 4)
+  num_workers: 8
+  shuffle_train: true
+  drop_last_train: false
+  pin_memory: true
+
+  features:
+    enabled: true
+    kind: waveform                 # no cache — the model computes log-mel
+  feature_precompute: false
+
+  specaugment:
+    enabled: false                 # augmentation happens inside the model (method)
+
+  gapaug:
+    per_class: 4
+    steps_per_epoch: 500
+    n_classes: 4
+    seed: null                     # null: derived from torch.initial_seed()

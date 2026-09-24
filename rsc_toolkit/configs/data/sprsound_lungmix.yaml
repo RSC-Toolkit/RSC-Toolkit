@@ -1,0 +1,49 @@
+# Lungmix (ICASSP 2025) SPRSound data — paper §III-A event 7-class → ICBHI-style 4-class merge (derived labels: Normal→0,
+# Fine/Coarse Crackle→1, Wheeze→2, Both→3). **Rhonchi·Stridor are excluded** (the paper describes merging them into wheeze).
+#   With this exclusion the train set has 6,602 events (merging Rhonchi·Stridor into wheeze would add 54 train events).
+# Assumption: 2022 inter-patient test (bundled official_split 'valid'→test).
+# **Non-standard**: differs from the toolkit's standard SPRSound protocol (7-class). Preprocessing is the same as icbhi_lungmix.
+name: sprsound_lungmix
+params:
+  datamodule_name: lungmix
+  dataset_name: sprsound
+  index_dataset_cls: rsc_toolkit.datasets.lungmix_data.LungmixIndexDataset
+  project_root: ${hydra:runtime.cwd}
+  data_dir: .datasets/sprsound
+  raw_data_subdir: Classification
+  index_filename: index_cycle.csv
+
+  sampling_rate: 16000
+  sample_level: cycle
+  desired_length_sec: 9.0
+  pad_type: repeat
+  fade: false
+  resample_after_slice: true     # as in the other sprsound configs (native 8 kHz segment → 16 kHz)
+  time_unit: ms_int
+
+  train_splits: [train]
+  val_splits: [test]
+  test_splits: [test]
+
+  batch_size: 4
+  num_workers: 4
+  shuffle_train: true
+  drop_last_train: false
+  pin_memory: true
+
+  features:
+    enabled: true
+    kind: waveform
+  feature_precompute: false
+
+  lungmix:
+    label_map: sprsound_7to4
+    emit_valid_len: true       # puts the original segment length (before padding) into meta_labels of train batches (default path for model mix_stage=raw; can be false for the padded alternative)
+    bandpass:
+      enabled: true
+      kind: butter
+      order: 4
+      zero_phase: true
+      low_hz: 50.0
+      high_hz: 1500.0
+      before_pad: true           # applied per cycle segment (assumption; per-recording alternative not implemented)

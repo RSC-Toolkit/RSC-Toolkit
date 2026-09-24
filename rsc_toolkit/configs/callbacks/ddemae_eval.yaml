@@ -1,0 +1,10 @@
+# @package _global_
+# DDE-MAE classification (B2/stage 2) evaluation protocol: best official test Score every epoch (no Se gate — selection criterion not specified in the paper; toolkit standard), resumable
+trainer:
+  params:
+    callbacks:
+      - _target_: rsc_toolkit.trainer.callbacks.icbhi_best_checkpoint.ICBHIBestScoreCheckpoint
+        dirpath: outputs/ddemae/${run.name}
+        min_se: -1.0
+      - _target_: rsc_toolkit.trainer.callbacks.resume_checkpoint.EpochResumeCheckpoint
+        dirpath: outputs/ddemae/${run.name}

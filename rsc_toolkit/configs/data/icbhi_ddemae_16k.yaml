@@ -1,0 +1,46 @@
+# DDE-MAE ICBHI data — **16 kHz variant** (the 4 kHz assumption run collapsed already at the baseline, Se<10%).
+# The only difference from the base config (icbhi_ddemae.yaml, 4 kHz as stated in paper §3.1) is sampling_rate 16000 — it gives the same feature geometry as the
+# Audio-MAE pretraining (AS-2M, 16 kHz, 128 mel, 10 ms hop), removing the band/resolution mismatch where 21 of 128 mel rows were empty filters at 4 kHz.
+# Everything else (10.24 s zero-padding, kaldi fbank 128/10 ms, Audio-MAE normalization constants, official 60/40 split, no augmentation) is unchanged.
+# The cache key changes (sampling_rate is part of the processor config), so pre-fill it once with more feature_precompute_num_workers before training.
+name: index
+params:
+  datamodule_name: index
+  dataset_name: icbhi
+  index_dataset_cls: rsc_toolkit.datasets.index_dataset.IndexDataset
+  project_root: ${hydra:runtime.cwd}
+  split_file: rsc_toolkit/datasets/icbhi/data/official_split.txt   # Assumption: fixed official 60/40 split (the paper's wording 'randomly selected' is ambiguous)
+  data_dir: .datasets/icbhi
+
+  sampling_rate: 16000             # **variant**: paper §3.1 uses 4 kHz — 16 kHz to match the pretraining band
+  sample_level: cycle
+  desired_length_sec: 10.24        # Assumption: Audio-MAE 1024 frames × 10 ms (actually 1022 + 2 frames of 0.0)
+  pad_type: zero                   # Assumption: waveform zero-padding → feature value −1.2776 (differs from +0.467 of Audio-MAE's feature-level ZeroPad2d; alternative: repeat_fade)
+
+  train_splits: [train]
+  val_splits: [test]               # official test evaluation every epoch → best-on-test (no validation set specified in the paper)
+  test_splits: [test]
+
+  batch_size: 8                    # stage 1: 8 per the paper; stage 2 not specified → 8 assumed
+  num_workers: 4
+  shuffle_train: true
+  drop_last_train: false
+
+  features:
+    enabled: true
+    kind: fbank
+    cache_dir: downloaded_datasets/features_cache
+    n_mels: 128
+    target_frames: 1024
+    frame_shift: 10
+    window_type: hanning
+    dither: 0.0
+    normalize: true                # (x - (-4.2677393)) / (4.5689974 * 2) — Audio-MAE AudioSet constants assumed
+    per_sample_stats: false
+
+  feature_precompute: true
+  feature_precompute_batch_size: 8
+  feature_precompute_num_workers: 0
+
+  specaugment:
+    enabled: false                 # the paper mentions no augmentation

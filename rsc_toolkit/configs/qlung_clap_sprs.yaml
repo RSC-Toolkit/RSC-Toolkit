@@ -1,0 +1,33 @@
+# QLung (Audio-CLAP) **trained and evaluated directly on the standard SPRSound task (2022 inter-patient, 7-class)** (SPR→SPR).
+#
+# The CLAP-backbone counterpart of qlung_sprs.yaml (AST version, SPR→SPR). No paper-reported value — the QLung paper reports the CLAP version only on ICBHI and
+# ICBHI→SPRSound OOD → not a reproduction target but a **toolkit extension (no paper counterpart)**.
+# Grade C (re-implementation from the specification, 3 assumptions in models/clap_qlung.py), same as the ICBHI CLAP version.
+#
+# Recipe: qlung_clap_icbhi unchanged (50 ep, bs 8, adam 5e-5/wd 1e-6, cosine, MA 0.6, AMP, unweighted CE).
+#         Only the number of classes (4→7) and class_nums for π_y change (same values as qlung_sprs).
+#
+#   scripts/train.sh qlung_clap_sprs seed=N run.name=sprs-qlung-clap-sN
+defaults:
+  - model: clap_qlung
+  - data_defaults@data: base
+  - data: sprsound_qlung_clap
+  - loss: cross_entropy        # unweighted CE (criterion[0])
+  - metrics: sprsound_metrics  # 7-class Se/Sp/Score (keeps the icbhi_score key → compatible with best selection in the qlung_paper callback)
+  - optimizer: adam            # lr 5e-5, wd 1e-6
+  - trainer: default           # max_epochs 50
+  - callbacks: qlung_paper     # MA 0.6 (excluding dfam) · PaperCosineLR · best-on-test (Se>5) · last.ckpt for resuming
+  - _self_
+seed: 1
+trainer:
+  params:
+    precision: 16-mixed        # official AMP
+run:
+  name: sprs-qlung-clap
+  group: qlung
+  tags: [qlung, clap, sprsound, extension, grade-c]
+model:
+  params:
+    n_cls: 7
+    # π_y — SPRSound 2022 inter-patient train distribution, 7-class (sum 6,656; same source as qlung_sprs.yaml)
+    class_nums: [5159, 912, 452, 49, 30, 39, 15]

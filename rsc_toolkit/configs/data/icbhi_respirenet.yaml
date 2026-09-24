@@ -1,0 +1,25 @@
+# RespireNet data: librosa 4 kHz (kaiser_best) → cycle → 8 s chunks (self-repeat padding, seeded) → magma image (BRC) → Normalize.
+#   80/20 patient folds (official code and released ckpt): split_mode=fold, test_fold=4
+#   ICBHI official 60/40 split (toolkit standard, not in the official code): data.params.split_mode=official
+# mean/std: if null, computed from the training set (augmentation on, seeded) (official get_mean_and_std) — for evaluation only, use the eval.py constants.
+name: icbhi_respirenet
+params:
+  datamodule_name: respirenet
+  data_dir: .datasets/icbhi
+  split_mode: fold
+  test_fold: 4
+  folds_file: rsc_toolkit/datasets/icbhi/data/patient_list_foldwise.txt
+  official_split_file: rsc_toolkit/datasets/icbhi/data/official_split.txt
+  sample_rate: 4000
+  desired_length: 8.0
+  res_type: kaiser_best
+  pad_seed: 0
+  augment: true                # 5 nlpaug augmentations (p .5) + roll (p .5), training only
+  aug_seed: 0
+  mean: null                   # → computed from the training set
+  std: null
+  batch_size: 64
+  num_workers: 8
+  weighted_sampler: true       # WeightedRandomSampler(1/class_prob) — train.py:114-118
+  aug_scale: null              # CBA (official --aug_scale). null = off (released ckpt condition). 1 = oversample the 3 abnormal classes up to the normal count (assumption)
+  cba_seed: null               # CBA sampling seed (null → aug_seed)

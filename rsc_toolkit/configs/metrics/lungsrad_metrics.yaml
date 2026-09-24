@@ -1,0 +1,18 @@
+# Lung-SRAD: standard 4-class ICBHIScore (S_p/S_e/icbhi_score) + 2-class derived metrics (paper_S_p/paper_S_e/paper_score; main.py:420-427 --two_cls_eval: preds>0 → abnormal)
+train:
+  - name: topk_accuracy
+    params:
+      topk: [1]
+
+val:
+  - name: topk_accuracy
+    params:
+      topk: [1]
+  - name: icbhi_score
+    params:
+      num_classes: 4
+      normal_index: 0
+      topk: 1
+  - name: icbhi_paper_binary
+    params:
+      normal_index: 0

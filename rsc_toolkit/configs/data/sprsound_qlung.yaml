@@ -1,0 +1,72 @@
+# Data config for **training QLung directly on the standard SPRSound task (2022 inter-patient, 7-class)** (SPR→SPR).
+#
+# Difference from sprsound_qlung_ood.yaml — that one is an **evaluation-only view** that applies an ICBHI-trained ckpt to SPRSound zero-shot,
+# so it sets label_map (7→4 merge, Rhonchi·Stridor excluded) and disables train shuffling; this config **trains** on SPRSound, so
+#   · no label_map → original 7-class labels (the official definition used by papers with SPRSound as the main task)
+#   · shuffle_train/drop_last_train on (same as the ICBHI QLung train loader)
+#
+# Recipe principle: carry over the recipe each paper used on ICBHI unchanged.
+# Hence the audio/feature chain is identical to icbhi_qlung.yaml — 16 kHz, 8 s, repeat_fade, fbank 128×798, AQS attached.
+#
+# time_unit: t0/t1 in the SPRSound index have ms precision (3 decimals), so 's' and 'ms_int' give the same sample offsets
+#   ('s' → int(t*sr), 'ms_int' → int(round(t*1000))*int(sr/1000); for t=1.079·sr=16000 both give 17264).
+#   QLung's own ICBHI chain uses 's' (default), so it is kept, which also yields the same waveforms as the OOD view.
+name: sprsound_qlung
+params:
+  datamodule_name: qlung
+
+  dataset_name: sprsound
+  index_dataset_cls: rsc_toolkit.datasets.qlung_data.QLungAQSIndexDataset
+  project_root: ${hydra:runtime.cwd}
+  data_dir: .datasets/sprsound
+  raw_data_subdir: Classification   # recording_path is relative to Classification/
+  index_filename: index_cycle.csv
+  # no label_map — original 7-class labels (the point where this differs from sprsound_7to4 in the OOD view)
+
+  sampling_rate: 16000
+  sample_level: cycle
+  desired_length_sec: 8.0
+  pad_type: repeat_fade          # same as ICBHI QLung (recording fade in/out + 8 s repeat + fade_out)
+  fade: true
+  resample_after_slice: false    # resample the whole recording to 16 kHz, then slice segments (ICBHI chain)
+  time_unit: s
+
+  train_splits: [train]
+  val_splits: [test]             # paper protocol: test evaluation every epoch (best-on-test) — same as the other rows
+  test_splits: [test]
+
+  batch_size: 8
+  num_workers: 8
+  shuffle_train: true
+  drop_last_train: true          # official train loader uses drop_last=True
+  pin_memory: true
+
+  features:
+    enabled: true
+    kind: fbank
+    # same waveform chain as the OOD view, but a separate cache — the audio chain is not part of the cache key,
+    # so separating caches by name according to purpose prevents feature-cache collisions.
+    cache_dir: downloaded_datasets/features_cache_qlung_sprs
+    n_mels: 128
+    target_frames: 798
+    frame_shift: 10
+    window_type: hanning
+    dither: 0.0
+    normalize: true
+
+  feature_precompute: true
+  feature_precompute_batch_size: 8
+  feature_precompute_num_workers: 0
+
+  specaugment:
+    enabled: false               # applied per batch by the model (ast_qlung)
+
+  qlung:
+    alpha: 0.7                   # --quality_alpha
+    beta: 0.3                    # --quality_beta
+    entropy_source: rms          # main result = code as is (including the bug in icbhi_dataset.py:177 that passes rms twice)
+    formula: code
+    cache_dir: downloaded_datasets/aqs_cache_sprs   # AQS is computed from the waveform — separate per dataset
+    precompute: true
+    precompute_num_workers: 8
+    attach_val: true             # attach AQS to validation batches too (same as ICBHI)

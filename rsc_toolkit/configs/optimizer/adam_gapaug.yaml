@@ -1,0 +1,5 @@
+# GaP-Aug §3.1: Adam, lr 1e-5 (weight decay and schedule not specified → wd 0 and no schedule assumed)
+name: adam
+params:
+  lr: 1e-5
+  weight_decay: 0.0

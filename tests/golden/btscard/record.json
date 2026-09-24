@@ -1,0 +1,18 @@
+{
+ "transformers": "4.40.0",
+ "torch": "2.2.2+cu121",
+ "repo": "/raid/doyoung/projects/RSC-Toolkit/outputs/reference/btscard",
+ "n": 4,
+ "device": "cpu",
+ "note": "fp32, eval mode (dropout off). The original train() autocasts only CLAP, but the golden uses fp32 throughout",
+ "ckpt": {
+  "path": "pretrained_models/upstream/btscard/best.pth",
+  "alpha": 0.0,
+  "epoch": -1,
+  "best_acc": [
+   87.27042431918383,
+   41.80118946473731,
+   64.53580689196058
+  ]
+ }
+}

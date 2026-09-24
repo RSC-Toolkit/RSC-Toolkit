@@ -1,0 +1,29 @@
+# SCL-metadata (ICASSP 2023) reproduction — supervised run (CE / Hybrid): 400 ep, bs 128, Adam 1e-4/wd 1e-4 + cosine (T_max 40), weighted CE, best test Sc every epoch.
+#   CE     : rsctk-train --config-name sclmeta_icbhi model.params.method=ce run.name=icbhi-sclmeta-ce-s1 seed=1
+#   Hybrid : ... model.params.method=hybrid run.name=icbhi-sclmeta-hybrid-s1
+# SCL/M-SCL take two runs: sclmeta_icbhi_pretrain → sclmeta_icbhi_linear.
+defaults:
+  - model: cnn6_sclmeta
+  - data_defaults@data: base
+  - data: icbhi_sclmeta
+  - loss: cross_entropy_weighted_icbhi
+  - metrics: icbhi_metrics
+  - optimizer: adam_sclmeta
+  - trainer: default
+  - callbacks: sclmeta_eval
+  - _self_
+
+seed: 1
+model:
+  params:
+    method: ce
+
+trainer:
+  params:
+    max_epochs: 400
+    precision: 32
+
+run:
+  name: icbhi-sclmeta-ce
+  group: sclmeta
+  tags: [sclmeta, icbhi]

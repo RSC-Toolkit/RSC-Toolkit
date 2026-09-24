@@ -1,0 +1,34 @@
+# Run config for the non-AST recipes of the sgscl repository (400 ep, bs 64, adam 1e-3/wd 1e-6, cosine, MA 0.5).
+#
+#   SFT(CE): rsctk-train --config-name sgscl_nonast_icbhi model.name=cnn6_sft run.name=icbhi-cnn6-ce
+#   SG-SCL : ... model.name=cnn6_sft model.params.method=sgscl loss=cross_entropy run.name=icbhi-cnn6-sgscl
+#   (repeat for seeds 1-5: seed=N)
+#
+# Note: the repo scripts (bs 64/400 ep/lr 1e-3) differ from the Interspeech'23 text (bs 128/200 ep) —
+# following official-code parity, the official code (scripts) is the default.
+defaults:
+  - model: sft_backbone
+  - data_defaults@data: base
+  - data: icbhi_sgscl_nonast
+  - loss: cross_entropy_weighted_icbhi   # script --weighted_loss (override with loss=cross_entropy for SG-SCL)
+  - metrics: icbhi_metrics
+  - optimizer: adam
+  - trainer: default
+  - callbacks: sgscl_nonast_paper
+  - _self_
+
+seed: 1
+
+optimizer:
+  params:
+    lr: 1e-3                   # script --learning_rate 1e-3 (wd 1e-6 is the adam default)
+
+trainer:
+  params:
+    max_epochs: 400
+    precision: 16-mixed        # official AMP (GradScaler + autocast)
+
+run:
+  name: icbhi-cnn6-ce
+  group: sgscl
+  tags: [sgscl, icbhi, nonast]

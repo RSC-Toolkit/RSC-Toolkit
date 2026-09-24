@@ -1,0 +1,12 @@
+# Lungmix §III-B: AdamW lr 1e-5 + cosine annealing. Assumptions: T_max = epochs (50, not specified), eta_min 0, no warmup.
+# weight_decay: not specified in the paper → 0 chosen (assumption). Alternatives: torch AdamW default 1e-2, toolkit AST/AdamW precedent 1e-6 —
+# the effect of wd is small for 50-epoch fine-tuning at lr 1e-5, but it is unconfirmed, so it is left as a flag (optimizer.params.weight_decay).
+name: adamw
+params:
+  lr: 1e-5
+  weight_decay: 0.0
+lr_scheduler:
+  name: cosine_annealing
+  params:
+    T_max: 50
+    eta_min: 0.0

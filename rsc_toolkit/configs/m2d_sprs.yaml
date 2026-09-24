@@ -1,0 +1,41 @@
+# M2D SPRSound fine-tuning (m2d app/icbhi_sprs eval_sprs.sh): 50 ep, bs 64 + split_iter 4, Adam 5e-6/wd 1e-4 + cosine (T_max 40),
+#   unweighted CE, freeze_embed, SpecAug (scl), Standardize 0.2000/0.2094, fp32, best-on-test Score (7-class; 2022 inter-patient).
+#   Target (cited in EMBC'25 Table II): base 230529 88.78±0.43 (M2D-X SPRS weights are not released → 89.77 cannot be reproduced).
+#   Base 230529   : rsctk-train --config-name m2d_sprs run.name=sprs-m2d-base-s1 seed=1
+defaults:
+  - model: m2d
+  - data_defaults@data: base
+  - data: sprsound_m2d
+  - loss: cross_entropy
+  - metrics: sprsound_metrics
+  - optimizer: adam_m2d
+  - trainer: default
+  - callbacks: m2d_sprs_eval
+  - _self_
+
+seed: 1
+
+model:
+  params:
+    n_cls: 7
+    std_mean: 0.2000
+    std_std: 0.2094
+
+optimizer:
+  params:
+    lr: 5e-6
+
+adapter:
+  name: split_iter
+  params:
+    split_iter: 4
+
+trainer:
+  params:
+    max_epochs: 50
+    precision: 32
+
+run:
+  name: sprs-m2d-base
+  group: m2d
+  tags: [m2d, sprsound]

@@ -1,0 +1,62 @@
+name: ci
+
+on:
+  push:
+    branches: ["main", "refactor/**", "chore/**"]
+  pull_request:
+
+jobs:
+  wheel-smoke:
+    # Build wheel -> install into an empty venv -> from a cwd outside the repo: import, registry, bundled data, config composition, console scripts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install (CPU torch)
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install --index-url https://download.pytorch.org/whl/cpu torch==2.7.0 torchaudio==2.7.0 torchvision==0.22.0
+          python -m pip install -e ".[trainer,models,dev]"
+      - name: Wheel smoke
+        run: PY=python scripts/packaging/smoke_installed_wheel.sh
+
+  unit-tests:
+    # Unit tests including golden-tensor regressions (CPU). No thread-cap env vars: they break bit-exact comparisons.
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install (CPU torch)
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install --index-url https://download.pytorch.org/whl/cpu torch==2.7.0 torchaudio==2.7.0 torchvision==0.22.0
+          # nbformat: tests/unit/test_tutorial_entry.py checks that the committed notebook matches its generator (scripts/tutorial/make_notebook.py)
+          python -m pip install -e ".[trainer,models,dev]" nbformat
+      - name: Unit tests
+        # exact_golden: bit-exact golden comparisons (SpecAugment, PAFA head, etc.) differ in the last digit on runners with a
+        # different CPU/BLAS, so they run on the development machine (GPU server). Tests that need pretrained checkpoints or real data skip themselves via skipif.
+        # -rs: logs the reason for every skipped test on the runner (about 80 depend on pretrained ckpts, real data, or the HF cache) so that
+        # a growing number of silent skips stays visible. tests/integration uses synthetic data only and runs here too.
+        run: python -m pytest tests/unit tests/integration -q -rs -m "not slow and not exact_golden" -p no:cacheprovider
+
+  tutorial:
+    # Executes tutorial notebook Part A (toy, CPU) with nbconvert: install -> index -> train -> re-evaluation -> plugin model.
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install (CPU torch)
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install --index-url https://download.pytorch.org/whl/cpu torch==2.7.0 torchaudio==2.7.0 torchvision==0.22.0
+          python -m pip install -e ".[trainer,models,notebook]"
+      - name: Run tutorial (Part A)
+        run: PY=python RSC_TUTORIAL_WORK=/tmp/rsc_tutorial scripts/tutorial/run_tutorial.sh

@@ -1,0 +1,20 @@
+# @package _global_
+# Callbacks for the AMS-D **SPRSound extension** — a copy of callbacks/amsd_paper.yaml with only the best-selection keys switched to the standard ones.
+#
+# Why separate: amsd_paper is for ICBHI and selects best with the paper's **binary** formula `paper_score`
+# (metrics/amsd_metrics.yaml also computes icbhi_paper_binary). The SPRS extension, however, computes only
+# `sprsound_metrics` (standard 7-class), so that key does not exist; left unchanged, every epoch only warns
+# "metric paper_score missing, skipping best selection" and **best.json·best.pth are never written** (only last.ckpt remains).
+# The paper's binary formula is only for comparison with the ICBHI paper-reported values, so on SPRS selecting by the standard 7-class metrics is correct.
+trainer:
+  params:
+    callbacks:
+      - _target_: rsc_toolkit.trainer.callbacks.amsd_epoch.AMSDEpochCallback
+      - _target_: rsc_toolkit.trainer.callbacks.amsd_best_checkpoint.AMSDBestScoreCheckpoint
+        dirpath: outputs/amsd/${run.name}
+        score_key: icbhi_score
+        se_key: S_e
+        sp_key: S_p
+        min_se: -1.0
+      - _target_: rsc_toolkit.trainer.callbacks.resume_checkpoint.EpochResumeCheckpoint
+        dirpath: outputs/amsd/${run.name}

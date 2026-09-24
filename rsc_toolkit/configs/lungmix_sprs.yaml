@@ -1,0 +1,35 @@
+# Lungmix (ICASSP 2025) SPRSound reproduction — 4-class merge (non-standard, as in the paper), 2022 inter-patient test assumed. Everything else is the same as lungmix_icbhi.
+#   rsctk-train --config-name lungmix_sprs run.name=sprs-lungmix-nonlinear-s1 seed=1          (Eq. 3, 'non-linear' row)
+#   rsctk-train --config-name lungmix_sprs model.params.apply_loudness_mask=false run.name=sprs-lungmix-woloudness-s1 seed=1
+#   rsctk-train --config-name lungmix_sprs model.params.variant=none run.name=sprs-lungmix-none-s1 seed=1
+#   rsctk-train --config-name lungmix_sprs model.params.mix_stage=padded run.name=sprs-lungmix-padded-s1 seed=1   (alternative, optional run)
+# The main run uses mix_stage=raw (mix original segments, then 9 s; data emit_valid_len=true).
+# Paper-reported: Fig.1 SPR→SPR 83.67 (selection criterion not specified; Fig.1 HF column = Table I w/o Mixup HF row → possibly the same selection criterion), Table I non-linear 80.61 /
+#       w/o loudness 76.27 / w/o Mixup 80.44.
+defaults:
+  - model: ast_lungmix
+  - data_defaults@data: base
+  - data: sprsound_lungmix
+  - loss: cross_entropy
+  - metrics: icbhi_metrics       # 4-class merge, so ICBHI-style Sp/Se/Score
+  - optimizer: adamw_lungmix
+  - trainer: default
+  - callbacks: lungmix_paper
+  - _self_
+
+seed: 1
+
+model:
+  params:
+    apply_loudness_mask: true    # main run = paper Eq. 3 ('non-linear' row). false = official code output ('w/o loudness' row)
+
+trainer:
+  params:
+    max_epochs: 50
+    accumulate_grad_batches: 8
+    precision: 32
+
+run:
+  name: sprs-lungmix-nonlinear
+  group: lungmix
+  tags: [lungmix, sprsound, 4class]

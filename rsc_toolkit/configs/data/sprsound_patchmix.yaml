@@ -1,0 +1,43 @@
+# Data config for extending the patch-mix family papers (AST/BEATs backbones, fbank 128×798) to the **standard SPRSound task**.
+# The papers evaluate ICBHI only, so **there is no paper-reported value** — toolkit results (to observe cross-dataset generalization).
+# SPRSound is used only as the dataset intends: 2022 inter-patient, event-level **7-class**.
+name: sprsound_patchmix
+params:
+  datamodule_name: index
+  dataset_name: sprsound
+  index_dataset_cls: rsc_toolkit.datasets.index_dataset.IndexDataset
+  project_root: ${hydra:runtime.cwd}
+  data_dir: .datasets/sprsound
+  raw_data_subdir: Classification
+  index_filename: index_cycle.csv
+  sampling_rate: 16000
+  sample_level: cycle
+  desired_length_sec: 8.0
+  pad_type: repeat_fade          # same chain as the patch-mix family on ICBHI
+  resample_after_slice: true
+  time_unit: ms_int
+  train_splits: [train]
+  val_splits: [test]             # 2022 inter-patient test
+  test_splits: [test]
+  batch_size: 8
+  num_workers: 8
+  shuffle_train: true
+  drop_last_train: true
+  pin_memory: true
+  features:
+    enabled: true
+    kind: fbank
+    cache_dir: downloaded_datasets/features_cache
+    n_mels: 128
+    target_frames: 798
+    frame_shift: 10
+    window_type: hanning
+    dither: 0.0
+    normalize: true
+  feature_precompute: true
+  feature_precompute_batch_size: 8
+  feature_precompute_num_workers: 0
+  specaugment:
+    enabled: true
+    policy: icbhi_ast_sup
+    mask: mean

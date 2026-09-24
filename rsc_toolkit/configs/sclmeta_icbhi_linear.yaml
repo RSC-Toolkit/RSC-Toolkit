@@ -1,0 +1,28 @@
+# SCL-metadata linear evaluation run: frozen encoder (encoder_ckpt) + Linear, 100 ep, Adam 0.1/wd 1e-4, weighted CE, best test Sc every epoch.
+#   rsctk-train --config-name sclmeta_icbhi_linear model.params.encoder_ckpt=outputs/sclmeta/icbhi-sclmeta-mscl-pre-s1/final_state.pth run.name=icbhi-sclmeta-mscl-s1 seed=1
+defaults:
+  - model: cnn6_sclmeta
+  - data_defaults@data: base
+  - data: icbhi_sclmeta
+  - loss: cross_entropy_weighted_icbhi
+  - metrics: icbhi_metrics
+  - optimizer: adam_sclmeta_linear
+  - trainer: default
+  - callbacks: sclmeta_eval
+  - _self_
+
+seed: 1
+model:
+  params:
+    method: linear
+    from_sl_official: false
+
+trainer:
+  params:
+    max_epochs: 100
+    precision: 32
+
+run:
+  name: icbhi-sclmeta-mscl
+  group: sclmeta
+  tags: [sclmeta, icbhi, linear]

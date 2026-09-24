@@ -1,0 +1,34 @@
+# Domain Transfer extended to the standard SPRSound task (7-class). **No paper-reported value** — ICBHI recipe unchanged.
+#   Paper setup: rsctk-train --config-name domaintransfer_sprs seed=N run.name=sprs-dt-paper-sN
+#   Baseline  : ... model.params.baseline=true model.params.mixup_alpha=0 \
+#               data.params.splice_per_class=0 data.params.use_noise=false \
+#               data.params.use_stretch=false data.params.use_pitch=false
+# Class weights are computed by DomainTransferDataModule from the SPRSound train distribution (including splices) and injected into the model
+# (same sklearn balanced formula as ICBHI — no separate loss config needed).
+defaults:
+  - model: resnest_ibn_dt
+  - data_defaults@data: base
+  - data: sprsound_domaintransfer
+  - loss: cross_entropy          # unused — the model computes the weighted soft-CE itself
+  - metrics: sprsound_metrics
+  - optimizer: adam_domaintransfer
+  - trainer: default
+  - callbacks: domaintransfer_paper
+  - _self_
+
+seed: 1
+
+trainer:
+  params:
+    max_epochs: 60
+    precision: 16-mixed
+    reload_dataloaders_every_n_epochs: 1
+
+run:
+  name: sprs-domaintransfer
+  group: domaintransfer
+  tags: [domaintransfer, sprsound, extension]
+
+model:
+  params:
+    n_cls: 7

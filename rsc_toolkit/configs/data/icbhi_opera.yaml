@@ -1,0 +1,35 @@
+# OPERA-CT (EMBC path) ICBHI data: sclmeta waveform preprocessing (segment resampling · 8 s circular padding, 16 kHz), passed on as raw waveforms
+# (per-batch trim · mel64 · dB · min-max are done by the model transform — batch-dependent, so not cacheable). bs 256 (ev_icbhi_opera.sh), no drop_last.
+name: icbhi_opera
+params:
+  datamodule_name: index
+  dataset_name: icbhi
+  index_dataset_cls: rsc_toolkit.datasets.index_dataset.IndexDataset
+  project_root: ${hydra:runtime.cwd}
+  split_file: rsc_toolkit/datasets/icbhi/data/official_split.txt
+  data_dir: .datasets/icbhi
+
+  sampling_rate: 16000
+  sample_level: cycle
+  desired_length_sec: 8.0
+  pad_type: sclmeta
+  fade: false
+  resample_after_slice: true
+
+  train_splits: [train]
+  val_splits: [test]
+  test_splits: [test]
+
+  batch_size: 256
+  num_workers: 8
+  shuffle_train: true
+  drop_last_train: false
+  pin_memory: true
+
+  features:
+    enabled: true
+    kind: waveform               # no cache
+  feature_precompute: false
+
+  specaugment:
+    enabled: false

@@ -1,0 +1,20 @@
+{
+ "ckpt": "pretrained_models/upstream/Cnn14_16k_mAP=0.438.pth",
+ "sample_ids": [
+  "103_2b2_Ar_mc_LittC2SE_cycle_0.364_3.250",
+  "103_2b2_Ar_mc_LittC2SE_cycle_3.250_6.636",
+  "noise_seed0"
+ ],
+ "logmel_shape": [
+  3,
+  1,
+  1001,
+  64
+ ],
+ "n_params_total": 81049500,
+ "n_params_wo_audioset_and_frontend": 79690061,
+ "torch": "2.7.0+cu126",
+ "torchlibrosa": "0.1.0",
+ "panns_commit": "d2f4b8c18eab44737fcc0de1248ae21eb43f6aa4",
+ "fc_audioset_in_golden": false
+}

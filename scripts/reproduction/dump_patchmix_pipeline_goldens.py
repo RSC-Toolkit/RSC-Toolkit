@@ -1,0 +1,118 @@
+"""
+Produces official-code parity goldens from the official Patch-Mix data pipeline
+(cycle extraction→cut/pad→fbank, SpecAugment).
+
+Unlike the model goldens, this script runs **in the toolkit venv**. The original repository does not pin the
+torchaudio version (a reproduction risk), so the reference here is the authors' code itself, not the library
+version — comparing the authors' code and ours on the same torchaudio isolates code differences only.
+
+  .venv/bin/python scripts/reproduction/dump_patchmix_pipeline_goldens.py \
+      --repo <patch-mix clone> --data sample_data/icbhi_patient107/files
+
+cv2/cmapy/nlpaug, imported at the top level of the authors' util module, are not used on the golden path,
+so they are replaced with stubs (get_individual_cycles_torchaudio / generate_fbank /
+SpecAugment only use torchaudio, librosa, numpy and torchvision).
+"""
+import argparse
+import json
+import pathlib
+import random
+import sys
+import types
+from types import SimpleNamespace
+
+import numpy as np
+import torch
+
+
+def _stub(name):
+    mod = types.ModuleType(name)
+    sys.modules[name] = mod
+    return mod
+
+
+def install_stubs():
+    _stub("cv2")
+    _stub("cmapy")
+    nlp = _stub("nlpaug")
+    aug = _stub("nlpaug.augmenter")
+    audio = _stub("nlpaug.augmenter.audio")
+    nlp.augmenter = aug
+    aug.audio = audio
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--repo", required=True)
+    ap.add_argument("--data", default="sample_data/icbhi_patient107/files")  # real ICBHI patient-107 recordings (local only)
+    ap.add_argument("--out", default="tests/golden/patchmix_pipeline")
+    ap.add_argument("--n_files", type=int, default=2)
+    ap.add_argument("--n_cycles", type=int, default=2)
+    args = ap.parse_args()
+
+    install_stubs()
+    sys.path.insert(0, str(pathlib.Path(args.repo).resolve()))
+
+    from util.icbhi_util import get_annotations, get_individual_cycles_torchaudio, generate_fbank  # noqa: E402
+    from util.augmentation import SpecAugment  # noqa: E402
+
+    out = pathlib.Path(args.out)
+    out.mkdir(parents=True, exist_ok=True)
+    data_folder = str(pathlib.Path(args.data).resolve())
+
+    ref_args = SimpleNamespace(
+        sample_rate=16000, desired_length=8, pad_types="repeat",
+        class_split="lungsound", n_cls=4, butterworth_filter=None,
+        specaug_policy="icbhi_ast_sup", specaug_mask="mean",
+    )
+
+    ann_dict = get_annotations(ref_args, data_folder)
+    filenames = sorted(ann_dict.keys())[: args.n_files]
+
+    entries = []
+    fbanks = []
+    for fn in filenames:
+        ann = ann_dict[fn]
+        cycles = get_individual_cycles_torchaudio(
+            ref_args, ann, None, data_folder, fn, ref_args.sample_rate, ref_args.n_cls
+        )
+        rows = []
+        for i in ann.index[: args.n_cycles]:
+            rows.append({
+                "start": float(ann.loc[i]["Start"]),
+                "end": float(ann.loc[i]["End"]),
+                "crackles": int(ann.loc[i]["Crackles"]),
+                "wheezes": int(ann.loc[i]["Wheezes"]),
+            })
+        for k in range(min(args.n_cycles, len(cycles))):
+            audio, label = cycles[k]
+            fb = generate_fbank(audio, ref_args.sample_rate, n_mels=128)  # (798,128,1) numpy
+            fbanks.append(torch.from_numpy(fb).squeeze(-1))
+            rows[k]["label"] = int(label)
+            rows[k]["audio_fingerprint"] = {
+                "shape": list(audio.shape),
+                "mean": float(audio.mean()), "std": float(audio.std()),
+                "tail_mean_abs": float(audio[..., -1000:].abs().mean()),  # for verifying fade_out
+            }
+        entries.append({"filename": fn, "cycles": rows[: args.n_cycles]})
+
+    torch.save(torch.stack(fbanks), out / "fbank_golden.pt")
+    json.dump({"data_folder_note": "sample_data/icbhi_patient107/files", "entries": entries,
+               "torch": torch.__version__}, open(out / "cycles_meta.json", "w"), indent=1)
+
+    # ---- SpecAugment goldens (same policy, same seed) ----
+    img = fbanks[0].unsqueeze(0).clone()  # [1, 798, 128] = same as ToTensor((798,128,1))
+    torch.save(img, out / "specaug_input.pt")
+    torch.manual_seed(5); np.random.seed(5); random.seed(5)
+    sa = SpecAugment(ref_args)
+    ref_out = sa(img.clone())  # the reference is in-place — pass a clone
+    assert not torch.equal(ref_out, img), "the gate is skipped for this seed — change the seed"
+    torch.save(ref_out, out / "specaug_golden.pt")
+
+    print("entries:", [(e["filename"], len(e["cycles"])) for e in entries])
+    print("fbank golden:", tuple(torch.stack(fbanks).shape))
+    print("done:", out)
+
+
+if __name__ == "__main__":
+    main()

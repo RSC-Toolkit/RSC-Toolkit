@@ -1,0 +1,29 @@
+# patch-mix family reproduction run config.
+#
+#   AST SFT      : rsctk-train --config-name patchmix_icbhi
+#   Patch-Mix CE : ... model.params.method=patchmix loss=cross_entropy run.name=icbhi-patchmix-ce
+#   Patch-Mix CL : ... model.params.method=patchmix_cl loss=cross_entropy run.name=icbhi-patchmix-cl
+#   (repeat for seeds 1-5: seed=N)
+#
+# Prerequisite: .datasets/icbhi downloaded + build-index done.
+defaults:
+  - model: ast_patchmix
+  - data_defaults@data: base
+  - data: icbhi_patchmix
+  - loss: cross_entropy_weighted_icbhi
+  - metrics: icbhi_metrics
+  - optimizer: adam            # lr 5e-5, wd 1e-6 — paper values
+  - trainer: default           # max_epochs 50
+  - callbacks: patchmix_paper
+  - _self_
+
+seed: 1
+
+trainer:
+  params:
+    precision: 16-mixed        # official AMP (GradScaler + autocast)
+
+run:
+  name: icbhi-ast-sft
+  group: patchmix
+  tags: [patchmix, icbhi]

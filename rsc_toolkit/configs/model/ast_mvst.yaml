@@ -1,0 +1,10 @@
+# MVST (ICASSP 2024) per-view AST — faithful port of the official code. Select view with an override (16|32|64|128|256).
+name: ast_mvst
+params:
+  n_cls: 4
+  view: 16
+  input_fdim: 256
+  input_tdim: 1024
+  audioset_pretrain: true        # loads only keys matching in name and shape from audioset_16_16_0.4422.pth (official quirk)
+  input_layout: freq_time
+  resize_to: [1024, 256]

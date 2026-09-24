@@ -1,0 +1,45 @@
+# PC-MCL (BEATs) extended to the standard SPRSound task (7-class). ICBHI recipe unchanged:
+# 16 kHz waveform · 10 s repeat+fade evaluation cycles · bs 32 · dynamic concatenation (11 combinations) · PM pairs.
+# The label space is sprsound7 (6 attributes) — a lossless decomposition of the 7 classes that keeps MCL's attribute sharing (methods/pcmcl_labelspace.py).
+# patient_id_mode keeps the same structural choice as ICBHI (= recording): measured on train, 1,772 recordings · mean 3.76 events ·
+# 89.8% with ≥2, so PM positive pairs exist. For patient-level grouping use patient_id_mode=patient (243 patients · mean 27.4 events).
+name: sprsound_pcmcl_beats
+params:
+  datamodule_name: pcmcl
+  dataset_name: sprsound
+  index_dataset_cls: rsc_toolkit.datasets.index_dataset.IndexDataset
+  project_root: ${hydra:runtime.cwd}
+  data_dir: .datasets/sprsound
+  raw_data_subdir: Classification
+  index_filename: index_cycle.csv
+  sampling_rate: 16000
+  sample_level: cycle
+  desired_length_sec: 10.0
+  pad_type: repeat_fade
+  resample_after_slice: true
+  time_unit: ms_int
+  train_splits: [train]
+  val_splits: [test]
+  test_splits: [test]
+  batch_size: 32
+  num_workers: 8
+  shuffle_train: true
+  drop_last_train: true
+  pin_memory: true
+  features:
+    enabled: true
+    kind: waveform
+  feature_precompute: false
+  specaugment:
+    enabled: false
+  pcmcl:
+    label_space: sprsound7       # 6-attribute decomposition — without it the 4-class converter silently drops labels 4·5·6
+    mode: default
+    mixing_prob: 1.0
+    conditional_mixing: false
+    mixing_label_strategy: additive
+    enable_ssl: true
+    ssl_prob: 0.3
+    patient_id_mode: recording
+    hard_negative_mode: dict_order
+    cache_dir: outputs/pcmcl/cache_sprs

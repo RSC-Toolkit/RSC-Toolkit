@@ -1,0 +1,29 @@
+# DDE-MAE stage 1 (disentangled FT, paper §2.3 (i)) — re-implementation from the paper specification (assumption run). No evaluation, saves final_state.pth.
+#   bs 8, AdamW 2e-4/wd 5e-4 (stated), epochs not specified → 50 assumed, no schedule assumed, Eq. 7 (α1 0.5, α2 0.02).
+#   S3: rsctk ... --config-name dde_icbhi_stage1 seed=1 run.name=icbhi-ddemae-s3-pre-s1
+#   S2: rsctk ... --config-name dde_icbhi_stage1 model.params.variant=s2 seed=1 run.name=icbhi-ddemae-s2-pre-s1
+#   ablation: model.params.use_mi=false (−MI) / model.params.use_siamese=false (−Siamese) / both (Table 2 row 4, inferred)
+defaults:
+  - model: audiomae_dde
+  - data_defaults@data: base
+  - data: icbhi_ddemae
+  - loss: cross_entropy            # unused (the loss is computed inside the model) — interface only
+  - metrics: ddemae_none           # dummy logits → classification metrics are meaningless
+  - optimizer: adamw_ddemae_stage1
+  - trainer: default
+  - callbacks: ddemae_stage1
+  - _self_
+
+seed: 1
+
+trainer:
+  params:
+    max_epochs: 50                 # assumption
+    precision: 32
+    limit_val_batches: 0           # stage 1 has no evaluation
+    num_sanity_val_steps: 0
+
+run:
+  name: icbhi-ddemae-s3-pre
+  group: ddemae
+  tags: [ddemae, icbhi, stage1, paper-spec-reimpl]

@@ -1,0 +1,63 @@
+# Portions of this file come from the original RSC-Toolkit code base by Miika Toikkanen; that code is under the MIT license.
+# See THIRD_PARTY_NOTICES.md. The rest of the file is under the PolyForm Noncommercial License 1.0.0.
+import logging
+import pathlib
+from typing import ClassVar, Optional, Type
+
+
+from rsc_toolkit.datasets.icbhi import ICBHIDataset
+from rsc_toolkit.datasets.icbhi.icbhi_dataset import ICBHIDatasetProcessor
+from rsc_toolkit.datasets import DatasetFactory
+from rsc_toolkit.datasets.base import BaseRSCDatasetDownloader
+
+
+logger = logging.getLogger(__name__)
+
+
+class ToyDatasetDownloader(BaseRSCDatasetDownloader):
+    name: str = "toy"
+
+    def download_dataset(self) -> None:
+        logger.info("Toy dataset is bundled with the repository -> no download.")
+
+    def validate_downloaded_files(self) -> bool:
+        return True # Toy dataset is bundled with the repository, no validation needed.
+
+
+class ToyDatasetProcessor(ICBHIDatasetProcessor):
+    name: str = "toy"
+    raw_data_directory: Optional[str] = None
+
+    def validate_processed_files(self) -> bool:
+        return True # Toy dataset is bundled with the repository, no validation needed.
+
+    @property
+    def data_folder(self):
+        if self.raw_data_directory:
+            p = pathlib.Path(self.raw_data_directory).expanduser().resolve()
+            if p.exists():
+                return p
+            logger.info(
+                "Toy dataset raw_data_directory does not exist (%s); using the bundled sample_data.",
+                p,
+            )
+
+        from rsc_toolkit.paths import project_root_from
+
+        project_root = project_root_from(None)  # repository root in a development checkout (sample_data is not shipped in the wheel)
+        sample_data_path = project_root / "sample_data" / "toy_dataset" / "files"
+        if not sample_data_path.exists():
+            raise ValueError(f"Toy dataset not found at {sample_data_path}. Set raw_data_directory explicitly.")
+        return sample_data_path
+
+
+@DatasetFactory.register_dataset_class("toy")
+class ToyDataset(ICBHIDataset):
+    """
+    Toy Dataset for testing.
+
+    Generated from ICHBI, and relying on ICBHI files (The subset is provided and does not need download).
+    """
+
+    downloader_class: ClassVar[Type[ToyDatasetDownloader]] = ToyDatasetDownloader
+    processor_class: ClassVar[Type[ToyDatasetProcessor]] = ToyDatasetProcessor

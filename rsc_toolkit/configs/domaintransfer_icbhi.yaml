@@ -1,0 +1,34 @@
+# A Domain Transfer Based Data Augmentation Method for Automated Respiratory Classification
+# (Zijie Wang, Zhao Wang; ICASSP 2022 pp.9017-9020) reproduction — **no official code, grade C (re-implementation from the paper specification)**.
+#   Paper setup: rsctk-train --config-name domaintransfer_icbhi run.name=icbhi-domaintransfer-s1 seed=1
+#               (Table 2 last row 'Baseline + augmentation', paper-reported Sp 70.4 / Se 40.2 / Sc 55.3)
+#   Baseline  : ... model.params.baseline=true model.params.mixup_alpha=0 \
+#               data.params.splice_per_class=0 data.params.use_noise=false \
+#               data.params.use_stretch=false data.params.use_pitch=false
+#               (Table 2 first row, paper-reported Sp 68.6 / Se 28.7 / Sc 49.6)
+# Every value not given in the paper is an assumption, with the rationale in each file's docstring/comments:
+#   ResNeSt depth · IBN type/position · spectrogram type · number of epochs · warm-up schedule · splice count ·
+#   stage-2 lr · environmental noise corpus (not applied).
+defaults:
+  - model: resnest_ibn_dt
+  - data_defaults@data: base
+  - data: icbhi_domaintransfer
+  - loss: cross_entropy          # unused — the model computes the weighted soft-CE (+mixup · label smoothing) itself
+  - metrics: icbhi_metrics
+  - optimizer: adam_domaintransfer
+  - trainer: default
+  - callbacks: domaintransfer_paper
+  - _self_
+
+seed: 1
+
+trainer:
+  params:
+    max_epochs: 60                          # stage 1: 50 + stage 2: 10 (assumption — not specified in the paper)
+    precision: 16-mixed
+    reload_dataloaders_every_n_epochs: 1    # splice samples are dropped in stage 2, so the training set shrinks
+
+run:
+  name: icbhi-domaintransfer
+  group: domaintransfer
+  tags: [domaintransfer, icbhi]

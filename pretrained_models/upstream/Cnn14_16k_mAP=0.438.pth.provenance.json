@@ -1,0 +1,12 @@
+{
+ "url": "https://zenodo.org/record/3987831/files/Cnn14_16k_mAP%3D0.438.pth?download=1",
+ "file": "Cnn14_16k_mAP=0.438.pth",
+ "size": 358668570,
+ "sha256": "e2ee543a27919542c2ea03eabaa70b24dcd4e6c8e05621de6b67a94e4c5058e6",
+ "known_size": 358668570,
+ "known_sha256": "e2ee543a27919542c2ea03eabaa70b24dcd4e6c8e05621de6b67a94e4c5058e6",
+ "matches_known": true,
+ "license": "MIT (PANNs, qiuqiangkong/audioset_tagging_cnn) — not bundled or redistributed; download separately",
+ "downloaded_at": "2026-08-26T11:46:25+00:00",
+ "used_by": "rsc_toolkit/models/cnn14_gapaug.py (GaP-Aug, 16 kHz version)"
+}

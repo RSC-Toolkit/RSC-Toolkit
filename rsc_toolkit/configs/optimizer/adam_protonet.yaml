@@ -1,0 +1,12 @@
+# Official main_pytorch_prototype.py:151-153 — Adam lr 1e-3, betas (0.9,0.999), eps 1e-8, wd 0
+# + StepLR(step_size=200, gamma=0.9) stepped **every iteration** (the official code calls scheduler.step() in the training loop).
+name: adam
+params:
+  lr: 1.0e-3
+  weight_decay: 0.0
+lr_scheduler:
+  name: step
+  params:
+    step_size: 200
+    gamma: 0.9
+  interval: step

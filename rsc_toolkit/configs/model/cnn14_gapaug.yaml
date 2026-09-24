@@ -1,0 +1,49 @@
+# GaP-Aug (ICASSP 2024) — original PANNs Cnn14 (AudioSet 16 kHz ckpt) + Algorithm 1. Re-implementation from the paper specification (no code).
+#   method: gapaug | gapaug_nomixup | naive | specaug | patchmask | mixup_only  (mixup: null = method default, true/false override)
+#   Assumption flags (not confirmed by the authors): norm_mode (sample_minmax | sample_minmax_restore | batch_minmax | db_offset | none), mixup_alpha,
+#   w_trip (1.0 = unweighted sum as written in Algorithm 1 line 14; 0.01 = intentional deviation flag based on the sister paper)/triplet_*, feature_preset (paper 400/100 vs panns16k 512/160),
+#   pretrained (16k|32k), window (hann = ckpt training setting | hamming = sister-paper convention), head_input (emb = official Transfer_Cnn14 post-dropout | feat),
+#   triplet_layer (emb | feat | pooled), n_patches/max_*/gamma_per/aug_p, specaug_* (PANNs defaults),
+#   joint_forward (false = 2 forwards as written in Algo. 1 line 13 | true = 1 combined forward, not as written), head_init
+#   Feature definition = PANNs formula (power → slaney mel 50–8000 → 10·log10 dB), assumed
+name: cnn14_gapaug
+params:
+  n_cls: 4
+  method: gapaug
+  mixup: null
+  pretrained: 16k
+  pretrained_path: null
+  sample_rate: 16000
+  feature_preset: paper
+  n_fft: null
+  hop: null
+  n_mels: 64
+  fmin: 50.0
+  fmax: 8000.0
+  window: hann
+  norm_mode: sample_minmax
+  db_offset: 100.0
+  n_patches: 32
+  max_freq: 16
+  max_time: 16
+  min_freq: 1
+  min_time: 1
+  gamma_min: 1.7
+  gamma_max: 2.0
+  gain: 1.0
+  gamma_per: patch
+  aug_p: 1.0
+  specaug_time_width: 64
+  specaug_time_stripes: 2
+  specaug_freq_width: 8
+  specaug_freq_stripes: 2
+  mixup_alpha: 1.0
+  mixup_loss: soft
+  w_trip: 1.0                      # unweighted sum as written in Algo. 1 line 14; 0.01 = deviation flag based on the sister paper
+  triplet_margin: 1.0
+  triplet_p: 2.0
+  triplet_source: xa
+  triplet_layer: emb
+  head_input: emb
+  joint_forward: false             # as written (2 forwards, M(X_mix)·M(X_a)). true = 1 combined forward (speed)
+  head_init: xavier

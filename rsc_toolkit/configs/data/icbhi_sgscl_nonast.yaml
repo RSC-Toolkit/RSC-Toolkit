@@ -1,0 +1,50 @@
+# ICBHI data config for the non-AST (ResNet18/34, EffNet-B0, CNN6) recipes of the sgscl repository.
+# Differences from the AST family:
+#   - fbank normalization uses per-sample mean/std (non-AST branch of the official generate_fbank) → separate cache key
+#   - batch 64 (repo scripts other_architectures/*_ce.sh)
+# SpecAugment is applied per batch by the model; meta labels are ignored by ce, so they are enabled for all.
+name: icbhi_sgscl_nonast
+params:
+  datamodule_name: index
+
+  dataset_name: icbhi
+  index_dataset_cls: rsc_toolkit.datasets.index_dataset.IndexDataset
+  project_root: ${hydra:runtime.cwd}
+  split_file: rsc_toolkit/datasets/icbhi/data/official_split.txt
+  data_dir: .datasets/icbhi
+
+  sampling_rate: 16000
+  sample_level: cycle
+  desired_length_sec: 8.0
+  pad_type: repeat_fade          # official cut_pad_sample_torchaudio (includes fade_out)
+
+  train_splits: [train]
+  val_splits: [test]             # paper protocol: official test evaluation every epoch (best-on-test)
+  test_splits: [test]
+
+  batch_size: 64
+  num_workers: 8
+  shuffle_train: true
+  drop_last_train: true          # official train loader uses drop_last=True
+  pin_memory: true
+
+  features:
+    enabled: true
+    kind: fbank
+    cache_dir: downloaded_datasets/features_cache
+    n_mels: 128
+    target_frames: 798
+    frame_shift: 10
+    window_type: hanning
+    dither: 0.0
+    normalize: true
+    per_sample_stats: true       # non-AST branch: (fbank - mean) / (std * 2)
+
+  feature_precompute: true
+  feature_precompute_batch_size: 8
+  feature_precompute_num_workers: 0
+
+  specaugment:
+    enabled: false               # applied per batch by the model
+
+  meta_label_mode: dev

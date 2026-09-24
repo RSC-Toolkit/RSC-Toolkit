@@ -1,0 +1,29 @@
+# MVST extended to the standard SPRSound task (7-class). **No paper-reported value** — ICBHI recipe unchanged.
+#   Each of the 5 views is trained separately and a fusion MLP is then added on top, so there are 6 runs per seed.
+#   rsctk-train --config-name mvst_sprs model.params.view=16 seed=N run.name=sprs-mvst-v16-sN
+#   ... view=32|64|128|256 → fusion at the end
+defaults:
+  - model: ast_mvst
+  - data_defaults@data: base
+  - data: sprsound_patchmix
+  - loss: cross_entropy
+  - metrics: sprsound_metrics
+  - optimizer: adamw_mvst
+  - trainer: default
+  - callbacks: mvst_paper
+  - _self_
+
+seed: 1
+
+trainer:
+  params:
+    precision: 16-mixed
+
+run:
+  name: sprs-mvst
+  group: mvst
+  tags: [mvst, sprsound, extension]
+
+model:
+  params:
+    n_cls: 7

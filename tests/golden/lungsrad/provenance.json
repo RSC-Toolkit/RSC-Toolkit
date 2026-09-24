@@ -1,0 +1,13 @@
+{
+ "repo": "/raid/doyoung/projects/RSC-Toolkit/outputs/reference/lungsrad",
+ "ckpt": "/raid/doyoung/projects/RSC-Toolkit/pretrained_models/upstream/dass/DASS_medium_v2.pth",
+ "torch": "2.7.0+cu126",
+ "timm": "1.0.28",
+ "torchvision": "0.22.0+cu126",
+ "device": "cuda",
+ "gpu": "NVIDIA RTX A6000",
+ "selective_scan_kernel": true,
+ "patches": [
+  "P1..P6 in docstring (clone unmodified; P3 blur_blocks=∅, P4 symlink cwd, P5 shims, P6 fallback only if --no-kernel)"
+ ]
+}

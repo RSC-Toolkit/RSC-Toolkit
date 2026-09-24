@@ -1,0 +1,29 @@
+# PAFA (BEATs) SPRSound extension
+# **No paper-reported value** — the paper evaluates ICBHI only. This extends it to the standard SPRSound task (2022 inter-patient, 7-class)
+# as a toolkit extension (no paper counterpart), not a reproduction target. The recipe is the paper's ICBHI recipe, unchanged.
+defaults:
+  - model: beats
+  - data_defaults@data: base
+  - data: sprsound_pafa_beats
+  - loss: cross_entropy
+  - metrics: sprsound_metrics
+  - optimizer: adam
+  - trainer: default
+  - callbacks: pafa_paper
+  - _self_
+
+seed: 1
+
+run:
+  name: sprs-beats-pafa
+  group: pafa
+  tags: [pafa, sprsound, extension]
+
+model:
+  params:
+    n_cls: 7
+
+trainer:
+  params:
+    max_epochs: 100
+    precision: 16-mixed

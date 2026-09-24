@@ -1,0 +1,37 @@
+# Full fine-tuning of OPERA-CT, ICBHI 4-class — toolkit standard task (no target value in the paper or repository: OPERA reports only the recording-level T7).
+#   Toolkit-defined recipe: the EMBC frozen recipe with freeze_body off, lr lowered to 5e-5 (the M2D TASLP fine-tuning value) and bs 64. Everything else is the same (150 ep, cosine T40, weighted CE).
+#   Run: rsctk-train --config-name opera_ft_icbhi run.name=icbhi-operact-ft-s1 seed=1
+defaults:
+  - model: opera_ct
+  - data_defaults@data: base
+  - data: icbhi_opera
+  - loss: cross_entropy_weighted_icbhi
+  - metrics: icbhi_metrics
+  - optimizer: adam_m2d
+  - trainer: default
+  - callbacks: opera_eval
+  - _self_
+
+seed: 1
+
+model:
+  params:
+    freeze_body: false
+
+data:
+  params:
+    batch_size: 64
+
+optimizer:
+  params:
+    lr: 5e-5
+
+trainer:
+  params:
+    max_epochs: 150
+    precision: 32
+
+run:
+  name: icbhi-operact-ft
+  group: opera
+  tags: [opera, icbhi, finetune]

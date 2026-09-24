@@ -1,0 +1,6 @@
+# BTS-CARD official script: --optimizer adam --learning_rate 5e-5 --weight_decay 1e-6 (same lr for all 6 param groups).
+# Paper §3.1 uses AdamW 5e-5 → override, e.g. optimizer=adam_btscard optimizer.name=adamw optimizer.params.weight_decay=1e-4 (parse_args default).
+name: adam
+params:
+  lr: 5e-5
+  weight_decay: 1e-6

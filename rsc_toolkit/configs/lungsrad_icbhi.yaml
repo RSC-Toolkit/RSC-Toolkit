@@ -1,0 +1,28 @@
+# Lung-SRAD (DASS-medium) ICBHI 4-class — official code defaults: 50 ep, bs 16 drop_last, AdamW 5e-5/wd 1e-6 + per-epoch cosine, unweighted CE,
+#   MA 0.5, per-sample fbank normalization + SpecAug (icbhi_ast_sup, mean) → Resize inside the model (128→128, 798→1024), fp16 autocast (no GradScaler), best-on-test (Se>5).
+#   Paper (official 60/40 split, 5 seeds): FT 61.06±1.27 → SAR 62.22±1.29 → Lung-SRAD 64.48±0.25 (2-class derived 68.20 / 68.40 / 72.57).
+#   Ladder: model.params.method=ce (FT) | ce_blur (SAR) | patchmix_cl (Lung-SRAD, cl_mode dual; time|freq|2d = Table 2)
+#   Axis definition: model.params.mix_layout=as_code (default, official behavior) | as_paper (Eq.6-7)
+#   Run: rsctk-train --config-name lungsrad_icbhi run.name=icbhi-lungsrad-dual-s1 seed=1 model.params.method=patchmix_cl
+defaults:
+  - model: dass_lungsrad
+  - data_defaults@data: base
+  - data: icbhi_lungsrad
+  - loss: cross_entropy         # the official code does not use --weighted_loss
+  - metrics: lungsrad_metrics   # 4-class + 2-class derived
+  - optimizer: adamw_addrsc     # AdamW lr 5e-5, wd 1e-6 (official misc.py: 'adam' → AdamW)
+  - trainer: default
+  - callbacks: lungsrad_paper
+  - _self_
+
+seed: 1
+
+trainer:
+  params:
+    max_epochs: 50
+    precision: 32               # AMP via autocast inside the model (no GradScaler, as in the official code)
+
+run:
+  name: icbhi-lungsrad
+  group: lungsrad
+  tags: [lungsrad, icbhi, dass]

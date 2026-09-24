@@ -1,0 +1,56 @@
+# DDE-MAE (Wei et al., Interspeech 2025) ICBHI data — re-implementation from the paper specification (assumption run).
+# Stated in the paper: 4 kHz downsampling (§3.1), 60/40 ('Following the official experimental settings' → interpreted as the fixed official split; flagged),
+#           4-class cycles, no augmentation (§3.6 states no mixup/cutmix; SpecAug not mentioned).
+# Not specified → assumed: features = Audio-MAE convention kaldi fbank 128 bins / 10 ms hop / 25 ms window (kaldi default) / hanning / dither 0,
+#           Audio-MAE AudioSet normalization constants (x+4.2677393)/(4.5689974*2), 10.24 s clips (long cycles truncated, short ones zero-padded).
+# [Padding level — assumption, caution] toolkit zero padding is **waveform-level** (processors/audio.py), so the fbank of the padded region is log(eps) ≈ −15.94 → constant −1.2776 after normalization.
+#           Audio-MAE dataset.py's ZeroPad2d pads with 0 at the **feature (fbank) level** → +0.467 after normalization, a different value (the toolkit has no feature-level padding).
+#           ICBHI cycles (mean ~2.7 s) leave most of the 10.24 s as padding: in 20 cached samples, 584–929 of 1024 frames (57–91%) are −1.2776.
+#           Also 10.24 s × 4 kHz = 40,960 samples → 1022 kaldi frames → processors/mel.py fills the last 2 frames with 0.0 (normalized space) (1022+2).
+#           Alternative flags: match desired_length_sec to the cycle length (e.g. 2.56 s → target_frames 256, model img_size (256,128)) or pad_type repeat_fade.
+# [4 kHz × 128 mel — assumption, caution] kaldi window of 100 samples → FFT 128 (65 bins) under 128 mel filters: measured on cached features, 21 of 128 rows are
+#           constant −1.2776 (empty mel filters) in every non-padded frame. Band/resolution mismatch with the pretraining features (16 kHz, 0–8 kHz band) (risk).
+#           Alternative flags: after 4 kHz downsampling, upsample back to 16 kHz (sampling_rate 16000 + 4 kHz low-pass up front = matches the pretraining band) or fewer n_mels.
+# [Prerequisite] feature_precompute_num_workers is 0, so without the cache (downloaded_datasets/features_cache/features/ce42de187845f15c, 6898 items) recomputation runs at 15 s/it
+#           for 2+ hours — if the cache key (feature parameters) changes, pre-fill it once with feature_precompute_num_workers=16 before training.
+name: index
+params:
+  datamodule_name: index
+  dataset_name: icbhi
+  index_dataset_cls: rsc_toolkit.datasets.index_dataset.IndexDataset
+  project_root: ${hydra:runtime.cwd}
+  split_file: rsc_toolkit/datasets/icbhi/data/official_split.txt   # Assumption: fixed official 60/40 split (the paper's wording 'randomly selected' is ambiguous)
+  data_dir: .datasets/icbhi
+
+  sampling_rate: 4000              # stated in paper §3.1
+  sample_level: cycle
+  desired_length_sec: 10.24        # Assumption: Audio-MAE 1024 frames × 10 ms (actually 1022 + 2 frames of 0.0)
+  pad_type: zero                   # Assumption: waveform zero-padding → feature value −1.2776 (differs from +0.467 of Audio-MAE's feature-level ZeroPad2d; alternative: repeat_fade)
+
+  train_splits: [train]
+  val_splits: [test]               # official test evaluation every epoch → best-on-test (no validation set specified in the paper)
+  test_splits: [test]
+
+  batch_size: 8                    # stage 1: 8 per the paper; stage 2 not specified → 8 assumed
+  num_workers: 4
+  shuffle_train: true
+  drop_last_train: false
+
+  features:
+    enabled: true
+    kind: fbank
+    cache_dir: downloaded_datasets/features_cache
+    n_mels: 128
+    target_frames: 1024
+    frame_shift: 10
+    window_type: hanning
+    dither: 0.0
+    normalize: true                # (x - (-4.2677393)) / (4.5689974 * 2) — Audio-MAE AudioSet constants assumed
+    per_sample_stats: false
+
+  feature_precompute: true
+  feature_precompute_batch_size: 8
+  feature_precompute_num_workers: 0
+
+  specaugment:
+    enabled: false                 # the paper mentions no augmentation

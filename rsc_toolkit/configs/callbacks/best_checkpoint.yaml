@@ -1,0 +1,10 @@
+# @package _global_
+# Generic best checkpoint: writes outputs/<run.group>/<run.name>/best.pth·best.json when the ICBHI Score on validation (val_splits) is best.
+# Paper reproduction configs use their own callback bundles (patchmix_paper etc.); this is the default for tutorials and training your own model.
+#   rsc-toolkit-train --config-name default data=toy_fbank model=cnn callbacks=best_checkpoint run.name=my-run run.group=my-group
+trainer:
+  params:
+    callbacks:
+      - _target_: rsc_toolkit.trainer.callbacks.icbhi_best_checkpoint.ICBHIBestScoreCheckpoint
+        dirpath: outputs/${run.group}/${run.name}
+        min_se: -1.0          # no Se gate (set 5.0 etc. only when following a paper protocol)

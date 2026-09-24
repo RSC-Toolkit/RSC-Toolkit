@@ -1,0 +1,11 @@
+# @package _global_
+# DDE-MAE stage 1 (disentangled FT): no evaluation, saves the last-epoch state (final_state.pth — all of E_R·E_I·decoder·q_θ), resumable
+# quirk: the optimizer state of the auxiliary Adam for q_θ (vCLUB) is not in last.ckpt — on resume the q_θ parameters are restored from state_dict but the Adam moments are reset.
+trainer:
+  params:
+    callbacks:
+      - _target_: rsc_toolkit.trainer.callbacks.final_state.FinalStateCheckpoint
+        dirpath: outputs/ddemae/${run.name}
+      - _target_: rsc_toolkit.trainer.callbacks.resume_checkpoint.EpochResumeCheckpoint
+        dirpath: outputs/ddemae/${run.name}
+      - _target_: rsc_toolkit.trainer.callbacks.ddemae_losses.DDEMAELossLogger

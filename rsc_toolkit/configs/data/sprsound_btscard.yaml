@@ -1,0 +1,39 @@
+# For BTS-CARD SPRSound OOD evaluation (not used for training). Equivalent to cell 5 of the official notebook data/Preprocessing_SPRSound.ipynb:
+#   resample to 48 kHz → fade in/out over the whole recording (sr/16; IndexDataset fade=true) → slice the event → 8 s repeat padding + fade_out
+#   (pad_type repeat_fade) → ClapProcessor log-mel (1, 1001, 64).
+# This differs from data/sprsound.yaml (pad_type repeat, no fade_out), so the feature cache is also separate (the cache key contains only the processor settings).
+# The 4-class merge, meta3 and sentences are built by rsc_toolkit/datasets/sprsound_ood.py on top of this datamodule's test set.
+name: index
+params:
+  datamodule_name: index
+
+  dataset_name: sprsound
+  index_dataset_cls: rsc_toolkit.datasets.index_dataset.IndexDataset
+  project_root: ${hydra:runtime.cwd}
+  data_dir: .datasets/sprsound
+  raw_data_subdir: Classification   # recording_path is relative to Classification/
+  index_filename: index_cycle.csv
+
+  sampling_rate: 48000
+  sample_level: cycle
+  desired_length_sec: 8.0
+  pad_type: repeat_fade
+  fade: true
+
+  train_splits: [train]
+  val_splits: [test]
+  test_splits: [test]          # SPRSound 2022 inter-patient test = the paper's 'valid' OOD set (1,429 events)
+
+  batch_size: 8
+  num_workers: 4
+  shuffle_train: false
+
+  features:
+    enabled: true
+    kind: clap
+    cache_dir: downloaded_datasets/features_cache_btscard
+    clap_model_name: laion/clap-htsat-unfused
+
+  feature_precompute: true
+  feature_precompute_batch_size: 8
+  feature_precompute_num_workers: 0

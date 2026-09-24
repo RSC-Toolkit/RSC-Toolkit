@@ -1,0 +1,22 @@
+# PC-MCL AST: AudioSet 10/10 AST (input_fdim=998/input_tdim=128 swapped quirk) → (cls+dist)/2 → Linear(768,3) + PM Linear(768,2).
+#   SpecAugment during training (icbhi_ast_sup, per batch) — on by default in the official code (--nospec unconfirmed → code default kept, assumption). fp16 autocast without GradScaler.
+name: ast_pcmcl
+params:
+  n_cls: 3
+  label_mode: multilabel
+  input_fdim: 998                # desired_length 10 s → 100*10-2 (main.py:257)
+  input_tdim: 128
+  imagenet_pretrain: true
+  audioset_pretrain: true
+  pretrained_path: null          # pretrained_models/upstream/audioset_0.4593.pth
+  input_layout: freq_time
+  enable_ssl: true
+  ssl_weight: 0.1                # assumption (not confirmed by the authors)
+  ssl_separate_training: false
+  ssl_projection_dim: 256
+  loss_combine: code
+  threshold: 0.5
+  specaug: true
+  specaug_policy: icbhi_ast_sup
+  specaug_mask: mean
+  amp: true

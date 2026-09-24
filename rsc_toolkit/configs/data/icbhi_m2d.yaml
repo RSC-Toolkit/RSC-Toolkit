@@ -1,0 +1,43 @@
+# M2D fine-tuning ICBHI data: sclmeta waveform preprocessing (segment resampling · fade · circular padding) + torchaudio dB-mel 80 (400/160, 50–8000 Hz).
+name: icbhi_m2d
+params:
+  datamodule_name: index
+  dataset_name: icbhi
+  index_dataset_cls: rsc_toolkit.datasets.index_dataset.IndexDataset
+  project_root: ${hydra:runtime.cwd}
+  split_file: rsc_toolkit/datasets/icbhi/data/official_split.txt
+  data_dir: .datasets/icbhi
+
+  sampling_rate: 16000
+  sample_level: cycle
+  desired_length_sec: 8.0
+  pad_type: sclmeta
+  fade: false
+  resample_after_slice: true
+
+  train_splits: [train]
+  val_splits: [test]
+  test_splits: [test]
+
+  batch_size: 64                 # --bs 64 (split_iter 4 → sub-batches of 16)
+  num_workers: 8
+  shuffle_train: true
+  drop_last_train: false         # the official DataLoader has no drop_last (last batch 46 → 44 used)
+  pin_memory: true
+
+  features:
+    enabled: true
+    kind: sclmeta_mel
+    cache_dir: downloaded_datasets/features_cache
+    n_mels: 80
+    n_fft: 400
+    win_length: 400
+    hop_length: 160
+    f_min: 50.0
+    f_max: 8000.0
+  feature_precompute: true
+  feature_precompute_batch_size: 8
+  feature_precompute_num_workers: 0
+
+  specaugment:
+    enabled: false

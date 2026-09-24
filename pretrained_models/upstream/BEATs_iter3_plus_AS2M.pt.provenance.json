@@ -1,0 +1,9 @@
+{
+ "url": "https://huggingface.co/SongsongBaobao8694/beats-iter3/resolve/main/BEATs_iter3_plus_AS2M.pt",
+ "official_source": "https://github.com/microsoft/unilm/tree/master/beats (OneDrive: https://1drv.ms/u/s!AqeByhGUtINrgcpke6_lRSZEKD5j2Q?e=A3FpOf)",
+ "note": "The OneDrive link cannot be downloaded by script, so the Hugging Face community mirror is used. No official hash is published; the config (predictor_class/finetuned_model) and parameter count confirm it is the pre-trained iter3+ AS2M checkpoint.",
+ "file": "BEATs_iter3_plus_AS2M.pt",
+ "size": 361499833,
+ "sha256": "d43cbfad4d7b56381c061d7a24774f908d4d94c72961f6eb1d9090ff18cd8d34",
+ "downloaded_at": "2026-08-25T02:20:43.247965+00:00"
+}

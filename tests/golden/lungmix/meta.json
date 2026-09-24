@@ -1,0 +1,50 @@
+{
+ "official_commit": "1cb94a31ecc80c2d9e84ea00d8fb114c70bae7a6",
+ "official_file": "/raid/doyoung/projects/RSC-Toolkit/outputs/reference/lungmix/lungmix.py",
+ "torch": "2.7.0+cu126",
+ "numpy": "2.4.6",
+ "num_threads": 1,
+ "note": "wav1/wav2 of icbhi_pair_9s hold the original waveforms of official ICBHI train cycles unchanged (public data under CC BY 4.0; 6.3 MB)",
+ "cases": [
+  {
+   "name": "synth_diff_len",
+   "seed": 11,
+   "smooth": false,
+   "label": "crackle",
+   "lam": 0.2899219401334903,
+   "max_length": 6626
+  },
+  {
+   "name": "synth_same_len",
+   "seed": 22,
+   "smooth": false,
+   "label": "both",
+   "lam": 0.19327143076421124,
+   "max_length": 7408
+  },
+  {
+   "name": "synth_smooth",
+   "seed": 33,
+   "smooth": true,
+   "label": "wheeze",
+   "lam": 0.7136608896352593,
+   "max_length": 6524
+  },
+  {
+   "name": "synth_both_normal",
+   "seed": 44,
+   "smooth": false,
+   "label": "both",
+   "lam": 0.8101237548424403,
+   "max_length": 2761
+  },
+  {
+   "name": "icbhi_pair_9s",
+   "seed": 55,
+   "smooth": false,
+   "label": "wheeze",
+   "lam": 0.7992158318229905,
+   "max_length": 283918
+  }
+ ]
+}

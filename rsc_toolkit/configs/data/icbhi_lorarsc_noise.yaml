@@ -1,0 +1,56 @@
+# LoRA-RSC data — variant with the 1D interpretation of the waveform noise (per-sample N(0,0.3²)). Usage: --config-name lorarsc_icbhi data=icbhi_lorarsc_noise
+# LoRA-RSC ICBHI data (dataset/icbhi.py, main_icbhi.py:128-133): slice the cycle at the native sr, resample to 16 kHz → Fade(sr/16) → 8 s circular padding + fade_out
+# (= sclmeta preprocessing chain) → HF ASTFeatureExtractor (kaldi fbank 128, 10 ms, hanning, dither 0, AudioSet-constant normalization, truncated to max_length 500 = first 5 s)
+# = toolkit fbank (target_frames 500) (verified to match the golden tests/golden/lorarsc/features.pt).
+# [1D noise interpretation] Waveform noise (unclear): the public code adds np.random.randn(len(audio))×0.3 to a (1,N) 2D array, so len=1 → a scalar DC offset per clip, which
+#   kaldi remove_dc_offset removes, leaving the features unchanged (golden toy, 4 cycles: max|diff| 6.4e-5 = fp32 cast level). **However**, the public code fails at that very
+#   (1,N) call with a kaldi AssertionError (golden orig_2d_call ok=False) → the authors' actual run must have differed from the public code here; made 1D,
+#   it becomes per-sample N(0,0.3²) noise (shared by train/test, cached once). The code cannot settle which → the default config follows the public code (scalar = no effect, no noise);
+#   the 1D interpretation is available as data=icbhi_lorarsc_noise (rsc_toolkit/datasets/lorarsc_noise.py, separate cache dir).
+# Boundaries: the official metadata.csv onset/offset carry floating-point residue (e.g. 7.2360000000000015), while the toolkit index_cycle.csv keeps the 3 decimals of the .txt —
+#   with int(t*sr) truncation, 18 starts and 35 lengths out of 6898 cycles differ by at most 1 sample (inside the 1000-sample fade, negligible).
+# SpecAugment is not used on the AST path. bs 16, drop_last False, official test evaluation every epoch.
+name: icbhi_lorarsc_noise
+params:
+  datamodule_name: index
+  dataset_name: icbhi
+  index_dataset_cls: rsc_toolkit.datasets.lorarsc_noise.LoRARSCNoisyIndexDataset   # per-sample N(0,0.3²) noise, deterministic per sample_id (cached once, shared by train/test)
+  # noise strength and seed are passed as constructor arguments (default 0.3 / 10 = class defaults). If changed, change cache_dir as well.
+  # index_dataset_params: {noise_std: 0.3, noise_seed: 10}
+  project_root: ${hydra:runtime.cwd}
+  split_file: rsc_toolkit/datasets/icbhi/data/official_split.txt   # matches the split column of dataset/metadata.csv file by file
+  data_dir: .datasets/icbhi
+
+  sampling_rate: 16000
+  sample_level: cycle
+  desired_length_sec: 8.0
+  pad_type: sclmeta
+  fade: false                      # the fade is applied directly to the segment by pad_type=sclmeta
+  resample_after_slice: true       # official get_sample: load the segment, then resample
+
+  train_splits: [train]
+  val_splits: [test]               # no validation set — official test evaluation every epoch, best Score (best-on-test, no Se gate)
+  test_splits: [test]
+
+  batch_size: 16                   # train.yaml batch_size_ICBHI
+  num_workers: 8
+  shuffle_train: true
+  drop_last_train: false           # official drop_last=False (259 steps/epoch)
+  pin_memory: true
+
+  features:
+    enabled: true
+    kind: fbank
+    cache_dir: downloaded_datasets/features_cache_lorarsc_noise03   # the cache key only looks at the processor config, so the noisy version needs a separate dir
+    n_mels: 128
+    target_frames: 500             # truncated at HF max_length=500
+    frame_shift: 10
+    window_type: hanning
+    dither: 0.0
+    normalize: true
+  feature_precompute: true
+  feature_precompute_batch_size: 8
+  feature_precompute_num_workers: 8      # segment loading and resampling are the CPU bottleneck (cached once)
+
+  specaugment:
+    enabled: false                 # not used on the official AST path

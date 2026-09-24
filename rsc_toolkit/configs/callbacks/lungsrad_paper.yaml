@@ -1,0 +1,19 @@
+# @package _global_
+# Lung-SRAD training protocol (main.py unchanged): MA 0.5 live average (model+projector), per-epoch cosine (η_min=lr·1e-3, no warmup),
+# best-on-test with best Score && Se > 5 (4-class ICBHIScore) — best.json also records 2-class derived metrics (paper_S_p/paper_S_e/paper_score; preds>0→abnormal), resumable
+trainer:
+  params:
+    callbacks:
+      - _target_: rsc_toolkit.trainer.callbacks.ma_update.LiveWeightAveraging
+        beta: 0.5
+      - _target_: rsc_toolkit.trainer.callbacks.paper_cosine_lr.PaperCosineLR
+        learning_rate: ${optimizer.params.lr}        # single source: the optimizer group (a hard-coded copy would silently ignore CLI sweeps)
+        epochs: ${trainer.params.max_epochs}
+      - _target_: rsc_toolkit.trainer.callbacks.amsd_best_checkpoint.AMSDBestScoreCheckpoint
+        dirpath: outputs/lungsrad/${run.name}
+        score_key: icbhi_score
+        se_key: S_e
+        sp_key: S_p
+        min_se: 5.0
+      - _target_: rsc_toolkit.trainer.callbacks.resume_checkpoint.EpochResumeCheckpoint
+        dirpath: outputs/lungsrad/${run.name}

@@ -1,0 +1,44 @@
+{
+ "date": "2026-08-25",
+ "ckpt": "pretrained_models/upstream/mvst/16/best.pth (16x16 view released by the authors)",
+ "paper_table1_16x16": {
+  "S_p": 78.48,
+  "S_e": 46.62,
+  "icbhi_score": 62.55
+ },
+ "eval": {
+  "seed1_split_920_stems (train 552/test 368, 2685 cycles)": {
+   "S_p": 79.02,
+   "S_e": 52.2,
+   "icbhi_score": 65.61
+  },
+  "seed1_split_with_our_2_extra_txt (922 stems)": {
+   "S_p": 81.59,
+   "S_e": 57.42,
+   "icbhi_score": 69.5
+  },
+  "seed1_split_patchmix_6_extra_txt (926 stems)": {
+   "S_p": 81.11,
+   "S_e": 58.16,
+   "icbhi_score": 69.64
+  },
+  "official_60_40_test (2756 cycles)": {
+   "S_p": 93.73,
+   "S_e": 82.33,
+   "icbhi_score": 88.03
+  }
+ },
+ "conclusion": "Without knowing the authors' folder layout (stems of the auxiliary files), the seed-1 split cannot be restored exactly. The reconstructed-split result is above the paper, and the official test gives 88, which means the released ckpt trained on many official test recordings (patient leakage). The paper-reported value is used only as an approximation (±3).",
+ "fusion_author_ckpts_on_seed1_split_920": {
+  "S_p": 81.03,
+  "S_e": 54.22,
+  "icbhi_score": 67.62,
+  "epoch": 5,
+  "paper_mvst": {
+   "S_p": 81.99,
+   "S_e": 51.1,
+   "icbhi_score": 66.55
+  },
+  "note": "5 author view ckpts -> toolkit feature dump + FuseMLP fusion (fusion.py protocol). Split-mismatch bias in the same direction (+1) as the single views."
+ }
+}

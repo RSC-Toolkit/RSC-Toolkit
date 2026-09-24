@@ -1,0 +1,60 @@
+# AMS-D ICBHI 4-class, official 60/40 split (toolkit goal). Reproduces the official loader/mydataset.py:
+#   clip → kaldi fbank 128/10 ms → (below 798 frames: zero-pad in the raw domain / above: truncate — code fallback) → [train] torchaudio
+#   FrequencyMasking(freqm//2)·TimeMasking(timem//2) with value 0 → normalize (x-mean)/(2·std). Noise/roll from epoch ≥10 are applied by the model (ast_amsd).
+#   dataset_aug (time-domain augmentation correcting class imbalance, paper §3.1; generation script and content unknown) is **not used** → known gap vs. the paper-reported values.
+#
+# Clip length — assumption (not confirmed by the authors): the official code has no clip-generation script. The paper §3.1 "16 kHz resample + 8 s loop-pad" is the default
+#   (desired_length_sec 8.0, pad_type repeat = repeat padding without fade; 8 s = exactly 798 frames, so the code's fbank zero-padding branch never runs).
+#   Second assumption (no waveform padding, silent zero-padding in the fbank domain, pad value +0.467):  data.params.desired_length_sec=null data.params.pad_type=zero
+#   AMSDDataModule automatically separates the cache into cache_dir/pad-<pad_type>-<desired_length_sec>-fade<fade>/ (switching assumptions regenerates it, tens of seconds with 8 workers).
+# Assumed values (config_train.yaml is missing): amsd_freqm 48 / amsd_timem 192 (AST AudioSet convention; effectively 24/96 after the code's //2) — paper §3.1 does not mention
+#   SpecAugment, so 0/0 is an equally valid candidate (data.params.amsd_freqm=0 data.params.amsd_timem=0). mean/std not specified in the paper → AST constants assumed.
+name: icbhi_amsd
+params:
+  datamodule_name: amsd
+
+  dataset_name: icbhi
+  index_dataset_cls: rsc_toolkit.datasets.index_dataset.IndexDataset
+  project_root: ${hydra:runtime.cwd}
+  split_file: rsc_toolkit/datasets/icbhi/data/official_split.txt
+  data_dir: .datasets/icbhi
+
+  sampling_rate: 16000
+  sample_level: cycle
+  desired_length_sec: 8.0        # Assumption: paper §3.1 8 s loop-pad. null assumes the code fallback (fbank zero-padding)
+  pad_type: repeat               # paper 'loop-padded' = repeat padding (no fade)
+  fade: false                    # the official loader has no fade
+
+  train_splits: [train]
+  val_splits: [test]             # official test evaluation every epoch (toolkit protocol, best-on-test; the official code's train 80/20 valid selection and epoch 45 are documented only)
+  test_splits: [test]
+
+  batch_size: 24
+  num_workers: 8
+  shuffle_train: true
+  drop_last_train: true          # myloader.py:161 drop_last=True
+  pin_memory: true
+
+  features:
+    enabled: true
+    kind: fbank
+    cache_dir: downloaded_datasets/features_cache_amsd   # no fade, no normalize → dedicated cache; the actual path is under /pad-*/ (AMSDDataModule)
+    n_mels: 128
+    target_frames: 798
+    frame_shift: 10
+    window_type: hanning
+    dither: 0.0
+    normalize: false             # raw fbank cache — AMSDFeatureDataset normalizes after masking
+
+  feature_precompute: true
+  feature_precompute_batch_size: 8
+  feature_precompute_num_workers: 8   # speeds up the first cache build — with 0 workers each cycle loads the whole recording, ~2 h
+
+  specaugment:
+    enabled: false               # differs from the toolkit SpecAugment policy — uses the torchaudio masking of AMSDFeatureDataset
+
+  amsd_freqm: 48                 # assumption (not confirmed by the authors; not mentioned in the paper → 0 is also a candidate)
+  amsd_timem: 192                # assumption (not confirmed by the authors; not mentioned in the paper → 0 is also a candidate)
+  amsd_mean: -4.2677393          # assumption (AST AudioSet constant; not specified in the paper)
+  amsd_std: 4.5689974            # assumption
+  amsd_return_index: true        # 4th element of the train batch = sample index (PS-KD buffer, noise seed)

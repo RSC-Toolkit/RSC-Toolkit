@@ -1,0 +1,15 @@
+# BEATs fine-tuning of the PAFA paper (Interspeech 2025) — faithful port of the official code (verified against goldens).
+#   BEATs + CE (SFT): model.params.method=ce
+#   BEATs + PAFA    : model.params.method=pafa (default; values from the script beats_pafa.sh)
+name: beats
+params:
+  n_cls: 4
+  method: pafa
+  w_ce: 1.0
+  w_pafa: 1.0
+  lambda_pcsl: 50.0
+  lambda_gpal: 0.0005
+  hidden_dim: null
+  output_dim: 768
+  norm_type: ln
+  proj_type: end2end

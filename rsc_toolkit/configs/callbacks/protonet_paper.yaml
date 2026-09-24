@@ -1,0 +1,16 @@
+# @package _global_
+# Prototype paper training-protocol callbacks:
+#   - injects the datamodule's balanced class weights into the model (official calculate_class_weight)
+#   - StepLR(step_size=200, gamma=0.9) — the official code calls scheduler.step() every iteration, so it is stepped per step
+#   - the official code evaluates only the last-iteration (10000) model → final_* is the primary result, best-on-test reported alongside
+trainer:
+  params:
+    callbacks:
+      - _target_: rsc_toolkit.trainer.callbacks.protonet_class_weight.ProtoNetClassWeight
+      - _target_: rsc_toolkit.trainer.callbacks.icbhi_best_checkpoint.ICBHIBestScoreCheckpoint
+        dirpath: outputs/protonet/${run.name}
+        min_se: 0.0
+      - _target_: rsc_toolkit.trainer.callbacks.gapaug_final_metrics.FinalMetricsToBestJson
+        dirpath: outputs/protonet/${run.name}
+      - _target_: rsc_toolkit.trainer.callbacks.resume_checkpoint.EpochResumeCheckpoint
+        dirpath: outputs/protonet/${run.name}

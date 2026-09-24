@@ -1,0 +1,60 @@
+# BTS-CARD **trained and evaluated directly on the standard SPRSound task (2022 inter-patient, 7-class)** (SPR→SPR).
+#
+# Why a separate config — the ICBHI-trained model is evaluated on SPRSound only as **zero-shot OOD** (7→4 merge), which gives no
+# "train on SPRSound → evaluate on SPRSound" value. This config provides it.
+# The OOD value has a paper-reported value (61.96±1.50), so it is **kept as is** and reported alongside.
+#
+# Paper-reported value: none — the paper uses SPRSound only for OOD. This is therefore not a reproduction target but a **toolkit extension (no paper counterpart)**.
+#
+# ── Two unavoidable differences when moving to SPRSound (take them into account when interpreting results) ───────────────
+# ① **The metadata text is effectively dead — there are only 8 distinct sentences (44 on ICBHI).**
+#    SPRSound has no adult_BMI·child_weight·child_height at all. The empty slots keep the official missing-value marker -1
+#    (no values are invented), and sentences are generated with the dialect the authors themselves used for SPRSound OOD
+#    (util/sprsound_util.py → meta_dialect=sprsound). Using the ICBHI vocabulary would put non-existent locations such as
+#    "right anterior chest" for SPRSound p1~p4, and even a non-existent stethoscope, into the sentence.
+#    **Moreover, among the remaining 3 fields, age is constant.** The authors' age split is `age >= 19 → adult`
+#    (the ICBHI adult/pediatric boundary), but SPRSound is a pediatric cohort with measured ages 0.20~16.20, so **all 6,656 are pediatric**.
+#    The stethoscope is single and drops out of the sentence, so only **sex and location vary → 2 x 4 = 8 sentences**.
+#    BTS-family methods are text-conditioned and the NDE branch **predicts the label from the sentence alone**, so the upper bound
+#    on the information that branch can carry drops to log2(8) = 3 bits. Values from this setting should be read not as "does BTS-CARD work on SPRSound"
+#    but as "**BTS-CARD with almost no metadata text**".
+#    Splitting the age into finer pediatric bins would restore information, but that would be a new formula found in neither the paper nor the authors' code
+#    (breaking official-code parity), so it is not the default — it can be added as a variant if needed.
+# ② **The stethoscope adversarial term becomes ineffective.** All 8,085 SPRSound events come from a single stethoscope (Yunting2), so
+#    the device discriminator has nothing to distinguish. n_dev=1 · lambda_dev=0 **make it explicit that the term is off**.
+#    The location discriminator (n_loc=4, p1~p4) still works, so half of the method remains active.
+#    (For the same reason SG-SCL and RespireNet are not extended to SPRSound at all — there the stethoscope is the whole method.)
+#
+# Recipe: BTS-CARD's official ICBHI script unchanged (15 ep, bs 8 drop_last, adam 5e-5/wd 1e-6, cosine, MA 0.5, AMP, unweighted CE).
+#
+#   rsctk-train --config-name btscard_sprs seed=N run.name=sprs-btscard-sN
+defaults:
+  - model: bts_card
+  - data_defaults@data: base
+  - data: sprsound_btscard_train
+  - loss: cross_entropy        # ICBHI BTS-CARD uses unweighted CE → SPRS stays unweighted
+  - metrics: sprsound_metrics  # 7-class Se/Sp/Score (icbhi_score key → compatible with best selection in the btscard_paper callback)
+  - optimizer: adam_btscard
+  - trainer: default
+  - callbacks: btscard_paper
+  - _self_
+
+seed: 1
+
+trainer:
+  params:
+    max_epochs: 15             # official script (paper: 30 — an ICBHI A/B check showed the two settings are practically equivalent)
+    precision: 16-mixed
+
+run:
+  name: sprs-btscard
+  group: btscard
+  tags: [btscard, bts, sprsound, extension]
+
+model:
+  params:
+    n_cls: 7
+    meta_dialect: sprsound     # see ① above
+    n_loc: 4                   # SPRSound recording locations p1~p4
+    n_dev: 1                   # single stethoscope (Yunting2)
+    lambda_dev: 0.0            # see ② above — explicitly disables the device adversarial term

@@ -1,0 +1,89 @@
+[build-system]
+# `license` as a PEP 639 SPDX expression and `license-files` are accepted from setuptools 77 on;
+# a --no-build-isolation build with an older version fails with "project.license must be valid exactly by one definition".
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "rsc-toolkit"
+version = "0.1.0"
+description = "Respiratory Sound Classification Toolkit"
+readme = "README.md"
+requires-python = ">=3.9"
+# Own code: PolyForm Noncommercial 1.0.0. Files with ported third-party code keep their original licenses
+# (see THIRD_PARTY_NOTICES.md and LICENSES/).
+license = "PolyForm-Noncommercial-1.0.0 AND MIT AND BSD-3-Clause AND Apache-2.0 AND CC-BY-NC-4.0 AND CC-BY-NC-SA-4.0 AND LicenseRef-NTT-Software-License-Agreement-for-Evaluation"
+license-files = ["LICENSE", "THIRD_PARTY_NOTICES.md", "LICENSES/*"]
+
+dependencies = [
+    "pydantic",
+    "librosa",
+    "tqdm",
+    "platformdirs",
+    "pandas",
+
+    # Below versions must be compatible with eachother
+    "torch==2.7.0",
+    "torchaudio==2.7.0", # before torchcodec change
+    "torchvision==0.22.0",
+    "torchcodec",
+]
+
+[project.optional-dependencies]
+trainer = [
+    "hydra-core",
+    "lightning",
+    "tensorboard",
+]
+models = [
+    "timm>=0.4.5",
+    "transformers",
+    # RespireNet feature pipeline (cv2 resize/color conversion, librosa kaiser_best resampling)
+    "opencv-python-headless",
+    "resampy",
+    # Log-mel front end of Prototype (protonet). models/protonet.py:43 imports it at module top level, so
+    # without it the model registration is silently skipped (ModelFactory.register_models turns the ImportError into a warning).
+    "torchlibrosa",
+]
+# Needed only for the ResNet50 SimCLR (SSL) weights.
+# models/backbone/resnet.py:129-133 imports it lazily inside the function and raises a RuntimeError with guidance if missing,
+# so no other code path is affected; hence a separate extra instead of `models`.
+ssl-weights = [
+    "lightning-bolts",
+]
+# For running the tutorial notebook (notebooks/tutorial.ipynb) and its CI check.
+notebook = [
+    "jupyter",
+    "nbconvert",
+    "nbformat",
+    "ipykernel",
+    "gdown",          # scripts/download_paper_weights.py (public paper weights)
+]
+dev = [
+    "pytest",
+    "black",
+    "flake8",
+    "isort",
+]
+
+[project.scripts]
+rsc-toolkit-train = "rsc_toolkit.train:main"
+rsc-toolkit-eval = "rsc_toolkit.evaluate:main"
+rsc-toolkit = "rsc_toolkit.cli:main"
+rsctk = "rsc_toolkit.cli:main"
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["rsc_toolkit*"]
+
+[tool.setuptools.package-data]
+# Bundled data read by runtime code. Globs are relative to each package directory.
+# (tests/unit/test_packaging.py checks that these globs match actual files)
+rsc_toolkit = ["configs/**/*.yaml", "configs/**/*.yml"]
+"rsc_toolkit.datasets.icbhi" = ["data/*.txt"]
+"rsc_toolkit.processors" = ["data/*.npy"]
+"rsc_toolkit.datasets.sprsound" = ["data/metadata.csv"]
+"rsc_toolkit.datasets.hflungv1" = ["data/metadata.csv"]

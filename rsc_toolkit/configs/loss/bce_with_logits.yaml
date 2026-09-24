@@ -1,0 +1,3 @@
+# PC-MCL 3-label main loss: torch.nn.BCEWithLogitsLoss() (wa976/PC-MCL main.py:421, no weights)
+name: bce_with_logits
+params: {}

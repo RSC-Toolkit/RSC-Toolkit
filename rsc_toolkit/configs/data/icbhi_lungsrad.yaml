@@ -1,0 +1,47 @@
+# Lung-SRAD ICBHI data = copy of icbhi_patchmix + batch 16 + per_sample_stats (official icbhi_util.py:241-245 (x−mean)/(2·std), main.py:227 bs16 drop_last).
+# SpecAugment (icbhi_ast_sup, mean, randn gate) is applied here by the datamodule — not inside the model. Resize(1024,128) is inside the model.
+name: icbhi_lungsrad
+params:
+  datamodule_name: index
+
+  dataset_name: icbhi
+  index_dataset_cls: rsc_toolkit.datasets.index_dataset.IndexDataset
+  project_root: ${hydra:runtime.cwd}
+  split_file: rsc_toolkit/datasets/icbhi/data/official_split.txt
+  data_dir: .datasets/icbhi
+
+  sampling_rate: 16000
+  sample_level: cycle
+  desired_length_sec: 8.0
+  pad_type: repeat_fade          # official cut_pad_sample_torchaudio (includes fade_out)
+
+  train_splits: [train]
+  val_splits: [test]             # paper protocol: official test evaluation every epoch (best-on-test)
+  test_splits: [test]
+
+  batch_size: 16
+  num_workers: 8
+  shuffle_train: true
+  drop_last_train: true          # official train loader uses drop_last=True
+  pin_memory: true
+
+  features:
+    enabled: true
+    kind: fbank
+    cache_dir: downloaded_datasets/features_cache
+    n_mels: 128
+    target_frames: 798           # 8 s -> 798 kaldi fbank frames (official h=798)
+    frame_shift: 10
+    window_type: hanning
+    dither: 0.0
+    normalize: true
+    per_sample_stats: true      # (x − mean) / (2·std) per sample (non-AST branch)
+
+  feature_precompute: true
+  feature_precompute_batch_size: 8
+  feature_precompute_num_workers: 0
+
+  specaugment:
+    enabled: true
+    policy: icbhi_ast_sup
+    mask: mean

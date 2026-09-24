@@ -1,0 +1,7 @@
+# patch-mix --weighted_loss applied to SPRSound: CE weighted by the normalized 1/(n/sum) (same formula as the ICBHI version).
+# class_nums is the SPRSound 2022 inter-patient **train** distribution, 7-class (sum 6,656) — counted on the actual data.
+#   Normal 5159 / Fine Crackle 912 / Wheeze 452 / Coarse Crackle 49 / Wheeze+Crackle 30 / Rhonchi 39 / Stridor 15
+# The counterpart that keeps "the same recipe" in the SPRS extensions of papers that use weighted CE on ICBHI (AST SFT · LungAdapter).
+name: cross_entropy_from_counts
+params:
+  class_nums: [5159, 912, 452, 49, 30, 39, 15]

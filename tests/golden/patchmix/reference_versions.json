@@ -1,0 +1,6 @@
+{
+ "torch": "2.13.0+cu130",
+ "timm": "0.4.5",
+ "repo": "https://github.com/raymin0223/patch-mix_contrastive_learning",
+ "commit": "836b09f"
+}

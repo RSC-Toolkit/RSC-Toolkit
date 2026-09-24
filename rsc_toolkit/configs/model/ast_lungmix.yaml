@@ -1,0 +1,42 @@
+# Lungmix (ICASSP 2025) AST — re-implementation from the paper specification (see the assumptions and flags in the models/ast_lungmix.py docstring).
+#   Baseline (w/o Mixup): model.params.variant=none
+#   Main method         : variant=non_linear + apply_loudness_mask=true (paper Eq. 3 = Table I 'Lungmix (non-linear)')
+#   Code version        : apply_loudness_mask=false = official lungmix() output (random mask only) = Table I 'Lungmix (w/o loudness)' row
+#                       (§III-C "without the loudness mask (using only a random mask)"; unconfirmed). The default in this file is
+#                       false (official code), and the experiment configs (lungmix_icbhi/sprs) override it to true.
+#   Others              : linear | combined | label_preservation | vanilla_mixup | lungmix_patchmix
+name: ast_lungmix
+params:
+  n_cls: 4
+  fstride: 10                    # Assumption: stride not specified → AudioSet 10/10 ckpt
+  tstride: 10
+  input_fdim: 128                # original AST layout (no 12×101 pos_embed interpolation)
+  input_tdim: 1024
+  pool: mean_all                 # Assumption: mean over all hidden states including cls/dist (mean_patches excludes them)
+  use_bn: true                   # BatchNorm1d(768) → Linear(n_cls)
+  head: bn_linear                # Assumption: BN replaces the LayerNorm of the original AST classifier (bn_ln_linear = BN → LN → Linear)
+  specaugment:
+    enabled: false               # not mentioned in the paper → off (when on, toolkit SpecAugment after fbank; data.specaugment has no effect on the waveform path)
+    policy: icbhi_ast_sup
+    mask: mean
+  sample_rate: 16000
+  n_mels: 128
+  target_frames: 1024            # 9 s ≈ 898 frames + zero-padding (assumption)
+  fbank_pad_before_norm: true    # Assumption: original AST order (normalize after padding)
+  variant: non_linear
+  apply_loudness_mask: false     # false = official lungmix() output (random mask only; official code = 'w/o loudness' row) / true = paper Eq. 3 ('non-linear' row)
+  overlap: lam                   # overlap value of random∧loudness on the Eq. 3 path (assumption): lam = mask returned by the official code ((1+λ)−1) | one = Eq. 8 OR interpretation
+  smooth: false                  # official code option (not in the paper)
+  mix_prob: 1.0                  # Assumption: mixing probability for every batch (randperm pairing and replacement of the original are fixed, no flag)
+  out_len_sec: 9.0
+  fit_mode: cut_first            # Assumption: repeat the mixed output (max_len+shift2), then cut to the first 9 s (cut_last | random_crop | none)
+  mix_stage: raw                 # Assumption (default, main run): mix only the original segments, then fit to 9 s (suggested by the maxlen(x_i,x_j) notation in paper Eq. 3 and the length-matching structure of the official function;
+                                 #   requires data lungmix.emit_valid_len=true) | padded = mix waveforms padded to 9 s (alternative — output expected to contain 25% constant padding)
+  vanilla_alpha: 0.5             # Beta(α,α) of vanilla_mixup (assumption: matches the 0.5 of the official lungmix)
+  lambda1: 1.0
+  lambda2_mode: ratio            # combined: λ2 = L_CE.detach()/L_mix.detach() (assumption) | fixed
+  lambda2: 1.0
+  mix_beta: 1.0                  # patch_mix β of lungmix_patchmix
+  patchmix_label_mode: mixup     # labels of lungmix_patchmix (assumption): mixup (PatchMixLoss interpolation) | preserve (CE(y_or), label-preserving combination of §III-C)
+  time_domain: false
+  mix_num_threads: 1             # CPU mixing threads (no numerical effect; 64 threads take 5–7 s per batch on a loaded server)

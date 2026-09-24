@@ -1,0 +1,18 @@
+# @package _global_
+# LungAdapter training protocol — **assumed** to be inherited per the paper's 'mostly follows [13]' (Bae Patch-Mix):
+#   - MA 0.5 live average (Bae --ma_update --ma_beta 0.5; harmless since frozen parameters do not change) — remove it from callbacks=... to disable
+#   - per-epoch cosine LR (paper: 'cosine scheduling'; eta_min = lr·0.1³ and no warmup assumed from Bae), lr 5e-4 (stated in the paper)
+#   - best-on-test: best Score && Se > 5 (Bae validate rule; model selection not specified in the paper)
+trainer:
+  params:
+    callbacks:
+      - _target_: rsc_toolkit.trainer.callbacks.ma_update.LiveWeightAveraging
+        beta: 0.5
+      - _target_: rsc_toolkit.trainer.callbacks.paper_cosine_lr.PaperCosineLR
+        learning_rate: ${optimizer.params.lr}        # single source: the optimizer group (a hard-coded copy would silently ignore CLI sweeps)
+        epochs: ${trainer.params.max_epochs}
+      - _target_: rsc_toolkit.trainer.callbacks.icbhi_best_checkpoint.ICBHIBestScoreCheckpoint
+        dirpath: outputs/lungadapter/${run.name}
+        min_se: 5.0
+      - _target_: rsc_toolkit.trainer.callbacks.resume_checkpoint.EpochResumeCheckpoint
+        dirpath: outputs/lungadapter/${run.name}

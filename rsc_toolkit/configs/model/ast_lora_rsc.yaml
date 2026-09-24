@@ -1,0 +1,15 @@
+# LoRA-RSC (ICASSP 2025): HF AST (AudioSet 10/10, max_length 500, pos_embed zero and frozen) + K,V LoRA (768→8→768, scaling 8/96) + final LN + Linear(768→4).
+# 299,524 trainable parameters (README 0.299M). method=full_ft is the README baseline (85.71M; differs from the 85.74M stated in the README).
+name: ast_lora_rsc
+params:
+  n_cls: 4
+  method: lora                   # lora | full_ft | linear (requires overriding optimizer.params.lr=5e-5 for full_ft and optimizer.params.lr=1e-3 for linear — official train.yaml; for linear both backbone and head groups use 1e-3, equivalent to a single group)
+  max_length: 500                # train.yaml max_len_AST_ICBHI — only the first 500 feature frames (5 s) are used (official quirk)
+  pretrained_dir: null           # default pretrained_models/upstream/hf/ast-finetuned-audioset-10-10-0.4593
+  lora_reduction: 96             # --reduction_rate_lora (actual rank = round(768/96) = 8)
+  lora_alpha: 8                  # --alpha_lora (scaling = 8/96)
+  lora_targets: [k, v]           # official K,V (the PETL_AST original and common practice use Q,V)
+  lora_init: hf_fast_init        # transformers 4.28.1 from_pretrained fast-init quirk: both down/up use trunc_normal(0.02). 'paper' = zeros/kaiming
+  pos_embed: zeros               # official quirk (AudioSet pos_embed not loaded). 'interpolate' is a toolkit extension
+  final_output: CLS
+  attn_implementation: eager

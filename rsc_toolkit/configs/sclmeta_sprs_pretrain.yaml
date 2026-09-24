@@ -1,0 +1,32 @@
+# The paper reports 200 ep for SPRS, but the code default (args.py --epochs 400) is followed (official-code parity).
+# SCL-metadata pretraining run (SCL / M-SCL): 400 ep, bs 128, Adam 1e-4/wd 1e-4 + cosine (T_max 40), no evaluation, saves the last state.
+#   M-SCL : rsctk-train --config-name sclmeta_icbhi_pretrain run.name=sprs-sclmeta-mscl-pre-s1 seed=1
+#   SCL   : ... model.params.method=scl run.name=sprs-sclmeta-scl-pre-s1
+defaults:
+  - model: cnn6_sclmeta
+  - data_defaults@data: base
+  - data: sprsound_sclmeta
+  - loss: cross_entropy   # unused (SupCon only)
+  - metrics: sprsound_metrics
+  - optimizer: adam_sclmeta
+  - trainer: default
+  - callbacks: sclmeta_sprs_pretrain
+  - _self_
+
+seed: 1
+model:
+  params:
+    n_cls: 7
+    method: mscl
+
+trainer:
+  params:
+    max_epochs: 400
+    precision: 32
+    limit_val_batches: 0        # the official pretraining has no evaluation
+    num_sanity_val_steps: 0
+
+run:
+  name: sprs-sclmeta-mscl-pre
+  group: sclmeta
+  tags: [sclmeta, sprsound, pretrain]

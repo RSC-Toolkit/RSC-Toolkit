@@ -1,0 +1,55 @@
+# QLung ICBHI data config — same feature chain as icbhi_patchmix/icbhi_sgscl (shared cache) + AQS float as the 3rd batch element.
+#   AQS variants: data.params.qlung.entropy_source=rms (default, code bug kept) | entropy (code formula + entropy, Figure 1)
+#             data.params.qlung.formula=code (default) | paper (paper Eq. 5 taken literally)
+name: icbhi_qlung
+params:
+  datamodule_name: qlung
+
+  dataset_name: icbhi
+  index_dataset_cls: rsc_toolkit.datasets.qlung_data.QLungAQSIndexDataset
+  project_root: ${hydra:runtime.cwd}
+  split_file: rsc_toolkit/datasets/icbhi/data/official_split.txt
+  data_dir: .datasets/icbhi
+
+  sampling_rate: 16000
+  sample_level: cycle
+  desired_length_sec: 8.0
+  pad_type: repeat_fade          # official cut_pad_sample_torchaudio (includes fade_out) — AQS is also computed from this waveform
+
+  train_splits: [train]
+  val_splits: [test]             # paper protocol: official test evaluation every epoch (best-on-test)
+  test_splits: [test]
+
+  batch_size: 8
+  num_workers: 8
+  shuffle_train: true
+  drop_last_train: true          # official train loader uses drop_last=True
+  pin_memory: true
+
+  features:
+    enabled: true
+    kind: fbank
+    cache_dir: downloaded_datasets/features_cache
+    n_mels: 128
+    target_frames: 798
+    frame_shift: 10
+    window_type: hanning
+    dither: 0.0
+    normalize: true
+
+  feature_precompute: true
+  feature_precompute_batch_size: 8
+  feature_precompute_num_workers: 0
+
+  specaugment:
+    enabled: false               # applied per batch by the model (ast_qlung)
+
+  qlung:
+    alpha: 0.7               # --quality_alpha
+    beta: 0.3                # --quality_beta
+    entropy_source: rms          # icbhi_dataset.py:177 bug kept (rms in place of H) | entropy (literal; 71 silent cycles give nan) | entropy_nanmean
+    formula: code                # normalization formula of get_acoustic_features.py
+    cache_dir: downloaded_datasets/aqs_cache
+    precompute: true
+    precompute_num_workers: 8
+    attach_val: true

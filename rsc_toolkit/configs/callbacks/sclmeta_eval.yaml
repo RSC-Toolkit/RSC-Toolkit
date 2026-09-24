@@ -1,0 +1,10 @@
+# @package _global_
+# SCL-metadata evaluation protocol: best test Sc every epoch (no Se gate — min_se effectively -inf), resumable
+trainer:
+  params:
+    callbacks:
+      - _target_: rsc_toolkit.trainer.callbacks.icbhi_best_checkpoint.ICBHIBestScoreCheckpoint
+        dirpath: outputs/sclmeta/${run.name}
+        min_se: -1.0
+      - _target_: rsc_toolkit.trainer.callbacks.resume_checkpoint.EpochResumeCheckpoint
+        dirpath: outputs/sclmeta/${run.name}

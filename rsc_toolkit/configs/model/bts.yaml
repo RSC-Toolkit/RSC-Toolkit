@@ -1,0 +1,13 @@
+# Metadata-text fusion CLAP of the BTS paper (Interspeech 2024) — faithful port of the official code (loading the authors' ckpt reproduces the README numbers).
+#   BTS (meta all) : default
+#   meta combination ablation : model.params.meta_mode=age_sex_loc etc. (paper Table 5)
+#   Audio-CLAP baseline : model=audioclap (audio only)
+name: bts
+params:
+  n_cls: 4
+  pretrained_name: laion/clap-htsat-unfused
+  final_feat_dim: 512
+  clap_final: concat
+  te_alpha: 0.5
+  meta_mode: all
+  text_max_length: 64

@@ -1,0 +1,13 @@
+# PC-MCL SPRSound: train batch labels are 6-attribute floats, so there are no train metrics.
+# For validation the model returns 6-sigmoid → decoding → 7-class one-hot (B,7), so the existing ICBHIScore (argmax) is used as is.
+train: []
+
+val:
+  - name: topk_accuracy
+    params:
+      topk: [1]
+  - name: icbhi_score
+    params:
+      num_classes: 7
+      normal_index: 0
+      topk: 1

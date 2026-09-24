@@ -1,0 +1,30 @@
+# Frozen OPERA-CT + Tfm head, ICBHI 4-class (NTT EMBC'25 arXiv 2504.18004; eval-audio-repr app/icbhi_sprs/ev_icbhi_opera.sh):
+#   150 ep, bs 256, Adam 3e-3/wd 1e-4 + cosine (T_max 40, eta 1e-6), weighted CE, SpecAug (20/40, shared across the batch), fp32, best-on-test Score.
+#   Target (EMBC table): Sp/Se/Score 48.97±1.21 (5 repetitions, seeds not fixed — seeds 1~5 here).
+#   Run: rsctk-train --config-name opera_embc_icbhi run.name=icbhi-operact-frozen-s1 seed=1
+defaults:
+  - model: opera_ct
+  - data_defaults@data: base
+  - data: icbhi_opera
+  - loss: cross_entropy_weighted_icbhi
+  - metrics: icbhi_metrics
+  - optimizer: adam_m2d
+  - trainer: default
+  - callbacks: opera_eval
+  - _self_
+
+seed: 1
+
+optimizer:
+  params:
+    lr: 3e-3
+
+trainer:
+  params:
+    max_epochs: 150
+    precision: 32
+
+run:
+  name: icbhi-operact-frozen
+  group: opera
+  tags: [opera, icbhi, frozen]

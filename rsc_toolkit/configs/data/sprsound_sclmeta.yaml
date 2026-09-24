@@ -1,0 +1,44 @@
+# SCL-metadata SPRSound (2022 inter-patient test) data: slice event segments at the native sr (8 kHz) with integer-ms onsets, resample to 16 kHz
+# → fade in/out → 8 s circular padding + fade_out → cached torchaudio dB-mel (64). 7-class (Normal/Fine Crackle/Wheeze/Coarse Crackle/Wheeze+Crackle/Rhonchi/Stridor).
+# Uses the split column (train/test) of the index — test = 2022 inter_test (event level · 2022 · inter-patient).
+name: sprsound_sclmeta
+params:
+  datamodule_name: index
+  dataset_name: sprsound
+  index_dataset_cls: rsc_toolkit.datasets.index_dataset.IndexDataset
+  project_root: ${hydra:runtime.cwd}
+  data_dir: .datasets/sprsound
+  raw_data_subdir: Classification   # recording_path is relative to Classification/
+  index_filename: index_cycle.csv
+
+  sampling_rate: 16000
+  sample_level: cycle
+  desired_length_sec: 8.0
+  pad_type: sclmeta
+  fade: false
+  resample_after_slice: true
+  time_unit: ms_int              # official dataset.py:202 — onset*int(sr/1000)
+
+  train_splits: [train]
+  val_splits: [test]
+  test_splits: [test]
+
+  batch_size: 128
+  num_workers: 8
+  shuffle_train: true
+  drop_last_train: false
+  pin_memory: true
+
+  features:
+    enabled: true
+    kind: sclmeta_mel
+    cache_dir: downloaded_datasets/features_cache
+    n_mels: 64
+  feature_precompute: true
+  feature_precompute_batch_size: 8
+  feature_precompute_num_workers: 0
+
+  specaugment:
+    enabled: false
+
+  meta_label_mode: sa_sprs       # gender x age_group (<5 / ≥5 years)
